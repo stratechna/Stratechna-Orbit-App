@@ -1,0 +1,31 @@
+[
+  {
+    "url": "https://github.com/frappe/erpnext",
+    "branch": "version-16"
+  },
+  {
+    "url": "https://github.com/frappe/hrms",
+    "branch": "version-16"
+  },
+  {
+    "url": "https://github.com/frappe/telephony",
+    "branch": "develop"
+  },
+  {
+    "url": "https://github.com/frappe/crm",
+    "branch": "main"
+  },
+  {
+    "url": "https://github.com/frappe/helpdesk",
+    "branch": "main"
+  },
+  {
+    "url": "https://github.com/frappe/wiki",
+    "branch": "master"
+  },
+  {
+    "url": "https://github.com/stratechna/Stratechna-Orbit-App",
+    "branch": "main",
+    "app": "orbit"
+  }
+]
