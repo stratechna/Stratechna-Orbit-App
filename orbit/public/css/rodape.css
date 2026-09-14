@@ -1,0 +1,53 @@
+/* Rodapé do ecrã de apps do Orbit.
+ *
+ * Cores tiradas das variáveis do próprio Frappe sempre que existem, para o
+ * rodapé acompanhar o tema claro e o escuro sem duas folhas de estilo. Onde não
+ * há variável, entram os degraus da ardósia da Stratechna.
+ */
+
+#orbit-rodape {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 10px;
+	padding: 56px 24px 72px;
+	text-align: center;
+}
+
+#orbit-rodape .orbit-rodape-nome {
+	font-size: 13px;
+	font-weight: 600;
+	letter-spacing: 0.22em;
+	color: var(--text-color, #22303d);
+}
+
+#orbit-rodape .orbit-rodape-frase {
+	margin: 0;
+	max-width: 46ch;
+	font-size: 14px;
+	line-height: 1.6;
+	color: var(--text-muted, #5f7386);
+}
+
+#orbit-rodape .orbit-rodape-marca {
+	height: 30px;
+	width: auto;
+	margin-top: 14px;
+	opacity: 0.9;
+}
+
+#orbit-rodape .orbit-rodape-base {
+	font-size: 11px;
+	letter-spacing: 0.03em;
+	color: var(--text-light, #8a9bab);
+}
+
+/* Em ecrãs estreitos a grelha já é apertada: o rodapé encolhe com ela. */
+@media (max-width: 640px) {
+	#orbit-rodape {
+		padding: 36px 16px 48px;
+	}
+	#orbit-rodape .orbit-rodape-frase {
+		font-size: 13px;
+	}
+}
