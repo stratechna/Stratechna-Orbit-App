@@ -122,3 +122,86 @@ def repor_atalhos():
     aviso = f"Orbit: atalhos — {len(criados)} criados, {mantidos} actualizados (domínio {dominio})"
     print(aviso)
     frappe.logger().info(aviso)
+
+
+# ── Nomes dos módulos ───────────────────────────────────────────────────────
+# Regra: marca não se traduz, função traduz-se.
+#
+# Os módulos que vendemos têm nome de produto — aparecem assim no catálogo, nos
+# domínios (docs., sign., events.) e nas propostas. Traduzi-los na interface
+# criaria duas designações para a mesma coisa. Os módulos do ERPNext e do RH
+# descrevem uma função, e essa é em português.
+#
+# O Frappe passa os rótulos por `_()` (frappe/apps.py), por isso o doctype
+# Translation é o ponto de extensão certo — e a tradução é por frase inteira, não
+# por pedaço, portanto "Stock Entry" não é afectado por traduzirmos "Stock".
+
+NOMES = {
+    # função → português
+    "Assets": "Ativos",
+    "Buying": "Compras",
+    "Selling": "Vendas",
+    "Stock": "Inventário",
+    "Manufacturing": "Produção",
+    "Subcontracting": "Subcontratação",
+    "Quality": "Qualidade",
+    "Projects": "Projetos",
+    "Payments": "Pagamentos",
+    "Banking": "Bancos",
+    "Taxes": "Impostos",
+    "Budget": "Orçamentos",
+    "Financial Reports": "Relatórios financeiros",
+    "Accounts Setup": "Configuração de contas",
+    "Account Setup": "Configuração de contas",
+    "Share Management": "Participações",
+    "Subscription": "Subscrições",
+    "Accounting": "Contabilidade",
+    "Invoicing": "Faturação",
+    "Organization": "Organização",
+    "ERPNext Settings": "Definições",
+    "Support": "Suporte",
+    # marca → fica como está; só se encurta o que vinha com o nome do fabricante
+    "Frappe CRM": "CRM",
+    "Helpdesk": "Desk",
+    "ERPNext": "ERP",
+    "Frappe HR": "RH",
+    "HR": "RH",
+}
+
+# A página de construção do Frappe é ferramenta de quem programa, não um módulo
+# do cliente. Fica escondida em vez de traduzida.
+ESCONDER = ("Framework", "Frappe Framework", "Build")
+
+
+def repor_nomes():
+    idioma = frappe.db.get_single_value("System Settings", "language") or "pt"
+    novas, actualizadas = 0, 0
+    for origem, texto in NOMES.items():
+        nome = frappe.db.get_value("Translation", {"language": idioma, "source_text": origem})
+        if nome:
+            if frappe.db.get_value("Translation", nome, "translated_text") != texto:
+                frappe.db.set_value("Translation", nome, "translated_text", texto)
+                actualizadas += 1
+        else:
+            frappe.get_doc({"doctype": "Translation", "language": idioma,
+                            "source_text": origem, "translated_text": texto}).insert(
+                ignore_permissions=True)
+            novas += 1
+
+    escondidos = 0
+    for rotulo in ESCONDER:
+        for nome in frappe.get_all("Desktop Icon", filters={"label": rotulo}, pluck="name"):
+            frappe.db.set_value("Desktop Icon", nome, "hidden", 1, update_modified=False)
+            escondidos += 1
+        if frappe.db.exists("Workspace", rotulo):
+            frappe.db.set_value("Workspace", rotulo, "is_hidden", 1, update_modified=False)
+
+    frappe.db.commit()
+    frappe.cache.delete_key("desktop_icons")
+    frappe.cache.delete_key("bootinfo")
+    frappe.clear_cache()
+
+    aviso = (f"Orbit: nomes — {novas} traduções novas, {actualizadas} actualizadas, "
+             f"{escondidos} ícones escondidos (idioma {idioma})")
+    print(aviso)
+    frappe.logger().info(aviso)

@@ -33,22 +33,22 @@
 		{
 			titulo: "Gestão",
 			nota: "Dinheiro, contratos e obrigações",
-			itens: ["Faturação", "Invoicing", "Payments", "Banking", "Taxes", "Budget",
-				"Financial Reports", "Accounts Setup", "Subscription", "Share Management",
-				"Accounting"],
+			itens: ["Invoicing", "Payments", "Banking", "Taxes", "Budget",
+				"Financial Reports", "Accounts Setup", "Account Setup", "Subscription",
+				"Share Management", "Accounting"],
 		},
 		{
 			titulo: "Operações",
 			nota: "O que se compra, produz e vende",
 			itens: ["Selling", "Buying", "Stock", "Assets", "Manufacturing",
-				"Subcontracting", "Quality", "Organização", "Organization"],
+				"Subcontracting", "Quality", "Organization"],
 		},
-		{ titulo: "Pessoas", nota: "Equipa e recursos humanos", itens: ["RH", "Frappe HR"] },
+		{ titulo: "Pessoas", nota: "Equipa e recursos humanos", itens: ["Frappe HR", "RH"] },
 		{
 			titulo: "Sistema",
 			nota: "Configuração da plataforma",
-			itens: ["Definições ...", "ERPNext Settings", "Framework", "Orbit", "Home",
-				"My Workspaces"],
+			itens: ["ERPNext Settings", "Home", "My Workspaces", "Users", "Website",
+				"Integrations", "Support"],
 		},
 	];
 
