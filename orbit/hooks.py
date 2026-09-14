@@ -11,18 +11,20 @@ app_license = "agpl-3.0"
 app_include_js = "/assets/orbit/js/orbit.js"
 app_include_css = "/assets/orbit/css/orbit.css"
 
-# Os ícones dos módulos vivem dentro das pastas do ERPNext, do HR e do Frappe —
-# é lá que o frontend os procura, antes de olhar para a base de dados. Uma
-# reconstrução da imagem apaga-os. Repor no fim de cada migração é o que dispensa
-# o cron que fazia isto de hora a hora.
-after_migrate = ["orbit.marca.repor_icones", "orbit.marca.repor_atalhos",
-                 "orbit.marca.repor_nomes"]
+# A grelha de módulos põe-se de pé por esta ordem, e a ordem importa: a
+# sincronização traz de volta as fichas que as apps trazem em ficheiro (e que o
+# migrate não repõe sozinho), e só depois se achatam as pastas, se recriam os
+# atalhos e se escondem os módulos que não se vendem — senão a sincronização
+# desfazia o que os outros três tinham feito.
+#
 # A instalação de qualquer app corre «Creating Desktop Icons» e leva à frente os
 # atalhos que não reconhece — foi o que apagou o Mail, o Docs, o Sign, o Events e
-# o Social quando esta app foi instalada. Recriá-los no fim de cada migração
-# fecha esse buraco.
-after_install = ["orbit.marca.repor_icones", "orbit.marca.repor_atalhos",
-                 "orbit.marca.repor_nomes"]
+# o Social quando esta app foi instalada. Correr isto no fim de cada migração e
+# de cada instalação fecha esse buraco.
+_POR_DE_PE = ["orbit.marca.sincronizar", "orbit.marca.achatar",
+              "orbit.marca.repor_atalhos", "orbit.marca.repor_nomes"]
+after_migrate = _POR_DE_PE
+after_install = _POR_DE_PE
 
 # Esta app não tem nada que valha a pena mostrar no ecrã de apps: é marca e
 # extensões, não é um módulo de trabalho.

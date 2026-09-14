@@ -1,0 +1,43 @@
+# Segunda camada: põe os símbolos da Stratechna onde o Frappe os vai buscar.
+#
+# O frontend monta o caminho do ícone a partir da app dona do módulo —
+# assets/<app>/icons/desktop_icons/<estilo>/<nome>.svg — e só cai no `logo_url`
+# da base de dados quando esse ficheiro não existe (frappe/public/js/frappe/
+# utils/utils.js, get_desktop_icon). Como o Frappe, o ERPNext e o HR trazem
+# essas pastas cheias, os módulos deles ignoram tudo o que se grave na base de
+# dados. Era por isso que metade da grelha ficava azul.
+#
+# Durante meses isto viveu num cron que copiava os ficheiros para os dois
+# contentores a correr. Funcionava, mas morria a cada reconstrução da imagem e
+# só se corrigia sozinho à hora seguinte. Agora que a imagem se constrói a
+# partir deste repositório, a marca entra na própria imagem: o backend e o
+# frontend saem da mesma imagem e servem os mesmos ficheiros, e uma máquina
+# acabada de levantar já está certa.
+#
+# Os originais ficam ao lado, em <estilo>.upstream, para se poder comparar.
+
+ARG BASE
+FROM ${BASE}
+
+USER frappe
+
+COPY --chown=frappe:frappe simbolos/modulos /tmp/marca-modulos
+
+RUN set -eu; \
+    repostos=0; \
+    for app in /tmp/marca-modulos/*; do \
+      nome=$(basename "$app"); \
+      for estilo in subtle solid; do \
+        origem="$app/$estilo"; \
+        destino="/home/frappe/frappe-bench/apps/$nome/$nome/public/icons/desktop_icons/$estilo"; \
+        [ -d "$origem" ] && [ -d "$destino" ] || continue; \
+        [ -d "$destino.upstream" ] || cp -r "$destino" "$destino.upstream"; \
+        for f in "$origem"/*.svg; do \
+          cp "$f" "$destino/$(basename "$f")"; \
+          repostos=$((repostos + 1)); \
+        done; \
+      done; \
+    done; \
+    rm -rf /tmp/marca-modulos; \
+    echo "símbolos repostos: $repostos"; \
+    [ "$repostos" -ge 80 ] || { echo "ERRO: esperavam-se pelo menos 80"; exit 1; }

@@ -12,7 +12,9 @@ on:
     branches: [main]
     paths:
       - "orbit/**"
+      - "simbolos/**"
       - "apps.json"
+      - "Containerfile.marca"
       - ".github/workflows/imagem.yml"
   workflow_dispatch:
 
@@ -55,8 +57,13 @@ jobs:
             --build-arg=FRAPPE_PATH=https://github.com/frappe/frappe \
             --build-arg=FRAPPE_BRANCH=${{ env.FRAPPE_BRANCH }} \
             --build-arg=CACHE_BUST=${{ github.sha }} \
-            --tag=orbit-frappe:teste \
+            --tag=orbit-frappe:base \
             --file=images/custom/Containerfile .
+
+      - name: Aplicar a marca aos símbolos dos módulos
+        run: |
+          docker build --build-arg=BASE=orbit-frappe:base \
+            --tag=orbit-frappe:teste --file=Containerfile.marca .
 
       - name: Verificar que a imagem tem o que o apps.json pede
         # O nome da app Frappe nem sempre é o último segmento do URL: o nosso
@@ -86,6 +93,19 @@ jobs:
           docker run --rm --entrypoint grep orbit-frappe:teste -q repor_nomes \
             /home/frappe/frappe-bench/apps/orbit/orbit/marca.py \
             || { echo "ERRO: a app na imagem não é a deste commit"; exit 1; }
+
+      - name: Verificar que os símbolos dos módulos são os nossos
+        # A marca destes entra por ficheiro, dentro do código de outras apps —
+        # o sítio onde é mais fácil desaparecer sem ninguém dar por isso. A
+        # prova é o fundo da nossa caixa (#22303d), que o upstream não usa.
+        run: |
+          for a in erpnext:projects frappe:users hrms:payroll; do
+            app=${a%%:*}; mod=${a##*:}
+            docker run --rm --entrypoint grep orbit-frappe:teste -q '#22303d' \
+              "/home/frappe/frappe-bench/apps/$app/$app/public/icons/desktop_icons/solid/$mod.svg" \
+              || { echo "ERRO: $app/$mod ainda é o símbolo de origem"; exit 1; }
+          done
+          echo "símbolos dos módulos verificados nas três apps"
 
       - name: Publicar (só chega aqui se as verificações passaram)
         run: |

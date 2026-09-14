@@ -1,20 +1,26 @@
-"""Faz a grelha de apps servir os ícones desta app, em vez dos do upstream.
+"""Põe a grelha de módulos no estado em que a vendemos.
 
-O caminho óbvio — escrever os nossos SVG por cima dos do ERPNext, do HR e do
-Frappe — não funciona e ainda bem: o contentor corre como `frappe` e as pastas
-das apps são de root. Uma marca que dependesse de escrever dentro de código
-alheio ficaria sempre à mercê de permissões e de cada reconstrução da imagem.
+O desenho de cada módulo NÃO se decide aqui. O frontend monta o caminho a partir
+da app dona do módulo — `assets/<app>/icons/desktop_icons/<estilo>/<nome>.svg`
+(frappe/public/js/frappe/utils/utils.js, get_desktop_icon) — e só cai no
+`logo_url` da base de dados quando esse ficheiro não existe. Como o Frappe, o
+ERPNext e o HR trazem essas pastas cheias, os nossos símbolos entram por ficheiro,
+na construção da imagem (Containerfile.marca), e não por definição.
 
-A solução usa o mecanismo do Frappe em vez de lutar contra ele. O frontend monta
-o caminho do ícone a partir do campo `app` do próprio Desktop Icon:
+Tentou-se o contrário: mudar o campo `app` dos Desktop Icon para `orbit`, para
+o caminho apontar para cá. Lê bem no papel e parte a casa — `build_folder_map`
+(sidebar_header.js) só mostra na barra lateral de cada app os ícones cujo `app`
+é o dela, e os módulos do ERPNext desapareciam de lá. O campo `app` é a relação
+de propriedade, não um apontador para ficheiros.
 
-    assets/<icone.app>/icons/desktop_icons/<estilo>/<nome>.svg
-    (frappe/public/js/frappe/utils/utils.js, get_desktop_icon)
+O que fica para a base de dados são as duas decisões de produto:
 
-Basta então dizer que estes ícones pertencem à app `orbit` — e os ficheiros
-passam a ser lidos de `orbit/public/icons/desktop_icons/`, que é nossa, versionada
-e reconstruída com a app. Nada é escrito fora daqui, e a marca sobrevive a
-qualquer actualização das apps do upstream.
+  sincronizar()  as fichas que as apps trazem em ficheiro voltam à tabela. O
+                 `bench migrate` não as repõe — são um comando à parte
+                 (`bench sync-desktop-icons`) — e já se viu a tabela cair de 49
+                 para 13 linhas sem ninguém lhe tocar, deixando a grelha vazia.
+  achatar()      cada módulo é uma app vendável, logo não há pastas: a
+                 «Accounting» do ERPNext passa a módulo e os nove filhos sobem.
 
 Corre no `after_migrate`, o último passo de qualquer actualização.
 """
@@ -23,44 +29,57 @@ import os
 
 import frappe
 
-NOSSOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "public", "icons", "desktop_icons")
 
+def sincronizar():
+    """Reimporta as fichas de Desktop Icon que cada app traz em ficheiro.
 
-def _rotulos_que_temos() -> set[str]:
-    """Os nomes de ficheiro que trazemos, que são os `scrub` dos rótulos."""
-    pasta = os.path.join(NOSSOS, "solid")
-    if not os.path.isdir(pasta):
-        return set()
-    return {f[:-4] for f in os.listdir(pasta) if f.endswith(".svg")}
+    É o mesmo que faz `bench sync-desktop-icons`, que não corre no migrate.
+    """
+    from frappe.modules.import_file import import_file_by_path
+    from frappe.modules.utils import get_app_level_directory_path
 
-
-def repor_icones():
-    """Aponta os Desktop Icon que temos desenhados para os ficheiros desta app."""
-    nossos = _rotulos_que_temos()
-    if not nossos:
-        frappe.log_error("Orbit: não há ícones em " + NOSSOS, "Orbit marca")
-        return
-
-    mudados, ja_certos = [], 0
-    for icone in frappe.get_all("Desktop Icon", fields=["name", "label", "app"]):
-        if frappe.scrub(icone.label) not in nossos:
+    lidos, importados = 0, 0
+    for app in frappe.get_installed_apps():
+        pasta = get_app_level_directory_path("desktop_icon", app)
+        if not os.path.isdir(pasta):
             continue
-        if icone.app == "orbit":
-            ja_certos += 1
-            continue
-        frappe.db.set_value("Desktop Icon", icone.name, "app", "orbit", update_modified=False)
-        mudados.append(icone.label)
+        for f in sorted(os.listdir(pasta)):
+            if not f.endswith(".json"):
+                continue
+            lidos += 1
+            if import_file_by_path(os.path.join(pasta, f), force=True, ignore_version=True):
+                importados += 1
 
     frappe.db.commit()
+    _limpar_cache()
+    aviso = f"Orbit: fichas de ícones — {lidos} lidas, {importados} importadas"
+    print(aviso)
+    frappe.logger().info(aviso)
+
+
+def achatar():
+    """Desfaz as pastas da grelha: cada módulo é uma app, e vende-se sozinho."""
+    achatadas = []
+    for pasta in frappe.get_all("Desktop Icon", filters={"icon_type": "Folder"},
+                                fields=["name", "label"]):
+        filhos = frappe.get_all("Desktop Icon", filters={"parent_icon": pasta.label}, pluck="name")
+        frappe.db.set_value("Desktop Icon", pasta.name, "icon_type", "Link", update_modified=False)
+        for f in filhos:
+            frappe.db.set_value("Desktop Icon", f, "parent_icon", "", update_modified=False)
+        achatadas.append(f"{pasta.label} (+{len(filhos)})")
+
+    frappe.db.commit()
+    _limpar_cache()
+    aviso = "Orbit: pastas achatadas — " + (", ".join(achatadas) or "nenhuma")
+    print(aviso)
+    frappe.logger().info(aviso)
+
+
+def _limpar_cache():
     # a lista de ficheiros e os ícones são lidos no arranque e ficam no boot
     frappe.cache.delete_key("desktop_icons")
     frappe.cache.delete_key("bootinfo")
     frappe.clear_cache()
-
-    aviso = (f"Orbit: {len(nossos)} ícones disponíveis, {len(mudados)} apontados agora, "
-             f"{ja_certos} já estavam")
-    print(aviso)
-    frappe.logger().info(aviso)
 
 
 # ── Atalhos para os módulos que vivem fora do Frappe ────────────────────────
