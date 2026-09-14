@@ -1,63 +1,63 @@
-"""Repõe os ícones dos módulos nas pastas onde o Frappe os vai buscar.
+"""Faz a grelha de apps servir os ícones desta app, em vez dos do upstream.
 
-Porque é preciso: o frontend procura primeiro
-`assets/<app>/icons/desktop_icons/<estilo>/<nome>.svg` e só cai no `logo_url` da
-base de dados se esse ficheiro não existir (frappe/public/js/frappe/utils/utils.js,
-get_desktop_icon). Como o ERPNext, o HR e o próprio Frappe trazem essa pasta cheia,
-os módulos deles ignoram tudo o que se grave na base de dados.
+O caminho óbvio — escrever os nossos SVG por cima dos do ERPNext, do HR e do
+Frappe — não funciona e ainda bem: o contentor corre como `frappe` e as pastas
+das apps são de root. Uma marca que dependesse de escrever dentro de código
+alheio ficaria sempre à mercê de permissões e de cada reconstrução da imagem.
 
-Escrever por cima é a única forma — e significa que a marca não sobrevive a uma
-reconstrução da imagem. Esta função corre no `after_migrate`, que é o último passo
-de qualquer actualização: a marca volta sozinha, sem depender de ninguém se
-lembrar nem de um cron a verificar de hora a hora.
+A solução usa o mecanismo do Frappe em vez de lutar contra ele. O frontend monta
+o caminho do ícone a partir do campo `app` do próprio Desktop Icon:
 
-Os nossos ficheiros vivem em orbit/public/icons/modulos/<app>/<estilo>/.
+    assets/<icone.app>/icons/desktop_icons/<estilo>/<nome>.svg
+    (frappe/public/js/frappe/utils/utils.js, get_desktop_icon)
+
+Basta então dizer que estes ícones pertencem à app `orbit` — e os ficheiros
+passam a ser lidos de `orbit/public/icons/desktop_icons/`, que é nossa, versionada
+e reconstruída com a app. Nada é escrito fora daqui, e a marca sobrevive a
+qualquer actualização das apps do upstream.
+
+Corre no `after_migrate`, o último passo de qualquer actualização.
 """
 
 import os
-import shutil
 
 import frappe
 
-NOSSOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "public", "icons", "modulos")
-ESTILOS = ("subtle", "solid")
+NOSSOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "public", "icons", "desktop_icons")
+
+
+def _rotulos_que_temos() -> set[str]:
+    """Os nomes de ficheiro que trazemos, que são os `scrub` dos rótulos."""
+    pasta = os.path.join(NOSSOS, "solid")
+    if not os.path.isdir(pasta):
+        return set()
+    return {f[:-4] for f in os.listdir(pasta) if f.endswith(".svg")}
 
 
 def repor_icones():
-    """Copia os nossos ícones para dentro das apps donas das pastas."""
-    if not os.path.isdir(NOSSOS):
-        frappe.log_error("Orbit: pasta de ícones em falta", NOSSOS)
+    """Aponta os Desktop Icon que temos desenhados para os ficheiros desta app."""
+    nossos = _rotulos_que_temos()
+    if not nossos:
+        frappe.log_error("Orbit: não há ícones em " + NOSSOS, "Orbit marca")
         return
 
-    copiados, saltados = 0, []
-    for app in sorted(os.listdir(NOSSOS)):
-        try:
-            base = frappe.get_app_path(app)
-        except Exception:
-            saltados.append(f"{app} (não instalada)")
+    mudados, ja_certos = [], 0
+    for icone in frappe.get_all("Desktop Icon", fields=["name", "label", "app"]):
+        if frappe.scrub(icone.label) not in nossos:
             continue
+        if icone.app == "orbit":
+            ja_certos += 1
+            continue
+        frappe.db.set_value("Desktop Icon", icone.name, "app", "orbit", update_modified=False)
+        mudados.append(icone.label)
 
-        for estilo in ESTILOS:
-            origem = os.path.join(NOSSOS, app, estilo)
-            destino = os.path.join(base, "public", "icons", "desktop_icons", estilo)
-            if not os.path.isdir(origem):
-                continue
-            if not os.path.isdir(destino):
-                saltados.append(f"{app}/{estilo} (a app já não tem essa pasta)")
-                continue
-            for ficheiro in os.listdir(origem):
-                if not ficheiro.endswith(".svg"):
-                    continue
-                shutil.copyfile(os.path.join(origem, ficheiro), os.path.join(destino, ficheiro))
-                copiados += 1
-
-    # A lista de ficheiros é lida no arranque e fica em cache com o boot.
+    frappe.db.commit()
+    # a lista de ficheiros e os ícones são lidos no arranque e ficam no boot
     frappe.cache.delete_key("desktop_icons")
     frappe.cache.delete_key("bootinfo")
     frappe.clear_cache()
 
-    aviso = f"Orbit: {copiados} ícones de módulo repostos"
-    if saltados:
-        aviso += " — saltados: " + ", ".join(saltados)
+    aviso = (f"Orbit: {len(nossos)} ícones disponíveis, {len(mudados)} apontados agora, "
+             f"{ja_certos} já estavam")
     print(aviso)
     frappe.logger().info(aviso)
