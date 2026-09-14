@@ -61,3 +61,64 @@ def repor_icones():
              f"{ja_certos} já estavam")
     print(aviso)
     frappe.logger().info(aviso)
+
+
+# ── Atalhos para os módulos que vivem fora do Frappe ────────────────────────
+# O Mail, o Docs, o Sign, o Events e o Social são sistemas separados, cada um no
+# seu domínio. Entram na grelha como Desk Icon com link externo — o mesmo
+# mecanismo que o Frappe usa para o CRM e o Helpdesk, que também têm frontend
+# próprio.
+#
+# Vivem aqui e não num script à parte por uma razão aprendida à força: instalar
+# qualquer app corre «Creating Desktop Icons», que re-sincroniza a tabela e apaga
+# o que não reconhece. Foi assim que estes cinco desapareceram. Recriá-los no
+# after_install e no after_migrate fecha esse buraco de vez.
+
+ATALHOS = [
+    {"nome": "Mail", "url": "https://mail.orbit.{dominio}", "simbolo": "mail"},
+    {"nome": "Docs", "url": "https://docs.{dominio}", "simbolo": "docs"},
+    {"nome": "Sign", "url": "https://sign.{dominio}", "simbolo": "sign"},
+    {"nome": "Events", "url": "https://events.{dominio}", "simbolo": "events"},
+    {"nome": "Social", "url": "https://social.{dominio}", "simbolo": "social"},
+]
+
+
+def _dominio_do_tenant() -> str:
+    """O domínio onde vivem os módulos de fora. Configurável por site em
+    site_config.json (`orbit_dominio_apps`); por omissão, o nosso."""
+    return frappe.conf.get("orbit_dominio_apps") or "stratechna.com"
+
+
+def repor_atalhos():
+    dominio = _dominio_do_tenant()
+    criados, mantidos = [], 0
+    for a in ATALHOS:
+        url = a["url"].format(dominio=dominio)
+        existente = frappe.db.get_value("Desktop Icon", {"label": a["nome"]}, "name")
+        if existente:
+            frappe.db.set_value("Desktop Icon", existente, {"link": url, "app": "orbit"},
+                                update_modified=False)
+            mantidos += 1
+            continue
+        frappe.get_doc({
+            "doctype": "Desktop Icon",
+            "label": a["nome"],
+            "icon_type": "App",
+            "link_type": "External",
+            "link": url,
+            "app": "orbit",
+            "logo_url": f"/assets/orbit/icons/apps/{a['simbolo']}.svg",
+            "bg_color": "gray",
+            "standard": 1,
+            "hidden": 0,
+        }).insert(ignore_permissions=True)
+        criados.append(a["nome"])
+
+    frappe.db.commit()
+    frappe.cache.delete_key("desktop_icons")
+    frappe.cache.delete_key("bootinfo")
+    frappe.clear_cache()
+
+    aviso = f"Orbit: atalhos — {len(criados)} criados, {mantidos} actualizados (domínio {dominio})"
+    print(aviso)
+    frappe.logger().info(aviso)

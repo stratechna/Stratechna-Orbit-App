@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 512" fill="none"
+     stroke-linecap="round" stroke-linejoin="round">
+  <title>Stratechna Orbit</title>
+
+
+  <ellipse cx="256" cy="256" rx="168" ry="84" stroke="#3d5163" stroke-width="32"
+           transform="rotate(-30 256 256)"/>
+  <circle cx="256" cy="256" r="46" fill="#cc0000" stroke="none"/>
+  <text x="480" y="236" fill="#3d5163" stroke="none"
+        font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="136" font-weight="700">Stratechna</text>
+  <text x="484" y="372" fill="#880000" stroke="none"
+        font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="104" font-weight="500">Orbit</text>
+</svg>

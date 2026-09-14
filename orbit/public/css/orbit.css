@@ -1,0 +1,185 @@
+/* Ecrã de apps do Stratechna Orbit.
+ *
+ * As cores vêm das variáveis do próprio Frappe sempre que existem, para o ecrã
+ * acompanhar o tema claro e o escuro sem duas folhas de estilo. Onde não há
+ * variável, entram os degraus da ardósia da Stratechna.
+ */
+
+/* ── Barra de cima: símbolo maior, com o nome ao lado ───────────────────── */
+.desktop-navbar .navbar-home {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.desktop-navbar .navbar-home #brand-logo {
+	height: 30px;
+	width: auto;
+}
+
+.desktop-navbar .navbar-home .orbit-marca-nome {
+	font-size: 14px;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	white-space: nowrap;
+	color: var(--text-color, #22303d);
+}
+
+@media (max-width: 720px) {
+	.desktop-navbar .navbar-home .orbit-marca-nome {
+		display: none; /* em telemóvel, o símbolo chega */
+	}
+}
+
+/* A grelha de origem fica no sítio, apenas escondida: se a nossa falhar, basta
+   tirar esta classe para o ecrã do Frappe voltar. */
+.desktop-container.orbit-escondido {
+	display: none;
+}
+
+/* ── Saudação ──────────────────────────────────────────────────────────── */
+#orbit-saudacao {
+	max-width: 1120px;
+	margin: 0 auto;
+	padding: 44px 28px 4px;
+}
+
+#orbit-saudacao .orbit-saudacao-titulo {
+	margin: 0;
+	font-size: 26px;
+	font-weight: 600;
+	letter-spacing: -0.02em;
+	color: var(--text-color, #22303d);
+}
+
+#orbit-saudacao .orbit-saudacao-frase {
+	margin: 6px 0 0;
+	font-size: 15px;
+	line-height: 1.5;
+	color: var(--text-muted, #5f7386);
+}
+
+/* ── Grelha por grupos ─────────────────────────────────────────────────── */
+#orbit-grelha {
+	max-width: 1120px;
+	margin: 0 auto;
+	padding: 20px 28px 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 34px;
+}
+
+.orbit-seccao-cab {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 16px;
+}
+
+.orbit-seccao-titulo {
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--text-muted, #5f7386);
+	white-space: nowrap;
+}
+
+/* O risco é o separador entre grupos: começa onde o título acaba e vai até ao
+   fim da linha, para separar sem cortar. */
+.orbit-seccao-risco {
+	flex: 1;
+	height: 1px;
+	background: var(--border-color, #e2e6ea);
+}
+
+.orbit-seccao-nota {
+	font-size: 12px;
+	color: var(--text-light, #8a9bab);
+	white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+	.orbit-seccao-nota {
+		display: none;
+	}
+}
+
+.orbit-lista {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+	gap: 8px 4px;
+}
+
+/* ── Cartão de cada módulo ─────────────────────────────────────────────── */
+.orbit-cartao {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 10px;
+	padding: 14px 8px 12px;
+	border-radius: 14px;
+	text-decoration: none;
+	color: inherit;
+	transition: background-color 120ms ease;
+}
+
+.orbit-cartao:hover,
+.orbit-cartao:focus-visible {
+	background: var(--fg-hover-color, rgba(34, 48, 61, 0.05));
+	text-decoration: none;
+	color: inherit;
+}
+
+.orbit-cartao:focus-visible {
+	outline: 2px solid var(--primary, #3d5163);
+	outline-offset: 2px;
+}
+
+.orbit-cartao-img,
+.orbit-cartao-vazio {
+	width: 54px;
+	height: 54px;
+	border-radius: 14px;
+	display: block;
+}
+
+.orbit-cartao-vazio {
+	background: var(--control-bg, #eef1f3);
+}
+
+.orbit-cartao-nome {
+	font-size: 12px;
+	line-height: 1.25;
+	text-align: center;
+	color: var(--text-color, #22303d);
+	/* Nomes longos passam a duas linhas em vez de serem cortados com reticências:
+	   «Financial R…» não diz nada a ninguém. */
+	overflow-wrap: anywhere;
+	max-width: 100%;
+}
+
+/* ── Rodapé ────────────────────────────────────────────────────────────── */
+#orbit-rodape {
+	display: flex;
+	justify-content: center;
+	padding: 48px 28px 72px;
+}
+
+#orbit-rodape .orbit-rodape-marca {
+	height: 26px;
+	width: auto;
+	opacity: 0.55;
+	transition: opacity 120ms ease;
+}
+
+#orbit-rodape .orbit-rodape-marca:hover {
+	opacity: 0.8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.orbit-cartao,
+	#orbit-rodape .orbit-rodape-marca {
+		transition: none;
+	}
+}
