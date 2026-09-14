@@ -1,0 +1,98 @@
+name: Imagem do Orbit
+
+# Porque é que esta construção vive aqui e não no servidor:
+# a 14-09-2026 construiu-se a imagem no StratechnaApps02, onde corre a produção.
+# A compilação dos frontends do Frappe precisa de vários gigabytes; o servidor
+# tinha ~2 GB livres, entrou em troca de memória com o disco e ficou com carga
+# 264 — o Orbit, o webmail, o Docs de dois clientes e o Social ficaram em baixo
+# até um corte a frio. Aqui há memória a sério e nada de nosso em risco.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "orbit/**"
+      - "apps.json"
+      - ".github/workflows/imagem.yml"
+  workflow_dispatch:
+
+env:
+  IMAGEM: ghcr.io/stratechna/stratechna-orbit-frappe
+  FRAPPE_BRANCH: version-16
+
+jobs:
+  construir:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Libertar espaço no disco
+        # A imagem final passa dos 6 GB e a construção precisa de bem mais.
+        # O runner vem com ferramentas que não usamos e ocupam dezenas de GB.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          df -h / | tail -1
+
+      - name: Trazer o frappe_docker
+        run: git clone --depth 1 https://github.com/frappe/frappe_docker.git
+
+      - name: Etiqueta pela data e pelo commit
+        id: v
+        run: |
+          echo "tag=$(date +%Y%m%d)-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Construir
+        working-directory: frappe_docker
+        run: |
+          docker build \
+            --secret id=apps_json,src=../apps.json \
+            --build-arg=FRAPPE_PATH=https://github.com/frappe/frappe \
+            --build-arg=FRAPPE_BRANCH=${{ env.FRAPPE_BRANCH }} \
+            --build-arg=CACHE_BUST=${{ github.sha }} \
+            --tag=orbit-frappe:teste \
+            --file=images/custom/Containerfile .
+
+      - name: Verificar que a imagem tem o que o apps.json pede
+        # O nome da app Frappe nem sempre é o último segmento do URL: o nosso
+        # repositório chama-se Stratechna-Orbit-App e a app chama-se orbit. Por
+        # isso a entrada aceita um campo "app" com o nome real.
+        run: |
+          ESPERADAS=$(python3 -c "
+          import json
+          print(' '.join(['frappe'] + [a.get('app') or a['url'].rstrip('/').split('/')[-1]
+                                       for a in json.load(open('apps.json'))]))")
+          PRESENTES=" $(docker run --rm --entrypoint ls orbit-frappe:teste \
+                        /home/frappe/frappe-bench/apps | tr '\n' ' ') "
+          FALTAM=""
+          for a in $ESPERADAS; do
+            case "$PRESENTES" in *" $a "*) ;; *) FALTAM="$FALTAM $a" ;; esac
+          done
+          if [ -n "$FALTAM" ]; then echo "ERRO: a imagem não tem:$FALTAM"; exit 1; fi
+          echo "imagem verificada: $ESPERADAS"
+
+      - name: Verificar que a nossa app vai na versão deste commit
+        # Já se publicou uma imagem com a app na versão anterior porque a camada
+        # do clone veio da cache. Aqui confirma-se contra um ficheiro que só
+        # existe na versão nova.
+        run: |
+          docker run --rm --entrypoint ls orbit-frappe:teste \
+            /home/frappe/frappe-bench/apps/orbit/orbit/public/js
+          docker run --rm --entrypoint grep orbit-frappe:teste -q repor_nomes \
+            /home/frappe/frappe-bench/apps/orbit/orbit/marca.py \
+            || { echo "ERRO: a app na imagem não é a deste commit"; exit 1; }
+
+      - name: Publicar (só chega aqui se as verificações passaram)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          for tag in ${{ steps.v.outputs.tag }} v16 latest; do
+            docker tag orbit-frappe:teste "$IMAGEM:$tag"
+            docker push -q "$IMAGEM:$tag"
+          done
+          echo "publicado: $IMAGEM:${{ steps.v.outputs.tag }} (e v16, latest)"
