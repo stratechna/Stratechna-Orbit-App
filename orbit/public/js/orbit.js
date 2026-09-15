@@ -45,9 +45,15 @@
 		{
 			linha: 1,
 			titulo: "Trabalho",
-			nota: "O dia-a-dia com clientes e equipa",
+			nota: "Clientes, equipa e o dia-a-dia",
+			// Os módulos do RH ficam com a app do RH. Estiveram em «Operações» e
+			// lia-se mal: o ícone do RH num bloco e o processamento salarial
+			// noutro, quando um se abre a partir do outro.
 			itens: ["Frappe CRM", "Helpdesk", "Mail", "Docs", "Sign", "Events",
-				"Social", "Wiki", "Frappe HR", "Projects"],
+				"Social", "Wiki", "Projects",
+				"Frappe HR", "HR Setup", "Recruitment", "Leaves", "Payroll",
+				"Expenses", "Performance", "Tenure", "Shift & Attendance",
+				"Tax & Benefits"],
 		},
 		{
 			linha: 1,
@@ -62,9 +68,7 @@
 			titulo: "Operações",
 			nota: "O que se compra, produz e vende",
 			itens: ["Selling", "Buying", "Stock", "Assets", "Manufacturing",
-				"Subcontracting", "Quality", "Organization",
-				"HR Setup", "Recruitment", "Leaves", "Payroll", "Expenses",
-				"Performance", "Tenure", "Shift & Attendance", "Tax & Benefits"],
+				"Subcontracting", "Quality", "Organization"],
 		},
 		{
 			linha: 2,
@@ -221,23 +225,41 @@
 
 		const grelha = document.createElement("div");
 		grelha.id = "orbit-grelha";
-		for (const n of [1, 2]) {
-			const desta = grupos.filter((g) => g.linha === n);
-			if (!desta.length) continue;
-			const linha = document.createElement("div");
-			linha.className = "orbit-linha";
-			// Todas as linhas se repartem em partes iguais, e como as duas têm
-			// dois blocos, cada bloco de baixo fica exactamente por baixo do de
-			// cima. É a coluna que manda, não o conteúdo.
-			linha.style.gridTemplateColumns = desta
-				.map(() => "minmax(0, 1fr)")
-				.join(" ");
-			for (const g of desta) linha.appendChild(bloco(g));
-			grelha.appendChild(linha);
+
+		const linhas = [1, 2].map((n) => grupos.filter((g) => g.linha === n)).filter((l) => l.length);
+
+		// As colunas são as mesmas em todas as linhas — para um bloco de baixo
+		// ficar exactamente por baixo do de cima — mas a largura de cada coluna
+		// é proporcional ao que essa coluna leva no total. A coluna dos módulos
+		// de trabalho carrega mais do dobro da de gestão, e com colunas iguais
+		// ficava com mais uma linha de símbolos do que o resto: a página crescia
+		// por causa de um bloco só.
+		const peso = [];
+		for (const linha of linhas) {
+			linha.forEach((g, i) => {
+				peso[i] = (peso[i] || 0) + g.membros.length;
+			});
+		}
+		// O mínimo impede que uma coluna com um módulo fique fina de mais para o
+		// próprio título do bloco.
+		const colunas = peso.map((n) => `minmax(0, ${Math.max(n, 4)}fr)`).join(" ");
+
+		for (const linha of linhas) {
+			const el = document.createElement("div");
+			el.className = "orbit-linha";
+			el.style.gridTemplateColumns = colunas;
+			for (const g of linha) el.appendChild(bloco(g));
+			grelha.appendChild(el);
 		}
 
 		const raiz = document.createElement("div");
 		raiz.id = "orbit-pagina";
+		// Quantos módulos há muda o tamanho a que cabem todos num ecrã. Um
+		// tenant com o Orbit inteiro tem o dobro dos módulos de um que só
+		// comprou o correio e o CRM; com uma medida fixa, ou o primeiro rola ou
+		// o segundo fica com símbolos perdidos no meio do branco.
+		const total = grupos.reduce((s, g) => s + g.membros.length, 0);
+		raiz.dataset.densidade = total > 24 ? "apertada" : "folgada";
 		raiz.appendChild(cabecalho());
 		raiz.appendChild(grelha);
 		raiz.appendChild(rodape());

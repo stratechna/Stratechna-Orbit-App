@@ -161,13 +161,17 @@
 }
 
 /* ── Os módulos ──────────────────────────────────────────────────────────
-   Dentro de cada linha os blocos têm a altura do mais alto, por isso as linhas
-   de símbolos repartem-se por essa altura em vez de se amontoarem no cimo. */
+   Encostados ao cimo do bloco, sempre. Chegou a haver aqui um
+   `align-content: space-between` para «encher» os blocos que a linha estica à
+   altura do mais alto — mas isso fazia o espaço entre linhas de símbolos
+   depender do bloco em que estavam: no Gestão as duas linhas afastavam-se uma
+   para o topo e outra para o fundo, e não pareciam da mesma família. O vazio
+   que sobra num bloco mais curto é melhor do que espaçamento inconstante. */
 .orbit-lista {
 	flex: 1 1 auto;
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
-	align-content: space-between;
+	align-content: start;
 	gap: 2px;
 }
 
@@ -276,6 +280,57 @@
 	.orbit-bloco { padding: 14px 14px 6px; }
 }
 
+/* ── Muitos módulos ────────────────────────────────────────────────────────
+   Acima de duas dezenas e meia de módulos, os símbolos encolhem para caberem
+   mais por linha — o que tira linhas aos blocos e mantém a página dentro do
+   ecrã. Com 45 módulos são seis por linha em vez de cinco. */
+#orbit-pagina[data-densidade="apertada"] .orbit-lista {
+	grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+}
+
+#orbit-pagina[data-densidade="apertada"] .orbit-cartao {
+	gap: 5px;
+	padding: 7px 3px 9px;
+}
+
+#orbit-pagina[data-densidade="apertada"] .orbit-cartao-img,
+#orbit-pagina[data-densidade="apertada"] .orbit-cartao-vazio {
+	width: 34px;
+	height: 34px;
+	border-radius: 8px;
+}
+
+#orbit-pagina[data-densidade="apertada"] .orbit-cartao-nome {
+	/* 10,5 px é o que deixa «Subcontratação» numa linha em células de 78 px; a
+	   11 px partia a palavra com hífen. Por isso também não se hifeniza aqui. */
+	font-size: 10.5px;
+	hyphens: manual;
+}
+
+#orbit-pagina[data-densidade="apertada"] #orbit-saudacao {
+	padding: 28px 0 16px;
+}
+
+#orbit-pagina[data-densidade="apertada"] #orbit-grelha {
+	gap: 14px;
+}
+
+#orbit-pagina[data-densidade="apertada"] .orbit-linha {
+	gap: 14px;
+}
+
+#orbit-pagina[data-densidade="apertada"] #orbit-rodape {
+	padding: 20px 0 22px;
+}
+
+#orbit-pagina[data-densidade="apertada"] .orbit-bloco {
+	padding: 13px 13px 6px;
+}
+
+#orbit-pagina[data-densidade="apertada"] .orbit-bloco-cab {
+	margin-bottom: 9px;
+}
+
 /* Portátil de 1280×800 (ecrã útil ~700 px): aperta-se mais um degrau. A conta é
    simples — o que sobra são cinco linhas de módulos na coluna mais alta, e cada
    linha que encolhe 10 px devolve 50 px à página. */
@@ -293,6 +348,26 @@
 	#orbit-rodape .orbit-rodape-empresa { height: 33px; }
 	#orbit-rodape .orbit-rodape-risco { height: 26px; }
 	#orbit-rodape .orbit-rodape-frase { font-size: 12px; }
+}
+
+/* Muitos módulos NUM ecrã baixo — o caso mais apertado de todos. As regras de
+   densidade têm mais especificidade do que as dos ecrãs baixos e passavam-lhes
+   à frente; por isso este degrau repete-as com o mesmo peso em vez de contar
+   com a herança. */
+@media (max-height: 780px) {
+	#orbit-pagina[data-densidade="apertada"] #orbit-saudacao { padding: 14px 0 10px; }
+	#orbit-pagina[data-densidade="apertada"] .orbit-cartao { padding: 5px 3px 7px; gap: 4px; }
+	#orbit-pagina[data-densidade="apertada"] .orbit-cartao-img,
+	#orbit-pagina[data-densidade="apertada"] .orbit-cartao-vazio {
+		width: 30px;
+		height: 30px;
+		border-radius: 7px;
+	}
+	#orbit-pagina[data-densidade="apertada"] .orbit-bloco { padding: 11px 11px 4px; }
+	#orbit-pagina[data-densidade="apertada"] .orbit-bloco-cab { margin-bottom: 7px; }
+	#orbit-pagina[data-densidade="apertada"] #orbit-grelha,
+	#orbit-pagina[data-densidade="apertada"] .orbit-linha { gap: 12px; }
+	#orbit-pagina[data-densidade="apertada"] #orbit-rodape { padding: 12px 0 14px; gap: 5px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

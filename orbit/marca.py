@@ -19,8 +19,10 @@ O que fica para a base de dados são as duas decisões de produto:
                  `bench migrate` não as repõe — são um comando à parte
                  (`bench sync-desktop-icons`) — e já se viu a tabela cair de 49
                  para 13 linhas sem ninguém lhe tocar, deixando a grelha vazia.
-  achatar()      cada módulo é uma app vendável, logo não há pastas: a
-                 «Accounting» do ERPNext passa a módulo e os nove filhos sobem.
+  achatar()      cada módulo é uma app vendável, logo nenhum fica pendurado
+                 noutro: sobem à grelha tanto os que estavam dentro da pasta
+                 «Accounting» como os que estavam dentro das apps ERPNext,
+                 Frappe HR e Framework.
 
 Corre no `after_migrate`, o último passo de qualquer actualização.
 """
@@ -58,19 +60,39 @@ def sincronizar():
 
 
 def achatar():
-    """Desfaz as pastas da grelha: cada módulo é uma app, e vende-se sozinho."""
-    achatadas = []
-    for pasta in frappe.get_all("Desktop Icon", filters={"icon_type": "Folder"},
-                                fields=["name", "label"]):
-        filhos = frappe.get_all("Desktop Icon", filters={"parent_icon": pasta.label}, pluck="name")
-        frappe.db.set_value("Desktop Icon", pasta.name, "icon_type", "Link", update_modified=False)
+    """Traz à grelha os módulos que estão pendurados noutro ícone.
+
+    Dois casos, e durante algum tempo só um estava tratado:
+
+    - **Pastas.** O ERPNext mete nove módulos de contabilidade dentro de uma
+      pasta «Accounting». A pasta era o único ícone sem desenho nenhum.
+    - **Apps.** Outros vinte e quatro — Vendas, Compras, Inventário, Produção,
+      os do RH, os do sistema — são filhos dos ícones ERPNext, Frappe HR e
+      Framework, e abriam-se só por dentro dessas apps. Como dois desses pais
+      estão escondidos, havia módulos sem caminho nenhum a partir do ecrã.
+
+    A decisão de produto é a mesma para os dois casos: cada módulo é uma app
+    vendável e mostra-se ao lado das outras. Quem quiser a vista por app tem-na
+    na barra lateral de cada uma, que não é tocada aqui.
+    """
+    pastas, promovidos = [], 0
+    for icone in frappe.get_all("Desktop Icon", fields=["name", "label", "icon_type"]):
+        filhos = frappe.get_all("Desktop Icon", filters={"parent_icon": icone.label},
+                                pluck="name")
+        if not filhos:
+            continue
+        if icone.icon_type == "Folder":
+            frappe.db.set_value("Desktop Icon", icone.name, "icon_type", "Link",
+                                update_modified=False)
         for f in filhos:
             frappe.db.set_value("Desktop Icon", f, "parent_icon", "", update_modified=False)
-        achatadas.append(f"{pasta.label} (+{len(filhos)})")
+        pastas.append(f"{icone.label} (+{len(filhos)})")
+        promovidos += len(filhos)
 
     frappe.db.commit()
     _limpar_cache()
-    aviso = "Orbit: pastas achatadas — " + (", ".join(achatadas) or "nenhuma")
+    aviso = (f"Orbit: {promovidos} módulos promovidos à grelha — "
+             + (", ".join(pastas) or "nenhum"))
     print(aviso)
     frappe.logger().info(aviso)
 
@@ -201,6 +223,22 @@ NOMES = {
     "Organization": "Organização",
     "ERPNext Settings": "Definições",
     "Support": "Suporte",
+    "Automation": "Automação",
+    "Printing": "Impressão",
+    # «E-mail» (tradução do Frappe) ficava ao lado do produto Mail e confundia
+    # duas coisas diferentes: este módulo é a configuração de contas do ERP.
+    "Email": "Contas de correio",
+    # Recursos humanos
+    "HR Setup": "Configuração de RH",
+    "Recruitment": "Recrutamento",
+    "Leaves": "Ausências",
+    "Payroll": "Processamento salarial",
+    "Expenses": "Despesas",
+    "Performance": "Desempenho",
+    "Tenure": "Antiguidade",
+    # O «&» da tradução do Frappe foge ao estilo dos restantes.
+    "Shift & Attendance": "Turnos e assiduidade",
+    "Tax & Benefits": "Impostos e benefícios",
     # marca → fica como está; só se encurta o que vinha com o nome do fabricante
     "Frappe CRM": "CRM",
     "Helpdesk": "Desk",
