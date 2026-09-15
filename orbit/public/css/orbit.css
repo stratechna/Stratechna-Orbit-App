@@ -3,6 +3,11 @@
  * As cores vêm das variáveis do próprio Frappe sempre que existem, para o ecrã
  * acompanhar o tema claro e o escuro sem duas folhas de estilo. Onde não há
  * variável, entram os degraus da ardósia da Stratechna.
+ *
+ * Regra de composição: a página inteira cabe num ecrã, sem rolar. Os módulos
+ * agrupam-se em blocos que se arrumam por colunas — a primeira versão punha um
+ * grupo por linha a toda a largura, e com grupos de um ou dois módulos o ecrã
+ * ficava com metros de vazio à direita e obrigava a rolar para chegar ao fim.
  */
 
 /* ── Barra de cima: símbolo maior, com o nome ao lado ───────────────────── */
@@ -37,88 +42,142 @@
 	display: none;
 }
 
+/* ── A página ──────────────────────────────────────────────────────────────
+   Coluna única: saudação em cima, blocos no meio a ocupar o que sobra, rodapé
+   encostado ao fundo do ecrã mesmo quando há poucos módulos. */
+#orbit-pagina {
+	display: flex;
+	flex-direction: column;
+	/* A altura da barra de cima é medida pelo JS e escrita em `--orbit-topo`:
+	   fixá-la em 60px deixava a página 1px mais alta que o ecrã e aparecia a
+	   barra de rolamento — precisamente o que se queria evitar. */
+	min-height: calc(100vh - var(--orbit-topo, 60px));
+	max-width: 1180px;
+	margin: 0 auto;
+	padding: 0 28px;
+	box-sizing: border-box;
+}
+
 /* ── Saudação ──────────────────────────────────────────────────────────── */
 #orbit-saudacao {
-	max-width: 1120px;
-	margin: 0 auto;
-	padding: 44px 28px 4px;
+	padding: 34px 0 20px;
 }
 
 #orbit-saudacao .orbit-saudacao-titulo {
 	margin: 0;
-	font-size: 26px;
+	font-size: 24px;
 	font-weight: 600;
 	letter-spacing: -0.02em;
 	color: var(--text-color, #22303d);
 }
 
 #orbit-saudacao .orbit-saudacao-frase {
-	margin: 6px 0 0;
-	font-size: 15px;
+	margin: 4px 0 0;
+	font-size: 14px;
 	line-height: 1.5;
 	color: var(--text-muted, #5f7386);
 }
 
-/* ── Grelha por grupos ─────────────────────────────────────────────────── */
+/* ── Os blocos ─────────────────────────────────────────────────────────────
+   Duas linhas de dois blocos, em colunas iguais: cada bloco de baixo fica
+   exactamente por baixo do de cima, com a mesma largura. Em baixo estão os
+   grupos que só dão uma linha de símbolos, e por isso a linha é mais baixa.
+
+   Dentro de cada linha os blocos esticam à mesma altura; entre linhas, não:
+   a de baixo é naturalmente mais baixa, e é isso que se quer. */
 #orbit-grelha {
-	max-width: 1120px;
-	margin: 0 auto;
-	padding: 20px 28px 8px;
+	flex: 1 1 auto;
 	display: flex;
 	flex-direction: column;
-	gap: 34px;
+	justify-content: center;
+	gap: 18px;
 }
 
-.orbit-seccao-cab {
+.orbit-linha {
+	display: grid;
+	align-items: stretch;
+	gap: 18px;
+}
+
+@media (max-width: 1000px) {
+	.orbit-linha { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+
+@media (max-width: 680px) {
+	.orbit-linha { grid-template-columns: minmax(0, 1fr) !important; }
+}
+
+.orbit-bloco {
+	display: flex;
+	flex-direction: column;
+	box-sizing: border-box;
+	padding: 16px 16px 8px;
+	background: var(--card-bg, #fff);
+	border: 1px solid var(--border-color, #e2e8ee);
+	border-radius: 12px;
+}
+
+/* Título à esquerda, legenda à direita e o risco a ligar os dois — a forma que
+   foi aprovada na primeira versão. */
+.orbit-bloco-cab {
 	display: flex;
 	align-items: center;
-	gap: 12px;
-	margin-bottom: 16px;
+	gap: 10px;
+	margin: 0 2px 12px;
 }
 
-.orbit-seccao-titulo {
-	font-size: 11px;
-	font-weight: 600;
-	letter-spacing: 0.12em;
-	text-transform: uppercase;
-	color: var(--text-muted, #5f7386);
-	white-space: nowrap;
-}
-
-/* O risco é o separador entre grupos: começa onde o título acaba e vai até ao
-   fim da linha, para separar sem cortar. */
-.orbit-seccao-risco {
-	flex: 1;
-	height: 1px;
-	background: var(--border-color, #e2e6ea);
-}
-
-.orbit-seccao-nota {
+.orbit-bloco-titulo {
+	flex: none;
 	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-color, #22303d);
+}
+
+.orbit-bloco-risco {
+	flex: 1 1 auto;
+	min-width: 12px;
+	height: 1px;
+	background: var(--border-color, #e2e8ee);
+}
+
+.orbit-bloco-nota {
+	flex: none;
+	font-size: 11.5px;
+	line-height: 1.35;
+	text-align: right;
 	color: var(--text-light, #8a9bab);
-	white-space: nowrap;
 }
 
-@media (max-width: 720px) {
-	.orbit-seccao-nota {
-		display: none;
-	}
+.orbit-bloco-nota:empty {
+	display: none;
 }
 
+/* Em blocos estreitos a legenda não cabe ao lado do título sem espremer o
+   risco até desaparecer; nesse caso sai, e o título fica sozinho. */
+@media (max-width: 1080px) {
+	.orbit-bloco-nota { display: none; }
+}
+
+/* ── Os módulos ──────────────────────────────────────────────────────────
+   Dentro de cada linha os blocos têm a altura do mais alto, por isso as linhas
+   de símbolos repartem-se por essa altura em vez de se amontoarem no cimo. */
 .orbit-lista {
+	flex: 1 1 auto;
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-	gap: 8px 4px;
+	grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+	align-content: space-between;
+	gap: 2px;
 }
 
-/* ── Cartão de cada módulo ─────────────────────────────────────────────── */
 .orbit-cartao {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: 10px;
-	padding: 14px 8px 12px;
-	border-radius: 14px;
+	gap: 7px;
+	padding: 10px 4px 12px;
+	border-radius: 10px;
 	text-decoration: none;
 	color: inherit;
 	transition: background-color 120ms ease;
@@ -126,60 +185,118 @@
 
 .orbit-cartao:hover,
 .orbit-cartao:focus-visible {
-	background: var(--fg-hover-color, rgba(34, 48, 61, 0.05));
+	background: var(--bg-color, #f4f7f9);
 	text-decoration: none;
 	color: inherit;
 }
 
-.orbit-cartao:focus-visible {
-	outline: 2px solid var(--primary, #3d5163);
-	outline-offset: 2px;
-}
-
 .orbit-cartao-img,
 .orbit-cartao-vazio {
-	width: 54px;
-	height: 54px;
-	border-radius: 14px;
-	display: block;
+	width: 40px;
+	height: 40px;
+	border-radius: 9px;
+	flex: none;
 }
 
 .orbit-cartao-vazio {
-	background: var(--control-bg, #eef1f3);
+	background: var(--bg-color, #eef2f5);
 }
 
 .orbit-cartao-nome {
-	font-size: 12px;
+	font-size: 11.5px;
 	line-height: 1.25;
 	text-align: center;
-	color: var(--text-color, #22303d);
-	/* Nomes longos passam a duas linhas em vez de serem cortados com reticências:
-	   «Financial R…» não diz nada a ninguém. */
-	overflow-wrap: anywhere;
-	max-width: 100%;
+	color: var(--text-muted, #5f7386);
+	/* `anywhere` partia «Subcontratação» a meio da palavra; `break-word` só
+	   quebra quando a palavra não cabe de todo. */
+	overflow-wrap: break-word;
+	hyphens: auto;
 }
 
-/* ── Rodapé ────────────────────────────────────────────────────────────── */
+/* ── Rodapé ────────────────────────────────────────────────────────────────
+   Três coisas, por esta ordem: a marca do produto, a frase que diz o que isto
+   é, e o logótipo da empresa a assinar por baixo do risco. */
 #orbit-rodape {
 	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	padding: 22px 0 26px;
+	text-align: center;
+}
+
+#orbit-rodape .orbit-rodape-marcas {
+	display: flex;
+	align-items: center;
 	justify-content: center;
-	padding: 48px 28px 72px;
+	gap: 22px;
 }
 
-#orbit-rodape .orbit-rodape-marca {
-	height: 26px;
+#orbit-rodape .orbit-rodape-produto {
+	height: 59px;
 	width: auto;
-	opacity: 0.55;
-	transition: opacity 120ms ease;
 }
 
-#orbit-rodape .orbit-rodape-marca:hover {
-	opacity: 0.8;
+#orbit-rodape .orbit-rodape-risco {
+	width: 1px;
+	height: 37px;
+	background: var(--border-color, #e2e8ee);
+}
+
+#orbit-rodape .orbit-rodape-empresa {
+	height: 44px;
+	width: auto;
+}
+
+#orbit-rodape .orbit-rodape-frase {
+	max-width: 62ch;
+	margin: 2px 0 0;
+	font-size: 13px;
+	line-height: 1.5;
+	color: var(--text-muted, #5f7386);
+}
+
+/* Um logótipo para cada tema. Quem manda é o `data-theme` que o Frappe carimba
+   na raiz — e não a preferência do sistema: no tema «automático» o próprio
+   Frappe resolve o sistema e carimba o resultado. Ler `prefers-color-scheme`
+   por cima disso escondia o logótipo certo quando os dois discordavam. */
+.orbit-so-escuro { display: none; }
+
+[data-theme="dark"] .orbit-so-claro { display: none; }
+[data-theme="dark"] .orbit-so-escuro { display: block; }
+
+/* Em ecrãs baixos aperta-se o espaço vertical em vez de se deixar rolar. */
+@media (max-height: 860px) {
+	#orbit-saudacao { padding: 24px 0 16px; }
+	#orbit-rodape { gap: 8px; padding: 20px 0 24px; }
+	#orbit-rodape .orbit-rodape-produto { height: 51px; }
+	#orbit-rodape .orbit-rodape-empresa { height: 37px; }
+	#orbit-rodape .orbit-rodape-risco { height: 31px; }
+	.orbit-cartao { padding: 8px 4px 10px; gap: 6px; }
+	.orbit-bloco { padding: 14px 14px 6px; }
+}
+
+/* Portátil de 1280×800 (ecrã útil ~700 px): aperta-se mais um degrau. A conta é
+   simples — o que sobra são cinco linhas de módulos na coluna mais alta, e cada
+   linha que encolhe 10 px devolve 50 px à página. */
+@media (max-height: 780px) {
+	#orbit-saudacao { padding: 16px 0 12px; }
+	#orbit-saudacao .orbit-saudacao-titulo { font-size: 21px; }
+	.orbit-cartao { padding: 6px 4px 8px; gap: 5px; }
+	.orbit-cartao-img,
+	.orbit-cartao-vazio { width: 34px; height: 34px; border-radius: 8px; }
+	.orbit-bloco { padding: 12px 12px 5px; }
+	.orbit-bloco-cab { margin-bottom: 9px; }
+	#orbit-rodape { gap: 6px; padding: 14px 0 16px; }
+	#orbit-rodape .orbit-rodape-marcas { gap: 18px; }
+	#orbit-rodape .orbit-rodape-produto { height: 44px; }
+	#orbit-rodape .orbit-rodape-empresa { height: 33px; }
+	#orbit-rodape .orbit-rodape-risco { height: 26px; }
+	#orbit-rodape .orbit-rodape-frase { font-size: 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.orbit-cartao,
-	#orbit-rodape .orbit-rodape-marca {
+	.orbit-cartao {
 		transition: none;
 	}
 }

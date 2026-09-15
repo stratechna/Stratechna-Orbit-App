@@ -6,8 +6,8 @@
  *
  *   - o nome da plataforma ao lado do símbolo, na barra de cima;
  *   - uma saudação que muda com a hora do dia, na mesma voz do portal;
- *   - os módulos agrupados por função, com um título discreto em cada grupo;
- *   - o logótipo da Stratechna a fechar a página.
+ *   - os módulos em blocos, para a página caber num ecrã sem rolar;
+ *   - o rodapé com a marca do produto, a frase e o logótipo da empresa.
  *
  * Decisão a assumir: a grelha é redesenhada por nós a partir de
  * `frappe.boot.desktop_icons`, em vez de tentarmos reorganizar a que o Frappe
@@ -22,15 +22,35 @@
 (function () {
 	const MARCA = "Stratechna Orbit";
 
-	// Os grupos, por ordem de aparição. Um módulo que não esteja em lista nenhuma
-	// cai em "Mais" — assim uma app nova nunca desaparece do ecrã.
+	// A frase do rodapé. Nomeia o que lá está dentro em vez de dizer «suite de
+	// produtividade», que toda a gente diz e não quer dizer nada.
+	const FRASE_RODAPE =
+		"A suite de gestão da Stratechna — CRM, suporte, faturação, documentos " +
+		"e correio, num só lugar.";
+
+	// Os grupos, em duas linhas: em cima os dois grandes, lado a lado; em baixo
+	// os dois pequenos, que só dão uma linha de símbolos e por isso levam blocos
+	// mais baixos. A largura de cada bloco da linha de baixo é proporcional ao
+	// que tem lá dentro, para a linha fechar de ponta a ponta como a de cima.
+	//
+	// Os nomes aqui são os RÓTULOS do `Desktop Icon`, não o que se lê no ecrã: o
+	// CRM chama-se «Frappe CRM» e o Desk chama-se «Helpdesk» na base de dados, e
+	// é a tradução que lhes dá o nome curto à frente do utilizador. Escrever aqui
+	// o nome traduzido foi o que atirou os dois para o grupo «Mais», com o ecrã a
+	// mostrar um bloco solto no fim — parecia decisão, era engano.
+	//
+	// Um módulo que não esteja em lista nenhuma cai em «Mais», para que uma app
+	// nova nunca desapareça do ecrã.
 	const GRUPOS = [
 		{
+			linha: 1,
 			titulo: "Trabalho",
 			nota: "O dia-a-dia com clientes e equipa",
-			itens: ["CRM", "Desk", "Mail", "Docs", "Sign", "Events", "Social", "Wiki", "Projects"],
+			itens: ["Frappe CRM", "Helpdesk", "Mail", "Docs", "Sign", "Events",
+				"Social", "Wiki", "Frappe HR", "Projects"],
 		},
 		{
+			linha: 1,
 			titulo: "Gestão",
 			nota: "Dinheiro, contratos e obrigações",
 			itens: ["Invoicing", "Payments", "Banking", "Taxes", "Budget",
@@ -38,17 +58,21 @@
 				"Share Management", "Accounting"],
 		},
 		{
+			linha: 2,
 			titulo: "Operações",
 			nota: "O que se compra, produz e vende",
 			itens: ["Selling", "Buying", "Stock", "Assets", "Manufacturing",
-				"Subcontracting", "Quality", "Organization"],
+				"Subcontracting", "Quality", "Organization",
+				"HR Setup", "Recruitment", "Leaves", "Payroll", "Expenses",
+				"Performance", "Tenure", "Shift & Attendance", "Tax & Benefits"],
 		},
-		{ titulo: "Pessoas", nota: "Equipa e recursos humanos", itens: ["Frappe HR", "RH"] },
 		{
+			linha: 2,
 			titulo: "Sistema",
 			nota: "Configuração da plataforma",
-			itens: ["ERPNext Settings", "Home", "My Workspaces", "Users", "Website",
-				"Integrations", "Support"],
+			itens: ["ERPNext Settings", "Users", "Website", "Integrations",
+				"Automation", "Data", "Email", "Printing", "System", "Support",
+				"Home", "My Workspaces"],
 		},
 	];
 
@@ -91,6 +115,17 @@
 	}
 
 	// ── Peças ────────────────────────────────────────────────────────────────
+	// A página mede-se contra o ecrã, e para isso precisa de saber quanto ocupa a
+	// barra de cima. Medida, não adivinhada: um valor fixo deixava a página uns
+	// pixéis mais alta do que o ecrã e punha barra de rolamento numa página que
+	// devia caber inteira.
+	function medirTopo() {
+		const barra = document.querySelector(".desktop-navbar") ||
+			document.querySelector(".navbar");
+		const h = barra ? Math.round(barra.getBoundingClientRect().height) : 60;
+		document.documentElement.style.setProperty("--orbit-topo", h + "px");
+	}
+
 	function marcaNaBarra() {
 		const casa = document.querySelector(".desktop-navbar .navbar-home");
 		if (!casa || casa.querySelector(".orbit-marca-nome")) return;
@@ -100,72 +135,53 @@
 		casa.appendChild(nome);
 	}
 
-	function cabecalho(container) {
-		if (document.getElementById("orbit-saudacao")) return;
+	function cabecalho() {
 		const s = saudacao();
-		const el = document.createElement("div");
+		const el = document.createElement("header");
 		el.id = "orbit-saudacao";
 		el.innerHTML =
 			`<h1 class="orbit-saudacao-titulo"></h1>` +
 			`<p class="orbit-saudacao-frase"></p>`;
 		el.querySelector(".orbit-saudacao-titulo").textContent = s.titulo;
 		el.querySelector(".orbit-saudacao-frase").textContent = s.frase;
-		container.parentNode.insertBefore(el, container);
+		return el;
 	}
 
-	function rodape(container) {
-		if (document.getElementById("orbit-rodape")) return;
+	// O rodapé responde a três coisas pedidas depois de o ver no ecrã: a marca do
+	// produto tinha ficado pequena de mais, faltava o logótipo da empresa e
+	// faltava a frase que estava na versão anterior.
+	function rodape() {
 		const el = document.createElement("footer");
 		el.id = "orbit-rodape";
-		el.innerHTML = `<img class="orbit-rodape-marca" src="/assets/orbit/img/stratechna.svg" alt="Stratechna">`;
-		container.parentNode.insertBefore(el, container.nextSibling);
+		el.innerHTML =
+			`<div class="orbit-rodape-marcas">` +
+			`<img class="orbit-rodape-produto" src="/assets/orbit/img/stratechna.svg" alt="${MARCA}">` +
+			`<span class="orbit-rodape-risco"></span>` +
+			`<img class="orbit-rodape-empresa orbit-so-claro" src="/assets/orbit/img/stratechna-marca.svg" alt="Stratechna">` +
+			`<img class="orbit-rodape-empresa orbit-so-escuro" src="/assets/orbit/img/stratechna-marca-escura.svg" alt="Stratechna">` +
+			`</div>` +
+			`<p class="orbit-rodape-frase"></p>`;
+		el.querySelector(".orbit-rodape-frase").textContent = FRASE_RODAPE;
+		return el;
 	}
 
-	function grelha(container) {
-		const icones = (frappe.boot && frappe.boot.desktop_icons) || [];
-		if (!icones.length) return false;
-		if (document.getElementById("orbit-grelha")) return true;
+	function bloco(g) {
+		const sec = document.createElement("section");
+		sec.className = "orbit-bloco";
+		sec.innerHTML =
+			`<div class="orbit-bloco-cab">` +
+			`<span class="orbit-bloco-titulo"></span>` +
+			`<span class="orbit-bloco-risco"></span>` +
+			`<span class="orbit-bloco-nota"></span>` +
+			`</div>`;
+		sec.querySelector(".orbit-bloco-titulo").textContent = g.titulo;
+		sec.querySelector(".orbit-bloco-nota").textContent = g.nota || "";
 
-		const visiveis = icones.filter((i) => !i.hidden && !i.parent_icon);
-		const usados = new Set();
-		const grupos = GRUPOS.map((g) => {
-			const membros = g.itens
-				.map((r) => visiveis.find((i) => i.label === r))
-				.filter(Boolean);
-			membros.forEach((m) => usados.add(m.label));
-			return { ...g, membros };
-		});
-		const sobras = visiveis.filter((i) => !usados.has(i.label));
-		if (sobras.length) grupos.push({ titulo: "Mais", nota: "", membros: sobras });
-
-		const raiz = document.createElement("div");
-		raiz.id = "orbit-grelha";
-		for (const g of grupos) {
-			if (!g.membros.length) continue;
-			const sec = document.createElement("section");
-			sec.className = "orbit-seccao";
-			const cab = document.createElement("div");
-			cab.className = "orbit-seccao-cab";
-			cab.innerHTML = `<span class="orbit-seccao-titulo"></span><span class="orbit-seccao-risco"></span>`;
-			cab.querySelector(".orbit-seccao-titulo").textContent = g.titulo;
-			if (g.nota) {
-				const nota = document.createElement("span");
-				nota.className = "orbit-seccao-nota";
-				nota.textContent = g.nota;
-				cab.appendChild(nota);
-			}
-			sec.appendChild(cab);
-
-			const lista = document.createElement("div");
-			lista.className = "orbit-lista";
-			for (const i of g.membros) lista.appendChild(cartao(i));
-			sec.appendChild(lista);
-			raiz.appendChild(sec);
-		}
-
-		container.parentNode.insertBefore(raiz, container);
-		container.classList.add("orbit-escondido");
-		return true;
+		const lista = document.createElement("div");
+		lista.className = "orbit-lista";
+		for (const i of g.membros) lista.appendChild(cartao(i));
+		sec.appendChild(lista);
+		return sec;
 	}
 
 	function cartao(icone) {
@@ -185,21 +201,68 @@
 		return a;
 	}
 
+	function pagina(container) {
+		const icones = (frappe.boot && frappe.boot.desktop_icons) || [];
+		if (!icones.length) return false;
+		if (document.getElementById("orbit-pagina")) return true;
+
+		const visiveis = icones.filter((i) => !i.hidden && !i.parent_icon);
+		const usados = new Set();
+		const grupos = GRUPOS.map((g) => {
+			const membros = g.itens
+				.map((r) => visiveis.find((i) => i.label === r))
+				.filter(Boolean);
+			membros.forEach((m) => usados.add(m.label));
+			return { ...g, membros };
+		}).filter((g) => g.membros.length);
+
+		const sobras = visiveis.filter((i) => !usados.has(i.label));
+		if (sobras.length) grupos.push({ linha: 2, titulo: "Mais", nota: "", membros: sobras });
+
+		const grelha = document.createElement("div");
+		grelha.id = "orbit-grelha";
+		for (const n of [1, 2]) {
+			const desta = grupos.filter((g) => g.linha === n);
+			if (!desta.length) continue;
+			const linha = document.createElement("div");
+			linha.className = "orbit-linha";
+			// Todas as linhas se repartem em partes iguais, e como as duas têm
+			// dois blocos, cada bloco de baixo fica exactamente por baixo do de
+			// cima. É a coluna que manda, não o conteúdo.
+			linha.style.gridTemplateColumns = desta
+				.map(() => "minmax(0, 1fr)")
+				.join(" ");
+			for (const g of desta) linha.appendChild(bloco(g));
+			grelha.appendChild(linha);
+		}
+
+		const raiz = document.createElement("div");
+		raiz.id = "orbit-pagina";
+		raiz.appendChild(cabecalho());
+		raiz.appendChild(grelha);
+		raiz.appendChild(rodape());
+
+		container.parentNode.insertBefore(raiz, container);
+		container.classList.add("orbit-escondido");
+		return true;
+	}
+
 	// ── Arranque ─────────────────────────────────────────────────────────────
 	function montar() {
 		const container = document.querySelector(".desktop-container");
 		if (!container) return false;
 		marcaNaBarra();
-		if (!grelha(container)) return false;
-		cabecalho(document.getElementById("orbit-grelha"));
-		rodape(document.getElementById("orbit-grelha"));
-		return true;
+		const feito = pagina(container);
+		if (feito) medirTopo();
+		return feito;
 	}
 
 	let tentativas = 0;
 	const relogio = setInterval(function () {
 		if (montar() || ++tentativas > 60) clearInterval(relogio);
 	}, 200);
+
+	window.addEventListener("resize", medirTopo);
 
 	if (window.frappe && frappe.router && frappe.router.on) {
 		frappe.router.on("change", function () {

@@ -102,6 +102,16 @@ ATALHOS = [
 ]
 
 
+# As apps com frontend próprio, que já vêm na grelha e só precisam do símbolo
+# certo. O rótulo é o da base de dados, não o que se lê no ecrã.
+MARCAS_APPS = {
+    "Frappe CRM": "crm",
+    "Helpdesk": "desk",
+    "Wiki": "wiki",
+    "Frappe HR": "rh",
+}
+
+
 def _dominio_do_tenant() -> str:
     """O domínio onde vivem os módulos de fora. Configurável por site em
     site_config.json (`orbit_dominio_apps`); por omissão, o nosso."""
@@ -132,6 +142,18 @@ def repor_atalhos():
             "hidden": 0,
         }).insert(ignore_permissions=True)
         criados.append(a["nome"])
+
+    # As apps que têm frontend próprio não passam pelos símbolos dos módulos: o
+    # `get_desktop_icon` não encontra ficheiro para o rótulo delas e cai no
+    # `logo_url`. Sem isto, o RH aparecia com o logótipo verde do Frappe HR no
+    # meio dos nossos quadrados, e o CRM, o Desk e o Wiki dependiam de ficheiros
+    # carregados à mão em /files — que não viajam com a app.
+    for rotulo, simbolo in MARCAS_APPS.items():
+        nome = frappe.db.get_value("Desktop Icon", {"label": rotulo}, "name")
+        if nome:
+            frappe.db.set_value("Desktop Icon", nome, "logo_url",
+                                f"/assets/orbit/icons/apps/{simbolo}.svg",
+                                update_modified=False)
 
     frappe.db.commit()
     frappe.cache.delete_key("desktop_icons")
