@@ -188,9 +188,37 @@
 		return sec;
 	}
 
+	// As apps que o cliente não subscreveu não desaparecem: ficam a cinzento e
+	// levam ao portal. Esconder deixava o cliente sem saber que existem e a nós
+	// sem a venda; e como a grelha é o catálogo, o catálogo tem de estar todo lá.
+	//
+	// Isto é a VISTA. Quem não tem a app não a tem mesmo — as do Frappe nem
+	// sequer estão instaladas no site, e as de fora não estão aprovisionadas.
+	// O cinzento não é o cadeado.
+	function inactiva(icone) {
+		const m = (frappe.boot && frappe.boot.orbit_apps && frappe.boot.orbit_apps.inactivas) || {};
+		return m[icone.label] || null;
+	}
+
 	function cartao(icone) {
+		const fechada = inactiva(icone);
 		const a = document.createElement("a");
-		a.className = "orbit-cartao";
+		a.className = fechada ? "orbit-cartao orbit-cartao--fechada" : "orbit-cartao";
+		if (fechada) {
+			const portal = (frappe.boot.orbit_apps && frappe.boot.orbit_apps.portal) || "#";
+			a.href = portal;
+			a.target = "_blank";
+			a.title = __("{0} — não subscrito. Clique para subscrever.", [__(icone.label)]);
+			a.innerHTML =
+				`<img class="orbit-cartao-img" alt="">` +
+				`<span class="orbit-cartao-nome"></span>` +
+				`<span class="orbit-cartao-selo">${__("Subscrever")}</span>`;
+			const url = frappe.utils.get_desktop_icon(icone.label, frappe.boot.desktop_icon_style);
+			const fonte = (icone.icon_type !== "Folder" && url) || icone.logo_url || icone.icon_image;
+			if (fonte) a.querySelector(".orbit-cartao-img").src = fonte;
+			a.querySelector(".orbit-cartao-nome").textContent = __(icone.label);
+			return a;
+		}
 		a.href = frappe.utils.get_route_for_icon(icone) || "#";
 		if (icone.link_type === "External") a.target = "_blank";
 		a.title = __(icone.label);

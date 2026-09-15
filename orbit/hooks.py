@@ -11,6 +11,12 @@ app_license = "agpl-3.0"
 app_include_js = "/assets/orbit/js/orbit.js"
 app_include_css = "/assets/orbit/css/orbit.css"
 
+# O ecrã precisa de saber, no arranque, que apps é que este tenant tem — para
+# pintar a cinzento as que não tem em vez de as esconder. Vai no boot e não numa
+# chamada à parte porque a grelha se desenha de uma vez: um pedido extra deixava
+# os cartões a mudar de cor depois de já estarem no ecrã.
+extend_bootinfo = "orbit.apps.acrescentar_ao_boot"
+
 # A grelha de módulos põe-se de pé por esta ordem, e a ordem importa: a
 # sincronização traz de volta as fichas que as apps trazem em ficheiro (e que o
 # migrate não repõe sozinho), e só depois se achatam as pastas, se recriam os

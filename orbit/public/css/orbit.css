@@ -217,6 +217,53 @@
 	hyphens: auto;
 }
 
+/* ── Apps por subscrever ───────────────────────────────────────────────────
+   Ficam na grelha, a cinzento, com um selo a convidar. Dessaturar o símbolo em
+   vez de o esconder mantém a app reconhecível — o cliente vê o que lhe falta,
+   e nós não perdemos a venda a quem não sabe que existe. */
+.orbit-cartao--fechada {
+	position: relative;
+	cursor: pointer;
+}
+
+.orbit-cartao--fechada .orbit-cartao-img {
+	filter: grayscale(1);
+	opacity: 0.38;
+}
+
+.orbit-cartao--fechada .orbit-cartao-nome {
+	color: var(--text-light, #8a9bab);
+}
+
+.orbit-cartao--fechada .orbit-cartao-selo {
+	display: block;
+	margin-top: 3px;
+	font-size: 9.5px;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--text-light, #8a9bab);
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.orbit-cartao--fechada:hover .orbit-cartao-img,
+.orbit-cartao--fechada:focus-visible .orbit-cartao-img {
+	filter: grayscale(0.3);
+	opacity: 0.85;
+}
+
+.orbit-cartao--fechada:hover .orbit-cartao-selo,
+.orbit-cartao--fechada:focus-visible .orbit-cartao-selo {
+	opacity: 1;
+	color: var(--text-muted, #5f7386);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.orbit-cartao--fechada .orbit-cartao-selo,
+	.orbit-cartao--fechada .orbit-cartao-img { transition: none; }
+}
+
 /* ── Rodapé ────────────────────────────────────────────────────────────────
    Três coisas, por esta ordem: a marca do produto, a frase que diz o que isto
    é, e o logótipo da empresa a assinar por baixo do risco. */
