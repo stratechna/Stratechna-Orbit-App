@@ -52,7 +52,13 @@
 	   fixá-la em 60px deixava a página 1px mais alta que o ecrã e aparecia a
 	   barra de rolamento — precisamente o que se queria evitar. */
 	min-height: calc(100vh - var(--orbit-topo, 60px));
-	max-width: 1180px;
+	/* 1400 e não 1180: com 47 módulos, esta largura dá NOVE colunas por bloco em
+	   vez de oito e encurta a página em 75px — medido, não estimado. É mais
+	   altura do que se ganhou a apertar espaçamentos, e vinha de graça.
+	   1400 porque é o que enche um portátil de 1440 lógicos sem margem morta e
+	   continua equilibrado num monitor externo; mais do que isto estica as
+	   linhas de símbolos até custarem a percorrer com os olhos. */
+	max-width: 1400px;
 	margin: 0 auto;
 	padding: 0 28px;
 	box-sizing: border-box;
