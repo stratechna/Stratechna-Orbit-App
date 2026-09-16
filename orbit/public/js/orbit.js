@@ -36,11 +36,11 @@
 	// Os nomes aqui são os RÓTULOS do `Desktop Icon`, não o que se lê no ecrã: o
 	// CRM chama-se «Frappe CRM» e o Desk chama-se «Helpdesk» na base de dados, e
 	// é a tradução que lhes dá o nome curto à frente do utilizador. Escrever aqui
-	// o nome traduzido foi o que atirou os dois para o grupo «Mais», com o ecrã a
+	// o nome traduzido foi o que atirou os dois para fora do sítio, com o ecrã a
 	// mostrar um bloco solto no fim — parecia decisão, era engano.
 	//
-	// Um módulo que não esteja em lista nenhuma cai em «Mais», para que uma app
-	// nova nunca desapareça do ecrã.
+	// Um módulo que não esteja em lista nenhuma cai em «Operações», para que uma
+	// app nova nunca desapareça do ecrã.
 	const GRUPOS = [
 		{
 			linha: 1,
@@ -248,8 +248,20 @@
 			return { ...g, membros };
 		}).filter((g) => g.membros.length);
 
+		// O que não está em lista nenhuma junta-se a «Operações» em vez de abrir
+		// um bloco «Mais» só para si. A rede de segurança mantém-se — um módulo
+		// novo continua a aparecer sem ninguém mexer aqui —, mas deixa de haver
+		// um bloco sem nome próprio a desequilibrar a linha de baixo.
 		const sobras = visiveis.filter((i) => !usados.has(i.label));
-		if (sobras.length) grupos.push({ linha: 2, titulo: "Mais", nota: "", membros: sobras });
+		if (sobras.length) {
+			const operacoes = grupos.find((g) => g.titulo === "Operações");
+			if (operacoes) operacoes.membros.push(...sobras);
+			// Se «Operações» não tiver nenhum módulo visível, nem sequer existe
+			// na lista — e aí as sobras precisam de sítio, ou desapareciam do
+			// ecrã, que é exactamente o que isto existe para evitar.
+			else grupos.push({ linha: 2, titulo: "Operações",
+				nota: "O que se compra, produz e vende", membros: sobras });
+		}
 
 		const grelha = document.createElement("div");
 		grelha.id = "orbit-grelha";

@@ -194,11 +194,14 @@
 	color: inherit;
 }
 
+/* 52px é o tamanho a que estes mesmos símbolos são mostrados no stratechna.com,
+   medido lá. Ter os dois sítios ao mesmo tamanho não é só arrumação: é o mesmo
+   desenho a ser reconhecido no site e dentro do produto. */
 .orbit-cartao-img,
 .orbit-cartao-vazio {
-	width: 40px;
-	height: 40px;
-	border-radius: 9px;
+	width: 52px;
+	height: 52px;
+	border-radius: 12px;
 	flex: none;
 }
 
@@ -340,11 +343,13 @@
 	padding: 7px 3px 9px;
 }
 
+/* Mesmo apertado, o símbolo não desce abaixo dos 46px: é a legibilidade que
+   está em causa, e é o que se ganha nos espaçamentos que paga o aumento. */
 #orbit-pagina[data-densidade="apertada"] .orbit-cartao-img,
 #orbit-pagina[data-densidade="apertada"] .orbit-cartao-vazio {
-	width: 34px;
-	height: 34px;
-	border-radius: 8px;
+	width: 46px;
+	height: 46px;
+	border-radius: 11px;
 }
 
 #orbit-pagina[data-densidade="apertada"] .orbit-cartao-nome {
