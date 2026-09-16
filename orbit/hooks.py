@@ -8,8 +8,15 @@ app_license = "agpl-3.0"
 # O rodapé do ecrã de apps só se consegue acrescentar por aqui: estes dois ganchos
 # são a única forma de o Frappe deixar entrar CSS e JS próprios em todas as páginas
 # do desk, e exigem uma app instalada.
-app_include_js = "/assets/orbit/js/orbit.js"
-app_include_css = "/assets/orbit/css/orbit.css"
+# O `?v=` não é decoração: o Frappe entrega estes dois caminhos ao browser tal e
+# qual (o `bundled_asset` só resolve nomes de bundle, e estes são caminhos
+# completos), e o nginx serve /assets sem `Cache-Control`. Sem versão no URL, o
+# browser fica agarrado à cópia que tem — e uma alteração publicada pode não
+# chegar a ver-se, por mais vezes que se recarregue.
+#
+# SUBIR ESTE NÚMERO sempre que se mexer no CSS ou no JS.
+app_include_js = "/assets/orbit/js/orbit.js?v=3"
+app_include_css = "/assets/orbit/css/orbit.css?v=3"
 
 # O ecrã precisa de saber, no arranque, que apps é que este tenant tem — para
 # pintar a cinzento as que não tem em vez de as esconder. Vai no boot e não numa

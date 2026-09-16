@@ -60,7 +60,10 @@
 
 /* ── Saudação ──────────────────────────────────────────────────────────── */
 #orbit-saudacao {
-	padding: 34px 0 20px;
+	/* Era 34/20. O espaço em cima e em baixo dos blocos estava a sobrar e a
+	   fazer a grelha parecer pequena no meio do ecrã — e era esse mesmo espaço
+	   que eu andava a poupar encolhendo os símbolos. */
+	padding: 22px 0 12px;
 }
 
 #orbit-saudacao .orbit-saudacao-titulo {
@@ -89,7 +92,11 @@
 	flex: 1 1 auto;
 	display: flex;
 	flex-direction: column;
-	justify-content: center;
+	/* `center` repartia a folga que sobrava em duas faixas vazias, uma acima e
+	   outra abaixo dos blocos — era o «espaço antes e depois» que se notava.
+	   Encostados ao cimo, a folga junta-se toda antes do rodapé, onde não
+	   separa nada. */
+	justify-content: flex-start;
 	gap: 18px;
 }
 
