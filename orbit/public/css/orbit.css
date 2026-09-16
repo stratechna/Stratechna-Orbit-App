@@ -317,6 +317,27 @@
 	color: var(--text-muted, #5f7386);
 }
 
+/* Discreto de propósito: pequeno, cinzento claro, sem sublinhado até se lá
+   passar por cima. O que a AGPL exige é que a oferta de código seja
+   ALCANÇÁVEL, não que compita com a marca. */
+#orbit-rodape .orbit-rodape-licencas {
+	margin-top: 6px;
+	font-size: 11px;
+	line-height: 1.4;
+	color: var(--text-light, #8a9bab);
+	text-decoration: none;
+	opacity: 0.75;
+	transition: opacity 120ms ease;
+}
+
+#orbit-rodape .orbit-rodape-licencas:hover,
+#orbit-rodape .orbit-rodape-licencas:focus-visible {
+	opacity: 1;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+	color: var(--text-muted, #5f7386);
+}
+
 /* Um logótipo para cada tema. Quem manda é o `data-theme` que o Frappe carimba
    na raiz — e não a preferência do sistema: no tema «automático» o próprio
    Frappe resolve o sistema e carimba o resultado. Ler `prefers-color-scheme`

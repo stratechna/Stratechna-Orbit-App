@@ -1,0 +1,83 @@
+{% extends "templates/web.html" %}
+{#
+   Página de licenças do Stratechna Orbit.
+
+   Não está aqui por elegância: seis dos componentes do Orbit são AGPL v3, e a
+   cláusula 13 dessa licença obriga a oferecer o código-fonte da NOSSA versão
+   modificada a quem usa o software pela rede — não basta o original ser
+   público. É esta página que cumpre essa oferta, e é o link no rodapé do ecrã
+   de apps que a torna alcançável.
+
+   Fica em `www/` e não no desk de propósito: tem de ser legível por quem usa o
+   serviço, incluindo sem sessão iniciada.
+#}
+
+{% block title %}Licenças e código aberto{% endblock %}
+
+{% block page_content %}
+<style>
+	.orbit-lic { max-width: 880px; margin: 0 auto; padding: 48px 24px 72px;
+		color: var(--text-color, #22303d); }
+	.orbit-lic h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.02em;
+		margin: 0 0 12px; }
+	.orbit-lic p { font-size: 14.5px; line-height: 1.65;
+		color: var(--text-muted, #5f7386); max-width: 68ch; }
+	.orbit-lic h2 { font-size: 12px; font-weight: 600; letter-spacing: 0.08em;
+		text-transform: uppercase; margin: 36px 0 12px;
+		color: var(--text-color, #22303d); }
+	/* A tabela rola dentro do seu contentor: em ecrã estreito, sem isto, era a
+	   página inteira a andar para o lado. */
+	.orbit-lic-tabela { overflow-x: auto; }
+	.orbit-lic table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+	.orbit-lic th { text-align: left; font-weight: 600; font-size: 11.5px;
+		letter-spacing: 0.06em; text-transform: uppercase;
+		color: var(--text-light, #8a9bab);
+		padding: 0 14px 8px 0; border-bottom: 1px solid var(--border-color, #e2e8ee); }
+	.orbit-lic td { padding: 10px 14px 10px 0; vertical-align: top;
+		border-bottom: 1px solid var(--border-color, #eef2f5); }
+	.orbit-lic td:first-child { font-weight: 600; white-space: nowrap; }
+	.orbit-lic a { color: inherit; text-decoration: underline;
+		text-underline-offset: 2px; }
+	.orbit-lic .orbit-lic-nota { font-size: 13px; margin-top: 28px;
+		padding-top: 18px; border-top: 1px solid var(--border-color, #e2e8ee); }
+</style>
+
+<div class="orbit-lic">
+	<h1>Licenças e código aberto</h1>
+
+	<p>O Stratechna Orbit é construído sobre software de código aberto. Abaixo
+	está cada componente, a licença ao abrigo da qual é distribuído, e onde
+	encontrar o código — tanto o original como a nossa versão.</p>
+
+	<p>Onde adaptámos alguma coisa — marca, aspecto ou integração entre
+	componentes — essas alterações estão nos repositórios da Stratechna
+	indicados na última coluna, e ficam sujeitas à licença do componente
+	original.</p>
+
+	<h2>Componentes</h2>
+	<div class="orbit-lic-tabela">
+		<table>
+			<thead>
+				<tr><th>Componente</th><th>O que faz</th><th>Licença</th><th>Código</th></tr>
+			</thead>
+			<tbody>
+				{% for c in componentes %}
+				<tr>
+					<td>{{ c.nome }}</td>
+					<td>{{ c.papel }}</td>
+					<td>{{ c.licenca }}</td>
+					<td>
+						<a href="{{ c.origem }}" rel="noopener" target="_blank">original</a>{% if c.nosso %} ·
+						<a href="{{ c.nosso }}" rel="noopener" target="_blank">a nossa versão</a>{% endif %}
+					</td>
+				</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	</div>
+
+	<p class="orbit-lic-nota">Os nomes e logótipos dos projectos acima são dos
+	respectivos titulares. O Stratechna Orbit é um produto da Stratechna,
+	baseado nestes componentes — não é afiliado nem endossado por eles.</p>
+</div>
+{% endblock %}

@@ -164,7 +164,12 @@
 			`<img class="orbit-rodape-empresa orbit-so-claro" src="/assets/orbit/img/stratechna-marca.svg" alt="Stratechna">` +
 			`<img class="orbit-rodape-empresa orbit-so-escuro" src="/assets/orbit/img/stratechna-marca-escura.svg" alt="Stratechna">` +
 			`</div>` +
-			`<p class="orbit-rodape-frase"></p>`;
+			`<p class="orbit-rodape-frase"></p>` +
+			// Seis dos componentes do Orbit são AGPL v3, e a cláusula 13 obriga a
+			// oferecer o código da nossa versão a quem usa o serviço pela rede.
+			// Fica por baixo de tudo e discreto — o que a licença exige é que
+			// seja alcançável, não que seja vistoso.
+			`<a class="orbit-rodape-licencas" href="/licencas">Licenças e código aberto</a>`;
 		el.querySelector(".orbit-rodape-frase").textContent = FRASE_RODAPE;
 		return el;
 	}
