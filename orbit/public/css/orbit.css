@@ -343,12 +343,16 @@
 	padding: 7px 3px 9px;
 }
 
-/* Mesmo apertado, o símbolo não desce abaixo dos 46px: é a legibilidade que
-   está em causa, e é o que se ganha nos espaçamentos que paga o aumento. */
+/* Apertado, o símbolo acompanha a altura do ecrã em vez de saltar para um
+   degrau fixo: `clamp` dá 52px numa janela alta e vai cedendo à medida que
+   falta altura, sem nunca descer abaixo dos 40 — que é o ponto a partir do
+   qual o desenho deixa de se distinguir.
+   Isto substitui dois degraus rígidos (46px aqui, 30px abaixo dos 780px de
+   altura) que produziam um salto enorme entre duas janelas quase iguais. */
 #orbit-pagina[data-densidade="apertada"] .orbit-cartao-img,
 #orbit-pagina[data-densidade="apertada"] .orbit-cartao-vazio {
-	width: 46px;
-	height: 46px;
+	width: clamp(40px, 5.6vh, 52px);
+	height: clamp(40px, 5.6vh, 52px);
 	border-radius: 11px;
 }
 
@@ -390,8 +394,10 @@
 	#orbit-saudacao { padding: 16px 0 12px; }
 	#orbit-saudacao .orbit-saudacao-titulo { font-size: 21px; }
 	.orbit-cartao { padding: 6px 4px 8px; gap: 5px; }
+	/* Com poucos módulos há folga de sobra mesmo num ecrã baixo: o símbolo só
+	   cede se a janela for mesmo curta. */
 	.orbit-cartao-img,
-	.orbit-cartao-vazio { width: 34px; height: 34px; border-radius: 8px; }
+	.orbit-cartao-vazio { width: clamp(44px, 6vh, 52px); height: clamp(44px, 6vh, 52px); border-radius: 11px; }
 	.orbit-bloco { padding: 12px 12px 5px; }
 	.orbit-bloco-cab { margin-bottom: 9px; }
 	#orbit-rodape { gap: 6px; padding: 14px 0 16px; }
@@ -407,19 +413,19 @@
    à frente; por isso este degrau repete-as com o mesmo peso em vez de contar
    com a herança. */
 @media (max-height: 780px) {
-	#orbit-pagina[data-densidade="apertada"] #orbit-saudacao { padding: 14px 0 10px; }
-	#orbit-pagina[data-densidade="apertada"] .orbit-cartao { padding: 5px 3px 7px; gap: 4px; }
-	#orbit-pagina[data-densidade="apertada"] .orbit-cartao-img,
-	#orbit-pagina[data-densidade="apertada"] .orbit-cartao-vazio {
-		width: 30px;
-		height: 30px;
-		border-radius: 7px;
-	}
-	#orbit-pagina[data-densidade="apertada"] .orbit-bloco { padding: 11px 11px 4px; }
-	#orbit-pagina[data-densidade="apertada"] .orbit-bloco-cab { margin-bottom: 7px; }
+	/* O tamanho do símbolo NÃO se repete aqui de propósito: quem manda é o
+	   `clamp` da regra de densidade, que já cede com a altura da janela. Havia
+	   aqui um degrau fixo de 30px que dava um salto de 46 para 30 entre duas
+	   janelas quase iguais — e era ele que fazia os símbolos aparecerem muito
+	   mais pequenos do que no site.
+	   O que se aperta em vez disso é o espaço à volta, que não se lê. */
+	#orbit-pagina[data-densidade="apertada"] #orbit-saudacao { padding: 10px 0 6px; }
+	#orbit-pagina[data-densidade="apertada"] .orbit-cartao { padding: 4px 3px 5px; gap: 3px; }
+	#orbit-pagina[data-densidade="apertada"] .orbit-bloco { padding: 9px 10px 3px; }
+	#orbit-pagina[data-densidade="apertada"] .orbit-bloco-cab { margin-bottom: 5px; }
 	#orbit-pagina[data-densidade="apertada"] #orbit-grelha,
-	#orbit-pagina[data-densidade="apertada"] .orbit-linha { gap: 12px; }
-	#orbit-pagina[data-densidade="apertada"] #orbit-rodape { padding: 12px 0 14px; gap: 5px; }
+	#orbit-pagina[data-densidade="apertada"] .orbit-linha { gap: 10px; }
+	#orbit-pagina[data-densidade="apertada"] #orbit-rodape { padding: 8px 0 10px; gap: 4px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
