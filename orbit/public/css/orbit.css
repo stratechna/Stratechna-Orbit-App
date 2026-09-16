@@ -343,17 +343,19 @@
 	padding: 7px 3px 9px;
 }
 
-/* Apertado, o símbolo acompanha a altura do ecrã em vez de saltar para um
-   degrau fixo: `clamp` dá 52px numa janela alta e vai cedendo à medida que
-   falta altura, sem nunca descer abaixo dos 40 — que é o ponto a partir do
-   qual o desenho deixa de se distinguir.
-   Isto substitui dois degraus rígidos (46px aqui, 30px abaixo dos 780px de
-   altura) que produziam um salto enorme entre duas janelas quase iguais. */
+/* 52px TAMBÉM no modo apertado — o mesmo tamanho do resto e o mesmo do
+   stratechna.com.
+   Durante três tentativas encolhi isto (46px, depois 40px) a tentar garantir
+   que os 45 módulos cabiam numa página. Estava a resolver um problema que não
+   existe: com os blocos em duas colunas sobra altura de sobra, e o que se
+   perdia era a legibilidade do desenho, que é a única coisa que ali se lê.
+   Só cede em janelas mesmo curtas — e aí é o `clamp` da regra dos ecrãs
+   baixos que manda. */
 #orbit-pagina[data-densidade="apertada"] .orbit-cartao-img,
 #orbit-pagina[data-densidade="apertada"] .orbit-cartao-vazio {
-	width: clamp(40px, 5.6vh, 52px);
-	height: clamp(40px, 5.6vh, 52px);
-	border-radius: 11px;
+	width: 52px;
+	height: 52px;
+	border-radius: 12px;
 }
 
 #orbit-pagina[data-densidade="apertada"] .orbit-cartao-nome {
@@ -413,12 +415,13 @@
    à frente; por isso este degrau repete-as com o mesmo peso em vez de contar
    com a herança. */
 @media (max-height: 780px) {
-	/* O tamanho do símbolo NÃO se repete aqui de propósito: quem manda é o
-	   `clamp` da regra de densidade, que já cede com a altura da janela. Havia
-	   aqui um degrau fixo de 30px que dava um salto de 46 para 30 entre duas
-	   janelas quase iguais — e era ele que fazia os símbolos aparecerem muito
-	   mais pequenos do que no site.
-	   O que se aperta em vez disso é o espaço à volta, que não se lê. */
+	/* Numa janela mesmo curta o símbolo cede — mas cede POUCO, e nunca abaixo
+	   de 44px. O que se aperta primeiro é o espaço à volta, que ninguém lê. */
+	#orbit-pagina[data-densidade="apertada"] .orbit-cartao-img,
+	#orbit-pagina[data-densidade="apertada"] .orbit-cartao-vazio {
+		width: clamp(44px, 7vh, 52px);
+		height: clamp(44px, 7vh, 52px);
+	}
 	#orbit-pagina[data-densidade="apertada"] #orbit-saudacao { padding: 10px 0 6px; }
 	#orbit-pagina[data-densidade="apertada"] .orbit-cartao { padding: 4px 3px 5px; gap: 3px; }
 	#orbit-pagina[data-densidade="apertada"] .orbit-bloco { padding: 9px 10px 3px; }
