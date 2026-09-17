@@ -139,15 +139,128 @@
 		casa.appendChild(nome);
 	}
 
+	// ── Agenda ───────────────────────────────────────────────────────────────
+	// Duas vistas lado a lado e não em abas: o mês responde a «quando estou
+	// livre?» e o dia a «o que tenho a seguir?». Numa vista de relance, esconder
+	// uma delas atrás de um clique tira-lhe a razão de existir.
+	//
+	// Os dois quadros desenham-se VAZIOS com a altura final e só depois se
+	// enchem. Sem isso, a faixa de cima crescia quando a resposta chegasse e o
+	// ecrã inteiro dava um salto — a mesma coisa que já se tinha notado quando a
+	// grelha substitui a do Frappe.
+	const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+		"Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+	function quadroMes() {
+		const el = document.createElement("div");
+		el.className = "orbit-mes";
+		const hoje = new Date();
+		el.innerHTML =
+			`<div class="orbit-agenda-cab">` +
+			`<span class="orbit-agenda-titulo">${MESES[hoje.getMonth()]}</span>` +
+			`<span class="orbit-agenda-risco"></span></div>` +
+			`<div class="orbit-mes-grelha"></div>`;
+
+		const g = el.querySelector(".orbit-mes-grelha");
+		for (const d of ["S", "T", "Q", "Q", "S", "S", "D"]) {
+			const c = document.createElement("span");
+			c.className = "orbit-mes-dia orbit-mes-dia--cab";
+			c.textContent = d;
+			g.appendChild(c);
+		}
+		const primeiro = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+		// getDay() dá 0 ao domingo; a semana aqui começa à segunda.
+		const recuo = (primeiro.getDay() + 6) % 7;
+		const dias = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
+		for (let i = 0; i < recuo; i++) {
+			g.appendChild(document.createElement("span"));
+		}
+		for (let d = 1; d <= dias; d++) {
+			const c = document.createElement("span");
+			c.className = "orbit-mes-dia" + (d === hoje.getDate() ? " orbit-mes-dia--hoje" : "");
+			c.dataset.dia = String(d);
+			c.textContent = String(d);
+			g.appendChild(c);
+		}
+		return el;
+	}
+
+	function quadroDia() {
+		const el = document.createElement("div");
+		el.className = "orbit-agenda";
+		el.innerHTML =
+			`<div class="orbit-agenda-cab">` +
+			`<span class="orbit-agenda-titulo">${__("Hoje")}</span>` +
+			`<span class="orbit-agenda-risco"></span>` +
+			`<a class="orbit-agenda-marcar" href="/app/event/new">${__("Marcar reunião")}</a>` +
+			`</div><div class="orbit-agenda-lista"></div>`;
+		return el;
+	}
+
+	function encherAgenda(mes, dia) {
+		frappe.call({ method: "orbit.agenda.resumo", type: "GET" })
+			.then((r) => {
+				const d = (r && r.message) || {};
+				for (const n of d.ocupados || []) {
+					const c = mes.querySelector(`.orbit-mes-dia[data-dia="${n}"]`);
+					if (c) c.classList.add("orbit-mes-dia--ocupado");
+				}
+				const lista = dia.querySelector(".orbit-agenda-lista");
+				lista.textContent = "";
+				if (!(d.hoje || []).length) {
+					const v = document.createElement("p");
+					v.className = "orbit-agenda-vazio";
+					// Estados diferentes, mensagens diferentes: um dia livre não
+					// é a mesma coisa que o correio estar em baixo, e dizer o
+					// mesmo nos dois casos escondia a avaria.
+					v.textContent = d.ligado
+						? __("Sem compromissos hoje.")
+						: __("Agenda indisponível.");
+					lista.appendChild(v);
+					return;
+				}
+				for (const e of d.hoje) {
+					const linha = document.createElement(e.meet ? "a" : "div");
+					linha.className = "orbit-agenda-linha";
+					if (e.meet) {
+						linha.href = e.local;
+						linha.target = "_blank";
+					}
+					linha.innerHTML =
+						`<span class="orbit-agenda-hora"></span>` +
+						`<span class="orbit-agenda-nome"></span>` +
+						(e.meet ? `<span class="orbit-agenda-meet" title="${__("Entrar na reunião")}"></span>` : "");
+					linha.querySelector(".orbit-agenda-hora").textContent =
+						e.dia_inteiro ? __("dia") : e.hora;
+					linha.querySelector(".orbit-agenda-nome").textContent = e.titulo;
+					lista.appendChild(linha);
+				}
+			})
+			.catch(() => {
+				const lista = dia.querySelector(".orbit-agenda-lista");
+				lista.innerHTML = `<p class="orbit-agenda-vazio">${__("Agenda indisponível.")}</p>`;
+			});
+	}
+
 	function cabecalho() {
 		const s = saudacao();
 		const el = document.createElement("header");
 		el.id = "orbit-saudacao";
 		el.innerHTML =
+			`<div class="orbit-saudacao-texto">` +
 			`<h1 class="orbit-saudacao-titulo"></h1>` +
-			`<p class="orbit-saudacao-frase"></p>`;
+			`<p class="orbit-saudacao-frase"></p></div>`;
 		el.querySelector(".orbit-saudacao-titulo").textContent = s.titulo;
 		el.querySelector(".orbit-saudacao-frase").textContent = s.frase;
+
+		const caixa = document.createElement("div");
+		caixa.className = "orbit-agenda-caixa";
+		const mes = quadroMes();
+		const dia = quadroDia();
+		caixa.appendChild(mes);
+		caixa.appendChild(dia);
+		el.appendChild(caixa);
+		encherAgenda(mes, dia);
 		return el;
 	}
 

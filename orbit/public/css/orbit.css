@@ -87,6 +87,199 @@
 	color: var(--text-muted, #5f7386);
 }
 
+/* ── Agenda ────────────────────────────────────────────────────────────────
+   Mês à esquerda, dia à direita, ambos à direita da saudação. A faixa de cima
+   deixa de ser só um cumprimento e passa a valer o espaço que ocupa.
+
+   Isto faz a página passar de um ecrã — decisão do utilizador, com o rodapé a
+   ficar abaixo da dobra. O `min-height: 100vh` do `#orbit-pagina` mantém-se: só
+   garante o MÍNIMO, e deixa a página crescer e rolar quando é preciso. */
+#orbit-saudacao {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 28px;
+}
+
+.orbit-saudacao-texto {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.orbit-agenda-caixa {
+	flex: none;
+	display: flex;
+	align-items: stretch;
+	gap: 12px;
+}
+
+.orbit-mes,
+.orbit-agenda {
+	box-sizing: border-box;
+	padding: 11px 13px 10px;
+	background: var(--card-bg, #fff);
+	border: 1px solid var(--border-color, #e2e8ee);
+	border-radius: 12px;
+}
+
+.orbit-mes { width: 232px; flex: none; }
+.orbit-agenda { width: 400px; flex: none; display: flex; flex-direction: column; }
+
+/* Mesmo cabeçalho dos blocos de módulos — título, risco, e uma acção à direita
+   quando faz sentido. A repetição é de propósito: são a mesma família. */
+.orbit-agenda-cab {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 0 0 8px;
+}
+
+.orbit-agenda-titulo {
+	flex: none;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-color, #22303d);
+}
+
+.orbit-agenda-risco {
+	flex: 1 1 auto;
+	min-width: 8px;
+	height: 1px;
+	background: var(--border-color, #e2e8ee);
+}
+
+.orbit-agenda-marcar {
+	flex: none;
+	padding: 3px 9px;
+	border: 1px solid var(--border-color, #e2e8ee);
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 600;
+	white-space: nowrap;
+	text-decoration: none;
+	color: var(--text-muted, #5f7386);
+}
+
+.orbit-agenda-marcar:hover,
+.orbit-agenda-marcar:focus-visible {
+	color: var(--text-color, #22303d);
+	border-color: var(--text-light, #8a9bab);
+	text-decoration: none;
+}
+
+/* ── Vista mensal ──────────────────────────────────────────────────────────
+   Sete colunas fixas: com `auto-fill` as semanas desalinhavam consoante o mês
+   começasse à segunda ou ao domingo. */
+.orbit-mes-grelha {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	gap: 1px;
+}
+
+.orbit-mes-dia {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 22px;
+	border-radius: 6px;
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-muted, #5f7386);
+}
+
+.orbit-mes-dia--cab {
+	font-size: 9.5px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	color: var(--text-light, #8a9bab);
+}
+
+/* Ocupado é preenchimento, hoje é contorno. Duas pistas diferentes para duas
+   coisas diferentes — se fossem ambas cor, um dia ocupado que calhasse hoje
+   perdia uma das duas informações. */
+.orbit-mes-dia--ocupado {
+	background: var(--bg-color, #eef2f5);
+	font-weight: 600;
+	color: var(--text-color, #22303d);
+}
+
+.orbit-mes-dia--hoje {
+	box-shadow: inset 0 0 0 1.5px #ea5c55;
+	font-weight: 600;
+	color: var(--text-color, #22303d);
+}
+
+/* ── Compromissos do dia ───────────────────────────────────────────────── */
+.orbit-agenda-lista {
+	flex: 1 1 auto;
+	display: flex;
+	flex-direction: column;
+}
+
+.orbit-agenda-linha {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 3px 4px;
+	margin: 0 -4px;
+	border-radius: 6px;
+	font-size: 12.5px;
+	line-height: 1.35;
+	text-decoration: none;
+	color: inherit;
+}
+
+a.orbit-agenda-linha:hover,
+a.orbit-agenda-linha:focus-visible {
+	background: var(--bg-color, #f4f7f9);
+	text-decoration: none;
+	color: inherit;
+}
+
+.orbit-agenda-hora {
+	flex: none;
+	width: 36px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-color, #22303d);
+}
+
+/* O título corta com reticências em vez de partir a linha: com quatro
+   compromissos, uma linha dupla fazia a faixa crescer de forma imprevisível. */
+.orbit-agenda-nome {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text-muted, #5f7386);
+}
+
+.orbit-agenda-meet {
+	flex: none;
+	width: 13px;
+	height: 13px;
+	border-radius: 3px;
+	background: #22303d;
+	opacity: 0.5;
+}
+
+a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
+
+.orbit-agenda-vazio {
+	margin: 2px 0 0;
+	font-size: 12.5px;
+	color: var(--text-light, #8a9bab);
+}
+
+/* Em ecrãs estreitos a agenda sai: a saudação sozinha ainda funciona, dois
+   quadros de 232 e 400px encavalitados não. */
+@media (max-width: 1100px) {
+	.orbit-agenda-caixa { display: none; }
+}
+
 /* ── Os blocos ─────────────────────────────────────────────────────────────
    Duas linhas de dois blocos, em colunas iguais: cada bloco de baixo fica
    exactamente por baixo do de cima, com a mesma largura. Em baixo estão os
