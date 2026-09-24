@@ -139,6 +139,23 @@ jobs:
               "/home/frappe/frappe-bench/apps/$f" \
               || { echo "ERRO: $f ainda é o símbolo de origem"; falhou=1; }
           done
+          # Os logótipos do fabricante estão desenhados DENTRO dos pacotes, como
+          # chamadas de render; trocá-los é escrever JavaScript à mão no meio de
+          # código minificado. Uma versão deste passo produziu `stroke-width`
+          # com crases — chave inválida — e o pacote deixava de carregar sem que
+          # nada aqui se queixasse. Daí a verificação de sintaxe.
+          for f in crm/crm/public/frontend/assets helpdesk/helpdesk/public/desk/assets; do
+            docker run --rm --entrypoint sh orbit-frappe:teste -c \
+              "cd /home/frappe/frappe-bench/apps/$f && for j in *.js; do node --check \"\$j\" || exit 1; done" \
+              || { echo "ERRO: JavaScript inválido em $f depois da marca"; falhou=1; }
+          done
+          # e o logótipo do fabricante não pode sobrar em pacote nenhum
+          for a in "helpdesk:M93.9278 0H23.1013" "crm:M214.286 0H85.7143"; do
+            app=${a%%:*}; d=${a#*:}
+            n=$(docker run --rm --entrypoint sh orbit-frappe:teste -c \
+                "grep -rl '$d' /home/frappe/frappe-bench/apps/$app --include='*.js' 2>/dev/null | wc -l")
+            [ "$n" = "0" ] || { echo "ERRO: o logótipo do $app ainda aparece em $n pacotes"; falhou=1; }
+          done
           [ $falhou -eq 0 ] || exit 1
           echo "marca das apps de frontend próprio verificada"
 

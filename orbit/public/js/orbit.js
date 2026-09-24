@@ -49,8 +49,12 @@
 			// Os módulos do RH ficam com a app do RH. Estiveram em «Operações» e
 			// lia-se mal: o ícone do RH num bloco e o processamento salarial
 			// noutro, quando um se abre a partir do outro.
+			// O Meet e o Chat entraram nesta lista a 24-09-2026: sem ela caíam na
+			// rede de segurança e apareciam em «Operações», longe do Mail e do
+			// Social, que são da mesma família. A rede funcionou — não se
+			// perderam —, mas o sítio estava errado.
 			itens: ["Frappe CRM", "Helpdesk", "Mail", "Docs", "Sign", "Events",
-				"Social", "Wiki", "Projects",
+				"Social", "Meet", "Chat", "Wiki", "Projects",
 				"Frappe HR", "HR Setup", "Recruitment", "Leaves", "Payroll",
 				"Expenses", "Performance", "Tenure", "Shift & Attendance",
 				"Tax & Benefits"],

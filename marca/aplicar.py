@@ -258,6 +258,106 @@ for pasta, minimo in PACOTES.items():
         falhas.append(f"{pasta}: só {tocados} pacotes com o nome do fabricante "
                       f"(esperavam-se {minimo}) — o upstream mudou os textos?")
 
+# ── Os logótipos do fabricante desenhados DENTRO dos pacotes ────────────────
+#
+# O painel «Getting started» do CRM e do Desk abre-se na primeira utilização com
+# um quadrado grande — magenta no CRM, violeta no Desk. Não é um ficheiro: é SVG
+# compilado para dentro do pacote Vue, como chamadas de render. Por isso
+# sobreviveu a todas as trocas de ficheiros de imagem, e era a primeira coisa
+# que um cliente via ao abrir a app.
+#
+# A troca é feita sobre o texto do pacote, sem lhe mudar o nome (mantém o hash).
+# A âncora é o `d` do primeiro caminho do logótipo, que é único e estável: se o
+# upstream redesenhar o símbolo, o padrão deixa de aparecer e a construção falha
+# — que é o que queremos saber.
+#
+# Os dois pacotes vêm de minificadores com aspas diferentes (" no Desk, ` no
+# CRM), por isso a aspa é capturada e reutilizada, em vez de assumida.
+LOGOS = {
+    "helpdesk/helpdesk/public/desk/assets": {
+        "ancora": "M93.9278 0H23.1013",
+        # A aspa é um grupo COM NOME: `\1` seguido de dígitos («\1118») é lido
+        # como a referência 11, e o padrão nunca casava — sem erro nenhum.
+        "caixa": r'width:(?P<q>["`])118(?P=q),height:(?P=q)118(?P=q),viewBox:(?P=q)0 0 118 118(?P=q)',
+        "simbolo": "desk",
+    },
+    "crm/crm/public/frontend/assets": {
+        "ancora": "M214.286 0H85.7143",
+        "caixa": r'width:(?P<q>["`])300(?P=q),height:(?P=q)300(?P=q),viewBox:(?P=q)0 0 300 300(?P=q)',
+        "simbolo": "crm",
+    },
+}
+
+# Os nossos símbolos, em chamadas de render. `{a}` é o nome que o minificador deu
+# ao createElementVNode e `{q}` a aspa que usa — ambos vêm do pacote.
+#
+# As chaves com hífen levam aspas DUPLAS fixas e não `{q}`: quando o pacote usa
+# crases, uma chave em crase (`stroke-width`:) não é JavaScript válido e o
+# ficheiro deixa de carregar. A crase serve para valores, não para nomes.
+FORMAS = {
+    "desk": (
+        '{a}({q}rect{q},{{width:{q}512{q},height:{q}512{q},rx:{q}72{q},fill:{q}#22303d{q}}},null,-1),'
+        '{a}({q}path{q},{{d:{q}M 128 288 a 128 128 0 0 1 256 0{q},transform:{q}translate(60 60) scale(0.7656){q},'
+        'stroke:{q}#8a9bab{q},\"stroke-width\":{q}32{q},\"stroke-linecap\":{q}round{q}}},null,-1),'
+        '{a}({q}path{q},{{d:{q}M 128 284 v 48{q},transform:{q}translate(60 60) scale(0.7656){q},'
+        'stroke:{q}#8a9bab{q},\"stroke-width\":{q}32{q},\"stroke-linecap\":{q}round{q}}},null,-1),'
+        '{a}({q}path{q},{{d:{q}M 384 284 v 48{q},transform:{q}translate(60 60) scale(0.7656){q},'
+        'stroke:{q}#ea5c55{q},\"stroke-width\":{q}32{q},\"stroke-linecap\":{q}round{q}}},null,-1)'
+    ),
+    "crm": (
+        '{a}({q}rect{q},{{width:{q}512{q},height:{q}512{q},rx:{q}72{q},fill:{q}#22303d{q}}},null,-1),'
+        '{a}({q}circle{q},{{cx:{q}256{q},cy:{q}190{q},r:{q}54{q},transform:{q}translate(60 60) scale(0.7656){q},'
+        'stroke:{q}#8a9bab{q},\"stroke-width\":{q}32{q},fill:{q}none{q}}},null,-1),'
+        '{a}({q}path{q},{{d:{q}M 146 388 a 110 110 0 0 1 220 0{q},transform:{q}translate(60 60) scale(0.7656){q},'
+        'stroke:{q}#8a9bab{q},\"stroke-width\":{q}32{q},\"stroke-linecap\":{q}round{q},fill:{q}none{q}}},null,-1),'
+        '{a}({q}circle{q},{{cx:{q}360{q},cy:{q}150{q},r:{q}34{q},transform:{q}translate(60 60) scale(0.7656){q},'
+        'fill:{q}#ea5c55{q}}},null,-1)'
+    ),
+}
+
+
+def trocar_logotipos() -> None:
+    import re
+    global feitos
+    for pasta, d in LOGOS.items():
+        caminho = os.path.join(APPS, pasta)
+        if not os.path.isdir(caminho):
+            falhas.append(f"pasta de pacotes em falta: {pasta}")
+            continue
+        trocados = 0
+        alvo = re.compile(
+            r'(\w+)\((["`])path\2,\{d:\2' + re.escape(d["ancora"]) + r'.*?\},null,-1\)\]',
+            re.DOTALL)
+        caixa = re.compile(d["caixa"])
+        for ficheiro in sorted(os.listdir(caminho)):
+            if not ficheiro.endswith(".js"):
+                continue
+            f = os.path.join(caminho, ficheiro)
+            with open(f, encoding="utf-8", errors="surrogateescape") as fh:
+                texto = fh.read()
+            if d["ancora"] not in texto:
+                continue
+            m = alvo.search(texto)
+            if not m:
+                falhas.append(f"{pasta}/{ficheiro}: o logótipo está lá mas não na forma esperada")
+                continue
+            a, q = m.group(1), m.group(2)
+            novo = FORMAS[d["simbolo"]].format(a=a, q=q) + "]"
+            texto = texto[:m.start()] + novo + texto[m.end():]
+            texto, n = caixa.subn(lambda mm: f'viewBox:{mm.group("q")}0 0 512 512{mm.group("q")}', texto)
+            if not n:
+                falhas.append(f"{pasta}/{ficheiro}: a caixa do logótipo não mudou de tamanho")
+            with open(f, "w", encoding="utf-8", errors="surrogateescape") as fh:
+                fh.write(texto)
+            trocados += 1
+            feitos += 1
+        if not trocados:
+            falhas.append(f"{pasta}: nenhum pacote com o logótipo do fabricante "
+                          f"(âncora {d['ancora']}) — o upstream mudou o símbolo?")
+
+
+trocar_logotipos()
+
 # ── Resultado ───────────────────────────────────────────────────────────────
 print(f"marca das apps de frontend próprio: {feitos} ficheiros tratados")
 if falhas:
