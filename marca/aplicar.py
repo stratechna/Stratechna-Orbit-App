@@ -97,6 +97,19 @@ def copiar(origem: str, destino: str) -> None:
     feitos += 1
 
 
+# ── A assinatura do fabricante em todas as páginas web ──────────────────────
+# `base.html` do Frappe abre com um comentário «Built on Frappe» e uma
+# meta-etiqueta `generator`. Não se veem no ecrã, mas vão em TODAS as páginas
+# públicas de todos os tenants: é o que um cliente encontra no código-fonte e o
+# que as ferramentas de impressão digital usam para dizer que software corremos.
+# O Frappe é MIT — não exige atribuição nenhuma —, e a declaração honesta está
+# na página /licencas, que é onde se lê e não onde se esconde.
+trocar("frappe/frappe/templates/base.html",
+       [("<!-- Built on Frappe. https://frappeframework.com/ -->",
+         "<!-- Stratechna Orbit. https://stratechna.com/orbit/ -->"),
+        ('<meta name="generator" content="frappe">',
+         '<meta name="generator" content="Stratechna Orbit">')])
+
 # ── CRM ─────────────────────────────────────────────────────────────────────
 for pagina in ("crm/crm/www/crm.html",
                "crm/crm/public/frontend/index.html",
