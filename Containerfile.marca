@@ -41,3 +41,21 @@ RUN set -eu; \
     rm -rf /tmp/marca-modulos; \
     echo "símbolos repostos: $repostos"; \
     [ "$repostos" -ge 80 ] || { echo "ERRO: esperavam-se pelo menos 80"; exit 1; }
+
+# ── Terceira camada: as apps que trazem frontend próprio ────────────────────
+#
+# O CRM, o Desk e o RH servem páginas e manifestos PWA antes de haver sessão —
+# título do separador, nome com que a app se instala no telemóvel, ícones — e
+# nenhum desses campos passa pelas definições da base de dados. Ficavam a dizer
+# «Frappe CRM» e a desenhar o quadrado do Frappe. Vão aqui, junto com os dezoito
+# símbolos de módulo da segunda cópia (a que o campo `icon_image` usa).
+#
+# O CRM e o Helpdesk são AGPL v3: alterá-los obriga a oferecer o código alterado
+# a quem lhes acede pela rede. É o que a página /licencas do Orbit faz, apontando
+# para este repositório.
+
+COPY --chown=frappe:frappe marca /tmp/marca-apps/marca
+COPY --chown=frappe:frappe simbolos /tmp/marca-apps/simbolos
+COPY --chown=frappe:frappe orbit/public/icons/apps /tmp/marca-apps/orbit/public/icons/apps
+
+RUN python3 /tmp/marca-apps/marca/aplicar.py && rm -rf /tmp/marca-apps

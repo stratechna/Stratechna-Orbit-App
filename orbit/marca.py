@@ -115,12 +115,17 @@ def _limpar_cache():
 # o que não reconhece. Foi assim que estes cinco desapareceram. Recriá-los no
 # after_install e no after_migrate fecha esse buraco de vez.
 
+# A ordem é a da grelha. O Meet é um CAMINHO DO PRÓPRIO SITE e não um endereço:
+# o atalho tem de passar pelo site do cliente para o token de sessão ser emitido
+# com a identidade dele (ver orbit/meet.py).
 ATALHOS = [
-    {"nome": "Mail", "url": "https://mail.orbit.{dominio}", "simbolo": "mail"},
-    {"nome": "Docs", "url": "https://docs.{dominio}", "simbolo": "docs"},
-    {"nome": "Sign", "url": "https://sign.{dominio}", "simbolo": "sign"},
-    {"nome": "Events", "url": "https://events.{dominio}", "simbolo": "events"},
-    {"nome": "Social", "url": "https://social.{dominio}", "simbolo": "social"},
+    {"nome": "Mail", "url": "https://mail.orbit.{dominio}", "simbolo": "mail", "ordem": 1},
+    {"nome": "Docs", "url": "https://docs.{dominio}", "simbolo": "docs", "ordem": 2},
+    {"nome": "Sign", "url": "https://sign.{dominio}", "simbolo": "sign", "ordem": 3},
+    {"nome": "Events", "url": "https://events.{dominio}", "simbolo": "events", "ordem": 4},
+    {"nome": "Social", "url": "https://social.{dominio}", "simbolo": "social", "ordem": 5},
+    {"nome": "Meet", "url": "/api/method/orbit.meet.entrar", "simbolo": "meet", "ordem": 6},
+    {"nome": "Chat", "url": "https://{chat}", "simbolo": "chat", "ordem": 7},
 ]
 
 
@@ -140,29 +145,52 @@ def _dominio_do_tenant() -> str:
     return frappe.conf.get("orbit_dominio_apps") or "stratechna.com"
 
 
+def _chat_do_tenant() -> str:
+    """O endereço da organização do Chat. Cada cliente tem a sua num subdomínio
+    (`<slug>.chat.orbit.stratechna.com`); a nossa ficou na raiz, por ter sido a
+    primeira. O slug vem do site_config (`orbit_slug`) e, na falta dele, do
+    primeiro pedaço do nome do site — que é como o aprovisionamento o forma."""
+    slug = frappe.conf.get("orbit_slug") or (frappe.local.site or "").split(".")[0]
+    raiz = "chat.orbit.stratechna.com"
+    return raiz if slug in ("", "stratechna", "orbit") else f"{slug}.{raiz}"
+
+
 def repor_atalhos():
+    """Os sete módulos de fora do Frappe, na grelha, com endereço deste tenant.
+
+    Durante algum tempo houve DOIS sítios a escrever estas mesmas fichas: esta
+    função (no `after_migrate`) e um guião `orbit_atalhos.py` no servidor, com
+    uma lista em JSON. Escreviam valores diferentes no campo `app` e em
+    `logo_url`, e ganhava o último a correr — o Meet e o Chat só existiam num
+    deles. Agora a lista é só esta, e o guião do servidor chama-a.
+
+    O símbolo vem da app (`/assets/orbit/icons/apps/`) e não de `/files`: um
+    ficheiro carregado para os ficheiros públicos de um site não viaja com a
+    app, e cada tenant novo ficava a precisar de uma cópia.
+    """
     dominio = _dominio_do_tenant()
+    chat = _chat_do_tenant()
     criados, mantidos = [], 0
     for a in ATALHOS:
-        url = a["url"].format(dominio=dominio)
-        existente = frappe.db.get_value("Desktop Icon", {"label": a["nome"]}, "name")
-        if existente:
-            frappe.db.set_value("Desktop Icon", existente, {"link": url, "app": "orbit"},
-                                update_modified=False)
-            mantidos += 1
-            continue
-        frappe.get_doc({
-            "doctype": "Desktop Icon",
-            "label": a["nome"],
-            "icon_type": "App",
-            "link_type": "External",
+        url = a["url"].format(dominio=dominio, chat=chat)
+        valores = {
             "link": url,
             "app": "orbit",
+            "icon_type": "App",
+            "link_type": "External",
             "logo_url": f"/assets/orbit/icons/apps/{a['simbolo']}.svg",
             "bg_color": "gray",
             "standard": 1,
             "hidden": 0,
-        }).insert(ignore_permissions=True)
+            "idx": a["ordem"],
+        }
+        existente = frappe.db.get_value("Desktop Icon", {"label": a["nome"]}, "name")
+        if existente:
+            frappe.db.set_value("Desktop Icon", existente, valores, update_modified=False)
+            mantidos += 1
+            continue
+        frappe.get_doc(dict(doctype="Desktop Icon", label=a["nome"], **valores)).insert(
+            ignore_permissions=True)
         criados.append(a["nome"])
 
     # As apps que têm frontend próprio não passam pelos símbolos dos módulos: o

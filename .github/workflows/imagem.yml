@@ -13,6 +13,7 @@ on:
     paths:
       - "orbit/**"
       - "simbolos/**"
+      - "marca/**"
       - "apps.json"
       - "Containerfile.marca"
       - ".github/workflows/imagem.yml"
@@ -106,6 +107,40 @@ jobs:
               || { echo "ERRO: $app/$mod ainda é o símbolo de origem"; exit 1; }
           done
           echo "símbolos dos módulos verificados nas três apps"
+
+      - name: Verificar a marca das apps de frontend próprio
+        # O nome do fabricante nestas três apps não vive nas definições: vive no
+        # título da página, no manifesto PWA e dentro dos pacotes compilados. É
+        # onde uma actualização do upstream o repõe sem ninguém dar por isso.
+        run: |
+          falhou=0
+          v() { # ficheiro, texto que NÃO pode lá estar
+            if docker run --rm --entrypoint grep orbit-frappe:teste -q "$2" \
+                 "/home/frappe/frappe-bench/apps/$1"; then
+              echo "ERRO: '$2' ainda aparece em $1"; falhou=1
+            else echo "ok: $1"; fi
+          }
+          v crm/crm/www/crm.html "Frappe CRM"
+          v crm/crm/public/frontend/manifest.webmanifest "Frappe CRM"
+          v helpdesk/helpdesk/www/helpdesk/index.html "<title>Helpdesk<"
+          v helpdesk/helpdesk/public/desk/manifest.webmanifest "Frappe Helpdesk"
+          v hrms/hrms/public/frontend/manifest.webmanifest "Frappe HR"
+          # os pacotes compilados: nenhum pode trazer o nome de duas palavras
+          for d in crm/crm/public/frontend/assets helpdesk/helpdesk/public/desk/assets \
+                   hrms/hrms/public/frontend/assets; do
+            n=$(docker run --rm --entrypoint sh orbit-frappe:teste -c \
+                "grep -rl 'Frappe CRM\|Frappe Helpdesk\|Frappe HR' /home/frappe/frappe-bench/apps/$d 2>/dev/null | wc -l")
+            [ "$n" = "0" ] || { echo "ERRO: $n pacotes em $d ainda trazem o nome do fabricante"; falhou=1; }
+          done
+          # a segunda cópia dos símbolos, a que o campo icon_image usa
+          for f in erpnext/erpnext/public/desktop_icons/support.svg \
+                   hrms/hrms/public/icons/desktop_icons/leaves.svg; do
+            docker run --rm --entrypoint grep orbit-frappe:teste -q '#22303d' \
+              "/home/frappe/frappe-bench/apps/$f" \
+              || { echo "ERRO: $f ainda é o símbolo de origem"; falhou=1; }
+          done
+          [ $falhou -eq 0 ] || exit 1
+          echo "marca das apps de frontend próprio verificada"
 
       - name: Publicar (só chega aqui se as verificações passaram)
         run: |
