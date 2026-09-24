@@ -149,7 +149,15 @@ def _chat_do_tenant() -> str:
     """O endereço da organização do Chat. Cada cliente tem a sua num subdomínio
     (`<slug>.chat.orbit.stratechna.com`); a nossa ficou na raiz, por ter sido a
     primeira. O slug vem do site_config (`orbit_slug`) e, na falta dele, do
-    primeiro pedaço do nome do site — que é como o aprovisionamento o forma."""
+    primeiro pedaço do nome do site — que é como o aprovisionamento o forma.
+
+    `orbit_chat_host` ganha a tudo, e existe porque o Zulip RESERVA uma lista de
+    subdomínios: o tenant `demo` não pôde ter a organização em `demo.chat…`
+    («Subdomain reserved») e ficou em `orbitdemo.chat…`. Sem esta chave, o
+    atalho da grelha apontava para um endereço que não existe."""
+    explicito = frappe.conf.get("orbit_chat_host")
+    if explicito:
+        return explicito
     slug = frappe.conf.get("orbit_slug") or (frappe.local.site or "").split(".")[0]
     raiz = "chat.orbit.stratechna.com"
     return raiz if slug in ("", "stratechna", "orbit") else f"{slug}.{raiz}"
