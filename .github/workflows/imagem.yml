@@ -156,6 +156,17 @@ jobs:
                 "grep -rl '$d' /home/frappe/frappe-bench/apps/$app --include='*.js' 2>/dev/null | wc -l")
             [ "$n" = "0" ] || { echo "ERRO: o logótipo do $app ainda aparece em $n pacotes"; falhou=1; }
           done
+          # O comutador de apps lê o gancho add_to_apps_screen de cada hooks.py,
+          # e não a tabela dos ícones: era por aí que o ERP aparecia com o «E»
+          # verde do ERPNext depois de todo o resto já estar marcado.
+          for h in frappe/frappe erpnext/erpnext hrms/hrms crm/crm helpdesk/helpdesk wiki/wiki; do
+            n=$(docker run --rm --entrypoint sh orbit-frappe:teste -c \
+                "grep -c 'assets/orbit/icons/apps/' /home/frappe/frappe-bench/apps/$h/hooks.py")
+            [ "$n" -ge 1 ] || { echo "ERRO: $h ainda aponta o comutador de apps para o logótipo de origem"; falhou=1; }
+          done
+          docker run --rm --entrypoint grep orbit-frappe:teste -rq 'images/framework.png' \
+            /home/frappe/frappe-bench/apps/crm/crm/public/frontend/assets \
+            && { echo "ERRO: a entrada «Desk» do CRM ainda tem o logótipo do Frappe"; falhou=1; } || true
           [ $falhou -eq 0 ] || exit 1
           echo "marca das apps de frontend próprio verificada"
 

@@ -329,6 +329,13 @@ FORMAS = {
 }
 
 
+# A assinatura do nosso quadrado dentro de um pacote: a caixa escura, do tamanho
+# a que os desenhamos. É o que distingue «ainda por trocar» de «já trocado».
+# Duas formas porque os dois pacotes vêm de minificadores com aspas diferentes.
+MARCAS_NOSSAS = ('width:`512`,height:`512`,rx:`72`,fill:`#22303d`',
+                 'width:"512",height:"512",rx:"72",fill:"#22303d"')
+
+
 def trocar_logotipos() -> None:
     import re
     global feitos
@@ -348,6 +355,12 @@ def trocar_logotipos() -> None:
             f = os.path.join(caminho, ficheiro)
             with open(f, encoding="utf-8", errors="surrogateescape") as fh:
                 texto = fh.read()
+            # Já trocado numa passagem anterior conta como feito: sem isto, correr
+            # o guião duas vezes (ou construir sobre uma base em cache) acusava
+            # «o upstream mudou o símbolo» sobre um símbolo que já era nosso.
+            if any(m in texto for m in MARCAS_NOSSAS):
+                trocados += 1
+                continue
             if d["ancora"] not in texto:
                 continue
             m = alvo.search(texto)
@@ -370,6 +383,65 @@ def trocar_logotipos() -> None:
 
 
 trocar_logotipos()
+
+# ── O comutador de apps ─────────────────────────────────────────────────────
+#
+# O menu «Apps» dentro do CRM e do Desk NÃO lê a tabela `Desktop Icon`: lê o
+# gancho `add_to_apps_screen` do `hooks.py` de cada app, e cada uma aponta para
+# o seu próprio logótipo. Era por isso que o ERP aparecia com o «E» verde do
+# ERPNext, o RH com o logótipo do Frappe HR e o Wiki com o do Frappe Wiki —
+# depois de todo o resto já estar marcado.
+#
+# E havia um «Desk» a mais: o frontend do CRM acrescenta à mão uma entrada para
+# a área de trabalho do Frappe, com o título «Desk», que colide com o nome que
+# damos ao Helpdesk. Essa entrada leva ao ecrã de apps do Orbit, por isso
+# chama-se «Orbit» — que é o que é.
+LOGOS_APPS = {
+    "frappe/frappe/hooks.py": ("/assets/frappe/images/frappe-framework-logo.svg", "orbit"),
+    "erpnext/erpnext/hooks.py": ("/assets/erpnext/images/erpnext-logo.svg", "erp"),
+    "hrms/hrms/hooks.py": ("/assets/hrms/images/frappe-hr-logo.svg", "rh"),
+    "crm/crm/hooks.py": ("/assets/crm/images/logo.svg", "crm"),
+    "helpdesk/helpdesk/hooks.py": ("/assets/helpdesk/desk/favicon.svg", "desk"),
+    "wiki/wiki/hooks.py": ("/assets/wiki/images/wiki-logo.png", "wiki"),
+}
+
+for ficheiro, (antigo, simbolo) in LOGOS_APPS.items():
+    trocar(ficheiro, [(antigo, f"/assets/orbit/icons/apps/{simbolo}.svg")])
+
+# A entrada «Desk» que o CRM acrescenta à mão, dentro do pacote compilado.
+trocar_no_pacote = [
+    ("crm/crm/public/frontend/assets", [
+        ("logo:`/assets/frappe/images/framework.png`,title:__(`Desk`)",
+         "logo:`/assets/orbit/icons/apps/orbit.svg`,title:__(`Orbit`)"),
+        ('logo:"/assets/frappe/images/framework.png",title:__("Desk")',
+         'logo:"/assets/orbit/icons/apps/orbit.svg",title:__("Orbit")'),
+    ]),
+]
+
+for pasta, pares in trocar_no_pacote:
+    caminho = os.path.join(APPS, pasta)
+    if not os.path.isdir(caminho):
+        falhas.append(f"pasta de pacotes em falta: {pasta}")
+        continue
+    tocados = 0
+    for ficheiro in sorted(os.listdir(caminho)):
+        if not ficheiro.endswith(".js"):
+            continue
+        alvo = os.path.join(caminho, ficheiro)
+        with open(alvo, encoding="utf-8", errors="surrogateescape") as fh:
+            texto = original = fh.read()
+        for antes, depois in pares:
+            if antes in texto:
+                texto = texto.replace(antes, depois)
+            if depois in texto:
+                tocados += 1
+        if texto != original:
+            with open(alvo, "w", encoding="utf-8", errors="surrogateescape") as fh:
+                fh.write(texto)
+            feitos += 1
+    if not tocados:
+        falhas.append(f"{pasta}: não encontrei a entrada «Desk» que o CRM acrescenta "
+                      "ao comutador de apps — o upstream mudou-a?")
 
 # ── Resultado ───────────────────────────────────────────────────────────────
 print(f"marca das apps de frontend próprio: {feitos} ficheiros tratados")
