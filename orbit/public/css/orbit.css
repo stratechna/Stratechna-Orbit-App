@@ -218,10 +218,10 @@
 	box-sizing: border-box;
 }
 
-/* O último é contornado e não cheio, como no divisor do stratechna.com, onde a
-   fila começa e acaba em círculos vazados. */
-.orbit-saudacao-pontos span:last-child {
-	background: none !important;
+/* Os das pontas são vazados, como no divisor do stratechna.com, onde a fila
+   começa e acaba em círculos de contorno. */
+.orbit-saudacao-pontos .orbit-ponto-vazado {
+	background: none;
 	border: 1.5px solid #ea5c55;
 }
 

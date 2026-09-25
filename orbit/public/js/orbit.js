@@ -254,14 +254,21 @@
 		// parecia aleatório em vez de desenhado. Agora é uma família só: o
 		// acento a esbater-se, que é o que sobrevive a um fundo escuro, com o
 		// último vazado como no divisor do site.
-		const PONTOS = ["#ea5c55", "#d4544e", "#b84a45", "#96403c", "#6e3532",
-			"#4a2a28", "transparent"];
+		// Sete pontos, com os das pontas VAZADOS — é o ritmo do divisor do site.
+		// A variação fica toda dentro do vermelho da marca, e nenhum tom desce
+		// ao escuro: sobre a faixa de ardósia, um vermelho escurecido é
+		// indistinguível do fundo, e foi isso que fez a primeira fila parecer
+		// aleatória. Do pálido ao cheio e outra vez ao pálido, simétrico.
+		const PONTOS = ["", "#f7b3af", "#ea5c55", "#d4544e", "#ea5c55",
+			"#f7b3af", ""];
 		el.innerHTML =
 			`<div class="orbit-saudacao-texto">` +
 			`<h1 class="orbit-saudacao-titulo"></h1>` +
 			`<p class="orbit-saudacao-frase"></p>` +
 			`<div class="orbit-saudacao-pontos" aria-hidden="true">` +
-			PONTOS.map((c) => `<span style="background:${c}"></span>`).join("") +
+			PONTOS.map((c) => c
+				? `<span style="background:${c}"></span>`
+				: `<span class="orbit-ponto-vazado"></span>`).join("") +
 			`</div></div>` +
 			// A marca da empresa muda-se para aqui, do rodapé. Na faixa escura
 			// é a versão para fundo escuro — a regra da casa é a marca variar
