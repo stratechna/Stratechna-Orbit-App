@@ -215,6 +215,14 @@
 	height: 7px;
 	border-radius: 50%;
 	display: block;
+	box-sizing: border-box;
+}
+
+/* O último é contornado e não cheio, como no divisor do stratechna.com, onde a
+   fila começa e acaba em círculos vazados. */
+.orbit-saudacao-pontos span:last-child {
+	background: none !important;
+	border: 1.5px solid #ea5c55;
 }
 
 .orbit-saudacao-texto {
@@ -425,15 +433,19 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 	bottom: -90px;
 	width: 620px;
 	height: 620px;
-	z-index: -1;
+	/* `z-index: -1` NÃO serve aqui: manda o desenho para trás do fundo do
+	   próprio elemento pai, e ele desaparece por completo — foi o que
+	   aconteceu à primeira. Fica em `0` e são os blocos que sobem para `1`,
+	   que é o que põe o desenho ENTRE o fundo e os cartões. */
+	z-index: 0;
 	pointer-events: none;
-	opacity: 0.055;
+	opacity: 0.09;
 	background: no-repeat center / contain
 		url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='none'%3E%3Cellipse cx='256' cy='256' rx='230' ry='112' stroke='%2322303d' stroke-width='14' transform='rotate(-30 256 256)'/%3E%3Cellipse cx='256' cy='256' rx='168' ry='82' stroke='%2322303d' stroke-width='12' transform='rotate(-30 256 256)'/%3E%3Ccircle cx='256' cy='256' r='44' fill='%23880000'/%3E%3C/svg%3E");
 }
 
 [data-theme="dark"] #orbit-corpo::after {
-	opacity: 0.075;
+	opacity: 0.11;
 	background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='none'%3E%3Cellipse cx='256' cy='256' rx='230' ry='112' stroke='%23c8d0d8' stroke-width='14' transform='rotate(-30 256 256)'/%3E%3Cellipse cx='256' cy='256' rx='168' ry='82' stroke='%23c8d0d8' stroke-width='12' transform='rotate(-30 256 256)'/%3E%3Ccircle cx='256' cy='256' r='44' fill='%23ea5c55'/%3E%3C/svg%3E");
 }
 
@@ -459,6 +471,8 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 }
 
 #orbit-corpo > .orbit-agenda-caixa {
+	position: relative;
+	z-index: 1;
 	flex: none;
 	width: 300px;
 	flex-direction: column;
@@ -501,6 +515,9 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 }
 
 .orbit-bloco {
+	/* Acima da marca de água, que vive no fundo do corpo. */
+	position: relative;
+	z-index: 1;
 	display: flex;
 	flex-direction: column;
 	box-sizing: border-box;

@@ -246,9 +246,16 @@
 		const el = document.createElement("header");
 		el.id = "orbit-saudacao";
 		// A fila de pontos é o divisor da marca, o mesmo que separa secções no
-		// stratechna.com. As cores são as da paleta, pela ordem em que lá estão.
-		const PONTOS = ["#8a9bab", "#c8d0d8", "#5f7386", "#ea5c55", "#880000",
-			"#3d5163", "#22303d"];
+		// stratechna.com.
+		//
+		// A primeira versão usava a paleta INTEIRA, cinzentos e ardósias
+		// incluídos — e sobre a faixa escura os tons escuros desapareciam
+		// contra o fundo. Ficavam quatro pontos a ler-se e três buracos, e
+		// parecia aleatório em vez de desenhado. Agora é uma família só: o
+		// acento a esbater-se, que é o que sobrevive a um fundo escuro, com o
+		// último vazado como no divisor do site.
+		const PONTOS = ["#ea5c55", "#d4544e", "#b84a45", "#96403c", "#6e3532",
+			"#4a2a28", "transparent"];
 		el.innerHTML =
 			`<div class="orbit-saudacao-texto">` +
 			`<h1 class="orbit-saudacao-titulo"></h1>` +
