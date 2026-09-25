@@ -460,12 +460,36 @@
 
 	// Se a página não cabe no ecrã, aperta. Mede-se depois de desenhar, porque
 	// antes não se sabe quantos símbolos cabem por linha nesta largura.
-	function ajustarDensidade(raiz) {
-		const cabe = () => document.documentElement.scrollHeight
-			<= window.innerHeight + 2;
-		if (raiz.dataset.densidade === "folgada" && !cabe()) {
-			raiz.dataset.densidade = "apertada";
+	//
+	// QUEM ROLA NÃO É O DOCUMENTO. O desk do Frappe põe o conteúdo dentro de um
+	// contentor com `overflow: auto` (`#main-section`), e o
+	// `document.documentElement.scrollHeight` fica preso à altura da janela —
+	// dizia sempre que cabia, com 327px a transbordar. Procura-se o primeiro
+	// antepassado que rola mesmo.
+	function rolador(el) {
+		for (let n = el; n && n !== document.body; n = n.parentElement) {
+			if (n.scrollHeight > n.clientHeight + 2) return n;
 		}
+		return document.scrollingElement || document.documentElement;
+	}
+
+	function ajustarDensidade(raiz) {
+		// Duas passagens: uma para deixar o browser desenhar com a densidade
+		// que se acabou de pôr, outra para ver se chegou.
+		const passo = () => {
+			const r = rolador(raiz);
+			if (r.scrollHeight <= r.clientHeight + 2) return false;
+			if (raiz.dataset.densidade === "folgada") {
+				raiz.dataset.densidade = "apertada";
+				return true;
+			}
+			if (raiz.dataset.densidade === "apertada") {
+				raiz.dataset.densidade = "minima";
+				return true;
+			}
+			return false;
+		};
+		requestAnimationFrame(() => { if (passo()) requestAnimationFrame(passo); });
 	}
 
 	// ── Arranque ─────────────────────────────────────────────────────────────

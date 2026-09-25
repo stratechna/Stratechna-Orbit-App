@@ -625,6 +625,98 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 	.orbit-bloco { padding: 14px 14px 6px; }
 }
 
+/* ── Rodapé numa linha só, quando há muitos módulos ───────────────────────
+   Com os blocos empilhados há mais dois cabeçalhos e mais duas linhas de
+   símbolos do que havia na grelha 2×2 — cerca de 280px a mais. Antes de
+   encolher os símbolos, que é o que o utilizador tem de acertar com o rato,
+   recupera-se altura onde não custa nada: o rodapé passa a uma linha, com a
+   frase ao lado dos logótipos em vez de por baixo.
+   De 179px para cerca de 80. */
+#orbit-pagina[data-densidade="apertada"] #orbit-rodape,
+#orbit-pagina[data-densidade="minima"] #orbit-rodape {
+	flex-direction: row;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 8px 20px;
+	padding: 14px 0 16px;
+	text-align: left;
+}
+
+#orbit-pagina[data-densidade="apertada"] #orbit-rodape .orbit-rodape-produto,
+#orbit-pagina[data-densidade="minima"] #orbit-rodape .orbit-rodape-produto {
+	height: 34px;
+}
+
+#orbit-pagina[data-densidade="apertada"] #orbit-rodape .orbit-rodape-empresa,
+#orbit-pagina[data-densidade="minima"] #orbit-rodape .orbit-rodape-empresa {
+	height: 26px;
+}
+
+#orbit-pagina[data-densidade="apertada"] #orbit-rodape .orbit-rodape-risco,
+#orbit-pagina[data-densidade="minima"] #orbit-rodape .orbit-rodape-risco {
+	height: 22px;
+}
+
+#orbit-pagina[data-densidade="apertada"] #orbit-rodape .orbit-rodape-frase,
+#orbit-pagina[data-densidade="minima"] #orbit-rodape .orbit-rodape-frase {
+	margin: 0;
+	max-width: 46ch;
+	text-align: left;
+}
+
+/* A faixa da marca também aperta — mas só nas margens, nunca no que lá está
+   escrito. */
+#orbit-pagina[data-densidade="apertada"] #orbit-saudacao,
+#orbit-pagina[data-densidade="minima"] #orbit-saudacao {
+	padding-top: 18px;
+	padding-bottom: 14px;
+	margin-bottom: 14px;
+}
+
+#orbit-pagina[data-densidade="apertada"] .orbit-bloco {
+	padding: 11px 14px 3px;
+}
+
+#orbit-pagina[data-densidade="apertada"] .orbit-bloco-cab {
+	margin-bottom: 8px;
+}
+
+/* ── Último recurso ────────────────────────────────────────────────────────
+   Quando nem apertado cabe — muitos módulos num ecrã baixo. Aqui sim os
+   símbolos encolhem mais, porque a alternativa é a página rolar e o rodapé
+   ficar escondido. */
+#orbit-pagina[data-densidade="minima"] .orbit-lista {
+	grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+}
+
+#orbit-pagina[data-densidade="minima"] .orbit-cartao {
+	padding: 5px 3px 7px;
+	gap: 4px;
+}
+
+#orbit-pagina[data-densidade="minima"] .orbit-cartao-img,
+#orbit-pagina[data-densidade="minima"] .orbit-cartao-vazio {
+	width: 30px;
+	height: 30px;
+}
+
+#orbit-pagina[data-densidade="minima"] .orbit-cartao-nome {
+	font-size: 10.5px;
+	line-height: 1.25;
+}
+
+#orbit-pagina[data-densidade="minima"] .orbit-bloco {
+	padding: 8px 12px 2px;
+}
+
+#orbit-pagina[data-densidade="minima"] .orbit-bloco-cab {
+	margin-bottom: 6px;
+}
+
+#orbit-pagina[data-densidade="minima"] #orbit-grelha {
+	gap: 12px;
+}
+
 /* ── Muitos módulos ────────────────────────────────────────────────────────
    Acima de duas dezenas e meia de módulos, os símbolos encolhem para caberem
    mais por linha — o que tira linhas aos blocos e mantém a página dentro do
