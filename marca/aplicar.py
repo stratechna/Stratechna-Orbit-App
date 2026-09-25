@@ -415,6 +415,11 @@ trocar_no_pacote = [
          "logo:`/assets/orbit/icons/apps/orbit.svg`,title:__(`Orbit`)"),
         ('logo:"/assets/frappe/images/framework.png",title:__("Desk")',
          'logo:"/assets/orbit/icons/apps/orbit.svg",title:__("Orbit")'),
+        # E o caminho da imagem sozinho, para os mapas de código: lá dentro vai
+        # o ficheiro ORIGINAL, não o minificado, e o par acima — que casa com a
+        # forma minificada — nunca lhe pega. É um endereço, não um
+        # identificador, por isso trocar só o caminho é seguro.
+        ("/assets/frappe/images/framework.png", "/assets/orbit/icons/apps/orbit.svg"),
     ]),
 ]
 
@@ -425,7 +430,11 @@ for pasta, pares in trocar_no_pacote:
         continue
     tocados = 0
     for ficheiro in sorted(os.listdir(caminho)):
-        if not ficheiro.endswith(".js"):
+        # Os `.js.map` também: são servidos ao lado do pacote e a verificação da
+        # construção olha para a pasta inteira. Deixá-los de fora fazia a
+        # construção acusar um logótipo que já não estava em lado nenhum que se
+        # veja — e tinha razão, do ponto de vista dela.
+        if not (ficheiro.endswith(".js") or ficheiro.endswith(".js.map")):
             continue
         alvo = os.path.join(caminho, ficheiro)
         with open(alvo, encoding="utf-8", errors="surrogateescape") as fh:
