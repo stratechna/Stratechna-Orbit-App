@@ -444,7 +444,17 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 .orbit-lista {
 	flex: 1 1 auto;
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+	/* TECTO DE COLUNAS, e não só um mínimo.
+	   Com os blocos a toda a largura, o `auto-fill` dava dezoito colunas de
+	   71px e os nomes partiam-se a meio da palavra — «Configura-ção»,
+	   «Recrutamen-to». E não ganhava altura nenhuma: o número de LINHAS é
+	   ditado pelo bloco maior (22 módulos), que dá duas linhas a partir de
+	   onze colunas. Ou seja, passar de doze para dezoito colunas estragava os
+	   nomes sem poupar um pixel.
+	   O `max()` põe o tecto: a coluna nunca é mais estreita do que um
+	   duodécimo da largura, logo nunca há mais de doze. Em ecrãs estreitos o
+	   mínimo em pixéis volta a mandar, e as colunas reduzem-se sozinhas. */
+	grid-template-columns: repeat(auto-fill, minmax(max(92px, calc(100% / 12)), 1fr));
 	align-content: start;
 	gap: 2px;
 }
@@ -491,7 +501,9 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 	/* `anywhere` partia «Subcontratação» a meio da palavra; `break-word` só
 	   quebra quando a palavra não cabe de todo. */
 	overflow-wrap: break-word;
-	hyphens: auto;
+	/* Sem hifenização automática: em rótulos de uma ou duas palavras corta a
+	   meio da palavra e lê-se pior do que a partir a linha. */
+	hyphens: manual;
 }
 
 /* ── Apps por subscrever ───────────────────────────────────────────────────
@@ -686,7 +698,7 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
    símbolos encolhem mais, porque a alternativa é a página rolar e o rodapé
    ficar escondido. */
 #orbit-pagina[data-densidade="minima"] .orbit-lista {
-	grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+	grid-template-columns: repeat(auto-fill, minmax(max(68px, calc(100% / 12)), 1fr));
 }
 
 #orbit-pagina[data-densidade="minima"] .orbit-cartao {
@@ -722,7 +734,7 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
    mais por linha — o que tira linhas aos blocos e mantém a página dentro do
    ecrã. Com 45 módulos são seis por linha em vez de cinco. */
 #orbit-pagina[data-densidade="apertada"] .orbit-lista {
-	grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+	grid-template-columns: repeat(auto-fill, minmax(max(78px, calc(100% / 12)), 1fr));
 }
 
 #orbit-pagina[data-densidade="apertada"] .orbit-cartao {
