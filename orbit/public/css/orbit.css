@@ -45,6 +45,16 @@
 /* ── A página ──────────────────────────────────────────────────────────────
    Coluna única: saudação em cima, blocos no meio a ocupar o que sobra, rodapé
    encostado ao fundo do ecrã mesmo quando há poucos módulos. */
+:root {
+	/* O espaçamento lateral da faixa que sangra até às bordas. Vive numa
+	   variável porque JÁ SE PERDEU DUAS VEZES: havia quatro regras a escrever
+	   `padding: <algo> 0 <algo>` na faixa — escritas quando ela acabava na
+	   coluna de conteúdo — e cada uma delas punha o horizontal a zero, que é o
+	   que alinha o que lá está com os blocos. Agora o horizontal é sempre esta
+	   variável, e o que as regras de altura mexem é só o vertical. */
+	--orbit-faixa-lado: max(28px, calc(50vw - 700px + 28px));
+}
+
 #orbit-pagina {
 	display: flex;
 	flex-direction: column;
@@ -69,7 +79,7 @@
 	/* Era 34/20. O espaço em cima e em baixo dos blocos estava a sobrar e a
 	   fazer a grelha parecer pequena no meio do ecrã — e era esse mesmo espaço
 	   que eu andava a poupar encolhendo os símbolos. */
-	padding: 22px 0 12px;
+	padding: 22px var(--orbit-faixa-lado) 12px;
 }
 
 #orbit-saudacao .orbit-saudacao-titulo {
@@ -125,7 +135,7 @@
 	margin-left: calc(50% - 50vw);
 	margin-right: calc(50% - 50vw);
 	margin-bottom: 18px;
-	padding: 24px max(28px, calc(50vw - 700px + 28px)) 22px;
+	padding: 24px var(--orbit-faixa-lado) 22px;
 	background: linear-gradient(135deg, #22303d 0%, #1a2530 100%);
 	color: #e4e9ee;
 	align-items: center;
@@ -815,7 +825,7 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 }
 
 #orbit-pagina[data-densidade="apertada"] #orbit-saudacao {
-	padding: 28px 0 16px;
+	padding: 20px var(--orbit-faixa-lado) 14px;
 }
 
 #orbit-pagina[data-densidade="apertada"] #orbit-grelha {
