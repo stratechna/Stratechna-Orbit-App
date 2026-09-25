@@ -167,6 +167,11 @@ jobs:
           docker run --rm --entrypoint grep orbit-frappe:teste -rq 'images/framework.png' \
             /home/frappe/frappe-bench/apps/crm/crm/public/frontend/assets \
             && { echo "ERRO: a entrada «Desk» do CRM ainda tem o logótipo do Frappe"; falhou=1; } || true
+          # O rodape de TODOS os emails: o ERPNext punha la uma ligacao de
+          # marketing para frappe.io, dentro do correio dos nossos clientes.
+          docker run --rm --entrypoint grep orbit-frappe:teste -q 'source=via_email_footer' \
+            /home/frappe/frappe-bench/apps/erpnext/erpnext/hooks.py \
+            && { echo "ERRO: o rodape dos emails ainda aponta para o frappe.io"; falhou=1; } || true
           [ $falhou -eq 0 ] || exit 1
           echo "marca das apps de frontend próprio verificada"
 

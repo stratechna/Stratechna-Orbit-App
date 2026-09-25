@@ -443,6 +443,35 @@ for pasta, pares in trocar_no_pacote:
         falhas.append(f"{pasta}: não encontrei a entrada «Desk» que o CRM acrescenta "
                       "ao comutador de apps — o upstream mudou-a?")
 
+# ── O rodapé de TODOS os emails que o Orbit envia ───────────────────────────
+#
+# O ERPNext acrescenta a cada email um «Sent via ERPNext» com ligação para
+# frappe.io. Não é uma atribuição de licença — a GPL v3 não exige nada na
+# interface — é uma ligação de marketing do fabricante dentro do correio que os
+# NOSSOS clientes recebem dos seus clientes. Passa a ser nossa.
+#
+# O gancho é `default_mail_footer` no hooks.py do ERPNext, lido pelo
+# frappe/email/email_body.py em cada mensagem.
+RODAPE_ERPNEXT = '''default_mail_footer = """
+\t<span>
+\t\tSent via
+\t\t<a class="text-muted" href="https://frappe.io/erpnext?source=via_email_footer" target="_blank">
+\t\t\tERPNext
+\t\t</a>
+\t</span>
+"""'''
+
+RODAPE_NOSSO = '''default_mail_footer = """
+\t<span>
+\t\tEnviado pelo
+\t\t<a class="text-muted" href="https://stratechna.com/orbit/" target="_blank">
+\t\t\tStratechna Orbit
+\t\t</a>
+\t</span>
+"""'''
+
+trocar("erpnext/erpnext/hooks.py", [(RODAPE_ERPNEXT, RODAPE_NOSSO)])
+
 # ── Resultado ───────────────────────────────────────────────────────────────
 print(f"marca das apps de frontend próprio: {feitos} ficheiros tratados")
 if falhas:
