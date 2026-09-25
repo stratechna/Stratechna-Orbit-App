@@ -22,16 +22,9 @@
 (function () {
 	const MARCA = "Stratechna Orbit";
 
-	// A frase do rodapé. Nomeia o que lá está dentro em vez de dizer «suite de
-	// produtividade», que toda a gente diz e não quer dizer nada.
-	const FRASE_RODAPE =
-		"A suite de gestão da Stratechna — CRM, suporte, faturação, documentos " +
-		"e correio, num só lugar.";
-
-	// Os grupos, em duas linhas: em cima os dois grandes, lado a lado; em baixo
-	// os dois pequenos, que só dão uma linha de símbolos e por isso levam blocos
-	// mais baixos. A largura de cada bloco da linha de baixo é proporcional ao
-	// que tem lá dentro, para a linha fechar de ponta a ponta como a de cima.
+	// Os grupos, empilhados a toda a largura pela ordem em que estão aqui.
+	// (O campo `linha` é o que restou da disposição em duas colunas e já não é
+	// lido; fica porque é o que diz a ordem de leitura pretendida.)
 	//
 	// Os nomes aqui são os RÓTULOS do `Desktop Icon`, não o que se lê no ecrã: o
 	// CRM chama-se «Frappe CRM» e o Desk chama-se «Helpdesk» na base de dados, e
@@ -262,43 +255,47 @@
 			`<p class="orbit-saudacao-frase"></p>` +
 			`<div class="orbit-saudacao-pontos" aria-hidden="true">` +
 			PONTOS.map((c) => `<span style="background:${c}"></span>`).join("") +
-			`</div></div>`;
+			`</div></div>` +
+			// A marca da empresa muda-se para aqui, do rodapé. Na faixa escura
+			// é a versão para fundo escuro — a regra da casa é a marca variar
+			// com o fundo, não o fundo variar com a marca. Por baixo, as
+			// ligações que sobraram do rodapé.
+			`<div class="orbit-saudacao-marca">` +
+			`<img src="/assets/orbit/img/stratechna-marca-escura.svg" alt="Stratechna">` +
+			`<a href="/licencas">${__("Licenças e código aberto")}</a>` +
+			`</div>`;
 		el.querySelector(".orbit-saudacao-titulo").textContent = s.titulo;
 		el.querySelector(".orbit-saudacao-frase").textContent = s.frase;
+		return el;
+	}
 
-		const caixa = document.createElement("div");
-		caixa.className = "orbit-agenda-caixa";
+	// A agenda, agora em coluna à direita dos blocos.
+	//
+	// Estava deitada dentro da faixa, ao lado da saudação, e era ela que lhe
+	// dava 185px de altura. Em coluna, a faixa fica a uma linha de marca, e os
+	// ~145px que se libertam voltam para os símbolos, que estavam pequenos de
+	// mais. O custo é a largura: a coluna leva 300px que os blocos deixam de
+	// ter. Compensa — a altura é o recurso escasso neste ecrã, não a largura.
+	function colunaAgenda() {
+		const el = document.createElement("aside");
+		el.className = "orbit-agenda-caixa";
 		const mes = quadroMes();
 		const dia = quadroDia();
-		caixa.appendChild(mes);
-		caixa.appendChild(dia);
-		el.appendChild(caixa);
+		el.appendChild(mes);
+		el.appendChild(dia);
 		encherAgenda(mes, dia);
 		return el;
 	}
 
-	// O rodapé responde a três coisas pedidas depois de o ver no ecrã: a marca do
-	// produto tinha ficado pequena de mais, faltava o logótipo da empresa e
-	// faltava a frase que estava na versão anterior.
-	function rodape() {
-		const el = document.createElement("footer");
-		el.id = "orbit-rodape";
-		el.innerHTML =
-			`<div class="orbit-rodape-marcas">` +
-			`<img class="orbit-rodape-produto" src="/assets/orbit/img/stratechna.svg" alt="${MARCA}">` +
-			`<span class="orbit-rodape-risco"></span>` +
-			`<img class="orbit-rodape-empresa orbit-so-claro" src="/assets/orbit/img/stratechna-marca.svg" alt="Stratechna">` +
-			`<img class="orbit-rodape-empresa orbit-so-escuro" src="/assets/orbit/img/stratechna-marca-escura.svg" alt="Stratechna">` +
-			`</div>` +
-			`<p class="orbit-rodape-frase"></p>` +
-			// Seis dos componentes do Orbit são AGPL v3, e a cláusula 13 obriga a
-			// oferecer o código da nossa versão a quem usa o serviço pela rede.
-			// Fica por baixo de tudo e discreto — o que a licença exige é que
-			// seja alcançável, não que seja vistoso.
-			`<a class="orbit-rodape-licencas" href="/licencas">Licenças e código aberto</a>`;
-		el.querySelector(".orbit-rodape-frase").textContent = FRASE_RODAPE;
-		return el;
-	}
+	// O rodapé deixou de existir como faixa própria.
+	//
+	// Tinha dois logótipos, uma frase de apresentação e uma ligação — 179px
+	// para dizer coisas que ninguém lê num ecrã que se usa todos os dias, e a
+	// competir em peso com os próprios módulos. A marca da empresa subiu para a
+	// faixa escura, onde tem contraste e onde já se olha; a ligação às licenças
+	// foi com ela; a frase saiu, porque quem está dentro do produto não precisa
+	// que lhe expliquem o que ele é; e o logótipo do Orbit saiu porque já está
+	// na barra de cima, ao lado do nome.
 
 	function bloco(g) {
 		const sec = document.createElement("section");
@@ -451,8 +448,17 @@
 		// para não haver um salto visível no arranque.
 		porDegrau(raiz, total > 24 ? 1 : 0);
 		raiz.appendChild(cabecalho());
-		raiz.appendChild(grelha);
-		raiz.appendChild(rodape());
+
+		// Duas colunas por baixo da faixa: os blocos à esquerda, a agenda à
+		// direita. A agenda é uma coluna e não uma faixa porque a altura é o
+		// recurso escasso deste ecrã — deitada, custava 185px a toda a largura;
+		// de pé, não custa altura nenhuma, porque os blocos são mais altos do
+		// que ela.
+		const corpo = document.createElement("div");
+		corpo.id = "orbit-corpo";
+		corpo.appendChild(grelha);
+		corpo.appendChild(colunaAgenda());
+		raiz.appendChild(corpo);
 
 		container.parentNode.insertBefore(raiz, container);
 		container.classList.add("orbit-escondido");

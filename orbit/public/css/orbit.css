@@ -117,10 +117,18 @@
 #orbit-saudacao {
 	position: relative;
 	overflow: hidden;
-	margin: 0 -28px 18px;
-	padding: 26px 28px 24px;
+	/* A TODA A LARGURA DO ECRÃ, e não só da coluna de conteúdo.
+	   A página vive numa coluna de 1400px centrada; para a faixa sangrar até
+	   às bordas, puxa-se cada lado pela distância que vai do centro da coluna
+	   ao centro do ecrã — `50% - 50vw`. O conteúdo dela fica alinhado com o
+	   resto por um padding do mesmo tamanho. */
+	margin-left: calc(50% - 50vw);
+	margin-right: calc(50% - 50vw);
+	margin-bottom: 18px;
+	padding: 24px max(28px, calc(50vw - 700px + 28px)) 22px;
 	background: linear-gradient(135deg, #22303d 0%, #1a2530 100%);
 	color: #e4e9ee;
+	align-items: center;
 }
 
 /* O grafismo: a própria elipse da marca do Orbit, muito esbatida, encostada à
@@ -160,6 +168,35 @@
 	margin: 12px 0 0;
 }
 
+/* A marca da empresa, à direita da faixa, com as ligações por baixo. Veio do
+   rodapé: aqui tem contraste e está onde já se olha. */
+.orbit-saudacao-marca {
+	flex: none;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 8px;
+	text-align: right;
+}
+
+.orbit-saudacao-marca img {
+	height: 38px;
+	width: auto;
+	display: block;
+}
+
+.orbit-saudacao-marca a {
+	font-size: 11.5px;
+	color: #8a9bab;
+	text-decoration: none;
+}
+
+.orbit-saudacao-marca a:hover,
+.orbit-saudacao-marca a:focus-visible {
+	color: #c8d0d8;
+	text-decoration: underline;
+}
+
 .orbit-saudacao-pontos span {
 	width: 7px;
 	height: 7px;
@@ -188,8 +225,8 @@
 	border-radius: 12px;
 }
 
-.orbit-mes { width: 232px; flex: none; }
-.orbit-agenda { width: 400px; flex: none; display: flex; flex-direction: column; }
+.orbit-mes { width: auto; flex: none; }
+.orbit-agenda { width: auto; flex: none; display: flex; flex-direction: column; }
 
 /* Mesmo cabeçalho dos blocos de módulos — título, risco, e uma acção à direita
    quando faz sentido. A repetição é de propósito: são a mesma família. */
@@ -353,6 +390,39 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 
    Dentro de cada linha os blocos esticam à mesma altura; entre linhas, não:
    a de baixo é naturalmente mais baixa, e é isso que se quer. */
+/* ── Corpo: blocos à esquerda, agenda à direita ───────────────────────────
+   A agenda estava deitada dentro da faixa e era ela que lhe dava 185px de
+   altura. De pé, ao lado dos blocos, não custa altura nenhuma — os blocos são
+   mais altos do que ela — e os 145px que se libertam voltam para os símbolos.
+   O custo é a largura: a coluna leva 300px que os blocos deixam de ter. Vale a
+   pena porque neste ecrã o que falta é altura, não largura. */
+#orbit-corpo {
+	flex: 1 1 auto;
+	display: flex;
+	align-items: flex-start;
+	gap: 18px;
+	min-height: 0;
+}
+
+#orbit-corpo > #orbit-grelha {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+#orbit-corpo > .orbit-agenda-caixa {
+	flex: none;
+	width: 300px;
+	flex-direction: column;
+	align-items: stretch;
+}
+
+/* Em ecrãs estreitos a coluna passa para baixo dos blocos em vez de os
+   espremer; abaixo de tablet sai, como já saía. */
+@media (max-width: 1100px) {
+	#orbit-corpo { flex-direction: column; }
+	#orbit-corpo > .orbit-agenda-caixa { width: 100%; flex-direction: row; }
+}
+
 #orbit-grelha {
 	flex: 1 1 auto;
 	display: flex;
@@ -553,70 +623,6 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 	.orbit-cartao--fechada .orbit-cartao-img { transition: none; }
 }
 
-/* ── Rodapé ────────────────────────────────────────────────────────────────
-   Três coisas, por esta ordem: a marca do produto, a frase que diz o que isto
-   é, e o logótipo da empresa a assinar por baixo do risco. */
-#orbit-rodape {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	gap: 8px;
-	padding: 22px 0 26px;
-	text-align: center;
-}
-
-#orbit-rodape .orbit-rodape-marcas {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	gap: 22px;
-}
-
-#orbit-rodape .orbit-rodape-produto {
-	height: 59px;
-	width: auto;
-}
-
-#orbit-rodape .orbit-rodape-risco {
-	width: 1px;
-	height: 37px;
-	background: var(--border-color, #e2e8ee);
-}
-
-#orbit-rodape .orbit-rodape-empresa {
-	height: 44px;
-	width: auto;
-}
-
-#orbit-rodape .orbit-rodape-frase {
-	max-width: 62ch;
-	margin: 2px 0 0;
-	font-size: 13px;
-	line-height: 1.5;
-	color: var(--text-muted, #5f7386);
-}
-
-/* Discreto de propósito: pequeno, cinzento claro, sem sublinhado até se lá
-   passar por cima. O que a AGPL exige é que a oferta de código seja
-   ALCANÇÁVEL, não que compita com a marca. */
-#orbit-rodape .orbit-rodape-licencas {
-	margin-top: 6px;
-	font-size: 11px;
-	line-height: 1.4;
-	color: var(--text-light, #8a9bab);
-	text-decoration: none;
-	opacity: 0.75;
-	transition: opacity 120ms ease;
-}
-
-#orbit-rodape .orbit-rodape-licencas:hover,
-#orbit-rodape .orbit-rodape-licencas:focus-visible {
-	opacity: 1;
-	text-decoration: underline;
-	text-underline-offset: 2px;
-	color: var(--text-muted, #5f7386);
-}
-
 /* Um logótipo para cada tema. Quem manda é o `data-theme` que o Frappe carimba
    na raiz — e não a preferência do sistema: no tema «automático» o próprio
    Frappe resolve o sistema e carimba o resultado. Ler `prefers-color-scheme`
@@ -629,51 +635,8 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 /* Em ecrãs baixos aperta-se o espaço vertical em vez de se deixar rolar. */
 @media (max-height: 860px) {
 	#orbit-saudacao { padding: 24px 0 16px; }
-	#orbit-rodape { gap: 8px; padding: 20px 0 24px; }
-	#orbit-rodape .orbit-rodape-produto { height: 51px; }
-	#orbit-rodape .orbit-rodape-empresa { height: 37px; }
-	#orbit-rodape .orbit-rodape-risco { height: 31px; }
 	.orbit-cartao { padding: 8px 4px 10px; gap: 6px; }
 	.orbit-bloco { padding: 14px 14px 6px; }
-}
-
-/* ── Rodapé numa linha só, quando há muitos módulos ───────────────────────
-   Com os blocos empilhados há mais dois cabeçalhos e mais duas linhas de
-   símbolos do que havia na grelha 2×2 — cerca de 280px a mais. Antes de
-   encolher os símbolos, que é o que o utilizador tem de acertar com o rato,
-   recupera-se altura onde não custa nada: o rodapé passa a uma linha, com a
-   frase ao lado dos logótipos em vez de por baixo.
-   De 179px para cerca de 80. */
-#orbit-pagina[data-densidade="apertada"] #orbit-rodape,
-#orbit-pagina[data-densidade="minima"] #orbit-rodape {
-	flex-direction: row;
-	flex-wrap: wrap;
-	justify-content: center;
-	gap: 8px 20px;
-	padding: 14px 0 16px;
-	text-align: left;
-}
-
-#orbit-pagina[data-densidade="apertada"] #orbit-rodape .orbit-rodape-produto,
-#orbit-pagina[data-densidade="minima"] #orbit-rodape .orbit-rodape-produto {
-	height: 34px;
-}
-
-#orbit-pagina[data-densidade="apertada"] #orbit-rodape .orbit-rodape-empresa,
-#orbit-pagina[data-densidade="minima"] #orbit-rodape .orbit-rodape-empresa {
-	height: 26px;
-}
-
-#orbit-pagina[data-densidade="apertada"] #orbit-rodape .orbit-rodape-risco,
-#orbit-pagina[data-densidade="minima"] #orbit-rodape .orbit-rodape-risco {
-	height: 22px;
-}
-
-#orbit-pagina[data-densidade="apertada"] #orbit-rodape .orbit-rodape-frase,
-#orbit-pagina[data-densidade="minima"] #orbit-rodape .orbit-rodape-frase {
-	margin: 0;
-	max-width: 46ch;
-	text-align: left;
 }
 
 /* A faixa da marca também aperta — mas só nas margens, nunca no que lá está
@@ -708,8 +671,10 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 
 #orbit-pagina[data-densidade="minima"] .orbit-cartao-img,
 #orbit-pagina[data-densidade="minima"] .orbit-cartao-vazio {
-	width: 30px;
-	height: 30px;
+	/* Nunca abaixo de 44px, que é a medida a que um alvo continua fácil de
+	   acertar. Abaixo disto é melhor a página rolar. */
+	width: 44px;
+	height: 44px;
 }
 
 #orbit-pagina[data-densidade="minima"] .orbit-cartao-nome {
@@ -764,6 +729,15 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 	overflow-y: auto;
 }
 
+/* Os degraus de aperto sobem de chão (34→42, 30→36): com a agenda fora da
+   faixa há mais altura disponível, e o que se ganhou em espaço deve voltar
+   para os símbolos, que é o que a pessoa tem de acertar com o rato. */
+
+/* O rodapé deixou de existir como elemento: a marca da empresa subiu para a
+   faixa escura e a ligação às licenças foi com ela. As regras que o vestiam
+   foram removidas — folha de estilo a vestir um elemento que já não é
+   desenhado é exactamente o tipo de resto que este trabalho anda a limpar. */
+
 /* ── Muitos módulos ────────────────────────────────────────────────────────
    Acima de duas dezenas e meia de módulos, os símbolos encolhem para caberem
    mais por linha — o que tira linhas aos blocos e mantém a página dentro do
@@ -811,10 +785,6 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 	gap: 14px;
 }
 
-#orbit-pagina[data-densidade="apertada"] #orbit-rodape {
-	padding: 20px 0 22px;
-}
-
 #orbit-pagina[data-densidade="apertada"] .orbit-bloco {
 	padding: 13px 13px 6px;
 }
@@ -836,12 +806,6 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 	.orbit-cartao-vazio { width: clamp(44px, 6vh, 52px); height: clamp(44px, 6vh, 52px); border-radius: 11px; }
 	.orbit-bloco { padding: 12px 12px 5px; }
 	.orbit-bloco-cab { margin-bottom: 9px; }
-	#orbit-rodape { gap: 6px; padding: 14px 0 16px; }
-	#orbit-rodape .orbit-rodape-marcas { gap: 18px; }
-	#orbit-rodape .orbit-rodape-produto { height: 44px; }
-	#orbit-rodape .orbit-rodape-empresa { height: 33px; }
-	#orbit-rodape .orbit-rodape-risco { height: 26px; }
-	#orbit-rodape .orbit-rodape-frase { font-size: 12px; }
 }
 
 /* Muitos módulos NUM ecrã baixo — o caso mais apertado de todos. As regras de
@@ -862,7 +826,6 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 	#orbit-pagina[data-densidade="apertada"] .orbit-bloco-cab { margin-bottom: 5px; }
 	#orbit-pagina[data-densidade="apertada"] #orbit-grelha,
 	#orbit-pagina[data-densidade="apertada"] .orbit-linha { gap: 10px; }
-	#orbit-pagina[data-densidade="apertada"] #orbit-rodape { padding: 8px 0 10px; gap: 4px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
