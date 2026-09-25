@@ -101,6 +101,72 @@
 	gap: 28px;
 }
 
+/* ── A faixa da marca ──────────────────────────────────────────────────────
+   Só a zona da saudação é escura, e não a página inteira. A razão é do sistema
+   de ícones: os 47 mosaicos são ardósia (#22303d) desenhados para fundo claro,
+   e sobre preto desapareciam — havia que trocá-los todos pela variante clara.
+   Além disso o Frappe tem tema por utilizador e o resto do desk (CRM, ERP,
+   Desk) continua claro: uma página toda escura só aqui fazia um salto a cada
+   entrada numa app.
+
+   Assim a marca fica onde o olho cai primeiro, os mosaicos ficam sobre o fundo
+   para que foram desenhados, e os dois temas continuam a funcionar.
+
+   O acento muda com o fundo, como manda a regra da marca: #880000 sobre claro,
+   #ea5c55 sobre escuro. Aqui o fundo é sempre escuro, logo é sempre o claro. */
+#orbit-saudacao {
+	position: relative;
+	overflow: hidden;
+	margin: 0 -28px 18px;
+	padding: 26px 28px 24px;
+	background: linear-gradient(135deg, #22303d 0%, #1a2530 100%);
+	color: #e4e9ee;
+}
+
+/* O grafismo: a própria elipse da marca do Orbit, muito esbatida, encostada à
+   direita e cortada pela margem. É SVG desenhado aqui — não depende de nenhuma
+   imagem do site, escala em qualquer largura e não há ficheiro para manter. */
+#orbit-saudacao::before {
+	content: "";
+	position: absolute;
+	top: 50%;
+	right: -40px;
+	width: 380px;
+	height: 380px;
+	transform: translateY(-50%);
+	pointer-events: none;
+	opacity: 0.09;
+	background: no-repeat center / contain
+		url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='none'%3E%3Cellipse cx='256' cy='256' rx='230' ry='112' stroke='%23c8d0d8' stroke-width='14' transform='rotate(-30 256 256)'/%3E%3Cellipse cx='256' cy='256' rx='168' ry='82' stroke='%23c8d0d8' stroke-width='12' transform='rotate(-30 256 256)'/%3E%3Ccircle cx='256' cy='256' r='44' fill='%23ea5c55'/%3E%3C/svg%3E");
+}
+
+#orbit-saudacao > * {
+	position: relative;
+}
+
+#orbit-saudacao .orbit-saudacao-titulo {
+	color: #f2f5f8;
+}
+
+#orbit-saudacao .orbit-saudacao-frase {
+	color: #a9b7c4;
+}
+
+/* A fila de pontos é o divisor da marca, o mesmo que separa secções no
+   stratechna.com — aqui em pequeno, entre o cumprimento e a frase. */
+.orbit-saudacao-pontos {
+	display: flex;
+	gap: 5px;
+	margin: 12px 0 0;
+}
+
+.orbit-saudacao-pontos span {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	display: block;
+}
+
 .orbit-saudacao-texto {
 	flex: 1 1 auto;
 	min-width: 0;
@@ -299,18 +365,20 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 	gap: 18px;
 }
 
+/* ── Disposição: um bloco por linha, a toda a largura ──────────────────────
+   Era uma grelha 2×2. Com blocos de 22, 9, 7 e 9 módulos, esticá-los à altura
+   do mais alto da linha deixava vazios grandes — mais de metade do bloco de
+   gestão era espaço morto — e as duas colunas nunca alinhavam entre si.
+
+   Empilhados, cada bloco tem a altura do que leva, há uma margem esquerda e uma
+   direita só, e os símbolos ficam todos na mesma grelha de colunas: é daí que
+   vem a harmonia que faltava. A leitura passa a ser de cima para baixo, que é
+   como se percorre uma página. */
 .orbit-linha {
 	display: grid;
 	align-items: stretch;
+	grid-template-columns: minmax(0, 1fr) !important;
 	gap: 18px;
-}
-
-@media (max-width: 1000px) {
-	.orbit-linha { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-}
-
-@media (max-width: 680px) {
-	.orbit-linha { grid-template-columns: minmax(0, 1fr) !important; }
 }
 
 .orbit-bloco {

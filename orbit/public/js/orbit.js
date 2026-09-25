@@ -250,10 +250,17 @@
 		const s = saudacao();
 		const el = document.createElement("header");
 		el.id = "orbit-saudacao";
+		// A fila de pontos é o divisor da marca, o mesmo que separa secções no
+		// stratechna.com. As cores são as da paleta, pela ordem em que lá estão.
+		const PONTOS = ["#8a9bab", "#c8d0d8", "#5f7386", "#ea5c55", "#880000",
+			"#3d5163", "#22303d"];
 		el.innerHTML =
 			`<div class="orbit-saudacao-texto">` +
 			`<h1 class="orbit-saudacao-titulo"></h1>` +
-			`<p class="orbit-saudacao-frase"></p></div>`;
+			`<p class="orbit-saudacao-frase"></p>` +
+			`<div class="orbit-saudacao-pontos" aria-hidden="true">` +
+			PONTOS.map((c) => `<span style="background:${c}"></span>`).join("") +
+			`</div></div>`;
 		el.querySelector(".orbit-saudacao-titulo").textContent = s.titulo;
 		el.querySelector(".orbit-saudacao-frase").textContent = s.frase;
 
@@ -322,6 +329,14 @@
 		return m[icone.label] || null;
 	}
 
+	// As apps com casa própria: as que vivem fora do Frappe (link externo) e as
+	// quatro que, dentro dele, são aplicações inteiras com arranque próprio.
+	const APPS_PROPRIAS = new Set(["Frappe CRM", "Helpdesk", "Wiki", "Frappe HR"]);
+
+	function eApp(icone) {
+		return icone.link_type === "External" || APPS_PROPRIAS.has(icone.label);
+	}
+
 	function cartao(icone) {
 		const fechada = inactiva(icone);
 		const a = document.createElement("a");
@@ -342,7 +357,18 @@
 			return a;
 		}
 		a.href = frappe.utils.get_route_for_icon(icone) || "#";
-		if (icone.link_type === "External") a.target = "_blank";
+		// Cada APP abre no seu próprio separador, com NOME.
+		//
+		// Estava incoerente: as apps de fora abriam em separador novo e as do
+		// Frappe no mesmo. E `_blank` sem nome abre um separador NOVO a cada
+		// clique — três cliques no Docs, três separadores iguais. Com um nome
+		// por app, o primeiro clique abre e os seguintes reutilizam o que já lá
+		// está, com o trabalho como estava.
+		//
+		// Só as apps. Os módulos do ERP (Vendas, Compras, Inventário…) são
+		// páginas da MESMA aplicação e continuam a abrir aqui: um separador por
+		// módulo seria uma dúzia de separadores para uma tarefa só.
+		if (eApp(icone)) a.target = "orbit-" + frappe.scrub(icone.label);
 		a.title = __(icone.label);
 
 		const url = frappe.utils.get_desktop_icon(icone.label, frappe.boot.desktop_icon_style);
@@ -388,29 +414,23 @@
 		const grelha = document.createElement("div");
 		grelha.id = "orbit-grelha";
 
-		const linhas = [1, 2].map((n) => grupos.filter((g) => g.linha === n)).filter((l) => l.length);
-
-		// As colunas são as mesmas em todas as linhas — para um bloco de baixo
-		// ficar exactamente por baixo do de cima — mas a largura de cada coluna
-		// é proporcional ao que essa coluna leva no total. A coluna dos módulos
-		// de trabalho carrega mais do dobro da de gestão, e com colunas iguais
-		// ficava com mais uma linha de símbolos do que o resto: a página crescia
-		// por causa de um bloco só.
-		const peso = [];
-		for (const linha of linhas) {
-			linha.forEach((g, i) => {
-				peso[i] = (peso[i] || 0) + g.membros.length;
-			});
-		}
-		// O mínimo impede que uma coluna com um módulo fique fina de mais para o
-		// próprio título do bloco.
-		const colunas = peso.map((n) => `minmax(0, ${Math.max(n, 4)}fr)`).join(" ");
-
-		for (const linha of linhas) {
+		// Um bloco por linha, a toda a largura.
+		//
+		// Era uma grelha 2×2 com as colunas proporcionais ao que cada uma
+		// levava. Resolvia o problema de um bloco pesado fazer crescer a
+		// página, mas criava outro: com 22, 9, 7 e 9 módulos, os blocos eram
+		// esticados à altura do mais alto da linha e sobravam vazios grandes —
+		// mais de metade do bloco de gestão era espaço morto. E as duas colunas
+		// nunca alinhavam uma com a outra.
+		//
+		// Empilhados, cada bloco tem a altura do que leva, todos partilham a
+		// mesma grelha de colunas de símbolos, e há uma margem esquerda e uma
+		// direita só. O `campo` do CSS (`auto-fill`) trata de quantos cabem por
+		// linha em cada largura de ecrã.
+		for (const g of grupos) {
 			const el = document.createElement("div");
 			el.className = "orbit-linha";
-			el.style.gridTemplateColumns = colunas;
-			for (const g of linha) el.appendChild(bloco(g));
+			el.appendChild(bloco(g));
 			grelha.appendChild(el);
 		}
 
@@ -421,6 +441,12 @@
 		// comprou o correio e o CRM; com uma medida fixa, ou o primeiro rola ou
 		// o segundo fica com símbolos perdidos no meio do branco.
 		const total = grupos.reduce((s, g) => s + g.membros.length, 0);
+		// A densidade era decidida pela contagem de módulos («mais de 24 =
+		// apertada»). Com os blocos empilhados a altura deixa de depender só da
+		// contagem — depende também de quantos cabem por linha, que muda com a
+		// largura do ecrã. Passa a ser MEDIDA: desenha-se folgado e, se a
+		// página não couber, aperta-se. A contagem fica como primeiro palpite,
+		// para não haver um salto visível no arranque.
 		raiz.dataset.densidade = total > 24 ? "apertada" : "folgada";
 		raiz.appendChild(cabecalho());
 		raiz.appendChild(grelha);
@@ -428,7 +454,18 @@
 
 		container.parentNode.insertBefore(raiz, container);
 		container.classList.add("orbit-escondido");
+		ajustarDensidade(raiz);
 		return true;
+	}
+
+	// Se a página não cabe no ecrã, aperta. Mede-se depois de desenhar, porque
+	// antes não se sabe quantos símbolos cabem por linha nesta largura.
+	function ajustarDensidade(raiz) {
+		const cabe = () => document.documentElement.scrollHeight
+			<= window.innerHeight + 2;
+		if (raiz.dataset.densidade === "folgada" && !cabe()) {
+			raiz.dataset.densidade = "apertada";
+		}
 	}
 
 	// ── Arranque ─────────────────────────────────────────────────────────────
@@ -447,6 +484,14 @@
 	}, 200);
 
 	window.addEventListener("resize", medirTopo);
+	window.addEventListener("resize", function () {
+		const raiz = document.getElementById("orbit-pagina");
+		if (!raiz) return;
+		// Alargar o ecrã põe mais símbolos por linha e pode voltar a caber
+		// folgado; por isso tenta-se sempre o folgado primeiro.
+		raiz.dataset.densidade = "folgada";
+		ajustarDensidade(raiz);
+	});
 
 	if (window.frappe && frappe.router && frappe.router.on) {
 		frappe.router.on("change", function () {
