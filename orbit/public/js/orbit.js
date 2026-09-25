@@ -239,10 +239,12 @@
 					linha.querySelector(".orbit-agenda-nome").textContent = e.titulo;
 					lista.appendChild(linha);
 				}
+				reavaliar();
 			})
 			.catch(() => {
 				const lista = dia.querySelector(".orbit-agenda-lista");
 				lista.innerHTML = `<p class="orbit-agenda-vazio">${__("Agenda indisponível.")}</p>`;
+				reavaliar();
 			});
 	}
 
@@ -511,6 +513,21 @@
 		requestAnimationFrame(passo);
 	}
 
+	// Recomeça do primeiro degrau e desce só o que for preciso.
+	//
+	// Tem de haver um recomeço — e não só «apertar mais» — porque a página pode
+	// passar a caber: a janela cresce, ou o conteúdo encolhe. Foi o que
+	// aconteceu com a agenda: ela chega por pedido ao servidor DEPOIS de a
+	// página estar desenhada, e a medição feita antes disso escolhia um degrau
+	// a mais do que o necessário — o ecrã ficava com os símbolos no tamanho
+	// mínimo quando o degrau anterior chegava perfeitamente.
+	function reavaliar() {
+		const raiz = document.getElementById("orbit-pagina");
+		if (!raiz) return;
+		porDegrau(raiz, 0);
+		ajustarDensidade(raiz);
+	}
+
 	// ── Arranque ─────────────────────────────────────────────────────────────
 	function montar() {
 		const container = document.querySelector(".desktop-container");
@@ -527,15 +544,13 @@
 	}, 200);
 
 	window.addEventListener("resize", medirTopo);
+	// Ao arrastar o canto da janela o `resize` dispara dezenas de vezes por
+	// segundo, e cada chamada arrancaria a sua própria descida de degraus.
+	// Espera-se que a pessoa pare.
+	let relogioReavaliar = null;
 	window.addEventListener("resize", function () {
-		const raiz = document.getElementById("orbit-pagina");
-		if (!raiz) return;
-		// Alargar o ecrã põe mais símbolos por linha e pode voltar a caber
-		// folgado; por isso tenta-se sempre o folgado primeiro.
-		// Alargar ou aumentar a janela pode voltar a permitir o folgado, por
-		// isso recomeça-se sempre do princípio em vez de só apertar mais.
-		porDegrau(raiz, 0);
-		ajustarDensidade(raiz);
+		clearTimeout(relogioReavaliar);
+		relogioReavaliar = setTimeout(reavaliar, 120);
 	});
 
 	if (window.frappe && frappe.router && frappe.router.on) {
