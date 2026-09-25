@@ -15,8 +15,8 @@ app_license = "agpl-3.0"
 # chegar a ver-se, por mais vezes que se recarregue.
 #
 # SUBIR ESTE NÚMERO sempre que se mexer no CSS ou no JS.
-app_include_js = "/assets/orbit/js/orbit.js?v=14"
-app_include_css = "/assets/orbit/css/orbit.css?v=14"
+app_include_js = "/assets/orbit/js/orbit.js?v=15"
+app_include_css = "/assets/orbit/css/orbit.css?v=15"
 
 # O ecrã precisa de saber, no arranque, que apps é que este tenant tem — para
 # pintar a cinzento as que não tem em vez de as esconder. Vai no boot e não numa

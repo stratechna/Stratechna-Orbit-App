@@ -180,20 +180,23 @@
 }
 
 .orbit-saudacao-marca img {
-	height: 38px;
+	height: 54px;
 	width: auto;
 	display: block;
 }
 
 .orbit-saudacao-marca a {
-	font-size: 11.5px;
-	color: #8a9bab;
+	/* Discreta de propósito: o que a licença exige é que seja alcançável, não
+	   que compita com a marca que está por cima dela. */
+	font-size: 10px;
+	letter-spacing: 0.02em;
+	color: #6b7c8c;
 	text-decoration: none;
 }
 
 .orbit-saudacao-marca a:hover,
 .orbit-saudacao-marca a:focus-visible {
-	color: #c8d0d8;
+	color: #a9b7c4;
 	text-decoration: underline;
 }
 
@@ -390,6 +393,40 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 
    Dentro de cada linha os blocos esticam à mesma altura; entre linhas, não:
    a de baixo é naturalmente mais baixa, e é isso que se quer. */
+/* ── A marca de água ──────────────────────────────────────────────────────
+   O mesmo símbolo que está esbatido na faixa escura, agora em grande sobre o
+   branco: encostado à direita e cortado pela borda, como se estivesse a entrar
+   pelo lado.
+
+   Fica ATRÁS de tudo (`z-index: -1`) e os blocos mantêm a superfície opaca —
+   o desenho aparece à volta deles e por baixo do último, nunca por trás de
+   texto. É também por isso que a opacidade é tão baixa: num ecrã cheio, o que
+   se vê são fatias entre os blocos, e uma marca de água que se nota é uma
+   marca de água a mais.
+
+   Vive no CORPO branco e não na página inteira: a página tem de deixar a faixa
+   escura sangrar para fora dela por margens negativas, e um `overflow: hidden`
+   ali cortava-a. O corpo não tem esse problema — e é ele o fundo branco de que
+   se está a falar. */
+#orbit-corpo::after {
+	content: "";
+	position: absolute;
+	right: -170px;
+	bottom: -90px;
+	width: 620px;
+	height: 620px;
+	z-index: -1;
+	pointer-events: none;
+	opacity: 0.055;
+	background: no-repeat center / contain
+		url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='none'%3E%3Cellipse cx='256' cy='256' rx='230' ry='112' stroke='%2322303d' stroke-width='14' transform='rotate(-30 256 256)'/%3E%3Cellipse cx='256' cy='256' rx='168' ry='82' stroke='%2322303d' stroke-width='12' transform='rotate(-30 256 256)'/%3E%3Ccircle cx='256' cy='256' r='44' fill='%23880000'/%3E%3C/svg%3E");
+}
+
+[data-theme="dark"] #orbit-corpo::after {
+	opacity: 0.075;
+	background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='none'%3E%3Cellipse cx='256' cy='256' rx='230' ry='112' stroke='%23c8d0d8' stroke-width='14' transform='rotate(-30 256 256)'/%3E%3Cellipse cx='256' cy='256' rx='168' ry='82' stroke='%23c8d0d8' stroke-width='12' transform='rotate(-30 256 256)'/%3E%3Ccircle cx='256' cy='256' r='44' fill='%23ea5c55'/%3E%3C/svg%3E");
+}
+
 /* ── Corpo: blocos à esquerda, agenda à direita ───────────────────────────
    A agenda estava deitada dentro da faixa e era ela que lhe dava 185px de
    altura. De pé, ao lado dos blocos, não custa altura nenhuma — os blocos são
@@ -397,6 +434,8 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
    O custo é a largura: a coluna leva 300px que os blocos deixam de ter. Vale a
    pena porque neste ecrã o que falta é altura, não largura. */
 #orbit-corpo {
+	position: relative;
+	overflow: hidden;
 	flex: 1 1 auto;
 	display: flex;
 	align-items: flex-start;
@@ -634,7 +673,9 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 
 /* Em ecrãs baixos aperta-se o espaço vertical em vez de se deixar rolar. */
 @media (max-height: 860px) {
-	#orbit-saudacao { padding: 24px 0 16px; }
+	/* Só o vertical. O padding horizontal da faixa é o que alinha o que lá
+	   está com os blocos — pô-lo a zero encostava o texto à borda do ecrã. */
+	#orbit-saudacao { padding-top: 20px; padding-bottom: 14px; }
 	.orbit-cartao { padding: 8px 4px 10px; gap: 6px; }
 	.orbit-bloco { padding: 14px 14px 6px; }
 }
@@ -797,7 +838,7 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
    simples — o que sobra são cinco linhas de módulos na coluna mais alta, e cada
    linha que encolhe 10 px devolve 50 px à página. */
 @media (max-height: 780px) {
-	#orbit-saudacao { padding: 16px 0 12px; }
+	#orbit-saudacao { padding-top: 16px; padding-bottom: 12px; }
 	#orbit-saudacao .orbit-saudacao-titulo { font-size: 21px; }
 	.orbit-cartao { padding: 6px 4px 8px; gap: 5px; }
 	/* Com poucos módulos há folga de sobra mesmo num ecrã baixo: o símbolo só
@@ -820,7 +861,7 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 		width: clamp(44px, 7vh, 52px);
 		height: clamp(44px, 7vh, 52px);
 	}
-	#orbit-pagina[data-densidade="apertada"] #orbit-saudacao { padding: 10px 0 6px; }
+	#orbit-pagina[data-densidade="apertada"] #orbit-saudacao { padding-top: 12px; padding-bottom: 8px; }
 	#orbit-pagina[data-densidade="apertada"] .orbit-cartao { padding: 4px 3px 5px; gap: 3px; }
 	#orbit-pagina[data-densidade="apertada"] .orbit-bloco { padding: 9px 10px 3px; }
 	#orbit-pagina[data-densidade="apertada"] .orbit-bloco-cab { margin-bottom: 5px; }
