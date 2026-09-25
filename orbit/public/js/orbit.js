@@ -444,10 +444,10 @@
 		// A densidade era decidida pela contagem de módulos («mais de 24 =
 		// apertada»). Com os blocos empilhados a altura deixa de depender só da
 		// contagem — depende também de quantos cabem por linha, que muda com a
-		// largura do ecrã. Passa a ser MEDIDA: desenha-se folgado e, se a
-		// página não couber, aperta-se. A contagem fica como primeiro palpite,
+		// largura do ecrã. Passa a ser MEDIDA: desenha-se e, se a página não
+		// couber, desce-se um degrau. A contagem fica como primeiro palpite,
 		// para não haver um salto visível no arranque.
-		raiz.dataset.densidade = total > 24 ? "apertada" : "folgada";
+		porDegrau(raiz, total > 24 ? 1 : 0);
 		raiz.appendChild(cabecalho());
 		raiz.appendChild(grelha);
 		raiz.appendChild(rodape());
@@ -473,19 +473,39 @@
 	//
 	// O fundo da nossa página contra a altura da janela é exacto, e não depende
 	// de nada que o Frappe faça à volta.
-	const DEGRAUS = ["folgada", "apertada", "minima"];
+	// Os degraus, do que custa menos ao que custa mais.
+	//
+	// A ordem é a decisão de produto que está por trás de tudo isto: este ecrã é
+	// um LANÇADOR, e o que ele existe para fazer são os símbolos. Por isso
+	// aperta-se primeiro o que é moldura (espaçamentos, rodapé), depois recolhe-se
+	// o calendário do mês — que é orientação, e a data também está no relógio do
+	// sistema — e só no fim se encolhem os símbolos, que são o que a pessoa tem
+	// de acertar com o rato. Os compromissos de hoje nunca saem: não estão em
+	// mais lado nenhum.
+	const DEGRAUS = [
+		{ densidade: "folgada", agenda: "inteira" },
+		{ densidade: "apertada", agenda: "inteira" },
+		{ densidade: "apertada", agenda: "recolhida" },
+		{ densidade: "minima", agenda: "recolhida" },
+	];
 
 	function cabe(raiz) {
 		return Math.round(raiz.getBoundingClientRect().bottom) <= window.innerHeight + 2;
+	}
+
+	function porDegrau(raiz, i) {
+		raiz.dataset.densidade = DEGRAUS[i].densidade;
+		raiz.dataset.agenda = DEGRAUS[i].agenda;
+		raiz.dataset.degrau = String(i);
 	}
 
 	function ajustarDensidade(raiz) {
 		// Um degrau por fotograma, para o browser desenhar entre cada um.
 		const passo = () => {
 			if (cabe(raiz)) return;
-			const i = DEGRAUS.indexOf(raiz.dataset.densidade);
-			if (i < 0 || i === DEGRAUS.length - 1) return;
-			raiz.dataset.densidade = DEGRAUS[i + 1];
+			const i = Number(raiz.dataset.degrau || 0);
+			if (i >= DEGRAUS.length - 1) return;
+			porDegrau(raiz, i + 1);
 			requestAnimationFrame(passo);
 		};
 		requestAnimationFrame(passo);
@@ -514,7 +534,7 @@
 		// folgado; por isso tenta-se sempre o folgado primeiro.
 		// Alargar ou aumentar a janela pode voltar a permitir o folgado, por
 		// isso recomeça-se sempre do princípio em vez de só apertar mais.
-		raiz.dataset.densidade = "folgada";
+		porDegrau(raiz, 0);
 		ajustarDensidade(raiz);
 	});
 

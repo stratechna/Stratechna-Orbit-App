@@ -729,6 +729,41 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 	gap: 12px;
 }
 
+/* ── Agenda recolhida ──────────────────────────────────────────────────────
+   Quando a página não cabe no ecrã, a agenda recolhe ANTES de os símbolos
+   encolherem ao mínimo. A ordem é deliberada: este ecrã é um lançador, e o que
+   ele existe para fazer são os símbolos. O calendário do mês é orientação —
+   útil, mas a data também está no relógio do sistema — enquanto os compromissos
+   de hoje são informação que não está em mais lado nenhum.
+   Por isso recolher é: o mês sai, o «Hoje» fica.
+
+   Sai cerca de 125px, que é mais do que se ganha a apertar tudo o resto junto.
+
+   É um estado à parte de `data-densidade` de propósito: sendo dois atributos
+   independentes, cada degrau escolhe a combinação que quer sem que as regras de
+   um apaguem as do outro. */
+#orbit-pagina[data-agenda="recolhida"] .orbit-mes {
+	display: none;
+}
+
+/* Sem o mês ao lado, a caixa deixa de ser esticada à altura dele e passa a ter
+   a altura do que leva. */
+#orbit-pagina[data-agenda="recolhida"] .orbit-agenda-caixa {
+	align-items: flex-start;
+}
+
+#orbit-pagina[data-agenda="recolhida"] .orbit-agenda {
+	width: 340px;
+	padding: 9px 12px 9px;
+}
+
+/* Um dia cheio não pode voltar a fazer crescer a faixa: a lista rola dentro de
+   si a partir de três compromissos. */
+#orbit-pagina[data-agenda="recolhida"] .orbit-agenda-lista {
+	max-height: 84px;
+	overflow-y: auto;
+}
+
 /* ── Muitos módulos ────────────────────────────────────────────────────────
    Acima de duas dezenas e meia de módulos, os símbolos encolhem para caberem
    mais por linha — o que tira linhas aos blocos e mantém a página dentro do
