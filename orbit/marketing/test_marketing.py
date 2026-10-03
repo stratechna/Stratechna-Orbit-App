@@ -166,7 +166,12 @@ class TestMarketing(IntegrationTestCase):
         self.assertEqual((e.ref, e.estado), ("venda_cruzada:SO-1", "Na fila"))
         envio.processar()                                                   # simulação
         self.assertEqual(frappe.db.get_value("Envio de Marketing", {"token": e.token}, "estado"), "Simulado")
-        publico.ir(e.token, 1)                                              # a ligação do produto DELE
+        # a ligação do produto DELE: a posição vem da própria mensagem, que
+        # põe o botão primeiro quando o há (esta automação não tem)
+        import json as _json
+        from orbit.marketing import mensagem
+        lig = modelos.ligacoes(mensagem.conteudo(a, _json.loads(e.dados)))
+        publico.ir(e.token, lig.index(produtos[0]["url"]))
         self.assertEqual(frappe.local.response.get("location"), produtos[0]["url"])
         # o tecto de frequência: outra automação não lhe escreve na mesma semana
         b = frappe.get_doc({"doctype": "Automacao de Marketing", "tipo": "Depois da compra", "dias_apos": 7,
