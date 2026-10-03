@@ -63,6 +63,16 @@ class TestMarketing(IntegrationTestCase):
             self.assertTrue(meta.has_field(campo), campo)
         self.assertTrue(meta.track_changes)
 
+    def test_entrada_no_ecra_de_apps(self):
+        from orbit import apps, marca
+        marca.repor_atalhos()
+        icone = frappe.db.get_value("Desktop Icon", {"label": "Marketing"},
+                                    ["link", "logo_url", "hidden"], as_dict=True)
+        self.assertEqual(icone.link, "/app/campanha-de-marketing")
+        self.assertEqual(icone.logo_url, "/assets/orbit/icons/apps/marketing.svg")
+        self.assertFalse(icone.hidden)
+        self.assertIn("marketing", apps.activas())
+
     def test_so_quem_pode_receber(self):
         emails = {r["email"] for r in destinatarios.contactaveis()}
         self.assertIn("pode@exemplo.invalid", emails)

@@ -44,6 +44,10 @@ APPS = {
     "events":   {"codigo": "W1500020", "frappe": None,       "rotulo": "Events",     "nome": "Events"},
     "erp":      {"codigo": "W1500021", "frappe": "erpnext",  "rotulo": "ERP",        "nome": "ERP"},
     "social":   {"codigo": "W1500022", "frappe": None,       "rotulo": "Social",     "nome": "Social"},
+    # O email marketing vende-se nos planos Launch/Grow/Lead Mail (W0502), não
+    # como app do Orbit por utilizador. O código é o do plano de entrada, que é
+    # para onde o cinzento leva quem não o tem.
+    "marketing": {"codigo": "W0502001", "frappe": "orbit",   "rotulo": "Marketing",  "nome": "Marketing"},
 }
 
 # Onde o cliente vai subscrever o que lhe falta.

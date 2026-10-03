@@ -126,6 +126,11 @@ ATALHOS = [
     {"nome": "Social", "url": "https://social.{dominio}", "simbolo": "social", "ordem": 5},
     {"nome": "Meet", "url": "/api/method/orbit.meet.entrar", "simbolo": "meet", "ordem": 6},
     {"nome": "Chat", "url": "https://{chat}", "simbolo": "chat", "ordem": 7},
+    # O Marketing vive dentro do Frappe (módulo desta app) mas não tem
+    # espaço de trabalho próprio: entra na grelha pelo mesmo mecanismo, com um
+    # caminho do próprio site, e abre na lista de campanhas — que é onde o
+    # trabalho começa.
+    {"nome": "Marketing", "url": "/app/campanha-de-marketing", "simbolo": "marketing", "ordem": 8},
 ]
 
 
@@ -164,7 +169,8 @@ def _chat_do_tenant() -> str:
 
 
 def repor_atalhos():
-    """Os sete módulos de fora do Frappe, na grelha, com endereço deste tenant.
+    """Os atalhos da grelha que não vêm de nenhuma app (os sete módulos de fora
+    do Frappe, e o Marketing), com endereço deste tenant.
 
     Durante algum tempo houve DOIS sítios a escrever estas mesmas fichas: esta
     função (no `after_migrate`) e um guião `orbit_atalhos.py` no servidor, com

@@ -46,8 +46,10 @@
 			// rede de segurança e apareciam em «Operações», longe do Mail e do
 			// Social, que são da mesma família. A rede funcionou — não se
 			// perderam —, mas o sítio estava errado.
+			// O Marketing entrou a 03-10-2026, ao lado do Social: as duas são
+			// a forma de o cliente falar com quem já o conhece.
 			itens: ["Frappe CRM", "Helpdesk", "Mail", "Docs", "Sign", "Events",
-				"Social", "Meet", "Chat", "Wiki", "Projects",
+				"Social", "Marketing", "Meet", "Chat", "Wiki", "Projects",
 				"Frappe HR", "HR Setup", "Recruitment", "Leaves", "Payroll",
 				"Expenses", "Performance", "Tenure", "Shift & Attendance",
 				"Tax & Benefits"],
