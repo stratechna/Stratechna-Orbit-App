@@ -98,6 +98,12 @@ class TestMarketing(IntegrationTestCase):
         self.assertEqual((c.estado, c.origem), ("Para aprovação", "Portal"))
         self.assertEqual([s.segmento for s in c.segmentos], ["Todos"])
         self.assertTrue(ponte.campanha(pedido)["repetido"])
+        com_blocos = ponte.campanha({**pedido, "portal_ref": "portal-teste-blocos",
+                                     "blocos": [{"tipo": "Título", "titulo": "Do editor", "alinhar": "Centro"},
+                                                {"tipo": "Inventado", "titulo": "fora"}, {"tipo": "Separador"}]})
+        cb = frappe.get_doc("Campanha de Marketing", com_blocos["nome"])
+        self.assertEqual([b.tipo for b in cb.blocos], ["Título", "Separador"])
+        self.assertIn("Do editor", mensagem.compor(cb, {"nome": "X"})["html"])
         self.assertFalse(ponte.campanha({**pedido, "portal_ref": "portal-teste-2", "segmentos": ["Não existe"]})["ok"])
         self.assertFalse(ponte.campanha({**pedido, "portal_ref": "portal-teste-3", "modelo": "Inventado"})["ok"])
         self.assertIn("portal-teste-1", [x.portal_ref for x in ponte.resultados({})["campanhas"]])

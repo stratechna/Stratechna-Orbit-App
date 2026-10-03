@@ -30,6 +30,11 @@ _DEFINICOES = {
     "plano_envios_mes": int, "responder_para": str,
 }
 
+_BLOCO = ("tipo", "titulo", "subtitulo", "texto", "botao_texto", "url", "imagem", "alinhar", "fundo",
+          "cor_botao", "colunas", "maximo")
+_TIPOS_DE_BLOCO = ("Título", "Texto", "Botão", "Imagem", "Imagem com título", "Faixa de destaque", "Produtos",
+                   "Produto em destaque", "Vantagens em colunas", "Lista de artigos", "Evento", "Assinatura",
+                   "Separador", "Espaço")
 _CAMPANHA = ("titulo", "modelo", "linha_assunto", "pre_cabecalho", "titulo_email", "subtitulo",
              "texto", "cta_texto", "cta_url", "imagem_topo", "destaque_texto", "destaque_subtexto",
              "evento_data", "evento_hora", "evento_local", "assinatura", "agendar_para")
@@ -98,6 +103,10 @@ def campanha(pedido: dict) -> dict:
                   for i in (pedido.get("itens") or [])[:6] if isinstance(i, dict) and i.get("titulo")],
         "produtos": [{k: p.get(k) for k in ("nome", "preco", "url", "imagem", "descricao")}
                      for p in (pedido.get("produtos") or [])[:6] if isinstance(p, dict) and p.get("nome")],
+        # Os blocos montados no editor do portal chegam como estão: a campanha
+        # sai como o cliente a aprovou lá.
+        "blocos": [{k: b.get(k) for k in _BLOCO if b.get(k) not in (None, "")}
+                   for b in (pedido.get("blocos") or [])[:30] if isinstance(b, dict) and b.get("tipo") in _TIPOS_DE_BLOCO],
     })
     doc.flags.do_portal = True
     cliente = str(pedido.get("aprovada_pelo_cliente") or "").strip()[:140]
