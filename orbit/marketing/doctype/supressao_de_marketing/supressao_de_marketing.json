@@ -22,7 +22,7 @@
    "fieldname": "motivo",
    "fieldtype": "Select",
    "label": "Motivo",
-   "options": "Devolvido\\nQueixa",
+   "options": "Devolvido\nQueixa",
    "reqd": 1,
    "in_list_view": 1,
    "in_standard_filter": 1,
