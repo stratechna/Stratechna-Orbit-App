@@ -411,9 +411,12 @@ def _bloco(t: _Tema, b: dict, c: dict, ir) -> str:
         return (f'<mj-section padding="0"><mj-column><mj-image src="{_e(img)}" alt=""{ligar} padding="0" '
                 f'fluid-on-mobile="true" /></mj-column></mj-section>')
     if tipo == "Imagem com título":
-        return _imagem_topo(t, {"imagem_topo": b.get("imagem"), "titulo": b.get("titulo"),
-                                "subtitulo": b.get("subtitulo"), "cta_texto": b.get("botao_texto"),
-                                "cta_url": b.get("url")}, ir, com_texto=True)
+        d = {"imagem_topo": b.get("imagem"), "titulo": b.get("titulo"), "subtitulo": b.get("subtitulo"),
+             "cta_texto": b.get("botao_texto"), "cta_url": b.get("url")}
+        if not _url(d["imagem_topo"]):
+            # Sem imagem fica o título e o botão ao centro, como no modelo sazonal.
+            return _titulo(t, d, 30, "center") + _botao(t, d, ir, alinhar="center")
+        return _imagem_topo(t, d, ir, com_texto=True)
     if tipo == "Faixa de destaque":
         return _faixa(t, {"destaque": {"texto": b.get("titulo"), "subtexto": b.get("subtitulo")}})
     if tipo == "Produtos":
