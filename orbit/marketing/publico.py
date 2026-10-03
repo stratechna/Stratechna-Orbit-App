@@ -49,8 +49,10 @@ def ir(t: str = "", i: int = 0):
     e = _envio(t)
     if not e:
         frappe.throw("Ligação desconhecida", frappe.DoesNotExistError)
-    c = frappe.get_doc("Campanha de Marketing", e.campanha)
-    ligacoes = modelos.ligacoes(mensagem.conteudo(c))
+    import json
+    c = frappe.get_doc("Automacao de Marketing", e.automacao) if e.get("automacao") else \
+        frappe.get_doc("Campanha de Marketing", e.campanha)
+    ligacoes = modelos.ligacoes(mensagem.conteudo(c, json.loads(e.dados) if e.get("dados") else None))
     i = int(i)
     if not 0 <= i < len(ligacoes):
         frappe.throw("Ligação desconhecida", frappe.DoesNotExistError)
@@ -67,7 +69,8 @@ def remover(t: str, tudo: bool) -> dict | None:
     e = _envio(t)
     if not e:
         return None
-    assunto = frappe.db.get_value("Campanha de Marketing", e.campanha, "assunto_marketing")
+    assunto = (frappe.db.get_value("Automacao de Marketing", e.automacao, "assunto_marketing") if e.get("automacao")
+               else frappe.db.get_value("Campanha de Marketing", e.campanha, "assunto_marketing"))
     if tudo or not assunto:
         if not frappe.db.exists("Email Unsubscribe", {"email": e.email, "global_unsubscribe": 1}):
             frappe.get_doc({"doctype": "Email Unsubscribe", "email": e.email,

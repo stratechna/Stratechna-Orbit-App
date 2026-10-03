@@ -10,10 +10,34 @@
    "fieldtype": "Link",
    "label": "Campanha",
    "options": "Campanha de Marketing",
-   "reqd": 1,
+   "reqd": 0,
    "in_list_view": 1,
    "in_standard_filter": 1,
    "idx": 1
+  },
+  {
+   "fieldname": "automacao",
+   "fieldtype": "Link",
+   "label": "Automação",
+   "options": "Automacao de Marketing",
+   "in_standard_filter": 1,
+   "idx": 2
+  },
+  {
+   "fieldname": "ref",
+   "fieldtype": "Data",
+   "label": "Motivo",
+   "search_index": 1,
+   "description": "O que levou a este envio (uma encomenda, a entrada…)",
+   "idx": 3
+  },
+  {
+   "fieldname": "dados",
+   "fieldtype": "Code",
+   "label": "Conteúdo próprio",
+   "options": "JSON",
+   "read_only": 1,
+   "idx": 4
   },
   {
    "fieldname": "email",
@@ -22,7 +46,7 @@
    "options": "Email",
    "reqd": 1,
    "in_list_view": 1,
-   "idx": 2
+   "idx": 5
   },
   {
    "fieldname": "estado",
@@ -32,27 +56,27 @@
    "default": "Na fila",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "idx": 3
+   "idx": 6
   },
   {
    "fieldname": "referencia_doctype",
    "fieldtype": "Link",
    "label": "Registo — tipo",
    "options": "DocType",
-   "idx": 4
+   "idx": 7
   },
   {
    "fieldname": "referencia_nome",
    "fieldtype": "Dynamic Link",
    "label": "Registo",
    "options": "referencia_doctype",
-   "idx": 5
+   "idx": 8
   },
   {
    "fieldname": "nome_destinatario",
    "fieldtype": "Data",
    "label": "Nome",
-   "idx": 6
+   "idx": 9
   },
   {
    "fieldname": "token",
@@ -61,7 +85,7 @@
    "unique": 1,
    "read_only": 1,
    "hidden": 1,
-   "idx": 7
+   "idx": 10
   },
   {
    "fieldname": "email_queue",
@@ -69,61 +93,61 @@
    "label": "Fila de email",
    "options": "Email Queue",
    "read_only": 1,
-   "idx": 8
+   "idx": 11
   },
   {
    "fieldname": "erro",
    "fieldtype": "Small Text",
    "label": "Erro",
    "read_only": 1,
-   "idx": 9
+   "idx": 12
   },
   {
    "fieldname": "cb",
    "fieldtype": "Column Break",
-   "idx": 10
+   "idx": 13
   },
   {
    "fieldname": "enviado_em",
    "fieldtype": "Datetime",
    "label": "Enviado em",
    "read_only": 1,
-   "idx": 11
+   "idx": 14
   },
   {
    "fieldname": "aberto_em",
    "fieldtype": "Datetime",
    "label": "Aberto em",
    "read_only": 1,
-   "idx": 12
+   "idx": 15
   },
   {
    "fieldname": "aberturas",
    "fieldtype": "Int",
    "label": "Aberturas",
    "read_only": 1,
-   "idx": 13
+   "idx": 16
   },
   {
    "fieldname": "clicado_em",
    "fieldtype": "Datetime",
    "label": "Clicado em",
    "read_only": 1,
-   "idx": 14
+   "idx": 17
   },
   {
    "fieldname": "cliques",
    "fieldtype": "Int",
    "label": "Cliques",
    "read_only": 1,
-   "idx": 15
+   "idx": 18
   },
   {
    "fieldname": "saiu_em",
    "fieldtype": "Datetime",
    "label": "Saiu em",
    "read_only": 1,
-   "idx": 16
+   "idx": 19
   }
  ],
  "permissions": [
@@ -146,7 +170,7 @@
  "states": [],
  "links": [],
  "creation": "2026-10-03 10:00:00.000000",
- "modified": "2026-10-03 14:00:00.000000",
+ "modified": "2026-10-03 16:00:00.000000",
  "owner": "Administrator",
  "modified_by": "Administrator",
  "idx": 0,

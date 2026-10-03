@@ -20,5 +20,6 @@ def get_context(context):
     if not e:
         return context
     context.email = e.email
-    context.assunto = frappe.db.get_value("Campanha de Marketing", e.campanha, "assunto_marketing")
+    context.assunto = (frappe.db.get_value("Automacao de Marketing", e.automacao, "assunto_marketing") if e.get("automacao")
+                       else frappe.db.get_value("Campanha de Marketing", e.campanha, "assunto_marketing"))
     return context

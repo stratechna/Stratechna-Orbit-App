@@ -50,22 +50,32 @@ def _absoluto(u: str | None) -> str | None:
     return u if u.startswith(("http://", "https://")) else get_url(u)
 
 
-def conteudo(c) -> dict:
-    """Os campos da campanha na forma que os modelos usam."""
-    return {
-        "modelo": modelos.POR_NOME.get(c.modelo, "relacao"),
-        "titulo": c.titulo_email, "subtitulo": c.subtitulo,
-        "paragrafos": [p.strip() for p in (c.texto or "").split("\n\n") if p.strip()],
-        "cta_texto": c.cta_texto, "cta_url": c.cta_url,
-        "imagem_topo": _absoluto(c.imagem_topo),
-        "destaque": {"texto": c.destaque_texto, "subtexto": c.destaque_subtexto} if c.destaque_texto else {},
-        "evento": {"data": c.evento_data, "hora": c.evento_hora, "local": c.evento_local},
-        "assinatura": c.assinatura,
+def conteudo(c, dados: dict | None = None) -> dict:
+    """Os campos de uma campanha ou automação na forma que os modelos usam.
+    `dados` é o que é só de um destinatário (os produtos que ELE comprou, a
+    encomenda DELE) — por cima do conteúdo comum. Lê-se com `.get` porque a
+    automação não tem todos os campos da campanha."""
+    g = c.get
+    k = {
+        "modelo": modelos.POR_NOME.get(g("modelo"), "relacao"),
+        "titulo": g("titulo_email"), "subtitulo": g("subtitulo"),
+        "paragrafos": [p.strip() for p in (g("texto") or "").split("\n\n") if p.strip()],
+        "cta_texto": g("cta_texto"), "cta_url": g("cta_url"),
+        "imagem_topo": _absoluto(g("imagem_topo")),
+        "destaque": {"texto": g("destaque_texto"), "subtexto": g("destaque_subtexto")} if g("destaque_texto") else {},
+        "evento": {"data": g("evento_data"), "hora": g("evento_hora"), "local": g("evento_local")},
+        "assinatura": g("assinatura"),
         "itens": [{"titulo": i.titulo, "texto": i.texto, "url": i.url, "imagem": _absoluto(i.imagem)}
-                  for i in (c.itens or [])],
+                  for i in (g("itens") or [])],
         "produtos": [{"nome": p.nome, "preco": p.preco, "url": p.url, "imagem": _absoluto(p.imagem),
-                      "descricao": p.descricao} for p in (c.produtos or [])],
+                      "descricao": p.descricao} for p in (g("produtos") or [])],
     }
+    if dados:
+        if dados.get("produtos") is not None:
+            k["produtos"] = dados["produtos"]
+        if dados.get("cta_url"):
+            k["cta_url"] = dados["cta_url"]
+    return k
 
 
 def _pessoal(texto: str | None, r: dict) -> str:
@@ -77,11 +87,11 @@ def url_publico(metodo: str, **params) -> str:
     return get_url(f"/api/method/orbit.marketing.publico.{metodo}?{urlencode(params)}")
 
 
-def compor(c, r: dict, token: str | None = None) -> dict:
+def compor(c, r: dict, token: str | None = None, dados: dict | None = None) -> dict:
     """Sem `token` é pré-visualização ou teste: as ligações vão directas e não
     há píxel."""
     d = definicoes()
-    k = conteudo(c)
+    k = conteudo(c, dados)
     for campo in ("titulo", "subtitulo", "assinatura"):
         if k.get(campo):
             k[campo] = _pessoal(k[campo], r)

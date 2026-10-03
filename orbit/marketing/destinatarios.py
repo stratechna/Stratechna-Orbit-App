@@ -92,6 +92,22 @@ def _cumpre(r: dict, regra: str, valor: str, cache: dict) -> bool:
         return (r.get("estado_lead") or "").lower() == baixo
     if regra == "Organização contém":
         return baixo in (r.get("organizacao") or "").lower()
+    if regra in ("Comprou nos últimos N dias", "Não compra há mais de N dias", "Comprou no grupo de artigos",
+                 "Tem pelo menos N encomendas"):
+        from frappe.utils import add_days, getdate, nowdate
+        from orbit.marketing import loja
+        if "compras" not in cache:
+            cache["compras"] = loja.ultima_compra()
+        x = cache["compras"].get(r["email"])
+        if not x:
+            return False
+        if regra == "Comprou nos últimos N dias":
+            return getdate(x["ultima"]) >= getdate(add_days(nowdate(), -cint(v)))
+        if regra == "Não compra há mais de N dias":
+            return getdate(x["ultima"]) < getdate(add_days(nowdate(), -cint(v)))
+        if regra == "Comprou no grupo de artigos":
+            return baixo in {g.lower() for g in x["grupos"]}
+        return x["n"] >= cint(v)
     if regra in ("Abriu nos últimos N dias", "Clicou nos últimos N dias"):
         coluna = "aberto_em" if regra.startswith("Abriu") else "clicado_em"
         chave = (coluna, cint(v))

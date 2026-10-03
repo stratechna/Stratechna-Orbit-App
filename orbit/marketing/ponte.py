@@ -26,6 +26,7 @@ _DEFINICOES = {
     "fonte_titulos": str, "fonte_texto": str, "legal_texto": str,
     "redes": dict, "contactos": dict,
     "plano_nome": str, "plano_contactos": int, "plano_campanhas_mes": int,
+    "plano_automacoes": str, "intervalo_minimo_dias": int,
 }
 
 _CAMPANHA = ("titulo", "modelo", "linha_assunto", "pre_cabecalho", "titulo_email", "subtitulo",

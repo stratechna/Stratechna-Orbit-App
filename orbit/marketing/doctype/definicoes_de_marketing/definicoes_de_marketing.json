@@ -132,6 +132,20 @@
    "label": "Campanhas por mês",
    "description": "0 = sem tecto",
    "idx": 19
+  },
+  {
+   "fieldname": "plano_automacoes",
+   "fieldtype": "Small Text",
+   "label": "Automações incluídas no plano",
+   "description": "Vazio = todas. Vem do portal.",
+   "idx": 20
+  },
+  {
+   "fieldname": "intervalo_minimo_dias",
+   "fieldtype": "Int",
+   "label": "Dias mínimos entre dois emails automáticos à mesma pessoa",
+   "default": "3",
+   "idx": 21
   }
  ],
  "permissions": [
@@ -152,7 +166,7 @@
  "states": [],
  "links": [],
  "creation": "2026-10-03 10:00:00.000000",
- "modified": "2026-10-03 14:00:00.000000",
+ "modified": "2026-10-03 16:00:00.000000",
  "owner": "Administrator",
  "modified_by": "Administrator",
  "idx": 0,

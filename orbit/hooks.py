@@ -50,7 +50,7 @@ scheduler_events = {
     "cron": {
         "* * * * *": ["orbit.marketing.envio.processar"],
     },
-    "hourly": ["orbit.marketing.envio.contagens_do_dia"],
+    "hourly": ["orbit.marketing.envio.contagens_do_dia", "orbit.marketing.automacoes.correr"],
 }
 
 # Esta app não tem nada que valha a pena mostrar no ecrã de apps: é marca e

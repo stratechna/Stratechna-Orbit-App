@@ -16,6 +16,7 @@ Em simulação (o modo por omissão, e o que vale enquanto faltar a conta de
 envio ou a identificação legal) o ciclo corre inteiro e nada entra na fila.
 """
 
+import json
 import math
 import uuid
 
@@ -74,11 +75,15 @@ TECTO_DEVOLUCOES = 0.05
 TECTO_QUEIXAS = 0.001
 
 
-def travao(nome: str) -> str | None:
-    """A razão para parar esta campanha, ou None."""
-    c = frappe.db.sql("""SELECT SUM(estado IN ('Enviado', 'Devolvido', 'Queixa')) AS saidos,
+def _chave(dono) -> str:
+    return "automacao" if dono.doctype == "Automacao de Marketing" else "campanha"
+
+
+def travao(nome: str, chave: str = "campanha") -> str | None:
+    """A razão para parar esta campanha (ou automação), ou None."""
+    c = frappe.db.sql(f"""SELECT SUM(estado IN ('Enviado', 'Devolvido', 'Queixa')) AS saidos,
             SUM(estado = 'Devolvido') AS devolvidos, SUM(estado = 'Queixa') AS queixas
-        FROM `tabEnvio de Marketing` WHERE campanha = %s""", nome, as_dict=True)[0]
+        FROM `tabEnvio de Marketing` WHERE {chave} = %s""", nome, as_dict=True)[0]
     saidos = cint(c.saidos)
     if saidos < AMOSTRA:
         return None
@@ -91,29 +96,37 @@ def travao(nome: str) -> str | None:
 
 def pausar(campanha, razao: str) -> None:
     campanha.db_set("estado", "Pausada")
-    campanha.add_comment("Comment", f"Pausada automaticamente: {razao}. "
+    if campanha.doctype == "Automacao de Marketing":
+        for e in frappe.get_all("Envio de Marketing", filters={"automacao": campanha.name, "estado": "Na fila"}, pluck="name"):
+            frappe.db.set_value("Envio de Marketing", e, "estado", "Cancelado")
+    campanha.add_comment("Comment", f"Parada automaticamente: {razao}. "
                                     "Reveja a lista antes de retomar.")
     aprovador = campanha.aprovada_por
     if aprovador:
         frappe.get_doc({"doctype": "Notification Log", "for_user": aprovador, "type": "Alert",
-                        "document_type": "Campanha de Marketing", "document_name": campanha.name,
-                        "subject": f"Campanha «{campanha.titulo}» pausada: {razao}"}).insert(ignore_permissions=True)
+                        "document_type": campanha.doctype, "document_name": campanha.name,
+                        "subject": f"«{campanha.get('titulo') or campanha.name}» parada: {razao}"}).insert(ignore_permissions=True)
 
 
-def despachar(campanha) -> None:
-    razao = travao(campanha.name)
+def despachar(campanha, lote: int | None = None) -> None:
+    """Faz sair um lote de uma campanha ou de uma automação. Para uma
+    automação a fila não acaba — volta a encher na corrida seguinte — e a
+    simulação lê-se a cada passagem, porque ela vive meses."""
+    chave = _chave(campanha)
+    razao = travao(campanha.name, chave)
     if razao:
         pausar(campanha, razao)
         return
     d = mensagem.definicoes()
-    lote = max(1, math.ceil(cint(d.limite_hora or 200) / 60))
-    fila = frappe.get_all("Envio de Marketing", filters={"campanha": campanha.name, "estado": "Na fila"},
+    lote = lote or max(1, math.ceil(cint(d.limite_hora or 200) / 60))
+    fila = frappe.get_all("Envio de Marketing", filters={chave: campanha.name, "estado": "Na fila"},
                           fields=["name"], order_by="creation", limit_page_length=lote)
     if not fila:
-        campanha.db_set({"estado": "Enviada", "enviada_em": now_datetime()})
-        actualizar_contagens(campanha.name)
+        if chave == "campanha":
+            campanha.db_set({"estado": "Enviada", "enviada_em": now_datetime()})
+        actualizar_contagens(campanha.name, chave)
         return
-    simulada = cint(campanha.simulada)
+    simulada = cint(campanha.simulada) if chave == "campanha" else int(simula(d))
     remetente = frappe.db.get_value("Email Account", d.email_account, "email_id") if d.email_account else None
     for linha in fila:
         e = frappe.get_doc("Envio de Marketing", linha.name)
@@ -127,7 +140,7 @@ def despachar(campanha) -> None:
             e.db_set({"estado": "Simulado", "enviado_em": now_datetime()})
             continue
         try:
-            m = mensagem.compor(campanha, r, e.token)
+            m = mensagem.compor(campanha, r, e.token, json.loads(e.dados) if e.get("dados") else None)
             # Os cabeçalhos X- passam pelo Frappe tal e qual. São eles que
             # deixam o portal ligar uma devolução ou queixa do relay ao envio
             # certo, no tenant certo.
@@ -154,10 +167,10 @@ def despachar(campanha) -> None:
             frappe.log_error(f"Campanha {campanha.name}", frappe.get_traceback())
 
 
-def actualizar_contagens(nome: str) -> None:
-    """Os números da campanha, a partir dos envios. A fila do Frappe diz o que
-    falhou depois de entregue a ela."""
-    for e in frappe.get_all("Envio de Marketing", filters={"campanha": nome, "estado": "Enviado",
+def actualizar_contagens(nome: str, chave: str = "campanha") -> None:
+    """Os números da campanha (ou automação), a partir dos envios. A fila do
+    Frappe diz o que falhou depois de entregue a ela."""
+    for e in frappe.get_all("Envio de Marketing", filters={chave: nome, "estado": "Enviado",
                                                            "email_queue": ("is", "set")},
                             fields=["name", "email_queue"]):
         if frappe.db.get_value("Email Queue", e.email_queue, "status") == "Error":
@@ -166,9 +179,9 @@ def actualizar_contagens(nome: str) -> None:
             SUM(estado IN ('Enviado', 'Simulado')) AS enviados,
             SUM(aberto_em IS NOT NULL) AS aberturas, SUM(clicado_em IS NOT NULL) AS cliques,
             SUM(saiu_em IS NOT NULL) AS saidas, SUM(estado = 'Falhou') AS falhas
-        FROM `tabEnvio de Marketing` WHERE campanha = %s""", nome, as_dict=True)[0]
-    frappe.db.set_value("Campanha de Marketing", nome, {k: cint(v) for k, v in c.items()},
-                        update_modified=False)
+        FROM `tabEnvio de Marketing` WHERE {chave} = %s""".replace("{chave}", chave), nome, as_dict=True)[0]
+    doctype = "Automacao de Marketing" if chave == "automacao" else "Campanha de Marketing"
+    frappe.db.set_value(doctype, nome, {k: cint(v) for k, v in c.items()}, update_modified=False)
 
 
 def processar() -> None:
@@ -181,13 +194,15 @@ def processar() -> None:
         except Exception:  # noqa: BLE001
             frappe.db.rollback()
             frappe.log_error(f"Abrir a campanha {nome}", frappe.get_traceback())
-    for nome in frappe.get_all("Campanha de Marketing", filters={"estado": "A enviar"}, pluck="name"):
-        try:
-            despachar(frappe.get_doc("Campanha de Marketing", nome))
-            frappe.db.commit()
-        except Exception:  # noqa: BLE001
-            frappe.db.rollback()
-            frappe.log_error(f"Despachar a campanha {nome}", frappe.get_traceback())
+    for doctype, filtro in (("Campanha de Marketing", {"estado": "A enviar"}),
+                            ("Automacao de Marketing", {"estado": "Activa"})):
+        for nome in frappe.get_all(doctype, filters=filtro, pluck="name"):
+            try:
+                despachar(frappe.get_doc(doctype, nome))
+                frappe.db.commit()
+            except Exception:  # noqa: BLE001
+                frappe.db.rollback()
+                frappe.log_error(f"Despachar {doctype} {nome}", frappe.get_traceback())
 
 
 def contagens_do_dia() -> None:
@@ -195,4 +210,6 @@ def contagens_do_dia() -> None:
     for nome in frappe.get_all("Campanha de Marketing", filters={"estado": ("in", ["A enviar", "Enviada"]),
                                "modified": (">=", frappe.utils.add_days(now_datetime(), -30))}, pluck="name"):
         actualizar_contagens(nome)
+    for nome in frappe.get_all("Automacao de Marketing", pluck="name"):
+        actualizar_contagens(nome, "automacao")
     frappe.db.commit()

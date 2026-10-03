@@ -141,6 +141,58 @@ class TestMarketing(IntegrationTestCase):
         self.assertEqual(c.estado, "Pausada")
         self.assertEqual(frappe.db.get_value("Envio de Marketing", {"token": "f" * 32}, "estado"), "Na fila")
 
+    def test_automacoes_com_loja_simulada(self):
+        from unittest.mock import patch
+        from frappe.utils import add_days, nowdate
+        from orbit.marketing import automacoes, loja
+        _contacto("cliente@exemplo.invalid", base="cliente", nome="Cli")
+        encomenda = {"name": "SO-1", "email": "cliente@exemplo.invalid", "data": add_days(nowdate(), -20),
+                     "creation": add_days(nowdate(), -20),
+                     "itens": [{"item_code": "FORNO", "item_name": "Forno", "item_group": "Fornos", "qty": 1}]}
+        produtos = [{"item_code": "LUVAS", "nome": "Luvas", "url": "https://loja.invalid/?post_type=product&p=7",
+                     "preco": "9,90 €", "imagem": None}]
+        a = frappe.get_doc({"doctype": "Automacao de Marketing", "tipo": "Venda cruzada", "dias_apos": 14,
+                            "linha_assunto": "Para acompanhar", "texto": "{{nome}}, veja isto."}).insert()
+        a.submeter()
+        a.aprovar()
+        a.db_set("activa_desde", add_days(nowdate(), -30))
+        a.reload()
+        with patch.object(loja, "encomendas", return_value=[encomenda]), \
+                patch.object(loja, "mais_vendidos", return_value=produtos):
+            r = automacoes.correr_uma(a)
+            self.assertEqual(r["entraram"], 1, r)
+            self.assertEqual(automacoes.correr_uma(a)["entraram"], 0)        # uma vez por motivo
+        e = frappe.get_all("Envio de Marketing", filters={"automacao": a.name}, fields=["ref", "estado", "dados", "token"])[0]
+        self.assertEqual((e.ref, e.estado), ("venda_cruzada:SO-1", "Na fila"))
+        envio.processar()                                                   # simulação
+        self.assertEqual(frappe.db.get_value("Envio de Marketing", {"token": e.token}, "estado"), "Simulado")
+        publico.ir(e.token, 1)                                              # a ligação do produto DELE
+        self.assertEqual(frappe.local.response.get("location"), produtos[0]["url"])
+        # o tecto de frequência: outra automação não lhe escreve na mesma semana
+        b = frappe.get_doc({"doctype": "Automacao de Marketing", "tipo": "Depois da compra", "dias_apos": 7,
+                            "linha_assunto": "Obrigado", "texto": "Obrigado."}).insert()
+        b.submeter()
+        b.aprovar()
+        b.db_set("activa_desde", add_days(nowdate(), -30))
+        b.reload()
+        with patch.object(loja, "encomendas", return_value=[encomenda]):
+            self.assertEqual(automacoes.correr_uma(b)["entraram"], 0)
+        a.pausar()
+        a.reload()
+        self.assertEqual(a.estado, "Pausada")
+
+    def test_automacao_fora_do_plano(self):
+        from orbit.marketing import ponte
+        ponte.definicoes({"plano_automacoes": "boas_vindas"})
+        frappe.clear_document_cache("Definicoes de Marketing", "Definicoes de Marketing")
+        try:
+            with self.assertRaises(frappe.ValidationError):
+                frappe.get_doc({"doctype": "Automacao de Marketing", "tipo": "Reactivação",
+                                "linha_assunto": "x", "texto": "y"}).insert()
+        finally:
+            ponte.definicoes({"plano_automacoes": ""})
+            frappe.clear_document_cache("Definicoes de Marketing", "Definicoes de Marketing")
+
     def test_so_quem_pode_receber(self):
         emails = {r["email"] for r in destinatarios.contactaveis()}
         self.assertIn("pode@exemplo.invalid", emails)

@@ -1,0 +1,277 @@
+{
+ "doctype": "DocType",
+ "name": "Automacao de Marketing",
+ "module": "Marketing",
+ "custom": 0,
+ "engine": "InnoDB",
+ "autoname": "field:tipo",
+ "naming_rule": "By fieldname",
+ "title_field": "tipo",
+ "fields": [
+  {
+   "fieldname": "tipo",
+   "fieldtype": "Select",
+   "label": "Tipo",
+   "options": "Boas-vindas\nDepois da compra\nVenda cruzada\nReactivação\nPagamento por concluir",
+   "reqd": 1,
+   "in_list_view": 1,
+   "idx": 1
+  },
+  {
+   "fieldname": "estado",
+   "fieldtype": "Select",
+   "label": "Estado",
+   "options": "Rascunho\nPara aprovação\nActiva\nPausada",
+   "default": "Rascunho",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "idx": 2
+  },
+  {
+   "fieldname": "activa_desde",
+   "fieldtype": "Datetime",
+   "label": "Activa desde",
+   "read_only": 1,
+   "idx": 3
+  },
+  {
+   "fieldname": "cb_topo",
+   "fieldtype": "Column Break",
+   "idx": 4
+  },
+  {
+   "fieldname": "modelo",
+   "fieldtype": "Select",
+   "label": "Modelo",
+   "options": "Newsletter\nNovidades\nPromoção\nProduto em destaque\nCatálogo\nCampanha sazonal\nConvite ou evento\nComunicado\nServiços\nArtigos\nBoas-vindas\nRelação com o cliente",
+   "default": "Relação com o cliente",
+   "reqd": 1,
+   "idx": 5
+  },
+  {
+   "fieldname": "assunto_marketing",
+   "fieldtype": "Link",
+   "label": "Assunto (de onde o destinatário pode sair)",
+   "options": "Assunto de Marketing",
+   "idx": 6
+  },
+  {
+   "fieldname": "sec_quando",
+   "fieldtype": "Section Break",
+   "label": "Quando sai",
+   "idx": 7
+  },
+  {
+   "fieldname": "dias_apos",
+   "fieldtype": "Int",
+   "label": "Dias depois da compra",
+   "depends_on": "eval:['Depois da compra','Venda cruzada'].includes(doc.tipo)",
+   "idx": 8
+  },
+  {
+   "fieldname": "dias_sem_compra",
+   "fieldtype": "Int",
+   "label": "Dias sem comprar",
+   "default": "120",
+   "depends_on": "eval:doc.tipo=='Reactivação'",
+   "idx": 9
+  },
+  {
+   "fieldname": "horas_apos",
+   "fieldtype": "Int",
+   "label": "Horas depois da encomenda por pagar",
+   "default": "4",
+   "depends_on": "eval:doc.tipo=='Pagamento por concluir'",
+   "idx": 10
+  },
+  {
+   "fieldname": "ate_dias",
+   "fieldtype": "Int",
+   "label": "Até quantos dias depois",
+   "default": "3",
+   "depends_on": "eval:doc.tipo=='Pagamento por concluir'",
+   "idx": 11
+  },
+  {
+   "fieldname": "sec_mensagem",
+   "fieldtype": "Section Break",
+   "label": "A mensagem",
+   "idx": 12
+  },
+  {
+   "fieldname": "linha_assunto",
+   "fieldtype": "Data",
+   "label": "Linha de assunto",
+   "reqd": 1,
+   "length": 140,
+   "idx": 13
+  },
+  {
+   "fieldname": "pre_cabecalho",
+   "fieldtype": "Data",
+   "label": "Pré-cabeçalho",
+   "length": 160,
+   "idx": 14
+  },
+  {
+   "fieldname": "titulo_email",
+   "fieldtype": "Data",
+   "label": "Título",
+   "idx": 15
+  },
+  {
+   "fieldname": "subtitulo",
+   "fieldtype": "Data",
+   "label": "Subtítulo",
+   "idx": 16
+  },
+  {
+   "fieldname": "texto",
+   "fieldtype": "Long Text",
+   "label": "Texto",
+   "description": "Um parágrafo por bloco, separados por uma linha em branco. {{nome}} é o nome do destinatário.",
+   "idx": 17
+  },
+  {
+   "fieldname": "cta_texto",
+   "fieldtype": "Data",
+   "label": "Botão — texto",
+   "idx": 18
+  },
+  {
+   "fieldname": "cta_url",
+   "fieldtype": "Data",
+   "label": "Botão — endereço",
+   "description": "No pagamento por concluir, vai para a loja de onde veio a encomenda.",
+   "idx": 19
+  },
+  {
+   "fieldname": "cb_mensagem",
+   "fieldtype": "Column Break",
+   "idx": 20
+  },
+  {
+   "fieldname": "imagem_topo",
+   "fieldtype": "Attach Image",
+   "label": "Imagem de topo",
+   "idx": 21
+  },
+  {
+   "fieldname": "assinatura",
+   "fieldtype": "Small Text",
+   "label": "Assinatura",
+   "idx": 22
+  },
+  {
+   "fieldname": "itens",
+   "fieldtype": "Table",
+   "label": "Vantagens ou serviços",
+   "options": "Item de Campanha",
+   "idx": 23
+  },
+  {
+   "fieldname": "sec_resultados",
+   "fieldtype": "Section Break",
+   "label": "Resultados",
+   "collapsible": 1,
+   "idx": 24
+  },
+  {
+   "fieldname": "ultima_corrida",
+   "fieldtype": "Datetime",
+   "label": "Última corrida",
+   "read_only": 1,
+   "idx": 25
+  },
+  {
+   "fieldname": "ultima_nota",
+   "fieldtype": "Data",
+   "label": "O que aconteceu",
+   "read_only": 1,
+   "idx": 26
+  },
+  {
+   "fieldname": "enviados",
+   "fieldtype": "Int",
+   "label": "Enviados",
+   "read_only": 1,
+   "idx": 27
+  },
+  {
+   "fieldname": "aberturas",
+   "fieldtype": "Int",
+   "label": "Abriram",
+   "read_only": 1,
+   "idx": 28
+  },
+  {
+   "fieldname": "cb_res",
+   "fieldtype": "Column Break",
+   "idx": 29
+  },
+  {
+   "fieldname": "cliques",
+   "fieldtype": "Int",
+   "label": "Clicaram",
+   "read_only": 1,
+   "idx": 30
+  },
+  {
+   "fieldname": "saidas",
+   "fieldtype": "Int",
+   "label": "Saíram",
+   "read_only": 1,
+   "idx": 31
+  },
+  {
+   "fieldname": "falhas",
+   "fieldtype": "Int",
+   "label": "Falharam ou devolveram",
+   "read_only": 1,
+   "idx": 32
+  },
+  {
+   "fieldname": "aprovada_por",
+   "fieldtype": "Link",
+   "label": "Aprovada por",
+   "options": "User",
+   "read_only": 1,
+   "idx": 33
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Sales User",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1,
+ "states": [],
+ "links": [],
+ "creation": "2026-10-03 16:00:00.000000",
+ "modified": "2026-10-03 16:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "idx": 0
+}
