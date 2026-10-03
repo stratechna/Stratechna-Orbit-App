@@ -28,7 +28,13 @@ def _pode_aprovar() -> bool:
 class CampanhadeMarketing(Document):
     def validate(self):
         if self.is_new():
-            self.estado = "Rascunho"
+            # Uma campanha do portal já foi escrita pela IA e revista pela
+            # Stratechna: chega à espera do cliente. Tudo o resto nasce em
+            # rascunho, seja qual for o estado que venha no pedido.
+            if self.flags.do_portal:
+                self.estado, self.origem = "Para aprovação", "Portal"
+            else:
+                self.estado, self.origem = "Rascunho", "Orbit"
             return
         if self.estado != "Rascunho" and not self.flags.ciclo:
             antes = self.get_doc_before_save()

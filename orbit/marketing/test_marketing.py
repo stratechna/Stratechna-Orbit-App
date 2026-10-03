@@ -73,6 +73,39 @@ class TestMarketing(IntegrationTestCase):
         self.assertFalse(icone.hidden)
         self.assertIn("marketing", apps.activas())
 
+    def test_ponte_do_portal(self):
+        from orbit.marketing import mensagem, ponte
+        r = ponte.definicoes({"marca_nome": "Exemplo", "cor_primaria": "#0b3d91", "plano_contactos": 1000,
+                              "redes": {"facebook": "https://facebook.com/x"}, "chave_desconhecida": "x"})
+        self.assertTrue(r["ok"])
+        frappe.clear_document_cache("Definicoes de Marketing", "Definicoes de Marketing")
+        d = mensagem.definicoes()
+        self.assertEqual((d.marca_nome, d.cor_primaria, d.plano_contactos), ("Exemplo", "#0b3d91", 1000))
+        self.assertFalse(d.get("chave_desconhecida"))
+        ponte.definicoes({"plano_contactos": 0})
+
+        o = ponte.opcoes({})
+        self.assertIn("Todos", [s["nome"] for s in o["segmentos"]])
+        self.assertIn("Novidades", o["assuntos"])
+
+        pedido = {"portal_ref": "portal-teste-1", "titulo": "Do portal", "modelo": "Promoção",
+                  "linha_assunto": "Só esta semana", "texto": "Texto da IA.", "segmentos": ["Todos", "Não existe"],
+                  "assunto": "Novidades", "estado": "Enviada", "aprovada_por": "admin@stratechna.com",
+                  "itens": [{"titulo": "A", "texto": "b"}], "produtos": [{"nome": "P", "preco": "1 €"}]}
+        r = ponte.campanha(pedido)
+        self.assertTrue(r["ok"], r)
+        c = frappe.get_doc("Campanha de Marketing", r["nome"])
+        self.assertEqual((c.estado, c.origem), ("Para aprovação", "Portal"))
+        self.assertEqual([s.segmento for s in c.segmentos], ["Todos"])
+        self.assertTrue(ponte.campanha(pedido)["repetido"])
+        self.assertFalse(ponte.campanha({**pedido, "portal_ref": "portal-teste-2", "segmentos": ["Não existe"]})["ok"])
+        self.assertFalse(ponte.campanha({**pedido, "portal_ref": "portal-teste-3", "modelo": "Inventado"})["ok"])
+        self.assertIn("portal-teste-1", [x.portal_ref for x in ponte.resultados({})["campanhas"]])
+
+    def test_campanha_nova_nasce_sempre_em_rascunho(self):
+        c = self._campanha(estado="Enviada", origem="Portal")
+        self.assertEqual((c.estado, c.origem), ("Rascunho", "Orbit"))
+
     def test_so_quem_pode_receber(self):
         emails = {r["email"] for r in destinatarios.contactaveis()}
         self.assertIn("pode@exemplo.invalid", emails)
