@@ -98,7 +98,7 @@ def despachar(campanha) -> None:
             e.db_set({"estado": "Enviado", "enviado_em": now_datetime(),
                       "email_queue": q.name if q else None})
         except Exception as x:  # noqa: BLE001
-            e.db_set({"estado": "Falhou", "erro": str(x)[:300]})
+            e.db_set({"estado": "Falhou", "erro": f"{type(x).__name__}: {x}"[:300]})
             frappe.log_error(f"Campanha {campanha.name}", frappe.get_traceback())
 
 

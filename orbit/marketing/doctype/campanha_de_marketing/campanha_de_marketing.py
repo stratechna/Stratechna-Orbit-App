@@ -42,10 +42,16 @@ class CampanhadeMarketing(Document):
     def _mudar(self, de: tuple, para: str, **extra):
         if self.estado not in de:
             frappe.throw(_("A campanha está «{0}» — este passo não se aplica.").format(self.estado))
+        # A marca deixa o próprio ciclo gravar fora de rascunho. Tem de sair
+        # logo a seguir: as flags vivem no objecto e sobrevivem ao reload(), e
+        # esquecida aqui deixava passar qualquer edição feita depois.
         self.flags.ciclo = True
-        self.estado = para
-        self.update(extra)
-        self.save()
+        try:
+            self.estado = para
+            self.update(extra)
+            self.save()
+        finally:
+            self.flags.ciclo = False
 
     def _falta(self) -> list[str]:
         falta = []

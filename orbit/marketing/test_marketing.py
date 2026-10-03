@@ -119,7 +119,7 @@ class TestMarketing(IntegrationTestCase):
             c = self._campanha()
             self._sair(c)
             envios = frappe.get_all("Envio de Marketing", filters={"campanha": c.name},
-                                    fields=["estado", "email_queue"])
+                                    fields=["estado", "email_queue", "erro"])
             self.assertTrue(envios and all(x.estado == "Enviado" and x.email_queue for x in envios), envios)
             m = frappe.db.get_value("Email Queue", envios[0].email_queue, "message")
             self.assertIn("List-Unsubscribe: <", m)
