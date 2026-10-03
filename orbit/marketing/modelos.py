@@ -576,13 +576,20 @@ def _rodape(t: _Tema, ident: dict, motivo: str, remover: str, legal_texto: str) 
              + _col(marca
                     + (f'<mj-text align="center" padding="0 0 12px">{pilulas}</mj-text>' if pilulas else "")
                     + (f'<mj-text align="center" font-size="13px" line-height="1.6" color="#aab0b9" padding="0">{contactos}</mj-text>'
-                       if contactos else ""))
+                       if contactos else "")
+                    # A identificação legal (nome, morada, NIF) fica na faixa da
+                    # marca, por baixo de um filete — decisão do utilizador de
+                    # 04-10-2026: fora dela fica só o aviso de remoção.
+                    + (f'<mj-divider border-width="1px" border-color="{_misturar(t.escuro, "#ffffff", 0.14)}" '
+                       f'padding="20px 60px 16px" />'
+                       f'<mj-text align="center" font-size="12px" line-height="1.7" color="#8f96a0" padding="0">'
+                       f'{_e(legal_texto).replace(chr(10), "<br>")}</mj-text>' if legal_texto else ""))
              + '</mj-section>')
     return (faixa
             + _sec(_col(f'<mj-text align="center" font-size="12px" line-height="1.7" color="#8a9099" padding="0">'
-                        f'{_e(legal_texto).replace(chr(10), "<br>")}<br><br>{_e(motivo)} '
+                        f'{_e(motivo)} '
                         f'<a href="{_e(remover)}" style="color:#6b717a;text-decoration:underline">Deixar de receber</a>.'
-                        f'</mj-text>'), t.fundo_pagina, f"24px {LATERAL}px 36px"))
+                        f'</mj-text>'), t.fundo_pagina, f"20px {LATERAL}px 32px"))
 
 
 # ── Os doze ────────────────────────────────────────────────────────────────
