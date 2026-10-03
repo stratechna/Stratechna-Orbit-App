@@ -42,7 +42,14 @@ def simula(d=None) -> bool:
 
 
 def preparar(campanha) -> int:
+    from orbit.marketing import volume
     quem = destinatarios.da_campanha(campanha)
+    if not volume.cabe(len(quem)):
+        # A verificação ao submeter pode ter ficado desactualizada (outras
+        # campanhas saíram entretanto). Pára aqui e diz porquê.
+        campanha.db_set("estado", "Pausada")
+        campanha.add_comment("Comment", "Não saiu: " + volume.recusa(len(quem)))
+        return 0
     for r in quem:
         frappe.get_doc({
             "doctype": "Envio de Marketing", "campanha": campanha.name, "email": r["email"],
@@ -149,7 +156,7 @@ def despachar(campanha, lote: int | None = None) -> None:
                 cabecalhos["X-SES-CONFIGURATION-SET"] = d.conjunto_configuracao
             q = frappe.sendmail(
                 recipients=[e.email], sender=remetente, subject=m["assunto"], message=m["html"],
-                email_headers=cabecalhos,
+                email_headers=cabecalhos, reply_to=d.get("responder_para") or None,
                 reference_doctype="Envio de Marketing", reference_name=e.name,
                 add_unsubscribe_link=0, with_container=False, delayed=True, raw_html=True,
                 # Os modelos MJML já levam os estilos em linha. A folha do

@@ -27,6 +27,7 @@ _DEFINICOES = {
     "redes": dict, "contactos": dict,
     "plano_nome": str, "plano_contactos": int, "plano_campanhas_mes": int,
     "plano_automacoes": str, "intervalo_minimo_dias": int,
+    "plano_envios_mes": int, "responder_para": str,
 }
 
 _CAMPANHA = ("titulo", "modelo", "linha_assunto", "pre_cabecalho", "titulo_email", "subtitulo",
@@ -99,10 +100,16 @@ def campanha(pedido: dict) -> dict:
                      for p in (pedido.get("produtos") or [])[:6] if isinstance(p, dict) and p.get("nome")],
     })
     doc.flags.do_portal = True
+    cliente = str(pedido.get("aprovada_pelo_cliente") or "").strip()[:140]
+    doc.flags.aprovada_no_portal = bool(cliente)
     doc.insert(ignore_permissions=True)
     quem = str(pedido.get("aprovada_por") or "a Stratechna")[:140]
-    doc.add_comment("Comment", f"Proposta pela Stratechna no portal e revista por {quem}. "
-                               "Falta a sua aprovação para sair.")
+    if cliente:
+        doc.add_comment("Comment", f"Proposta pela Stratechna, revista por {quem} e aprovada no portal por "
+                                   f"{cliente} em {pedido.get('aprovada_pelo_cliente_em') or '—'}.")
+    else:
+        doc.add_comment("Comment", f"Proposta pela Stratechna no portal e revista por {quem}. "
+                                   "Falta a sua aprovação para sair.")
     return {"ok": True, "nome": doc.name, "estado": doc.estado}
 
 
@@ -113,8 +120,10 @@ def resultados(pedido: dict) -> dict:
     campos = ["name", "titulo", "estado", "origem", "portal_ref", "agendar_para", "enviada_em",
               "destinatarios", "enviados", "aberturas", "cliques", "saidas", "falhas", "simulada",
               "aprovada_por", "aprovada_em", "modified"]
-    return {"ok": True, "campanhas": frappe.get_all("Campanha de Marketing", filters=filtros, fields=campos,
-                                                    order_by="modified desc", limit=500)}
+    from orbit.marketing import volume
+    return {"ok": True, "volume": volume.estado(),
+            "campanhas": frappe.get_all("Campanha de Marketing", filters=filtros, fields=campos,
+                                        order_by="modified desc", limit=500)}
 
 
 def relay(pedido: dict) -> dict:
@@ -184,5 +193,40 @@ def evento(pedido: dict) -> dict:
     return {"ok": True, "suprimidos": sorted(emails), "envio": envio.name if envio else None}
 
 
-ACCOES = {"definicoes": definicoes, "opcoes": opcoes, "campanha": campanha, "resultados": resultados,
+def resumo_mes(pedido: dict) -> dict:
+    """O mês de um tenant, para o relatório mensal do portal: cada campanha e
+    cada automação com os números DO MÊS (contados pelos envios criados nele),
+    e o movimento da lista."""
+    from frappe.utils import get_first_day, get_last_day
+    from orbit.marketing import destinatarios, volume
+    ini = get_first_day(pedido.get("mes") or frappe.utils.nowdate())
+    fim = get_last_day(ini)
+    filtro = (">=", ini), ("<=", f"{fim} 23:59:59")
+    def _numeros(chave, nome):
+        r = frappe.db.sql(f"""SELECT COUNT(*) AS destinatarios,
+                SUM(estado = 'Enviado') AS enviados, SUM(estado = 'Simulado') AS simulados,
+                SUM(aberto_em IS NOT NULL) AS aberturas, SUM(clicado_em IS NOT NULL) AS cliques,
+                SUM(saiu_em IS NOT NULL) AS saidas, SUM(estado IN ('Devolvido', 'Queixa', 'Falhou')) AS falhas
+            FROM `tabEnvio de Marketing` WHERE {chave} = %s AND creation BETWEEN %s AND %s""",
+            (nome, ini, f"{fim} 23:59:59"), as_dict=True)[0]
+        return {k: cint(v) for k, v in r.items()}
+    campanhas = []
+    for c in frappe.get_all("Campanha de Marketing", filters={"estado": ("in", ["A enviar", "Enviada", "Pausada"])},
+                            fields=["name", "titulo", "origem", "portal_ref", "modelo", "linha_assunto", "enviada_em"]):
+        n = _numeros("campanha", c.name)
+        if n["destinatarios"]:
+            campanhas.append({**c, **n})
+    automacoes = []
+    for a in frappe.get_all("Automacao de Marketing", fields=["name", "tipo", "estado"]):
+        n = _numeros("automacao", a.name)
+        if n["destinatarios"] or a.estado == "Activa":
+            automacoes.append({**a, **n})
+    return {"ok": True, "mes": str(ini), "campanhas": campanhas, "automacoes": automacoes,
+            "lista": {"contactaveis": len(destinatarios.contactaveis()),
+                      "suprimidos_no_mes": frappe.db.count("Supressao de Marketing", {"data": ("between", [ini, fim])}),
+                      "sairam_no_mes": frappe.db.count("Email Unsubscribe", {"creation": ("between", [ini, f"{fim} 23:59:59"])})},
+            "volume": volume.estado() if str(ini) == str(get_first_day(frappe.utils.nowdate())) else None}
+
+
+ACCOES = {"resumo_mes": resumo_mes, "definicoes": definicoes, "opcoes": opcoes, "campanha": campanha, "resultados": resultados,
           "relay": relay, "evento": evento}

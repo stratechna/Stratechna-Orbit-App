@@ -32,7 +32,10 @@ class CampanhadeMarketing(Document):
             # Stratechna: chega à espera do cliente. Tudo o resto nasce em
             # rascunho, seja qual for o estado que venha no pedido.
             if self.flags.do_portal:
-                self.estado, self.origem = "Para aprovação", "Portal"
+                # Aprovada pelo cliente no portal: chega pronta a sair à hora
+                # marcada. Sem essa aprovação, espera pela dele aqui.
+                self.estado = "Aprovada" if self.flags.aprovada_no_portal else "Para aprovação"
+                self.origem = "Portal"
             else:
                 self.estado, self.origem = "Rascunho", "Orbit"
             return
@@ -75,12 +78,13 @@ class CampanhadeMarketing(Document):
             n = len(destinatarios.contactaveis())
             if n > cint(d.plano_contactos):
                 frappe.throw(_("Há {0} contactos que podem receber e o plano inclui {1}.").format(n, d.plano_contactos))
-        if cint(d.plano_campanhas_mes):
-            inicio = now_datetime().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            n = frappe.db.count("Campanha de Marketing", {"name": ("!=", self.name), "estado": ("not in", ["Rascunho", "Cancelada"]),
-                                                          "creation": (">=", inicio)})
-            if n >= cint(d.plano_campanhas_mes):
-                frappe.throw(_("O plano inclui {0} campanhas por mês e este mês já foram {1}.").format(d.plano_campanhas_mes, n))
+        # O número de campanhas que o cliente cria aqui não tem tecto: o que o
+        # plano limita é o VOLUME de envios do mês (e as campanhas que a
+        # Stratechna escreve, contadas no portal).
+        from orbit.marketing import volume
+        n = len(destinatarios.da_campanha(self))
+        if not volume.cabe(n):
+            frappe.throw(volume.recusa(n))
 
     @frappe.whitelist()
     def submeter(self):
@@ -127,6 +131,11 @@ class CampanhadeMarketing(Document):
                                 pluck="email_queue"):
             if frappe.db.get_value("Email Queue", q, "status") == "Not Sent":
                 frappe.db.set_value("Email Queue", q, "status", "Cancelled")
+
+    @frappe.whitelist()
+    def volume(self) -> dict:
+        from orbit.marketing import volume
+        return volume.estado()
 
     @frappe.whitelist()
     def contar(self) -> int:

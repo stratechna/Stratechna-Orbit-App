@@ -24,6 +24,12 @@ frappe.ui.form.on("Campanha de Marketing", {
 				d.show();
 			});
 		});
+		// O volume do mês, à vista de quem cria a campanha.
+		frm.call("volume").then(({ message: v }) => {
+			if (!v || !v.limite) return;
+			const cor = v.usado >= v.limite ? "red" : v.usado > v.limite * 0.8 ? "orange" : "blue";
+			frm.dashboard.add_indicator(__("Envios este mês: {0} de {1}", [v.usado, v.limite]), cor);
+		});
 		frm.add_custom_button(__("Quantos recebem"), () => {
 			frm.call("contar").then(({ message: n }) =>
 				frappe.msgprint(__("Se saísse agora: {0} destinatários.", [n])));
