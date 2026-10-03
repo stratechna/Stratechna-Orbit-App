@@ -137,6 +137,13 @@
    "idx": 15
   },
   {
+   "fieldname": "rotulo",
+   "fieldtype": "Data",
+   "label": "Sobretítulo",
+   "description": "A linha pequena em maiúsculas por cima do título (ex.: «Só esta semana»).",
+   "depends_on": "eval:!(doc.blocos || []).length"
+  },
+  {
    "fieldname": "titulo_email",
    "fieldtype": "Data",
    "label": "Título",

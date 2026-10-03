@@ -30,12 +30,10 @@ _DEFINICOES = {
     "plano_envios_mes": int, "responder_para": str,
 }
 
-_BLOCO = ("tipo", "titulo", "subtitulo", "texto", "botao_texto", "url", "imagem", "alinhar", "fundo",
-          "cor_botao", "colunas", "maximo")
-_TIPOS_DE_BLOCO = ("Título", "Texto", "Botão", "Imagem", "Imagem com título", "Faixa de destaque", "Produtos",
-                   "Produto em destaque", "Vantagens em colunas", "Lista de artigos", "Evento", "Assinatura",
-                   "Separador", "Espaço")
-_CAMPANHA = ("titulo", "modelo", "linha_assunto", "pre_cabecalho", "titulo_email", "subtitulo",
+_BLOCO = ("tipo", "rotulo", "titulo", "subtitulo", "texto", "botao_texto", "url", "imagem", "imagem_2", "imagem_3",
+          "alinhar", "fundo", "cor_botao", "colunas", "maximo", "posicao", "margens")
+_TIPOS_DE_BLOCO = ('Título', 'Texto', 'Botão', 'Imagem', 'Imagem com título', 'Imagem e texto', 'Faixa de destaque', 'Faixa de chamada', 'Produtos', 'Produto em destaque', 'Vantagens em colunas', 'Números', 'Lista de artigos', 'Evento', 'Testemunho', 'Galeria', 'Cupão', 'Assinatura', 'Separador', 'Espaço')
+_CAMPANHA = ("rotulo", "titulo", "modelo", "linha_assunto", "pre_cabecalho", "titulo_email", "subtitulo",
              "texto", "cta_texto", "cta_url", "imagem_topo", "destaque_texto", "destaque_subtexto",
              "evento_data", "evento_hora", "evento_local", "assinatura", "agendar_para")
 
@@ -101,7 +99,7 @@ def campanha(pedido: dict) -> dict:
         "segmentos": [{"segmento": s} for s in segmentos],
         "itens": [{k: i.get(k) for k in ("titulo", "texto", "url", "imagem")}
                   for i in (pedido.get("itens") or [])[:6] if isinstance(i, dict) and i.get("titulo")],
-        "produtos": [{k: p.get(k) for k in ("nome", "preco", "url", "imagem", "descricao")}
+        "produtos": [{k: p.get(k) for k in ("nome", "preco", "preco_antigo", "etiqueta", "url", "imagem", "descricao")}
                      for p in (pedido.get("produtos") or [])[:6] if isinstance(p, dict) and p.get("nome")],
         # Os blocos montados no editor do portal chegam como estão: a campanha
         # sai como o cliente a aprovou lá.

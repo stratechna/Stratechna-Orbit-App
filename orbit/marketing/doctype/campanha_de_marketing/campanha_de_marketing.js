@@ -22,7 +22,7 @@ const desenhar = frappe.utils.debounce((frm) => {
 			quadro.srcdoc = m.html;
 		});
 }, 700);
-const CAMPOS_DA_MENSAGEM = ["modelo", "linha_assunto", "pre_cabecalho", "titulo_email", "subtitulo", "texto",
+const CAMPOS_DA_MENSAGEM = ["rotulo", "modelo", "linha_assunto", "pre_cabecalho", "titulo_email", "subtitulo", "texto",
 	"cta_texto", "cta_url", "imagem_topo", "destaque_texto", "destaque_subtexto", "evento_data", "evento_hora",
 	"evento_local", "assinatura", "itens_add", "itens_remove", "produtos_add", "produtos_remove",
 	"blocos_add", "blocos_remove", "blocos_move"];
@@ -116,9 +116,11 @@ frappe.ui.form.on("Item de Campanha", {
 	titulo: desenhar, texto: desenhar, url: desenhar, imagem: desenhar,
 });
 frappe.ui.form.on("Bloco de Campanha", {
-	tipo: desenhar, titulo: desenhar, subtitulo: desenhar, texto: desenhar, botao_texto: desenhar, url: desenhar,
-	imagem: desenhar, alinhar: desenhar, fundo: desenhar, cor_botao: desenhar, colunas: desenhar, maximo: desenhar,
+	tipo: desenhar, rotulo: desenhar, titulo: desenhar, subtitulo: desenhar, texto: desenhar, botao_texto: desenhar,
+	url: desenhar, imagem: desenhar, imagem_2: desenhar, imagem_3: desenhar, alinhar: desenhar, fundo: desenhar,
+	cor_botao: desenhar, colunas: desenhar, maximo: desenhar, posicao: desenhar, margens: desenhar,
 });
 frappe.ui.form.on("Produto de Campanha", {
-	nome: desenhar, preco: desenhar, url: desenhar, imagem: desenhar, descricao: desenhar,
+	nome: desenhar, preco: desenhar, preco_antigo: desenhar, etiqueta: desenhar, url: desenhar, imagem: desenhar,
+	descricao: desenhar,
 });

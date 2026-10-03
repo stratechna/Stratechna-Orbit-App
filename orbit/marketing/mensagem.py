@@ -14,7 +14,7 @@ import json
 import frappe
 from frappe.utils import cint, get_url
 
-from orbit.marketing import modelos
+from orbit.marketing import imagens, modelos
 
 MOTIVO = {
     "consentimento": "Recebe este email porque aceitou receber as nossas comunicações.",
@@ -50,8 +50,8 @@ def _absoluto(u: str | None) -> str | None:
     return u if u.startswith(("http://", "https://")) else get_url(u)
 
 
-CAMPOS_DO_BLOCO = ("tipo", "titulo", "subtitulo", "texto", "botao_texto", "url", "alinhar", "fundo",
-                   "cor_botao", "colunas", "maximo")
+CAMPOS_DO_BLOCO = ("tipo", "rotulo", "titulo", "subtitulo", "texto", "botao_texto", "url", "alinhar", "fundo",
+                   "cor_botao", "colunas", "maximo", "posicao", "margens")
 
 
 def conteudo(c, dados: dict | None = None) -> dict:
@@ -62,7 +62,7 @@ def conteudo(c, dados: dict | None = None) -> dict:
     g = c.get
     k = {
         "modelo": modelos.POR_NOME.get(g("modelo"), "relacao"),
-        "titulo": g("titulo_email"), "subtitulo": g("subtitulo"),
+        "rotulo": g("rotulo"), "titulo": g("titulo_email"), "subtitulo": g("subtitulo"),
         "paragrafos": [p.strip() for p in (g("texto") or "").split("\n\n") if p.strip()],
         "cta_texto": g("cta_texto"), "cta_url": g("cta_url"),
         "imagem_topo": _absoluto(g("imagem_topo")),
@@ -71,9 +71,11 @@ def conteudo(c, dados: dict | None = None) -> dict:
         "assinatura": g("assinatura"),
         "itens": [{"titulo": i.titulo, "texto": i.texto, "url": i.url, "imagem": _absoluto(i.imagem)}
                   for i in (g("itens") or [])],
-        "produtos": [{"nome": p.nome, "preco": p.preco, "url": p.url, "imagem": _absoluto(p.imagem),
+        "produtos": [{"nome": p.nome, "preco": p.preco, "preco_antigo": p.get("preco_antigo"),
+                      "etiqueta": p.get("etiqueta"), "url": p.url, "imagem": _absoluto(p.imagem),
                       "descricao": p.descricao} for p in (g("produtos") or [])],
-        "blocos": [{**{k: b.get(k) for k in CAMPOS_DO_BLOCO}, "imagem": _absoluto(b.get("imagem"))}
+        "blocos": [{**{k: b.get(k) for k in CAMPOS_DO_BLOCO}, "imagem": _absoluto(b.get("imagem")),
+                    "imagem_2": _absoluto(b.get("imagem_2")), "imagem_3": _absoluto(b.get("imagem_3"))}
                    for b in (g("blocos") or []) if b.get("tipo")],
     }
     if dados:
@@ -98,7 +100,7 @@ def compor(c, r: dict, token: str | None = None, dados: dict | None = None) -> d
     há píxel."""
     d = definicoes()
     k = conteudo(c, dados)
-    for campo in ("titulo", "subtitulo", "assinatura"):
+    for campo in ("rotulo", "titulo", "subtitulo", "assinatura"):
         if k.get(campo):
             k[campo] = _pessoal(k[campo], r)
     k["paragrafos"] = [_pessoal(p, r) for p in k["paragrafos"]]
@@ -119,7 +121,7 @@ def compor(c, r: dict, token: str | None = None, dados: dict | None = None) -> d
         motivo=MOTIVO.get(r.get("mkt_base_legal") or "", ""),
         legal_texto=d.legal_texto or "",
         pixel=url_publico("aberto", t=token) if token and cint(d.medir_aberturas) else None,
-        assunto=c.linha_assunto or "", pre_cabecalho=c.pre_cabecalho or "")
+        assunto=c.linha_assunto or "", pre_cabecalho=c.pre_cabecalho or "", img=imagens.recortar)
     return {"assunto": _pessoal(c.linha_assunto, r), "html": html,
             "sair_um_clique": url_publico("sair", t=token) if token else None}
 
