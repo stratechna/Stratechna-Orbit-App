@@ -24,6 +24,10 @@
     "branch": "master"
   },
   {
+    "url": "https://github.com/dvdl16/woocommerce_fusion",
+    "branch": "version-16"
+  },
+  {
     "url": "https://github.com/stratechna/Stratechna-Orbit-App",
     "branch": "main",
     "app": "orbit"
