@@ -124,3 +124,15 @@ def acrescentar_cabecalhos(queue_name: str, sair_um_clique: str) -> None:
              f"List-Unsubscribe-Post: List-Unsubscribe=One-Click{quebra}"
              f"Precedence: bulk{quebra}")
     q.db_set("message", novos + mensagem, update_modified=False)
+
+
+@frappe.whitelist()
+def previsualizar_rascunho(doc) -> dict:
+    """A pré-visualização do que está no formulário, gravado ou não — é o que
+    deixa ver a campanha a montar-se enquanto se escreve."""
+    frappe.has_permission("Campanha de Marketing", "read", throw=True)
+    dados = json.loads(doc) if isinstance(doc, str) else dict(doc)
+    dados["doctype"] = "Campanha de Marketing"
+    c = frappe.get_doc(dados)
+    r = compor(c, {"nome": "Maria", "mkt_base_legal": "consentimento"})
+    return {"assunto": r["assunto"], "html": r["html"]}

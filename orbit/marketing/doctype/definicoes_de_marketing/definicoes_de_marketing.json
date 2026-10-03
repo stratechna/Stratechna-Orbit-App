@@ -134,18 +134,34 @@
    "idx": 19
   },
   {
+   "fieldname": "plano_envios_mes",
+   "fieldtype": "Int",
+   "label": "Envios por mês (plano + suplementos)",
+   "read_only": 1,
+   "description": "0 = sem tecto. Vem do portal.",
+   "idx": 20
+  },
+  {
+   "fieldname": "responder_para",
+   "fieldtype": "Data",
+   "label": "Responder para",
+   "options": "Email",
+   "description": "A caixa real do cliente. As respostas às campanhas vão para aqui, não para o remetente.",
+   "idx": 21
+  },
+  {
    "fieldname": "plano_automacoes",
    "fieldtype": "Small Text",
    "label": "Automações incluídas no plano",
    "description": "Vazio = todas. Vem do portal.",
-   "idx": 20
+   "idx": 22
   },
   {
    "fieldname": "intervalo_minimo_dias",
    "fieldtype": "Int",
    "label": "Dias mínimos entre dois emails automáticos à mesma pessoa",
    "default": "3",
-   "idx": 21
+   "idx": 23
   }
  ],
  "permissions": [
@@ -166,7 +182,7 @@
  "states": [],
  "links": [],
  "creation": "2026-10-03 10:00:00.000000",
- "modified": "2026-10-03 16:00:00.000000",
+ "modified": "2026-10-03 20:00:00.000000",
  "owner": "Administrator",
  "modified_by": "Administrator",
  "idx": 0,

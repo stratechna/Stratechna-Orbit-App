@@ -198,6 +198,43 @@ class TestMarketing(IntegrationTestCase):
             ponte.definicoes({"plano_automacoes": ""})
             frappe.clear_document_cache("Definicoes de Marketing", "Definicoes de Marketing")
 
+    def test_menu_e_galeria(self):
+        from orbit.marketing import menu
+        from orbit.marketing.page.modelos_de_email.modelos_de_email import galeria
+        menu.garantir()
+        itens = [i.link_to for i in frappe.get_doc("Workspace Sidebar", "Marketing").items]
+        for alvo in ("Campanha de Marketing", "Automacao de Marketing", "Segmento de Marketing",
+                     "Supressao de Marketing", "Definicoes de Marketing", "modelos-de-email"):
+            self.assertIn(alvo, itens)
+        g = galeria()
+        self.assertEqual(len(g), 12)
+        self.assertTrue(all("<mj-" not in m["html"] for m in g))
+
+    def test_aprovada_no_portal_entra_aprovada(self):
+        from orbit.marketing import ponte
+        r = ponte.campanha({"portal_ref": "portal-aprovada-1", "titulo": "Do portal", "modelo": "Novidades",
+                            "linha_assunto": "x", "texto": "y", "segmentos": ["Todos"],
+                            "aprovada_pelo_cliente": "cliente@exemplo.invalid", "aprovada_pelo_cliente_em": "2026-10-03"})
+        self.assertEqual(frappe.db.get_value("Campanha de Marketing", r["nome"], "estado"), "Aprovada")
+
+    def test_volume_do_plano(self):
+        from orbit.marketing import ponte, volume
+        ponte.definicoes({"plano_envios_mes": 1})
+        frappe.clear_document_cache("Definicoes de Marketing", "Definicoes de Marketing")
+        try:
+            frappe.get_doc({"doctype": "Envio de Marketing", "email": "vol@exemplo.invalid", "estado": "Enviado",
+                            "token": "v" * 32}).insert(ignore_permissions=True)
+            self.assertFalse(volume.cabe(1))
+            c = self._campanha()
+            with self.assertRaises(frappe.ValidationError):
+                c.submeter()
+            r = ponte.resumo_mes({})
+            self.assertTrue(r["ok"])
+            self.assertEqual(r["volume"]["limite"], 1)
+        finally:
+            ponte.definicoes({"plano_envios_mes": 0})
+            frappe.clear_document_cache("Definicoes de Marketing", "Definicoes de Marketing")
+
     def test_so_quem_pode_receber(self):
         emails = {r["email"] for r in destinatarios.contactaveis()}
         self.assertIn("pode@exemplo.invalid", emails)
@@ -206,6 +243,15 @@ class TestMarketing(IntegrationTestCase):
 
     def test_segmento_por_assunto(self):
         self.assertEqual({r["email"] for r in destinatarios.do_segmento("Promoções")}, {"pode@exemplo.invalid"})
+
+    def test_previsualizar_rascunho_sem_gravar(self):
+        from orbit.marketing.mensagem import previsualizar_rascunho
+        r = previsualizar_rascunho({"modelo": "Promoção", "titulo_email": "Olá {{nome}}", "linha_assunto": "Saldos",
+                                    "destaque_texto": "-30%", "produtos": [{"nome": "Cadeira", "preco": "49 €"}]})
+        self.assertEqual(r["assunto"], "Saldos")
+        self.assertIn("Olá Maria", r["html"])
+        self.assertIn("-30%", r["html"])
+        self.assertIn("Cadeira", r["html"])
 
     def test_doze_modelos(self):
         for chave in modelos.MODELOS:

@@ -123,6 +123,11 @@ def correr_uma(a) -> dict:
         nota = "o plano já não inclui esta automação"
         a.db_set({"ultima_corrida": now_datetime(), "ultima_nota": nota})
         return {"entraram": 0, "nota": nota}
+    from orbit.marketing import volume
+    if not volume.cabe(1):
+        nota = "o volume de envios do mês está esgotado"
+        a.db_set({"ultima_corrida": now_datetime(), "ultima_nota": nota})
+        return {"entraram": 0, "nota": nota}
     intervalo = cint(mensagem.definicoes().get("intervalo_minimo_dias")) or 3
     entraram, saltados, vistos = 0, 0, set()
     for r, ref, extra in _candidatos(a)[:LOTE]:
