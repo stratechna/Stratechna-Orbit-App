@@ -16,13 +16,20 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, get_datetime, now_datetime
 
-from orbit.marketing import destinatarios, envio, mensagem
+from orbit.marketing import destinatarios, envio, mensagem, modelos
 
 ABERTOS = ("titulo", "agendar_para")
 
 
 def _pode_aprovar() -> bool:
     return bool({"Sales Manager", "System Manager"} & set(frappe.get_roles()))
+
+
+def _linhas(tabela) -> list:
+    """O conteúdo de uma tabela sem o que o Frappe muda sozinho (nomes, datas)."""
+    fora = {"name", "creation", "modified", "modified_by", "owner", "parent", "parenttype", "parentfield", "docstatus", "doctype"}
+    return [{k: v for k, v in (r.as_dict() if hasattr(r, "as_dict") else dict(r)).items()
+             if k not in fora and not k.startswith("_")} for r in (tabela or [])]
 
 
 class CampanhadeMarketing(Document):
@@ -45,7 +52,11 @@ class CampanhadeMarketing(Document):
                 for f in self.meta.fields:
                     if f.fieldname in ABERTOS or f.read_only or f.fieldtype in ("Section Break", "Column Break"):
                         continue
-                    if str(antes.get(f.fieldname) or "") != str(self.get(f.fieldname) or "") and f.fieldtype not in ("Table", "Table MultiSelect"):
+                    if f.fieldtype in ("Table", "Table MultiSelect"):
+                        mudou = _linhas(antes.get(f.fieldname)) != _linhas(self.get(f.fieldname))
+                    else:
+                        mudou = str(antes.get(f.fieldname) or "") != str(self.get(f.fieldname) or "")
+                    if mudou:
                         frappe.throw(_("Só se altera uma campanha em rascunho. Para mudar esta, rejeite-a com o motivo."))
 
     def _mudar(self, de: tuple, para: str, **extra):
@@ -141,6 +152,18 @@ class CampanhadeMarketing(Document):
     def contar(self) -> int:
         n = len(destinatarios.da_campanha(self))
         return n
+
+    @frappe.whitelist()
+    def montar_blocos(self):
+        """Enche o editor com a sequência do modelo e o texto que a campanha
+        já tem. Substitui os blocos que houver — o formulário pede confirmação."""
+        if self.estado != "Rascunho":
+            frappe.throw(_("Só se altera uma campanha em rascunho."))
+        k = mensagem.conteudo(self)
+        self.set("blocos", [])
+        for b in modelos.blocos_do_modelo(k["modelo"], k):
+            self.append("blocos", b)
+        self.save()
 
     @frappe.whitelist()
     def previsualizar(self) -> dict:

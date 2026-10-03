@@ -24,13 +24,29 @@ const desenhar = frappe.utils.debounce((frm) => {
 }, 700);
 const CAMPOS_DA_MENSAGEM = ["modelo", "linha_assunto", "pre_cabecalho", "titulo_email", "subtitulo", "texto",
 	"cta_texto", "cta_url", "imagem_topo", "destaque_texto", "destaque_subtexto", "evento_data", "evento_hora",
-	"evento_local", "assinatura", "itens_add", "itens_remove", "produtos_add", "produtos_remove"];
+	"evento_local", "assinatura", "itens_add", "itens_remove", "produtos_add", "produtos_remove",
+	"blocos_add", "blocos_remove", "blocos_move"];
 
 frappe.ui.form.on("Campanha de Marketing", {
 	...Object.fromEntries(CAMPOS_DA_MENSAGEM.map((c) => [c, desenhar])),
 	refresh(frm) {
 		desenhar(frm);
 		if (frm.is_new()) return;
+		if (frm.doc.estado === "Rascunho") {
+			// O editor de blocos começa pelo modelo: a sequência dele, com o
+			// texto que a campanha já tem. Substitui os blocos que houver.
+			frm.add_custom_button(__("Montar a partir do modelo"), () => {
+				const montar = () => frm.call("montar_blocos").then(() => {
+					frappe.show_alert({ message: __("Blocos montados a partir de «{0}»", [frm.doc.modelo]), indicator: "green" });
+					frm.reload_doc();
+				});
+				if ((frm.doc.blocos || []).length) {
+					frappe.confirm(__("Os blocos actuais são substituídos pelos do modelo. Continuar?"), montar);
+				} else {
+					montar();
+				}
+			});
+		}
 		const passo = (metodo, args, msg) =>
 			frm.call(metodo, args || {}).then(() => {
 				if (msg) frappe.show_alert({ message: msg, indicator: "green" });
@@ -98,6 +114,10 @@ frappe.ui.form.on("Campanha de Marketing", {
 // As linhas das tabelas também redesenham.
 frappe.ui.form.on("Item de Campanha", {
 	titulo: desenhar, texto: desenhar, url: desenhar, imagem: desenhar,
+});
+frappe.ui.form.on("Bloco de Campanha", {
+	tipo: desenhar, titulo: desenhar, subtitulo: desenhar, texto: desenhar, botao_texto: desenhar, url: desenhar,
+	imagem: desenhar, alinhar: desenhar, fundo: desenhar, cor_botao: desenhar, colunas: desenhar, maximo: desenhar,
 });
 frappe.ui.form.on("Produto de Campanha", {
 	nome: desenhar, preco: desenhar, url: desenhar, imagem: desenhar, descricao: desenhar,

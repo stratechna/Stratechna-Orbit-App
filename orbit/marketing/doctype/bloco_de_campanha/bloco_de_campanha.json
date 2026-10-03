@@ -1,0 +1,140 @@
+{
+ "doctype": "DocType",
+ "name": "Bloco de Campanha",
+ "module": "Marketing",
+ "custom": 0,
+ "engine": "InnoDB",
+ "fields": [
+  {
+   "fieldname": "tipo",
+   "fieldtype": "Select",
+   "label": "Bloco",
+   "options": "Título\nTexto\nBotão\nImagem\nImagem com título\nFaixa de destaque\nProdutos\nProduto em destaque\nVantagens em colunas\nLista de artigos\nEvento\nAssinatura\nSeparador\nEspaço",
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 2,
+   "idx": 1
+  },
+  {
+   "fieldname": "titulo",
+   "fieldtype": "Data",
+   "label": "Título",
+   "in_list_view": 1,
+   "columns": 3,
+   "depends_on": "eval:[\"Título\", \"Imagem com título\", \"Faixa de destaque\"].includes(doc.tipo)",
+   "idx": 2
+  },
+  {
+   "fieldname": "subtitulo",
+   "fieldtype": "Data",
+   "label": "Subtítulo",
+   "depends_on": "eval:[\"Título\", \"Imagem com título\", \"Faixa de destaque\"].includes(doc.tipo)",
+   "idx": 3
+  },
+  {
+   "fieldname": "texto",
+   "fieldtype": "Small Text",
+   "label": "Texto",
+   "in_list_view": 1,
+   "columns": 3,
+   "description": "Um parágrafo por bloco de linhas, separados por uma linha em branco. {{nome}} é o nome de quem recebe.",
+   "depends_on": "eval:[\"Texto\", \"Assinatura\"].includes(doc.tipo)",
+   "idx": 4
+  },
+  {
+   "fieldname": "botao_texto",
+   "fieldtype": "Data",
+   "label": "Texto do botão",
+   "depends_on": "eval:[\"Botão\", \"Imagem com título\", \"Produto em destaque\"].includes(doc.tipo)",
+   "idx": 5
+  },
+  {
+   "fieldname": "url",
+   "fieldtype": "Data",
+   "label": "Endereço",
+   "in_list_view": 1,
+   "columns": 2,
+   "depends_on": "eval:[\"Botão\", \"Imagem\", \"Imagem com título\"].includes(doc.tipo)",
+   "idx": 6
+  },
+  {
+   "fieldname": "imagem",
+   "fieldtype": "Attach Image",
+   "label": "Imagem",
+   "depends_on": "eval:[\"Imagem\", \"Imagem com título\"].includes(doc.tipo)",
+   "idx": 7
+  },
+  {
+   "fieldname": "cb_aspecto",
+   "fieldtype": "Column Break",
+   "idx": 8
+  },
+  {
+   "fieldname": "alinhar",
+   "fieldtype": "Select",
+   "label": "Alinhamento",
+   "options": "Esquerda\nCentro",
+   "default": "Esquerda",
+   "depends_on": "eval:[\"Título\", \"Botão\"].includes(doc.tipo)",
+   "idx": 9
+  },
+  {
+   "fieldname": "fundo",
+   "fieldtype": "Select",
+   "label": "Fundo",
+   "options": "Branco\nSuave",
+   "default": "Branco",
+   "description": "Suave é um tom claro da cor da marca.",
+   "depends_on": "eval:[\"Título\", \"Texto\", \"Botão\", \"Produtos\", \"Vantagens em colunas\"].includes(doc.tipo)",
+   "idx": 10
+  },
+  {
+   "fieldname": "cor_botao",
+   "fieldtype": "Select",
+   "label": "Cor do botão",
+   "options": "Marca\nDestaque",
+   "default": "Marca",
+   "depends_on": "eval:[\"Botão\"].includes(doc.tipo)",
+   "idx": 11
+  },
+  {
+   "fieldname": "colunas",
+   "fieldtype": "Select",
+   "label": "Colunas",
+   "options": "3\n2",
+   "default": "3",
+   "depends_on": "eval:[\"Produtos\"].includes(doc.tipo)",
+   "idx": 12
+  },
+  {
+   "fieldname": "maximo",
+   "fieldtype": "Int",
+   "label": "Quantos, no máximo",
+   "default": "6",
+   "depends_on": "eval:[\"Produtos\"].includes(doc.tipo)",
+   "idx": 13
+  },
+  {
+   "fieldname": "nota",
+   "fieldtype": "HTML",
+   "label": "De onde vem",
+   "options": "<p class='text-muted small'>Os produtos, as vantagens, os artigos e o evento vêm das tabelas e dos campos da campanha, mais abaixo.</p>",
+   "depends_on": "eval:[\"Produtos\", \"Produto em destaque\", \"Vantagens em colunas\", \"Lista de artigos\", \"Evento\"].includes(doc.tipo)",
+   "idx": 14
+  }
+ ],
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 0,
+ "naming_rule": "Random",
+ "states": [],
+ "links": [],
+ "creation": "2026-10-03 10:00:00.000000",
+ "modified": "2026-10-03 10:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "idx": 0,
+ "istable": 1,
+ "editable_grid": 1
+}
