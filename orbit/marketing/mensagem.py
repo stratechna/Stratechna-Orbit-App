@@ -50,6 +50,10 @@ def _absoluto(u: str | None) -> str | None:
     return u if u.startswith(("http://", "https://")) else get_url(u)
 
 
+CAMPOS_DO_BLOCO = ("tipo", "titulo", "subtitulo", "texto", "botao_texto", "url", "alinhar", "fundo",
+                   "cor_botao", "colunas", "maximo")
+
+
 def conteudo(c, dados: dict | None = None) -> dict:
     """Os campos de uma campanha ou automação na forma que os modelos usam.
     `dados` é o que é só de um destinatário (os produtos que ELE comprou, a
@@ -69,6 +73,8 @@ def conteudo(c, dados: dict | None = None) -> dict:
                   for i in (g("itens") or [])],
         "produtos": [{"nome": p.nome, "preco": p.preco, "url": p.url, "imagem": _absoluto(p.imagem),
                       "descricao": p.descricao} for p in (g("produtos") or [])],
+        "blocos": [{**{k: b.get(k) for k in CAMPOS_DO_BLOCO}, "imagem": _absoluto(b.get("imagem"))}
+                   for b in (g("blocos") or []) if b.get("tipo")],
     }
     if dados:
         if dados.get("produtos") is not None:
@@ -96,6 +102,10 @@ def compor(c, r: dict, token: str | None = None, dados: dict | None = None) -> d
         if k.get(campo):
             k[campo] = _pessoal(k[campo], r)
     k["paragrafos"] = [_pessoal(p, r) for p in k["paragrafos"]]
+    for b in k["blocos"]:
+        for campo in ("titulo", "subtitulo", "texto"):
+            if b.get(campo):
+                b[campo] = _pessoal(b[campo], r)
     ligacoes = modelos.ligacoes(k)
 
     def ir(u):

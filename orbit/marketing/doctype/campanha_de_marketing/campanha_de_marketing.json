@@ -104,6 +104,18 @@
    "idx": 12
   },
   {
+   "fieldname": "sec_editor",
+   "fieldtype": "Section Break",
+   "label": "Blocos da mensagem",
+   "description": "Opcional. Sem blocos, a mensagem segue o modelo escolhido. Com blocos, sai pela ordem desta lista — acrescente, tire ou arraste para reordenar. «Montar a partir do modelo» preenche-a com o modelo e o texto que já tem."
+  },
+  {
+   "fieldname": "blocos",
+   "fieldtype": "Table",
+   "label": "Blocos",
+   "options": "Bloco de Campanha"
+  },
+  {
    "fieldname": "sec_mensagem",
    "fieldtype": "Section Break",
    "label": "A mensagem",
@@ -128,32 +140,37 @@
    "fieldname": "titulo_email",
    "fieldtype": "Data",
    "label": "Título",
-   "idx": 16
+   "idx": 16,
+   "depends_on": "eval:!(doc.blocos || []).length"
   },
   {
    "fieldname": "subtitulo",
    "fieldtype": "Data",
    "label": "Subtítulo",
-   "idx": 17
+   "idx": 17,
+   "depends_on": "eval:!(doc.blocos || []).length"
   },
   {
    "fieldname": "texto",
    "fieldtype": "Long Text",
    "label": "Texto",
    "description": "Um parágrafo por bloco, separados por uma linha em branco. {{nome}} é o nome do destinatário.",
-   "idx": 18
+   "idx": 18,
+   "depends_on": "eval:!(doc.blocos || []).length"
   },
   {
    "fieldname": "cta_texto",
    "fieldtype": "Data",
    "label": "Botão — texto",
-   "idx": 19
+   "idx": 19,
+   "depends_on": "eval:!(doc.blocos || []).length"
   },
   {
    "fieldname": "cta_url",
    "fieldtype": "Data",
    "label": "Botão — endereço",
-   "idx": 20
+   "idx": 20,
+   "depends_on": "eval:!(doc.blocos || []).length"
   },
   {
    "fieldname": "cb_mensagem",
@@ -164,20 +181,23 @@
    "fieldname": "imagem_topo",
    "fieldtype": "Attach Image",
    "label": "Imagem de topo",
-   "idx": 22
+   "idx": 22,
+   "depends_on": "eval:!(doc.blocos || []).length"
   },
   {
    "fieldname": "destaque_texto",
    "fieldtype": "Data",
    "label": "Destaque (ex.: −30%)",
    "description": "Só o que é verdade.",
-   "idx": 23
+   "idx": 23,
+   "depends_on": "eval:!(doc.blocos || []).length"
   },
   {
    "fieldname": "destaque_subtexto",
    "fieldtype": "Data",
    "label": "Destaque — complemento",
-   "idx": 24
+   "idx": 24,
+   "depends_on": "eval:!(doc.blocos || []).length"
   },
   {
    "fieldname": "evento_data",
@@ -201,7 +221,8 @@
    "fieldname": "assinatura",
    "fieldtype": "Small Text",
    "label": "Assinatura",
-   "idx": 28
+   "idx": 28,
+   "depends_on": "eval:!(doc.blocos || []).length"
   },
   {
    "fieldname": "sec_blocos",

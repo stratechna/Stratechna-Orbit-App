@@ -379,6 +379,97 @@ def _corpo(chave: str, t: _Tema, c: dict, ir) -> str:
     return _titulo(t, c, 24) + _texto(t, c) + _grelha(t, ps, ir, 3, maximo=3) + _botao(t, c, ir)
 
 
+# ── O editor de blocos ────────────────────────────────────────────────────
+#
+# Os doze modelos são sequências fixas das peças acima. O editor deixa a
+# sequência na mão de quem escreve — acrescentar, tirar, reordenar — sem lhe
+# dar a paginação: cada bloco usa a mesma peça que os modelos, com as cores,
+# fontes e logótipo da marca. Decisão do utilizador de 03-10-2026: blocos
+# estruturados dentro da marca, não um editor livre de arrastar e largar.
+
+def _paragrafos(texto) -> list:
+    return [p.strip() for p in str(texto or "").split("\n\n") if p.strip()]
+
+
+def _bloco(t: _Tema, b: dict, c: dict, ir) -> str:
+    tipo = b.get("tipo")
+    alinhar = "center" if b.get("alinhar") == "Centro" else "left"
+    fundo = t.suave if b.get("fundo") == "Suave" else "#ffffff"
+    ps = c.get("produtos") or []
+    if tipo == "Título":
+        return _titulo(t, {"titulo": b.get("titulo"), "subtitulo": b.get("subtitulo")}, 28, alinhar, fundo)
+    if tipo == "Texto":
+        return _texto(t, {"paragrafos": _paragrafos(b.get("texto"))}, fundo)
+    if tipo == "Botão":
+        cor = t.acento if b.get("cor_botao") == "Destaque" else None
+        return _botao(t, {"cta_texto": b.get("botao_texto"), "cta_url": b.get("url")}, ir, cor, alinhar, fundo)
+    if tipo == "Imagem":
+        img = _url(b.get("imagem"))
+        if not img:
+            return ""
+        ligar = f' href="{_e(ir(b["url"]))}"' if _url(b.get("url")) else ""
+        return (f'<mj-section padding="0"><mj-column><mj-image src="{_e(img)}" alt=""{ligar} padding="0" '
+                f'fluid-on-mobile="true" /></mj-column></mj-section>')
+    if tipo == "Imagem com título":
+        d = {"imagem_topo": b.get("imagem"), "titulo": b.get("titulo"), "subtitulo": b.get("subtitulo"),
+             "cta_texto": b.get("botao_texto"), "cta_url": b.get("url")}
+        if not _url(d["imagem_topo"]):
+            # Sem imagem fica o título e o botão ao centro, como no modelo sazonal.
+            return _titulo(t, d, 30, "center") + _botao(t, d, ir, alinhar="center")
+        return _imagem_topo(t, d, ir, com_texto=True)
+    if tipo == "Faixa de destaque":
+        return _faixa(t, {"destaque": {"texto": b.get("titulo"), "subtexto": b.get("subtitulo")}})
+    if tipo == "Produtos":
+        colunas = 2 if str(b.get("colunas")) == "2" else 3
+        return _grelha(t, ps, ir, colunas, fundo, int(b.get("maximo") or 6))
+    if tipo == "Produto em destaque":
+        return _destaque_produto(t, ps[0] if ps else None, {"cta_texto": b.get("botao_texto")}, ir)
+    if tipo == "Vantagens em colunas":
+        return _itens_colunas(t, c.get("itens"), ir, fundo)
+    if tipo == "Lista de artigos":
+        return _lista_artigos(t, c.get("itens"), ir)
+    if tipo == "Evento":
+        return _evento(t, c)
+    if tipo == "Assinatura":
+        return _assinatura(t, {"assinatura": b.get("texto")})
+    if tipo == "Separador":
+        return (f'<mj-section background-color="#ffffff" padding="8px 32px"><mj-column>'
+                f'<mj-divider border-width="1px" border-color="#e3e3e3" padding="0" /></mj-column></mj-section>')
+    if tipo == "Espaço":
+        return ('<mj-section background-color="#ffffff" padding="0"><mj-column>'
+                '<mj-spacer height="24px" /></mj-column></mj-section>')
+    return ""
+
+
+def blocos_do_modelo(chave: str, c: dict) -> list:
+    """A sequência de um modelo como lista de blocos, cheia com o conteúdo que
+    já existe — o ponto de partida do editor. Desenhada com estes blocos, a
+    mensagem fica como o modelo, com pequenas diferenças de tamanho de letra."""
+    tit = {"tipo": "Título", "titulo": c.get("titulo"), "subtitulo": c.get("subtitulo")}
+    txt = {"tipo": "Texto", "texto": "\n\n".join(c.get("paragrafos") or [])}
+    bot = {"tipo": "Botão", "botao_texto": c.get("cta_texto"), "url": c.get("cta_url")}
+    img = {"tipo": "Imagem", "imagem": c.get("imagem_topo")}
+    centro = {"alinhar": "Centro"}
+    suave = {"fundo": "Suave"}
+    seq = {
+        "newsletter": [img, tit, txt, {"tipo": "Lista de artigos"}, bot],
+        "novidades": [{**tit, **centro, **suave}, {**txt, **suave}, {"tipo": "Produtos", **suave}, {**bot, **centro, **suave}],
+        "promocao": [{"tipo": "Faixa de destaque", "titulo": (c.get("destaque") or {}).get("texto"),
+                      "subtitulo": (c.get("destaque") or {}).get("subtexto")},
+                     {**tit, **centro}, txt, {"tipo": "Produtos"}, {**bot, **centro, "cor_botao": "Destaque"}],
+        "produto": [{"tipo": "Produto em destaque", "botao_texto": c.get("cta_texto")}, tit, txt, {"tipo": "Produtos", "maximo": 3}, bot],
+        "catalogo": [{**tit, **centro}, {"tipo": "Produtos", "colunas": "2"}, {**bot, **centro}],
+        "sazonal": [{"tipo": "Imagem com título", "imagem": c.get("imagem_topo"), "titulo": c.get("titulo"),
+                     "subtitulo": c.get("subtitulo"), "botao_texto": c.get("cta_texto"), "url": c.get("cta_url")}, txt],
+        "evento": [img, {**tit, **centro}, {"tipo": "Evento"}, txt, {**bot, **centro, "cor_botao": "Destaque"}],
+        "institucional": [tit, txt, {"tipo": "Assinatura", "texto": c.get("assinatura")}],
+        "servicos": [{**tit, **centro}, {"tipo": "Vantagens em colunas"}, {**bot, **centro}],
+        "artigos": [tit, txt, {"tipo": "Lista de artigos"}],
+        "boas_vindas": [{**tit, **centro, **suave}, {**txt, **suave}, {"tipo": "Vantagens em colunas", **suave}, {**bot, **centro, **suave}],
+    }.get(chave) or [tit, txt, {"tipo": "Produtos", "maximo": 3}, bot]
+    return [{k: v for k, v in b.items() if v not in (None, "")} for b in seq]
+
+
 def gerar(conteudo: dict, ident: dict, *, ir: Callable[[str], str], remover: str, motivo: str,
           legal_texto: str, pixel: Optional[str] = None, assunto: str = "",
           pre_cabecalho: str = "") -> str:
@@ -399,7 +490,10 @@ def gerar(conteudo: dict, ident: dict, *, ir: Callable[[str], str], remover: str
         f'<mj-style>a {{ color: {t.primaria}; }} @media (max-width:480px) {{ .mj-column-per-50 {{ width:100% !important; }} }}</mj-style>'
         f'</mj-head><mj-body background-color="{t.fundo_pagina}" width="620px">'
         f'<mj-wrapper padding="20px 0" background-color="{t.fundo_pagina}">'
-        + _cabecalho(t, ir) + _corpo(chave, t, conteudo, ir) + _rodape(t, ident, motivo, remover, legal_texto)
+        + _cabecalho(t, ir)
+        + ("".join(_bloco(t, b, conteudo, ir) for b in conteudo["blocos"]) if conteudo.get("blocos")
+           else _corpo(chave, t, conteudo, ir))
+        + _rodape(t, ident, motivo, remover, legal_texto)
         + f'</mj-wrapper>{rastos}</mj-body></mjml>')
     resultado = mjml2html(fonte_mjml)
     return resultado if isinstance(resultado, str) else getattr(resultado, "html", str(resultado))
@@ -410,6 +504,9 @@ def ligacoes(conteudo: dict) -> list:
     urls = [conteudo.get("cta_url")]
     urls += [p.get("url") for p in conteudo.get("produtos") or []]
     urls += [i.get("url") for i in conteudo.get("itens") or []]
+    # Os blocos no fim: as posições acima não mudam, e um clique registado
+    # numa campanha antiga continua a apontar para o mesmo sítio.
+    urls += [b.get("url") for b in conteudo.get("blocos") or []]
     saida = []
     for u in urls:
         u = _url(u)

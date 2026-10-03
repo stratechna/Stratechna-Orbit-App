@@ -5,7 +5,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_to_date, now_datetime
 
-from orbit.marketing import consentimento, destinatarios, envio, modelos, publico
+from orbit.marketing import consentimento, destinatarios, envio, mensagem, modelos, publico
 
 
 def _contacto(email, estado="Pode receber", base="consentimento", assuntos=None, nome="Ana"):
@@ -252,6 +252,42 @@ class TestMarketing(IntegrationTestCase):
         self.assertIn("Olá Maria", r["html"])
         self.assertIn("-30%", r["html"])
         self.assertIn("Cadeira", r["html"])
+
+    def test_blocos_pela_ordem_e_medidos(self):
+        k = {"modelo": "relacao", "produtos": [{"nome": "Cadeira", "url": "https://exemplo.invalid/p"}],
+             "blocos": [{"tipo": "Faixa de destaque", "titulo": "-40%"},
+                        {"tipo": "Texto", "texto": "Primeiro\n\nSegundo"},
+                        {"tipo": "Produtos", "colunas": "2"},
+                        {"tipo": "Botão", "botao_texto": "Comprar", "url": "https://exemplo.invalid/b"},
+                        {"tipo": "Separador"}, {"tipo": "Espaço"}]}
+        html = modelos.gerar(k, {}, ir=lambda u: f"MEDIDO[{u}]", remover="#", motivo="m", legal_texto="L")
+        self.assertNotIn("<mj-", html)
+        self.assertLess(html.index("-40%"), html.index("Primeiro"))
+        self.assertLess(html.index("Segundo"), html.index("Cadeira"))
+        self.assertIn("MEDIDO[https://exemplo.invalid/b]", html)
+        self.assertIn("https://exemplo.invalid/b", modelos.ligacoes(k))
+
+    def test_montar_blocos_a_partir_do_modelo(self):
+        for chave in modelos.MODELOS:
+            ex = modelos.exemplo(chave)
+            blocos = modelos.blocos_do_modelo(chave, ex)
+            self.assertTrue(blocos, chave)
+            html = modelos.gerar({**ex, "blocos": blocos}, {}, ir=lambda u: u or "#", remover="#",
+                                 motivo="m", legal_texto="L")
+            self.assertNotIn("<mj-", html, chave)
+        c = self._campanha(modelo="Promoção", titulo_email="Saldos", destaque_texto="-30%")
+        c.montar_blocos()
+        c.reload()
+        self.assertEqual([b.tipo for b in c.blocos][:2], ["Faixa de destaque", "Título"])
+        self.assertEqual(c.blocos[0].titulo, "-30%")
+        c.blocos[1].titulo = "Olá {{nome}}"
+        c.save()
+        html = mensagem.compor(c, {"nome": "Rita"})["html"]
+        self.assertIn("Olá Rita", html)
+        c.submeter()
+        c.blocos[1].titulo = "Mudado por baixo"
+        with self.assertRaises(frappe.ValidationError):
+            c.save()
 
     def test_doze_modelos(self):
         for chave in modelos.MODELOS:
