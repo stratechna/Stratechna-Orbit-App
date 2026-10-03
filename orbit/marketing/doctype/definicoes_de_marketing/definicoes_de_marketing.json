@@ -1,0 +1,153 @@
+{
+ "doctype": "DocType",
+ "name": "Definicoes de Marketing",
+ "module": "Marketing",
+ "custom": 0,
+ "engine": "InnoDB",
+ "fields": [
+  {
+   "fieldname": "modo",
+   "fieldtype": "Select",
+   "label": "Modo",
+   "options": "Simular\nReal",
+   "default": "Simular",
+   "description": "Em simulação o ciclo corre inteiro e nada sai.",
+   "idx": 1
+  },
+  {
+   "fieldname": "email_account",
+   "fieldtype": "Link",
+   "label": "Conta de envio (relay)",
+   "options": "Email Account",
+   "description": "Nunca a conta das caixas de correio: o marketing sai por um relay próprio.",
+   "idx": 2
+  },
+  {
+   "fieldname": "limite_hora",
+   "fieldtype": "Int",
+   "label": "Mensagens por hora, no máximo",
+   "default": "200",
+   "idx": 3
+  },
+  {
+   "fieldname": "medir_aberturas",
+   "fieldtype": "Check",
+   "label": "Medir aberturas",
+   "default": "1",
+   "idx": 4
+  },
+  {
+   "fieldname": "sec_marca",
+   "fieldtype": "Section Break",
+   "label": "A marca (vem do portal)",
+   "idx": 5
+  },
+  {
+   "fieldname": "marca_nome",
+   "fieldtype": "Data",
+   "label": "Nome da marca",
+   "idx": 6
+  },
+  {
+   "fieldname": "logo_url",
+   "fieldtype": "Data",
+   "label": "Logótipo (endereço público)",
+   "idx": 7
+  },
+  {
+   "fieldname": "cor_primaria",
+   "fieldtype": "Color",
+   "label": "Cor principal",
+   "idx": 8
+  },
+  {
+   "fieldname": "cor_acento",
+   "fieldtype": "Color",
+   "label": "Cor de destaque",
+   "idx": 9
+  },
+  {
+   "fieldname": "fonte_titulos",
+   "fieldtype": "Data",
+   "label": "Tipo de letra dos títulos",
+   "idx": 10
+  },
+  {
+   "fieldname": "fonte_texto",
+   "fieldtype": "Data",
+   "label": "Tipo de letra do texto",
+   "idx": 11
+  },
+  {
+   "fieldname": "legal_texto",
+   "fieldtype": "Small Text",
+   "label": "Identificação legal (rodapé)",
+   "description": "Nome, morada e NIF. Sem isto nada sai a sério.",
+   "idx": 12
+  },
+  {
+   "fieldname": "redes",
+   "fieldtype": "Code",
+   "label": "Redes sociais (JSON)",
+   "options": "JSON",
+   "idx": 13
+  },
+  {
+   "fieldname": "contactos",
+   "fieldtype": "Code",
+   "label": "Contactos (JSON)",
+   "options": "JSON",
+   "idx": 14
+  },
+  {
+   "fieldname": "sec_plano",
+   "fieldtype": "Section Break",
+   "label": "O plano (vem do portal)",
+   "idx": 15
+  },
+  {
+   "fieldname": "plano_nome",
+   "fieldtype": "Data",
+   "label": "Plano",
+   "read_only": 1,
+   "idx": 16
+  },
+  {
+   "fieldname": "plano_contactos",
+   "fieldtype": "Int",
+   "label": "Contactos contactáveis, no máximo",
+   "description": "0 = sem tecto",
+   "idx": 17
+  },
+  {
+   "fieldname": "plano_campanhas_mes",
+   "fieldtype": "Int",
+   "label": "Campanhas por mês",
+   "description": "0 = sem tecto",
+   "idx": 18
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1,
+ "naming_rule": "",
+ "states": [],
+ "links": [],
+ "creation": "2026-10-03 10:00:00.000000",
+ "modified": "2026-10-03 10:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "idx": 0,
+ "issingle": 1
+}

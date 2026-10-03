@@ -36,8 +36,22 @@ extend_bootinfo = "orbit.apps.acrescentar_ao_boot"
 # de cada instalação fecha esse buraco.
 _POR_DE_PE = ["orbit.marca.sincronizar", "orbit.marca.achatar",
               "orbit.marca.repor_atalhos", "orbit.marca.repor_nomes"]
-after_migrate = _POR_DE_PE
-after_install = _POR_DE_PE
+# O consentimento de marketing no CRM (campos, painel e histórico) entra em todos
+# os tenants por aqui — é o que o torna transversal, e o que faz um tenant novo
+# já nascer com ele.
+_MARKETING = ["orbit.marketing.consentimento.garantir"]
+after_migrate = _POR_DE_PE + _MARKETING
+after_install = _POR_DE_PE + _MARKETING
+
+# Email marketing: a saída das campanhas corre ao minuto (o ritmo por hora
+# reparte-se em sessenta lotes), as contagens de aberturas e cliques de hora a
+# hora. Quem envia de facto é a fila do Frappe.
+scheduler_events = {
+    "cron": {
+        "* * * * *": ["orbit.marketing.envio.processar"],
+    },
+    "hourly": ["orbit.marketing.envio.contagens_do_dia"],
+}
 
 # Esta app não tem nada que valha a pena mostrar no ecrã de apps: é marca e
 # extensões, não é um módulo de trabalho.

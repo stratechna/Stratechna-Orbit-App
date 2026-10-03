@@ -1,0 +1,79 @@
+{
+ "doctype": "DocType",
+ "name": "Segmento de Marketing",
+ "module": "Marketing",
+ "custom": 0,
+ "engine": "InnoDB",
+ "fields": [
+  {
+   "fieldname": "nome",
+   "fieldtype": "Data",
+   "label": "Nome",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "idx": 1
+  },
+  {
+   "fieldname": "descricao",
+   "fieldtype": "Small Text",
+   "label": "Descrição",
+   "idx": 2
+  },
+  {
+   "fieldname": "regras",
+   "fieldtype": "Table",
+   "label": "Regras — todas têm de se cumprir",
+   "options": "Regra de Segmento",
+   "idx": 3
+  },
+  {
+   "fieldname": "contactaveis",
+   "fieldtype": "Int",
+   "label": "Contactáveis na última contagem",
+   "read_only": 1,
+   "in_list_view": 1,
+   "idx": 4
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Sales User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1,
+ "naming_rule": "By fieldname",
+ "states": [],
+ "links": [],
+ "creation": "2026-10-03 10:00:00.000000",
+ "modified": "2026-10-03 10:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "idx": 0,
+ "autoname": "field:nome",
+ "title_field": "nome"
+}

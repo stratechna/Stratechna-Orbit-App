@@ -1,0 +1,154 @@
+{
+ "doctype": "DocType",
+ "name": "Envio de Marketing",
+ "module": "Marketing",
+ "custom": 0,
+ "engine": "InnoDB",
+ "fields": [
+  {
+   "fieldname": "campanha",
+   "fieldtype": "Link",
+   "label": "Campanha",
+   "options": "Campanha de Marketing",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "idx": 1
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email",
+   "reqd": 1,
+   "in_list_view": 1,
+   "idx": 2
+  },
+  {
+   "fieldname": "estado",
+   "fieldtype": "Select",
+   "label": "Estado",
+   "options": "Na fila\nEnviado\nSimulado\nFalhou\nSaltado\nCancelado",
+   "default": "Na fila",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "idx": 3
+  },
+  {
+   "fieldname": "referencia_doctype",
+   "fieldtype": "Link",
+   "label": "Registo — tipo",
+   "options": "DocType",
+   "idx": 4
+  },
+  {
+   "fieldname": "referencia_nome",
+   "fieldtype": "Dynamic Link",
+   "label": "Registo",
+   "options": "referencia_doctype",
+   "idx": 5
+  },
+  {
+   "fieldname": "nome_destinatario",
+   "fieldtype": "Data",
+   "label": "Nome",
+   "idx": 6
+  },
+  {
+   "fieldname": "token",
+   "fieldtype": "Data",
+   "label": "Token",
+   "unique": 1,
+   "read_only": 1,
+   "hidden": 1,
+   "idx": 7
+  },
+  {
+   "fieldname": "email_queue",
+   "fieldtype": "Link",
+   "label": "Fila de email",
+   "options": "Email Queue",
+   "read_only": 1,
+   "idx": 8
+  },
+  {
+   "fieldname": "erro",
+   "fieldtype": "Small Text",
+   "label": "Erro",
+   "read_only": 1,
+   "idx": 9
+  },
+  {
+   "fieldname": "cb",
+   "fieldtype": "Column Break",
+   "idx": 10
+  },
+  {
+   "fieldname": "enviado_em",
+   "fieldtype": "Datetime",
+   "label": "Enviado em",
+   "read_only": 1,
+   "idx": 11
+  },
+  {
+   "fieldname": "aberto_em",
+   "fieldtype": "Datetime",
+   "label": "Aberto em",
+   "read_only": 1,
+   "idx": 12
+  },
+  {
+   "fieldname": "aberturas",
+   "fieldtype": "Int",
+   "label": "Aberturas",
+   "read_only": 1,
+   "idx": 13
+  },
+  {
+   "fieldname": "clicado_em",
+   "fieldtype": "Datetime",
+   "label": "Clicado em",
+   "read_only": 1,
+   "idx": 14
+  },
+  {
+   "fieldname": "cliques",
+   "fieldtype": "Int",
+   "label": "Cliques",
+   "read_only": 1,
+   "idx": 15
+  },
+  {
+   "fieldname": "saiu_em",
+   "fieldtype": "Datetime",
+   "label": "Saiu em",
+   "read_only": 1,
+   "idx": 16
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 0,
+ "naming_rule": "Random",
+ "states": [],
+ "links": [],
+ "creation": "2026-10-03 10:00:00.000000",
+ "modified": "2026-10-03 10:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "idx": 0,
+ "in_create": 1
+}

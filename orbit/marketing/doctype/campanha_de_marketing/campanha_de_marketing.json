@@ -1,0 +1,341 @@
+{
+ "doctype": "DocType",
+ "name": "Campanha de Marketing",
+ "module": "Marketing",
+ "custom": 0,
+ "engine": "InnoDB",
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "MKT-.YYYY.-",
+   "default": "MKT-.YYYY.-",
+   "hidden": 1,
+   "reqd": 1,
+   "idx": 1
+  },
+  {
+   "fieldname": "titulo",
+   "fieldtype": "Data",
+   "label": "Nome interno",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "Só para nós — o destinatário não o vê.",
+   "idx": 2
+  },
+  {
+   "fieldname": "estado",
+   "fieldtype": "Select",
+   "label": "Estado",
+   "options": "Rascunho\nPara aprovação\nAprovada\nA enviar\nEnviada\nCancelada",
+   "default": "Rascunho",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "allow_on_submit": 0,
+   "idx": 3
+  },
+  {
+   "fieldname": "origem",
+   "fieldtype": "Select",
+   "label": "Origem",
+   "options": "Orbit\nPortal",
+   "default": "Orbit",
+   "read_only": 1,
+   "idx": 4
+  },
+  {
+   "fieldname": "cb_topo",
+   "fieldtype": "Column Break",
+   "idx": 5
+  },
+  {
+   "fieldname": "modelo",
+   "fieldtype": "Select",
+   "label": "Modelo",
+   "options": "Newsletter\nNovidades\nPromoção\nProduto em destaque\nCatálogo\nCampanha sazonal\nConvite ou evento\nComunicado\nServiços\nArtigos\nBoas-vindas\nRelação com o cliente",
+   "default": "Novidades",
+   "reqd": 1,
+   "in_list_view": 1,
+   "idx": 6
+  },
+  {
+   "fieldname": "assunto_marketing",
+   "fieldtype": "Link",
+   "label": "Assunto (de onde o destinatário pode sair)",
+   "options": "Assunto de Marketing",
+   "idx": 7
+  },
+  {
+   "fieldname": "agendar_para",
+   "fieldtype": "Datetime",
+   "label": "Sair em",
+   "idx": 8
+  },
+  {
+   "fieldname": "sec_quem",
+   "fieldtype": "Section Break",
+   "label": "A quem",
+   "idx": 9
+  },
+  {
+   "fieldname": "segmentos",
+   "fieldtype": "Table MultiSelect",
+   "label": "Segmentos",
+   "options": "Segmento da Campanha",
+   "idx": 10
+  },
+  {
+   "fieldname": "destinatarios",
+   "fieldtype": "Int",
+   "label": "Destinatários",
+   "read_only": 1,
+   "idx": 11
+  },
+  {
+   "fieldname": "sec_mensagem",
+   "fieldtype": "Section Break",
+   "label": "A mensagem",
+   "idx": 12
+  },
+  {
+   "fieldname": "linha_assunto",
+   "fieldtype": "Data",
+   "label": "Linha de assunto",
+   "reqd": 1,
+   "length": 140,
+   "idx": 13
+  },
+  {
+   "fieldname": "pre_cabecalho",
+   "fieldtype": "Data",
+   "label": "Pré-cabeçalho",
+   "length": 160,
+   "idx": 14
+  },
+  {
+   "fieldname": "titulo_email",
+   "fieldtype": "Data",
+   "label": "Título",
+   "idx": 15
+  },
+  {
+   "fieldname": "subtitulo",
+   "fieldtype": "Data",
+   "label": "Subtítulo",
+   "idx": 16
+  },
+  {
+   "fieldname": "texto",
+   "fieldtype": "Long Text",
+   "label": "Texto",
+   "description": "Um parágrafo por bloco, separados por uma linha em branco. {{nome}} é o nome do destinatário.",
+   "idx": 17
+  },
+  {
+   "fieldname": "cta_texto",
+   "fieldtype": "Data",
+   "label": "Botão — texto",
+   "idx": 18
+  },
+  {
+   "fieldname": "cta_url",
+   "fieldtype": "Data",
+   "label": "Botão — endereço",
+   "idx": 19
+  },
+  {
+   "fieldname": "cb_mensagem",
+   "fieldtype": "Column Break",
+   "idx": 20
+  },
+  {
+   "fieldname": "imagem_topo",
+   "fieldtype": "Attach Image",
+   "label": "Imagem de topo",
+   "idx": 21
+  },
+  {
+   "fieldname": "destaque_texto",
+   "fieldtype": "Data",
+   "label": "Destaque (ex.: −30%)",
+   "description": "Só o que é verdade.",
+   "idx": 22
+  },
+  {
+   "fieldname": "destaque_subtexto",
+   "fieldtype": "Data",
+   "label": "Destaque — complemento",
+   "idx": 23
+  },
+  {
+   "fieldname": "evento_data",
+   "fieldtype": "Data",
+   "label": "Evento — data",
+   "idx": 24
+  },
+  {
+   "fieldname": "evento_hora",
+   "fieldtype": "Data",
+   "label": "Evento — hora",
+   "idx": 25
+  },
+  {
+   "fieldname": "evento_local",
+   "fieldtype": "Data",
+   "label": "Evento — local",
+   "idx": 26
+  },
+  {
+   "fieldname": "assinatura",
+   "fieldtype": "Small Text",
+   "label": "Assinatura",
+   "idx": 27
+  },
+  {
+   "fieldname": "sec_blocos",
+   "fieldtype": "Section Break",
+   "label": "Blocos",
+   "idx": 28
+  },
+  {
+   "fieldname": "itens",
+   "fieldtype": "Table",
+   "label": "Vantagens, serviços ou artigos",
+   "options": "Item de Campanha",
+   "idx": 29
+  },
+  {
+   "fieldname": "produtos",
+   "fieldtype": "Table",
+   "label": "Produtos",
+   "options": "Produto de Campanha",
+   "idx": 30
+  },
+  {
+   "fieldname": "sec_resultados",
+   "fieldtype": "Section Break",
+   "label": "Resultados",
+   "collapsible": 1,
+   "idx": 31
+  },
+  {
+   "fieldname": "simulada",
+   "fieldtype": "Check",
+   "label": "Simulação (nada saiu)",
+   "read_only": 1,
+   "idx": 32
+  },
+  {
+   "fieldname": "enviados",
+   "fieldtype": "Int",
+   "label": "Enviados",
+   "read_only": 1,
+   "idx": 33
+  },
+  {
+   "fieldname": "aberturas",
+   "fieldtype": "Int",
+   "label": "Abriram",
+   "read_only": 1,
+   "idx": 34
+  },
+  {
+   "fieldname": "cb_res",
+   "fieldtype": "Column Break",
+   "idx": 35
+  },
+  {
+   "fieldname": "cliques",
+   "fieldtype": "Int",
+   "label": "Clicaram",
+   "read_only": 1,
+   "idx": 36
+  },
+  {
+   "fieldname": "saidas",
+   "fieldtype": "Int",
+   "label": "Saíram",
+   "read_only": 1,
+   "idx": 37
+  },
+  {
+   "fieldname": "falhas",
+   "fieldtype": "Int",
+   "label": "Falharam ou devolveram",
+   "read_only": 1,
+   "idx": 38
+  },
+  {
+   "fieldname": "sec_aprovacao",
+   "fieldtype": "Section Break",
+   "label": "Aprovação",
+   "collapsible": 1,
+   "idx": 39
+  },
+  {
+   "fieldname": "aprovada_por",
+   "fieldtype": "Link",
+   "label": "Aprovada por",
+   "options": "User",
+   "read_only": 1,
+   "idx": 40
+  },
+  {
+   "fieldname": "aprovada_em",
+   "fieldtype": "Datetime",
+   "label": "Aprovada em",
+   "read_only": 1,
+   "idx": 41
+  },
+  {
+   "fieldname": "enviada_em",
+   "fieldtype": "Datetime",
+   "label": "Enviada em",
+   "read_only": 1,
+   "idx": 42
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Sales User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1,
+ "naming_rule": "By \"Naming Series\" field",
+ "states": [],
+ "links": [],
+ "creation": "2026-10-03 10:00:00.000000",
+ "modified": "2026-10-03 10:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "idx": 0,
+ "autoname": "naming_series:",
+ "title_field": "titulo",
+ "show_title_field_in_link": 1
+}

@@ -1,0 +1,53 @@
+{
+ "doctype": "DocType",
+ "name": "Item de Campanha",
+ "module": "Marketing",
+ "custom": 0,
+ "engine": "InnoDB",
+ "fields": [
+  {
+   "fieldname": "titulo",
+   "fieldtype": "Data",
+   "label": "Título",
+   "in_list_view": 1,
+   "columns": 3,
+   "idx": 1
+  },
+  {
+   "fieldname": "texto",
+   "fieldtype": "Small Text",
+   "label": "Texto",
+   "in_list_view": 1,
+   "columns": 4,
+   "idx": 2
+  },
+  {
+   "fieldname": "url",
+   "fieldtype": "Data",
+   "label": "Endereço",
+   "in_list_view": 1,
+   "columns": 2,
+   "idx": 3
+  },
+  {
+   "fieldname": "imagem",
+   "fieldtype": "Attach Image",
+   "label": "Imagem",
+   "idx": 4
+  }
+ ],
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 0,
+ "naming_rule": "Random",
+ "states": [],
+ "links": [],
+ "creation": "2026-10-03 10:00:00.000000",
+ "modified": "2026-10-03 10:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "idx": 0,
+ "istable": 1,
+ "editable_grid": 1
+}

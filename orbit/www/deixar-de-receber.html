@@ -1,0 +1,42 @@
+{% extends "templates/web.html" %}
+{% block title %}Deixar de receber{% endblock %}
+{% block page_content %}
+<div style="max-width:520px;margin:48px auto;font-size:16px;line-height:1.55">
+  <h1 style="font-size:24px;margin-bottom:16px">Deixar de receber</h1>
+  {% if not valido %}
+    <p>Esta ligação já não é válida.</p>
+  {% elif feito %}
+    {% if feito == "tudo" %}
+      <p>Não voltará a receber comunicações de {{ marca or "este remetente" }}.</p>
+    {% else %}
+      <p>Não voltará a receber «{{ feito }}».</p>
+    {% endif %}
+  {% else %}
+    <div id="pedido">
+      <p>Endereço: <strong>{{ email }}</strong></p>
+      {% if assunto %}
+        <button class="btn btn-primary btn-block" onclick="sair(0)" style="margin-top:12px">Deixar de receber «{{ assunto }}»</button>
+      {% endif %}
+      <button class="btn btn-default btn-block" onclick="sair(1)" style="margin-top:12px">Deixar de receber tudo de {{ marca or "este remetente" }}</button>
+    </div>
+    <p id="feito" style="display:none"></p>
+    <script>
+      // O pedido vai ao mesmo método da remoção num clique do cliente de
+      // correio: uma só porta para sair, e nenhum formulário a precisar de sessão.
+      function sair(tudo) {
+        const corpo = new URLSearchParams({ t: {{ token|tojson }}, tudo: String(tudo) });
+        fetch("/api/method/orbit.marketing.publico.sair", { method: "POST", body: corpo })
+          .then(r => r.json()).then(r => {
+            document.getElementById("pedido").style.display = "none";
+            const p = document.getElementById("feito");
+            p.style.display = "block";
+            p.textContent = r.message && r.message.ok
+              ? (tudo ? "Não voltará a receber comunicações de " + {{ (marca or "este remetente")|tojson }} + "."
+                      : "Não voltará a receber «" + {{ (assunto or "")|tojson }} + "».")
+              : "Não foi possível registar o pedido. Tente outra vez.";
+          });
+      }
+    </script>
+  {% endif %}
+</div>
+{% endblock %}
