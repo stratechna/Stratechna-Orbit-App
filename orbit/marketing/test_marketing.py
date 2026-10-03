@@ -244,6 +244,15 @@ class TestMarketing(IntegrationTestCase):
     def test_segmento_por_assunto(self):
         self.assertEqual({r["email"] for r in destinatarios.do_segmento("Promoções")}, {"pode@exemplo.invalid"})
 
+    def test_previsualizar_rascunho_sem_gravar(self):
+        from orbit.marketing.mensagem import previsualizar_rascunho
+        r = previsualizar_rascunho({"modelo": "Promoção", "titulo_email": "Olá {{nome}}", "linha_assunto": "Saldos",
+                                    "destaque_texto": "-30%", "produtos": [{"nome": "Cadeira", "preco": "49 €"}]})
+        self.assertEqual(r["assunto"], "Saldos")
+        self.assertIn("Olá Maria", r["html"])
+        self.assertIn("-30%", r["html"])
+        self.assertIn("Cadeira", r["html"])
+
     def test_doze_modelos(self):
         for chave in modelos.MODELOS:
             html = modelos.gerar(modelos.exemplo(chave), {}, ir=lambda u: u or "#", remover="#",

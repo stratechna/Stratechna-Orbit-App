@@ -224,6 +224,17 @@
    "idx": 31
   },
   {
+   "fieldname": "sec_como_fica",
+   "fieldtype": "Section Break",
+   "label": "Como fica",
+   "description": "Actualiza-se enquanto escreve, com a marca das Definições e um destinatário de exemplo."
+  },
+  {
+   "fieldname": "como_fica",
+   "fieldtype": "HTML",
+   "label": "Como fica"
+  },
+  {
    "fieldname": "sec_resultados",
    "fieldtype": "Section Break",
    "label": "Resultados",
