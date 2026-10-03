@@ -92,7 +92,9 @@ def despachar(campanha) -> None:
                 recipients=[e.email], sender=remetente, subject=m["assunto"], message=m["html"],
                 reference_doctype="Envio de Marketing", reference_name=e.name,
                 add_unsubscribe_link=0, with_container=False, delayed=True, raw_html=True,
-                send_priority=0)
+                # Os modelos MJML já levam os estilos em linha. A folha do
+                # Frappe por cima mudava o desenho do email do cliente.
+                add_css=False, send_priority=0)
             if q:
                 mensagem.acrescentar_cabecalhos(q.name, m["sair_um_clique"])
             e.db_set({"estado": "Enviado", "enviado_em": now_datetime(),

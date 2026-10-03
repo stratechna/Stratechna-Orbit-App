@@ -138,4 +138,4 @@ class CampanhadeMarketing(Document):
         m = mensagem.compor(self, {"nome": "Teste", "mkt_base_legal": "consentimento"})
         frappe.sendmail(recipients=[para], sender=frappe.db.get_value("Email Account", d.email_account, "email_id"),
                         subject="[TESTE] " + m["assunto"], message=m["html"], add_unsubscribe_link=0,
-                        with_container=False, raw_html=True, now=True)
+                        with_container=False, raw_html=True, add_css=False, now=True)
