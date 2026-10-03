@@ -60,9 +60,13 @@ def _sairam(assunto: str | None) -> tuple[set, set]:
 
 def contactaveis(assunto: str | None = None) -> list[dict]:
     globais, do_assunto = _sairam(assunto)
+    # Quem devolveu ou se queixou (Supressao de Marketing) fica de fora sempre.
+    suprimidos = {(e or "").lower() for e in frappe.get_all("Supressao de Marketing", pluck="email",
+                                                            limit_page_length=0)}
     return [r for r in _registos()
             if r.get("mkt_estado") == "Pode receber" and r.get("mkt_base_legal")
-            and not r["unsubscribed"] and r["email"] not in globais and r["email"] not in do_assunto]
+            and not r["unsubscribed"] and r["email"] not in globais and r["email"] not in do_assunto
+            and r["email"] not in suprimidos]
 
 
 def _comportamento(coluna: str, dias: int) -> set:

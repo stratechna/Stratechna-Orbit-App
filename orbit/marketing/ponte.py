@@ -116,4 +116,72 @@ def resultados(pedido: dict) -> dict:
                                                     order_by="modified desc", limit=500)}
 
 
-ACCOES = {"definicoes": definicoes, "opcoes": opcoes, "campanha": campanha, "resultados": resultados}
+def relay(pedido: dict) -> dict:
+    """A conta de envio pelo relay, criada ou actualizada pelo portal. A
+    palavra-passe chega pelo stdin da ponte e fica no campo cifrado do Frappe;
+    nunca vai à linha de comandos nem ao registo."""
+    email = str(pedido.get("email_id") or "").strip().lower()
+    if "@" not in email or not pedido.get("smtp_server") or not pedido.get("login"):
+        return {"ok": False, "erro": "faltam o remetente, o servidor ou o utilizador do relay"}
+    nome = "Marketing (relay)"
+    doc = frappe.get_doc("Email Account", nome) if frappe.db.exists("Email Account", nome) else \
+        frappe.new_doc("Email Account")
+    doc.update({"email_account_name": nome, "email_id": email, "enable_outgoing": 1, "enable_incoming": 0,
+                "smtp_server": pedido["smtp_server"], "smtp_port": str(cint(pedido.get("smtp_port") or 587)),
+                "use_tls": 1, "login_id_is_different": 1, "login_id": pedido["login"],
+                "always_use_account_email_id_as_sender": 1,
+                "always_use_account_name_as_sender_name": 0, "default_outgoing": 0,
+                "send_unsubscribe_message": 0, "track_email_status": 0})
+    if pedido.get("password"):
+        doc.password = pedido["password"]
+        doc.awaiting_password = 0
+    doc.flags.ignore_permissions = True
+    # Validar a ligação SMTP ao gravar não serve aqui: o relay só aceita
+    # o remetente depois de o domínio estar verificado, e isso é assíncrono.
+    doc.flags.ignore_validate = bool(pedido.get("sem_validar"))
+    doc.save() if not doc.is_new() else doc.insert()
+    d = frappe.get_single("Definicoes de Marketing")
+    d.email_account = doc.name
+    if pedido.get("conjunto_configuracao"):
+        d.conjunto_configuracao = str(pedido["conjunto_configuracao"])[:140]
+    d.flags.ignore_permissions = True
+    d.save()
+    return {"ok": True, "conta": doc.name}
+
+
+def evento(pedido: dict) -> dict:
+    """Uma devolução definitiva ou uma queixa, vinda do relay pelo portal."""
+    from frappe.utils import now_datetime
+    tipo = pedido.get("tipo")
+    if tipo not in ("devolvido", "queixa"):
+        return {"ok": False, "erro": "tipo de evento desconhecido"}
+    t = str(pedido.get("token") or "")
+    envio = frappe.db.get_value("Envio de Marketing", {"token": t}, ["name", "campanha", "email"], as_dict=True) if t else None
+    emails = {str(e).strip().lower() for e in pedido.get("emails") or [] if "@" in str(e)}
+    if envio:
+        emails.add(envio.email.lower())
+        frappe.db.set_value("Envio de Marketing", envio.name, {
+            "estado": "Devolvido" if tipo == "devolvido" else "Queixa",
+            "erro": str(pedido.get("detalhe") or "")[:300]}, update_modified=False)
+    for email in emails:
+        if not frappe.db.exists("Supressao de Marketing", email):
+            frappe.get_doc({"doctype": "Supressao de Marketing", "email": email,
+                            "motivo": "Devolvido" if tipo == "devolvido" else "Queixa",
+                            "detalhe": str(pedido.get("detalhe") or "")[:500],
+                            "campanha": envio.campanha if envio else None,
+                            "data": now_datetime()}).insert(ignore_permissions=True)
+        if tipo == "queixa":
+            # Uma queixa é também uma saída: o CRM passa a dizê-lo.
+            if not frappe.db.exists("Email Unsubscribe", {"email": email, "global_unsubscribe": 1}):
+                frappe.get_doc({"doctype": "Email Unsubscribe", "email": email,
+                                "global_unsubscribe": 1}).insert(ignore_permissions=True)
+            for nome in frappe.get_all("Contact Email", filters={"email_id": email}, pluck="parent"):
+                frappe.db.set_value("Contact", nome, {"mkt_estado": "Retirou", "unsubscribed": 1})
+            for nome in frappe.get_all("CRM Lead", filters={"email": email}, pluck="name") \
+                    if frappe.db.exists("DocType", "CRM Lead") else []:
+                frappe.db.set_value("CRM Lead", nome, "mkt_estado", "Retirou")
+    return {"ok": True, "suprimidos": sorted(emails), "envio": envio.name if envio else None}
+
+
+ACCOES = {"definicoes": definicoes, "opcoes": opcoes, "campanha": campanha, "resultados": resultados,
+          "relay": relay, "evento": evento}

@@ -64,7 +64,47 @@ def _registo(e) -> dict:
             "mkt_base_legal": v.get("mkt_base_legal"), "mkt_estado": v.get("mkt_estado")}
 
 
+# O travão. Acima destas taxas, nas primeiras centenas de envios, alguma coisa
+# está errada com a lista — e continuar é o que põe o domínio do cliente nas
+# listas negras. A Google corta acima de 0,3% de queixas; aqui pára-se muito
+# antes. Só se avalia a partir de AMOSTRA envios, senão uma devolução nos
+# primeiros dez dava 10%.
+AMOSTRA = 100
+TECTO_DEVOLUCOES = 0.05
+TECTO_QUEIXAS = 0.001
+
+
+def travao(nome: str) -> str | None:
+    """A razão para parar esta campanha, ou None."""
+    c = frappe.db.sql("""SELECT SUM(estado IN ('Enviado', 'Devolvido', 'Queixa')) AS saidos,
+            SUM(estado = 'Devolvido') AS devolvidos, SUM(estado = 'Queixa') AS queixas
+        FROM `tabEnvio de Marketing` WHERE campanha = %s""", nome, as_dict=True)[0]
+    saidos = cint(c.saidos)
+    if saidos < AMOSTRA:
+        return None
+    if cint(c.devolvidos) / saidos > TECTO_DEVOLUCOES:
+        return f"{cint(c.devolvidos)} devoluções em {saidos} envios (acima de {TECTO_DEVOLUCOES:.0%})"
+    if cint(c.queixas) / saidos > TECTO_QUEIXAS:
+        return f"{cint(c.queixas)} queixas de spam em {saidos} envios (acima de {TECTO_QUEIXAS:.1%})"
+    return None
+
+
+def pausar(campanha, razao: str) -> None:
+    campanha.db_set("estado", "Pausada")
+    campanha.add_comment("Comment", f"Pausada automaticamente: {razao}. "
+                                    "Reveja a lista antes de retomar.")
+    aprovador = campanha.aprovada_por
+    if aprovador:
+        frappe.get_doc({"doctype": "Notification Log", "for_user": aprovador, "type": "Alert",
+                        "document_type": "Campanha de Marketing", "document_name": campanha.name,
+                        "subject": f"Campanha «{campanha.titulo}» pausada: {razao}"}).insert(ignore_permissions=True)
+
+
 def despachar(campanha) -> None:
+    razao = travao(campanha.name)
+    if razao:
+        pausar(campanha, razao)
+        return
     d = mensagem.definicoes()
     lote = max(1, math.ceil(cint(d.limite_hora or 200) / 60))
     fila = frappe.get_all("Envio de Marketing", filters={"campanha": campanha.name, "estado": "Na fila"},
@@ -88,8 +128,15 @@ def despachar(campanha) -> None:
             continue
         try:
             m = mensagem.compor(campanha, r, e.token)
+            # Os cabeçalhos X- passam pelo Frappe tal e qual. São eles que
+            # deixam o portal ligar uma devolução ou queixa do relay ao envio
+            # certo, no tenant certo.
+            cabecalhos = {"X-Orbit-Envio": e.token, "X-Orbit-Tenant": (frappe.local.site or "").split(".")[0]}
+            if d.conjunto_configuracao:
+                cabecalhos["X-SES-CONFIGURATION-SET"] = d.conjunto_configuracao
             q = frappe.sendmail(
                 recipients=[e.email], sender=remetente, subject=m["assunto"], message=m["html"],
+                email_headers=cabecalhos,
                 reference_doctype="Envio de Marketing", reference_name=e.name,
                 add_unsubscribe_link=0, with_container=False, delayed=True, raw_html=True,
                 # Os modelos MJML já levam os estilos em linha. A folha do

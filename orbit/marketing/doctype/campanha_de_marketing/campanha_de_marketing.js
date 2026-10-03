@@ -52,11 +52,14 @@ frappe.ui.form.on("Campanha de Marketing", {
 					(v) => passo("enviar_teste", { para: v.para }, __("Teste enviado")), __("Enviar teste"));
 			}, __("Ciclo"));
 		}
+		if (frm.doc.estado === "Pausada") {
+			frm.add_custom_button(__("Retomar"), () => passo("retomar", null, __("Retomada")), __("Ciclo"));
+		}
 		if (!["Enviada", "Cancelada"].includes(frm.doc.estado)) {
 			frm.add_custom_button(__("Cancelar"), () => passo("cancelar", null, __("Cancelada")), __("Ciclo"));
 		}
 
-		const cores = { "Rascunho": "gray", "Para aprovação": "orange", "Aprovada": "blue", "A enviar": "yellow", "Enviada": "green", "Cancelada": "red" };
+		const cores = { "Rascunho": "gray", "Para aprovação": "orange", "Aprovada": "blue", "A enviar": "yellow", "Pausada": "red", "Enviada": "green", "Cancelada": "red" };
 		frm.page.set_indicator(__(frm.doc.estado), cores[frm.doc.estado] || "gray");
 		if (frm.doc.estado !== "Rascunho") frm.set_read_only();
 	},

@@ -110,8 +110,16 @@ class CampanhadeMarketing(Document):
         self.db_set("agendar_para", get_datetime(quando))
 
     @frappe.whitelist()
+    def retomar(self):
+        """Depois de uma pausa automática. O travão volta a avaliar no
+        minuto seguinte: retomar sem mudar nada à lista volta a parar."""
+        if not _pode_aprovar():
+            frappe.throw(_("Só quem gere o marketing da empresa pode retomar."), frappe.PermissionError)
+        self._mudar(("Pausada",), "A enviar")
+
+    @frappe.whitelist()
     def cancelar(self):
-        self._mudar(("Rascunho", "Para aprovação", "Aprovada", "A enviar"), "Cancelada")
+        self._mudar(("Rascunho", "Para aprovação", "Aprovada", "A enviar", "Pausada"), "Cancelada")
         for e in frappe.get_all("Envio de Marketing", filters={"campanha": self.name, "estado": "Na fila"}, pluck="name"):
             frappe.db.set_value("Envio de Marketing", e, "estado", "Cancelado")
         # O que já estava na fila do Frappe e ainda não saiu, não sai.

@@ -37,94 +37,101 @@
    "idx": 4
   },
   {
+   "fieldname": "conjunto_configuracao",
+   "fieldtype": "Data",
+   "label": "Conjunto de configuração do relay",
+   "description": "Vai no cabeçalho de cada mensagem para o relay saber a quem avisar das devoluções e queixas.",
+   "idx": 5
+  },
+  {
    "fieldname": "sec_marca",
    "fieldtype": "Section Break",
    "label": "A marca (vem do portal)",
-   "idx": 5
+   "idx": 6
   },
   {
    "fieldname": "marca_nome",
    "fieldtype": "Data",
    "label": "Nome da marca",
-   "idx": 6
+   "idx": 7
   },
   {
    "fieldname": "logo_url",
    "fieldtype": "Data",
    "label": "Logótipo (endereço público)",
-   "idx": 7
+   "idx": 8
   },
   {
    "fieldname": "cor_primaria",
    "fieldtype": "Color",
    "label": "Cor principal",
-   "idx": 8
+   "idx": 9
   },
   {
    "fieldname": "cor_acento",
    "fieldtype": "Color",
    "label": "Cor de destaque",
-   "idx": 9
+   "idx": 10
   },
   {
    "fieldname": "fonte_titulos",
    "fieldtype": "Data",
    "label": "Tipo de letra dos títulos",
-   "idx": 10
+   "idx": 11
   },
   {
    "fieldname": "fonte_texto",
    "fieldtype": "Data",
    "label": "Tipo de letra do texto",
-   "idx": 11
+   "idx": 12
   },
   {
    "fieldname": "legal_texto",
    "fieldtype": "Small Text",
    "label": "Identificação legal (rodapé)",
    "description": "Nome, morada e NIF. Sem isto nada sai a sério.",
-   "idx": 12
+   "idx": 13
   },
   {
    "fieldname": "redes",
    "fieldtype": "Code",
    "label": "Redes sociais (JSON)",
    "options": "JSON",
-   "idx": 13
+   "idx": 14
   },
   {
    "fieldname": "contactos",
    "fieldtype": "Code",
    "label": "Contactos (JSON)",
    "options": "JSON",
-   "idx": 14
+   "idx": 15
   },
   {
    "fieldname": "sec_plano",
    "fieldtype": "Section Break",
    "label": "O plano (vem do portal)",
-   "idx": 15
+   "idx": 16
   },
   {
    "fieldname": "plano_nome",
    "fieldtype": "Data",
    "label": "Plano",
    "read_only": 1,
-   "idx": 16
+   "idx": 17
   },
   {
    "fieldname": "plano_contactos",
    "fieldtype": "Int",
    "label": "Contactos contactáveis, no máximo",
    "description": "0 = sem tecto",
-   "idx": 17
+   "idx": 18
   },
   {
    "fieldname": "plano_campanhas_mes",
    "fieldtype": "Int",
    "label": "Campanhas por mês",
    "description": "0 = sem tecto",
-   "idx": 18
+   "idx": 19
   }
  ],
  "permissions": [
@@ -145,7 +152,7 @@
  "states": [],
  "links": [],
  "creation": "2026-10-03 10:00:00.000000",
- "modified": "2026-10-03 10:00:00.000000",
+ "modified": "2026-10-03 14:00:00.000000",
  "owner": "Administrator",
  "modified_by": "Administrator",
  "idx": 0,

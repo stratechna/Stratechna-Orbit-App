@@ -1,0 +1,77 @@
+{
+ "doctype": "DocType",
+ "name": "Supressao de Marketing",
+ "module": "Marketing",
+ "custom": 0,
+ "engine": "InnoDB",
+ "autoname": "field:email",
+ "naming_rule": "By fieldname",
+ "title_field": "email",
+ "fields": [
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "idx": 1
+  },
+  {
+   "fieldname": "motivo",
+   "fieldtype": "Select",
+   "label": "Motivo",
+   "options": "Devolvido\\nQueixa",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "idx": 2
+  },
+  {
+   "fieldname": "detalhe",
+   "fieldtype": "Small Text",
+   "label": "Detalhe do relay",
+   "idx": 3
+  },
+  {
+   "fieldname": "campanha",
+   "fieldtype": "Link",
+   "label": "Campanha",
+   "options": "Campanha de Marketing",
+   "idx": 4
+  },
+  {
+   "fieldname": "data",
+   "fieldtype": "Datetime",
+   "label": "Data",
+   "in_list_view": 1,
+   "idx": 5
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1,
+ "states": [],
+ "links": [],
+ "creation": "2026-10-03 14:00:00.000000",
+ "modified": "2026-10-03 14:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "idx": 0
+}

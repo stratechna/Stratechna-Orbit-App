@@ -106,6 +106,41 @@ class TestMarketing(IntegrationTestCase):
         c = self._campanha(estado="Enviada", origem="Portal")
         self.assertEqual((c.estado, c.origem), ("Rascunho", "Orbit"))
 
+    def test_devolucao_e_queixa_suprimem(self):
+        from orbit.marketing import ponte
+        _contacto("devolve@exemplo.invalid", nome="Dev")
+        _contacto("queixa@exemplo.invalid", nome="Que")
+        self.assertTrue(ponte.evento({"tipo": "devolvido", "emails": ["devolve@exemplo.invalid"],
+                                      "detalhe": "550 5.1.1 user unknown"})["ok"])
+        self.assertTrue(ponte.evento({"tipo": "queixa", "emails": ["queixa@exemplo.invalid"]})["ok"])
+        self.assertFalse(ponte.evento({"tipo": "outro"})["ok"])
+        emails = {r["email"] for r in destinatarios.contactaveis()}
+        self.assertNotIn("devolve@exemplo.invalid", emails)
+        self.assertNotIn("queixa@exemplo.invalid", emails)
+        nome = frappe.db.get_value("Contact Email", {"email_id": "queixa@exemplo.invalid"}, "parent")
+        self.assertEqual(frappe.db.get_value("Contact", nome, "mkt_estado"), "Retirou")
+        nome = frappe.db.get_value("Contact Email", {"email_id": "devolve@exemplo.invalid"}, "parent")
+        self.assertEqual(frappe.db.get_value("Contact", nome, "mkt_estado"), "Pode receber")
+
+    def test_travao_para_a_campanha(self):
+        c = self._campanha()
+        c.submeter()
+        c.aprovar()
+        c.agendar(_passado())
+        envio.processar()
+        c.reload()
+        for n in range(envio.AMOSTRA):
+            frappe.get_doc({"doctype": "Envio de Marketing", "campanha": c.name, "email": f"t{n}@exemplo.invalid",
+                            "estado": "Devolvido" if n < 10 else "Enviado", "token": f"{n:032d}"}).insert(ignore_permissions=True)
+        frappe.get_doc({"doctype": "Envio de Marketing", "campanha": c.name, "email": "fila@exemplo.invalid",
+                        "estado": "Na fila", "token": "f" * 32}).insert(ignore_permissions=True)
+        c.db_set("estado", "A enviar")
+        self.assertIn("devoluções", envio.travao(c.name))
+        envio.despachar(c)
+        c.reload()
+        self.assertEqual(c.estado, "Pausada")
+        self.assertEqual(frappe.db.get_value("Envio de Marketing", {"token": "f" * 32}, "estado"), "Na fila")
+
     def test_so_quem_pode_receber(self):
         emails = {r["email"] for r in destinatarios.contactaveis()}
         self.assertIn("pode@exemplo.invalid", emails)
@@ -169,6 +204,8 @@ class TestMarketing(IntegrationTestCase):
             self.assertIn("List-Unsubscribe-Post: List-Unsubscribe=One-Click", m)
             self.assertIn("orbit.marketing.publico.aberto", m)
             self.assertNotIn("X-List-Unsubscribe", m)
+            self.assertIn("X-Orbit-Envio:", m)
+            self.assertIn("X-Orbit-Tenant:", m)
         finally:
             d.reload()
             d.modo = "Simular"
