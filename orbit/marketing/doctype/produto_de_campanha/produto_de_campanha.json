@@ -23,24 +23,38 @@
    "idx": 2
   },
   {
+   "fieldname": "preco_antigo",
+   "fieldtype": "Data",
+   "label": "Preço antes",
+   "description": "Aparece riscado ao lado do preço.",
+   "idx": 3
+  },
+  {
+   "fieldname": "etiqueta",
+   "fieldtype": "Data",
+   "label": "Etiqueta",
+   "description": "Ex.: «Novo», «−20%». Fica por cima da fotografia.",
+   "idx": 4
+  },
+  {
    "fieldname": "url",
    "fieldtype": "Data",
    "label": "Endereço",
    "in_list_view": 1,
    "columns": 3,
-   "idx": 3
+   "idx": 5
   },
   {
    "fieldname": "imagem",
    "fieldtype": "Attach Image",
    "label": "Imagem",
-   "idx": 4
+   "idx": 6
   },
   {
    "fieldname": "descricao",
    "fieldtype": "Small Text",
    "label": "Descrição curta",
-   "idx": 5
+   "idx": 7
   }
  ],
  "permissions": [],

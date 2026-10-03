@@ -9,11 +9,19 @@
    "fieldname": "tipo",
    "fieldtype": "Select",
    "label": "Bloco",
-   "options": "Título\nTexto\nBotão\nImagem\nImagem com título\nFaixa de destaque\nProdutos\nProduto em destaque\nVantagens em colunas\nLista de artigos\nEvento\nAssinatura\nSeparador\nEspaço",
+   "options": "Título\nTexto\nBotão\nImagem\nImagem com título\nImagem e texto\nFaixa de destaque\nFaixa de chamada\nProdutos\nProduto em destaque\nVantagens em colunas\nNúmeros\nLista de artigos\nEvento\nTestemunho\nGaleria\nCupão\nAssinatura\nSeparador\nEspaço",
    "reqd": 1,
    "in_list_view": 1,
    "columns": 2,
    "idx": 1
+  },
+  {
+   "fieldname": "rotulo",
+   "fieldtype": "Data",
+   "label": "Sobretítulo",
+   "description": "A linha pequena em maiúsculas por cima do título (ex.: «Só esta semana»).",
+   "depends_on": "eval:[\"Título\", \"Imagem com título\", \"Imagem e texto\", \"Produto em destaque\", \"Cupão\"].includes(doc.tipo)",
+   "idx": 2
   },
   {
    "fieldname": "titulo",
@@ -21,15 +29,17 @@
    "label": "Título",
    "in_list_view": 1,
    "columns": 3,
-   "depends_on": "eval:[\"Título\", \"Imagem com título\", \"Faixa de destaque\"].includes(doc.tipo)",
-   "idx": 2
+   "depends_on": "eval:[\"Título\", \"Imagem com título\", \"Imagem e texto\", \"Faixa de destaque\", \"Faixa de chamada\", \"Testemunho\", \"Cupão\"].includes(doc.tipo)",
+   "idx": 3,
+   "description": "No testemunho, o nome de quem fala; no cupão, o código."
   },
   {
    "fieldname": "subtitulo",
    "fieldtype": "Data",
    "label": "Subtítulo",
-   "depends_on": "eval:[\"Título\", \"Imagem com título\", \"Faixa de destaque\"].includes(doc.tipo)",
-   "idx": 3
+   "depends_on": "eval:[\"Título\", \"Imagem com título\", \"Faixa de destaque\", \"Testemunho\", \"Cupão\"].includes(doc.tipo)",
+   "idx": 4,
+   "description": "No testemunho, o cargo ou a empresa; no cupão, a validade."
   },
   {
    "fieldname": "texto",
@@ -38,15 +48,15 @@
    "in_list_view": 1,
    "columns": 3,
    "description": "Um parágrafo por bloco de linhas, separados por uma linha em branco. {{nome}} é o nome de quem recebe.",
-   "depends_on": "eval:[\"Texto\", \"Assinatura\"].includes(doc.tipo)",
-   "idx": 4
+   "depends_on": "eval:[\"Texto\", \"Assinatura\", \"Imagem e texto\", \"Faixa de chamada\", \"Testemunho\", \"Cupão\"].includes(doc.tipo)",
+   "idx": 5
   },
   {
    "fieldname": "botao_texto",
    "fieldtype": "Data",
    "label": "Texto do botão",
-   "depends_on": "eval:[\"Botão\", \"Imagem com título\", \"Produto em destaque\"].includes(doc.tipo)",
-   "idx": 5
+   "depends_on": "eval:[\"Botão\", \"Imagem com título\", \"Imagem e texto\", \"Faixa de chamada\", \"Produto em destaque\"].includes(doc.tipo)",
+   "idx": 6
   },
   {
    "fieldname": "url",
@@ -54,20 +64,35 @@
    "label": "Endereço",
    "in_list_view": 1,
    "columns": 2,
-   "depends_on": "eval:[\"Botão\", \"Imagem\", \"Imagem com título\"].includes(doc.tipo)",
-   "idx": 6
+   "depends_on": "eval:[\"Botão\", \"Imagem\", \"Imagem com título\", \"Imagem e texto\", \"Faixa de chamada\", \"Galeria\"].includes(doc.tipo)",
+   "idx": 7
   },
   {
    "fieldname": "imagem",
    "fieldtype": "Attach Image",
    "label": "Imagem",
-   "depends_on": "eval:[\"Imagem\", \"Imagem com título\"].includes(doc.tipo)",
-   "idx": 7
+   "depends_on": "eval:[\"Imagem\", \"Imagem com título\", \"Imagem e texto\", \"Faixa de chamada\", \"Testemunho\", \"Galeria\"].includes(doc.tipo)",
+   "idx": 8,
+   "description": "Na faixa de chamada, fica por trás do texto (opcional); no testemunho, a fotografia de quem fala."
+  },
+  {
+   "fieldname": "imagem_2",
+   "fieldtype": "Attach Image",
+   "label": "Segunda imagem",
+   "depends_on": "eval:[\"Galeria\"].includes(doc.tipo)",
+   "idx": 9
+  },
+  {
+   "fieldname": "imagem_3",
+   "fieldtype": "Attach Image",
+   "label": "Terceira imagem",
+   "depends_on": "eval:[\"Galeria\"].includes(doc.tipo)",
+   "idx": 10
   },
   {
    "fieldname": "cb_aspecto",
    "fieldtype": "Column Break",
-   "idx": 8
+   "idx": 11
   },
   {
    "fieldname": "alinhar",
@@ -76,7 +101,7 @@
    "options": "Esquerda\nCentro",
    "default": "Esquerda",
    "depends_on": "eval:[\"Título\", \"Botão\"].includes(doc.tipo)",
-   "idx": 9
+   "idx": 12
   },
   {
    "fieldname": "fundo",
@@ -85,8 +110,8 @@
    "options": "Branco\nSuave",
    "default": "Branco",
    "description": "Suave é um tom claro da cor da marca.",
-   "depends_on": "eval:[\"Título\", \"Texto\", \"Botão\", \"Produtos\", \"Vantagens em colunas\"].includes(doc.tipo)",
-   "idx": 10
+   "depends_on": "eval:[\"Título\", \"Texto\", \"Botão\", \"Produtos\", \"Vantagens em colunas\", \"Números\", \"Imagem e texto\"].includes(doc.tipo)",
+   "idx": 13
   },
   {
    "fieldname": "cor_botao",
@@ -95,7 +120,25 @@
    "options": "Marca\nDestaque",
    "default": "Marca",
    "depends_on": "eval:[\"Botão\"].includes(doc.tipo)",
-   "idx": 11
+   "idx": 14
+  },
+  {
+   "fieldname": "posicao",
+   "fieldtype": "Select",
+   "label": "Imagem",
+   "options": "Imagem à esquerda\nImagem à direita",
+   "default": "Imagem à esquerda",
+   "depends_on": "eval:[\"Imagem e texto\"].includes(doc.tipo)",
+   "idx": 15
+  },
+  {
+   "fieldname": "margens",
+   "fieldtype": "Select",
+   "label": "Largura",
+   "options": "Toda a largura\nCom margens",
+   "default": "Toda a largura",
+   "depends_on": "eval:[\"Imagem\"].includes(doc.tipo)",
+   "idx": 16
   },
   {
    "fieldname": "colunas",
@@ -104,7 +147,7 @@
    "options": "3\n2",
    "default": "3",
    "depends_on": "eval:[\"Produtos\"].includes(doc.tipo)",
-   "idx": 12
+   "idx": 17
   },
   {
    "fieldname": "maximo",
@@ -112,15 +155,15 @@
    "label": "Quantos, no máximo",
    "default": "6",
    "depends_on": "eval:[\"Produtos\"].includes(doc.tipo)",
-   "idx": 13
+   "idx": 18
   },
   {
    "fieldname": "nota",
    "fieldtype": "HTML",
    "label": "De onde vem",
-   "options": "<p class='text-muted small'>Os produtos, as vantagens, os artigos e o evento vêm das tabelas e dos campos da campanha, mais abaixo.</p>",
-   "depends_on": "eval:[\"Produtos\", \"Produto em destaque\", \"Vantagens em colunas\", \"Lista de artigos\", \"Evento\"].includes(doc.tipo)",
-   "idx": 14
+   "options": "<p class='text-muted small'>Os produtos, as vantagens, os números, os artigos e o evento vêm das tabelas e dos campos da campanha, mais abaixo. Nos números, o título de cada item é o número e o texto a legenda.</p>",
+   "depends_on": "eval:[\"Produtos\", \"Produto em destaque\", \"Vantagens em colunas\", \"Números\", \"Lista de artigos\", \"Evento\"].includes(doc.tipo)",
+   "idx": 19
   }
  ],
  "permissions": [],

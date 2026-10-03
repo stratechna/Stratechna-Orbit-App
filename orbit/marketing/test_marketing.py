@@ -295,6 +295,39 @@ class TestMarketing(IntegrationTestCase):
         with self.assertRaises(frappe.ValidationError):
             c.save()
 
+    def test_blocos_novos_e_imagens_a_medida(self):
+        pedidos = []
+
+        def img(u, w, h):
+            pedidos.append((u, w, h))
+            return f"{u}#{w}x{h}"
+        k = {"modelo": "relacao", "itens": [{"titulo": "98%", "texto": "renovam"}],
+             "produtos": [{"nome": "Cadeira", "preco": "49 €", "preco_antigo": "69 €", "etiqueta": "Novo",
+                           "imagem": "https://exemplo.invalid/c.jpg", "url": "https://exemplo.invalid/p"}],
+             "blocos": [{"tipo": "Imagem e texto", "rotulo": "Equipa", "titulo": "Lado a lado", "texto": "Texto",
+                         "imagem": "https://exemplo.invalid/a.jpg", "posicao": "Imagem à direita"},
+                        {"tipo": "Números"}, {"tipo": "Testemunho", "texto": "Muito bom", "titulo": "Ana"},
+                        {"tipo": "Galeria", "imagem": "https://exemplo.invalid/g1.jpg", "imagem_2": "https://exemplo.invalid/g2.jpg"},
+                        {"tipo": "Cupão", "titulo": "BEMVINDO10"},
+                        {"tipo": "Faixa de chamada", "titulo": "Vamos?", "botao_texto": "Sim", "url": "https://exemplo.invalid/s"},
+                        {"tipo": "Produtos"}]}
+        html = modelos.gerar(k, {}, ir=lambda u: u or "#", remover="#", motivo="m", legal_texto="L", img=img)
+        self.assertNotIn("<mj-", html)
+        for texto in ("Lado a lado", "98%", "Muito bom", "BEMVINDO10", "Vamos?", "69 €", "Novo"):
+            self.assertIn(texto, html)
+        self.assertIn('direction="rtl"', modelos._imagem_texto(modelos._Tema({}), k["blocos"][0], lambda u: u))
+        # Toda a imagem é pedida com medidas: nenhuma sai sem recorte.
+        self.assertTrue(pedidos and all(w for _, w, _ in pedidos))
+        self.assertIn("https://exemplo.invalid/c.jpg#", html)
+
+    def test_cabecalho_escuro_com_logotipo_para_fundo_escuro(self):
+        ident = {"nome": "Marca", "cores": {"primaria": "#22303d", "acento": "#cc0000"},
+                 "logotipos": {"claro": "https://exemplo.invalid/claro.png", "escuro": "https://exemplo.invalid/escuro.png"}}
+        html = modelos.gerar(modelos.exemplo("novidades"), ident, ir=lambda u: u or "#", remover="#",
+                             motivo="m", legal_texto="L")
+        self.assertIn("escuro.png", html)
+        self.assertIn("#cc0000", html.lower())
+
     def test_doze_modelos(self):
         for chave in modelos.MODELOS:
             html = modelos.gerar(modelos.exemplo(chave), {}, ir=lambda u: u or "#", remover="#",
