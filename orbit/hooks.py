@@ -40,8 +40,12 @@ _POR_DE_PE = ["orbit.marca.sincronizar", "orbit.marca.achatar",
 # os tenants por aqui — é o que o torna transversal, e o que faz um tenant novo
 # já nascer com ele.
 _MARKETING = ["orbit.marketing.consentimento.garantir", "orbit.marketing.menu.garantir"]
-after_migrate = _POR_DE_PE + _MARKETING
-after_install = _POR_DE_PE + _MARKETING
+# A marcação de reuniões precisa de dois campos próprios — a referência no
+# `Event` e o segredo do feed no `User`. Pela mesma razão que o consentimento:
+# um tenant novo tem de nascer com eles.
+_MARCACAO = ["orbit.marcacao.garantir"]
+after_migrate = _POR_DE_PE + _MARKETING + _MARCACAO
+after_install = _POR_DE_PE + _MARKETING + _MARCACAO
 
 # Email marketing: a saída das campanhas corre ao minuto (o ritmo por hora
 # reparte-se em sessenta lotes), as contagens de aberturas e cliques de hora a
