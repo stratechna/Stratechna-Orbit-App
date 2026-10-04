@@ -120,6 +120,38 @@ class TestMarcacao(IntegrationTestCase):
         with self.assertRaises(frappe.ValidationError):
             marcacao.ocupado("Administrator", str(agora), str(add_to_date(agora, days=200)))
 
+    # ── cancelar ───────────────────────────────────────────────────────────
+
+    def test_cancelar_poe_o_evento_em_cancelled(self):
+        inicio = add_to_date(now_datetime(), days=8)
+        ref = "MARC-TESTE-CANCELA"
+        r = marcacao.criar(anfitriao="Administrator", assunto="Para cancelar",
+                           inicio=str(inicio), fim=str(add_to_date(inicio, minutes=30)),
+                           referencia=ref)
+        c = marcacao.cancelar(ref, motivo="mudou de ideias")
+        self.assertTrue(c["ok"])
+        self.assertEqual(frappe.db.get_value("Event", r["evento"], "status"), "Cancelled")
+        self.assertIn("CANCELADA: mudou de ideias",
+                      frappe.db.get_value("Event", r["evento"], "description"))
+
+    def test_cancelar_referencia_desconhecida_nao_rebenta(self):
+        c = marcacao.cancelar("MARC-NAO-EXISTE")
+        self.assertFalse(c["ok"])
+
+    def test_cancelado_deixa_de_ocupar(self):
+        """Uma hora cancelada tem de voltar a ficar livre."""
+        inicio = add_to_date(now_datetime(), days=9).replace(hour=15, minute=0,
+                                                            second=0, microsecond=0)
+        ref = "MARC-TESTE-LIBERTA"
+        marcacao.criar(anfitriao="Administrator", assunto="Liberta depois",
+                       inicio=str(inicio), fim=str(add_to_date(inicio, minutes=30)),
+                       referencia=ref)
+        marcacao.cancelar(ref)
+        r = marcacao.ocupado("Administrator", str(add_to_date(inicio, days=-1)),
+                             str(add_to_date(inicio, days=1)))
+        self.assertFalse(any(i["inicio"].startswith(inicio.strftime("%Y-%m-%dT%H:%M"))
+                             for i in r["ocupado"]))
+
     # ── feed ───────────────────────────────────────────────────────────────
 
     def test_feed_recusa_segredo_errado(self):

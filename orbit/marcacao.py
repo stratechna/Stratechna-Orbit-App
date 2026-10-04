@@ -236,6 +236,34 @@ def _juntar_convidado(evento: str, email: str) -> None:
         frappe.log_error(f"Marcação: não liguei o contacto {nome}: {e}", "Orbit Marcação")
 
 
+@frappe.whitelist()
+def cancelar(referencia: str, motivo: str = None) -> dict:
+    """Cancela o compromisso de uma marcação.
+
+    **Existe porque o `frappe.client.set_value` genérico é recusado** à conta de
+    integração do portal — 403 `PermissionError`, verificado a 04-10-2026. A
+    saída tentadora era dar-lhe mais poderes; a certa é esta: um método estreito
+    que só mexe no estado de um `Event` que nasceu de uma marcação nossa. A
+    conta continua sem poder alterar nada no resto do Orbit.
+
+    Procura-se pela referência e não pelo nome do documento de propósito: o
+    portal conhece a referência, e assim não pode pedir o cancelamento de um
+    compromisso qualquer indicando-lhe o nome.
+    """
+    nome = frappe.db.get_value("Event", {"custom_referencia_marcacao": referencia}, "name")
+    if not nome:
+        return {"ok": False, "erro": "sem compromisso para esta referência"}
+
+    frappe.db.set_value("Event", nome, "status", "Cancelled", update_modified=True)
+    if motivo:
+        actual = frappe.db.get_value("Event", nome, "description") or ""
+        frappe.db.set_value("Event", nome, "description",
+                            f"{actual}\n\nCANCELADA: {motivo}".strip(),
+                            update_modified=False)
+    frappe.db.commit()
+    return {"ok": True, "evento": nome}
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 3. O feed iCalendar que o webmail subscreve
 # ═══════════════════════════════════════════════════════════════════════════
