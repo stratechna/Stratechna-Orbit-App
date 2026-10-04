@@ -264,6 +264,28 @@ def cancelar(referencia: str, motivo: str = None) -> dict:
     return {"ok": True, "evento": nome}
 
 
+@frappe.whitelist()
+def reagendar(referencia: str, inicio: str, fim: str) -> dict:
+    """Move o compromisso para outra hora, mantendo-o.
+
+    Mover e não apagar-e-criar: o `Event` é o mesmo documento, por isso o que
+    estiver ligado a ele — participantes, anexos, histórico — sobrevive. E quem
+    já tem o compromisso no telemóvel vê-o mudar de hora em vez de aparecer um
+    segundo ao lado do primeiro.
+    """
+    nome = frappe.db.get_value("Event", {"custom_referencia_marcacao": referencia}, "name")
+    if not nome:
+        return {"ok": False, "erro": "sem compromisso para esta referência"}
+
+    frappe.db.set_value("Event", nome, {
+        "starts_on": frappe.utils.get_datetime(inicio),
+        "ends_on": frappe.utils.get_datetime(fim),
+        "status": "Open",
+    }, update_modified=True)
+    frappe.db.commit()
+    return {"ok": True, "evento": nome}
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 3. O feed iCalendar que o webmail subscreve
 # ═══════════════════════════════════════════════════════════════════════════

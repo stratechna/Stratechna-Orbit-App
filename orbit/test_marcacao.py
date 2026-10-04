@@ -152,6 +152,40 @@ class TestMarcacao(IntegrationTestCase):
         self.assertFalse(any(i["inicio"].startswith(inicio.strftime("%Y-%m-%dT%H:%M"))
                              for i in r["ocupado"]))
 
+    # ── reagendar ──────────────────────────────────────────────────────────
+
+    def test_reagendar_move_o_mesmo_evento(self):
+        inicio = add_to_date(now_datetime(), days=10)
+        ref = "MARC-TESTE-REAGENDA"
+        r = marcacao.criar(anfitriao="Administrator", assunto="Move-se",
+                           inicio=str(inicio), fim=str(add_to_date(inicio, minutes=30)),
+                           referencia=ref)
+        nova = add_to_date(inicio, days=1)
+        m = marcacao.reagendar(ref, str(nova), str(add_to_date(nova, minutes=30)))
+        self.assertTrue(m["ok"])
+        # O mesmo documento, não um segundo.
+        self.assertEqual(m["evento"], r["evento"])
+        self.assertEqual(
+            frappe.db.get_value("Event", r["evento"], "starts_on").strftime("%Y-%m-%d %H:%M"),
+            nova.strftime("%Y-%m-%d %H:%M"))
+
+    def test_reagendar_reabre_um_cancelado(self):
+        inicio = add_to_date(now_datetime(), days=11)
+        ref = "MARC-TESTE-REABRE"
+        r = marcacao.criar(anfitriao="Administrator", assunto="Volta",
+                           inicio=str(inicio), fim=str(add_to_date(inicio, minutes=30)),
+                           referencia=ref)
+        marcacao.cancelar(ref)
+        nova = add_to_date(inicio, days=2)
+        marcacao.reagendar(ref, str(nova), str(add_to_date(nova, minutes=30)))
+        self.assertEqual(frappe.db.get_value("Event", r["evento"], "status"), "Open")
+
+    def test_reagendar_referencia_desconhecida_nao_rebenta(self):
+        agora = now_datetime()
+        m = marcacao.reagendar("MARC-NAO-EXISTE", str(agora),
+                               str(add_to_date(agora, minutes=30)))
+        self.assertFalse(m["ok"])
+
     # ── feed ───────────────────────────────────────────────────────────────
 
     def test_feed_recusa_segredo_errado(self):
