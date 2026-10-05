@@ -144,7 +144,12 @@ def resumo(ano: int = None, mes: int = None) -> dict:
 
     def formatar(linha):
         titulo, inicio, fim, dia_inteiro, local = linha
-        d = datetime.datetime.fromtimestamp(inicio)
+        # **O fuso é dito, não herdado** — ver `marcacao.hora_local`. O
+        # contentor corre em UTC e o site está em Europe/Lisbon: sem isto, no
+        # horário de Verão a agenda mostrava tudo uma hora mais cedo do que a
+        # pessoa marcou, e ninguém desconfiava porque parecia só «uma hora».
+        from orbit.marcacao import hora_local
+        d = hora_local(inicio)
         return {
             "titulo": titulo or "(sem título)",
             "hora": "" if dia_inteiro else d.strftime("%H:%M"),
@@ -154,10 +159,11 @@ def resumo(ano: int = None, mes: int = None) -> dict:
             "meet": "meet.orbit.stratechna.com" in (local or ""),
         }
 
+    from orbit.marcacao import hora_local
     ocupados = sorted({
-        datetime.datetime.fromtimestamp(l[1]).day
+        hora_local(l[1]).day
         for l in do_mes
-        if datetime.datetime.fromtimestamp(l[1]).month == mes
+        if hora_local(l[1]).month == mes
     })
 
     return {

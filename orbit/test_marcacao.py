@@ -152,6 +152,31 @@ class TestMarcacao(IntegrationTestCase):
         self.assertFalse(any(i["inicio"].startswith(inicio.strftime("%Y-%m-%dT%H:%M"))
                              for i in r["ocupado"]))
 
+    # ── fuso ───────────────────────────────────────────────────────────────
+
+    def test_hora_local_no_horario_de_verao(self):
+        """Uma reunião real das 11:00 de Lisboa não pode ser lida como 10:00.
+
+        O contentor do Frappe corre em UTC; se a conversão herdar o fuso do
+        contentor, no Verão tudo recua uma hora e oferecem-se horas que estão
+        ocupadas. Esta época é a do compromisso «Webgate: revisão trimestral»,
+        20-09-2026 às 11:00 de Lisboa.
+        """
+        self.assertEqual(marcacao.hora_local(1789898400),
+                         datetime.datetime(2026, 9, 20, 11, 0))
+
+    def test_hora_local_no_horario_de_inverno(self):
+        """Em Dezembro, Lisboa é UTC — e a conversão tem de dar o mesmo."""
+        # 2026-12-15 11:00 em Lisboa = 11:00 UTC
+        epoca = int(datetime.datetime(2026, 12, 15, 11, 0,
+                                      tzinfo=datetime.timezone.utc).timestamp())
+        self.assertEqual(marcacao.hora_local(epoca),
+                         datetime.datetime(2026, 12, 15, 11, 0))
+
+    def test_hora_local_devolve_sem_fuso_agarrado(self):
+        """Comparar uma data com fuso com outra sem ele levanta TypeError."""
+        self.assertIsNone(marcacao.hora_local(1789898400).tzinfo)
+
     # ── reagendar ──────────────────────────────────────────────────────────
 
     def test_reagendar_move_o_mesmo_evento(self):

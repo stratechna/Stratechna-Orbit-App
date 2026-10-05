@@ -38,6 +38,7 @@ correio de toda a gente.
 import datetime
 import hashlib
 import secrets
+import zoneinfo
 
 import frappe
 
@@ -45,6 +46,16 @@ from orbit import agenda
 
 # Quanto do futuro é que o feed carrega. Um ano chega para qualquer agenda e
 # evita que uma conta antiga arraste anos de histórico a cada leitura do SOGo.
+# **O fuso tem de ser dito, não herdado.** O contentor do Frappe corre em UTC
+# (verificado a 05-10-2026: `TZ` vazio, `date` dá UTC) mas o site está em
+# Europe/Lisbon — e é o site que manda, porque é nele que estão as horas de
+# trabalho e os `Event`. Converter um instante do SOGo com
+# `datetime.fromtimestamp()` dava a hora do contentor: no horário de Verão,
+# **uma hora mais cedo do que a verdadeira**. Uma reunião real das 11:00
+# aparecia ocupada às 10:00, e as 11:00 eram oferecidas a quem quisesse marcar
+# por cima dela.
+FUSO = zoneinfo.ZoneInfo("Europe/Lisbon")
+
 DIAS_DO_FEED = 365
 DIAS_PASSADOS_NO_FEED = 30
 
@@ -52,6 +63,17 @@ DIAS_PASSADOS_NO_FEED = 30
 # ═══════════════════════════════════════════════════════════════════════════
 # 1. Quando é que esta pessoa está ocupada
 # ═══════════════════════════════════════════════════════════════════════════
+
+def hora_local(epoca) -> datetime.datetime:
+    """Um instante do SOGo na hora de Lisboa, sem fuso agarrado.
+
+    Devolve-se «ingénuo» (sem `tzinfo`) de propósito: é assim que o Frappe
+    guarda os `Event` e é assim que o portal compara com o horário de
+    atendimento. Misturar datas com e sem fuso numa comparação levanta
+    `TypeError` — e numa que não levante, mente.
+    """
+    return datetime.datetime.fromtimestamp(epoca, FUSO).replace(tzinfo=None)
+
 
 def _ocupado_no_sogo(email: str, de: datetime.datetime, ate: datetime.datetime) -> list:
     """Os intervalos ocupados no calendário do webmail.
@@ -66,9 +88,14 @@ def _ocupado_no_sogo(email: str, de: datetime.datetime, ate: datetime.datetime) 
         ligacao = agenda._ligar()
     except Exception as e:
         frappe.log_error(f"Marcação: não liguei ao Mail: {e}", "Orbit Marcação")
-        return []
+        raise
     if ligacao is None:
-        return []
+        # **Não se devolve lista vazia.** Vazio quer dizer «não tem nada
+        # marcado», e é indistinguível de «não consegui ler» — com a diferença
+        # de que o segundo caso oferece todas as horas de alguém cuja agenda
+        # está cheia. Quem chama tem de saber que não sabe.
+        raise frappe.ValidationError(
+            "Não consegui ler a agenda do Mail — a disponibilidade não pode ser calculada.")
 
     try:
         with ligacao, ligacao.cursor() as cur:
@@ -78,7 +105,7 @@ def _ocupado_no_sogo(email: str, de: datetime.datetime, ate: datetime.datetime) 
             linhas = agenda._eventos(cur, tabela, int(de.timestamp()), int(ate.timestamp()))
     except Exception as e:
         frappe.log_error(f"Marcação: falhou a leitura do Mail: {e}", "Orbit Marcação")
-        return []
+        raise
     finally:
         try:
             ligacao.close()
@@ -89,10 +116,10 @@ def _ocupado_no_sogo(email: str, de: datetime.datetime, ate: datetime.datetime) 
     for titulo, inicio, fim, dia_inteiro, local in linhas:
         if not inicio:
             continue
-        i = datetime.datetime.fromtimestamp(inicio)
+        i = hora_local(inicio)
         # Sem fim marcado, assume-se uma hora: é melhor reservar a mais do que
         # oferecer uma hora que afinal está tomada.
-        f = datetime.datetime.fromtimestamp(fim) if fim else i + datetime.timedelta(hours=1)
+        f = hora_local(fim) if fim else i + datetime.timedelta(hours=1)
         if dia_inteiro:
             # O dia inteiro ocupa o dia inteiro. Não se adivinha o horário de
             # expediente aqui — quem o conhece é o portal.
