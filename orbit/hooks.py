@@ -38,6 +38,7 @@ extend_bootinfo = "orbit.apps.acrescentar_ao_boot"
 # o Social quando esta app foi instalada. Correr isto no fim de cada migração e
 # de cada instalação fecha esse buraco.
 _POR_DE_PE = ["orbit.marca.sincronizar", "orbit.marca.achatar",
+              "orbit.marca.calar_convites",
               "orbit.marca.repor_atalhos", "orbit.marca.repor_nomes"]
 # O consentimento de marketing no CRM (campos, painel e histórico) entra em todos
 # os tenants por aqui — é o que o torna transversal, e o que faz um tenant novo

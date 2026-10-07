@@ -326,3 +326,32 @@ def repor_nomes():
              f"{escondidos} ícones escondidos (idioma {idioma})")
     print(aviso)
     frappe.logger().info(aviso)
+
+
+# ── Convites do fabricante ──────────────────────────────────────────────────
+# O Frappe v16 pergunta uma vez a quem é System Manager se quer trocar a grelha
+# de ícones pela navegação nova — num diálogo em inglês, com link para a
+# documentação dele. Qual é o desenho do Orbit decidimo-lo nós; não é uma
+# pergunta para pôr ao cliente, e muito menos nessa língua.
+#
+# Desliga-se pela mesma bandeira que o «não voltes a perguntar» do próprio
+# Frappe grava (frappe/utils/new_navigation_nudge.py), e não por remendo ao
+# código dele. Fica aqui porque a bandeira é limpa de propósito em releases
+# futuras: sem isto, o convite voltava a aparecer ao fim de cada actualização.
+CONVITES_A_CALAR = ("skip_new_navigation_prompt",)
+
+
+def calar_convites():
+    from frappe.utils import cint
+
+    calados = 0
+    for bandeira in CONVITES_A_CALAR:
+        if not cint(frappe.defaults.get_global_default(bandeira)):
+            frappe.defaults.set_global_default(bandeira, 1)
+            calados += 1
+    frappe.db.commit()
+    frappe.clear_cache()
+
+    aviso = f"Orbit: convites do fabricante — {calados} calados"
+    print(aviso)
+    frappe.logger().info(aviso)
