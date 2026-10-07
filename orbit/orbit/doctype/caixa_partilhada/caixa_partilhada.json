@@ -1,0 +1,95 @@
+{
+ "doctype": "DocType",
+ "name": "Caixa Partilhada",
+ "module": "Orbit",
+ "custom": 0,
+ "engine": "InnoDB",
+ "description": "Uma caixa de correio que aparece na janela de mais do que uma pessoa. A caixa não é criada aqui — é escolhida de entre as que já existem.",
+ "fields": [
+  {
+   "fieldname": "caixa",
+   "fieldtype": "Data",
+   "label": "Caixa",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "description": "Escolhida de entre as caixas que existem. Criar caixas faz-se onde se criam todas.",
+   "idx": 1,
+   "options": "Email"
+  },
+  {
+   "fieldname": "rotulo",
+   "fieldtype": "Data",
+   "label": "Como aparece na janela de quem a vê",
+   "in_list_view": 1,
+   "idx": 2
+  },
+  {
+   "fieldname": "activa",
+   "fieldtype": "Check",
+   "label": "Activa",
+   "default": "1",
+   "in_list_view": 1,
+   "idx": 3
+  },
+  {
+   "fieldname": "sec_pessoas",
+   "fieldtype": "Section Break",
+   "label": "Quem a vê",
+   "idx": 4
+  },
+  {
+   "fieldname": "pessoas",
+   "fieldtype": "Table",
+   "label": "Pessoas",
+   "options": "Pessoa com Acesso a Caixa",
+   "idx": 5
+  },
+  {
+   "fieldname": "sec_prova",
+   "fieldtype": "Section Break",
+   "label": "Prova de que a caixa é sua",
+   "description": "Pedida sempre que se dá acesso a mais alguém. As permissões dizem quem pode administrar; isto diz de quem é a caixa — partilhar uma caixa de departamento é administração, partilhar a caixa pessoal de alguém é outra coisa.",
+   "idx": 6
+  },
+  {
+   "fieldname": "senha_original",
+   "fieldtype": "Password",
+   "label": "Palavra-passe da caixa",
+   "description": "A senha com que se entra nesta caixa. Não é guardada: é confirmada e esquecida.",
+   "idx": 7
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Gestor de Correio",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1,
+ "naming_rule": "By fieldname",
+ "autoname": "field:caixa",
+ "title_field": "caixa",
+ "states": [],
+ "links": [],
+ "creation": "2026-10-07 16:00:00.000000",
+ "modified": "2026-10-07 16:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "idx": 0
+}

@@ -44,7 +44,9 @@ _MARKETING = ["orbit.marketing.consentimento.garantir", "orbit.marketing.menu.ga
 # `Event` e o segredo do feed no `User`. Pela mesma razão que o consentimento:
 # um tenant novo tem de nascer com eles.
 _MARCACAO = ["orbit.marcacao.garantir"]
-after_migrate = _POR_DE_PE + _MARKETING + _MARCACAO
+_CAIXAS = ["orbit.caixas.garantir"]
+
+after_migrate = _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS
 after_install = _POR_DE_PE + _MARKETING + _MARCACAO
 
 # Email marketing: a saída das campanhas corre ao minuto (o ritmo por hora
