@@ -48,11 +48,17 @@
 			// perderam —, mas o sítio estava errado.
 			// O Marketing entrou a 03-10-2026, ao lado do Social: as duas são
 			// a forma de o cliente falar com quem já o conhece.
+			// A linha que divide o RH entre este grupo e «Gestão» é a mesma que
+			// divide os dois grupos: aqui ficam as PESSOAS (quem entra, quem
+			// falta, quem faz turnos, como corre o trabalho de cada um); o
+			// dinheiro que delas decorre — salários, despesas, impostos e
+			// benefícios — é obrigação da casa e vai para «Gestão», ao lado da
+			// facturação e dos pagamentos. Quem trata de uma coisa raramente
+			// trata da outra.
 			itens: ["Frappe CRM", "Helpdesk", "Mail", "Docs", "Sign", "Events",
 				"Social", "Marketing", "Meet", "Chat", "Wiki", "Projects",
-				"Frappe HR", "HR Setup", "Recruitment", "Leaves", "Payroll",
-				"Expenses", "Performance", "Tenure", "Shift & Attendance",
-				"Tax & Benefits"],
+				"Frappe HR", "HR Setup", "Recruitment", "Leaves",
+				"Performance", "Tenure", "Shift & Attendance"],
 		},
 		{
 			linha: 1,
@@ -60,7 +66,8 @@
 			nota: "Dinheiro, contratos e obrigações",
 			itens: ["Invoicing", "Payments", "Banking", "Taxes", "Budget",
 				"Financial Reports", "Accounts Setup", "Account Setup", "Subscription",
-				"Share Management", "Accounting"],
+				"Share Management", "Accounting",
+				"Payroll", "Expenses", "Tax & Benefits"],
 		},
 		{
 			linha: 2,
