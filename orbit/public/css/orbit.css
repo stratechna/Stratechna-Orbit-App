@@ -901,3 +901,75 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 		transition: none;
 	}
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   AS CORES DA MARCA
+   ══════════════════════════════════════════════════════════════════════════
+
+   Vermelho #b20009 para a ACÇÃO, ardósia #1a2a33 para a ESTRUTURA. É a mesma
+   regra do site, das peças sociais e do webmail — e é uma regra, não uma
+   paleta: o vermelho marca o que se carrega, e por isso não pode estar em mais
+   nada. Se tudo for vermelho, nada é.
+
+   **Os azuis de informação ficam como estão, de propósito.** São eles que
+   distinguem um aviso de um erro de uma confirmação; pintá-los da cor da marca
+   fazia o Orbit ficar bonito e ilegível.
+
+   Isto entra pelo `app_include_css` (secretária) e pelo `web_include_css`
+   (entrada e páginas públicas). Nenhum ficheiro do Frappe é alterado. */
+
+:root {
+	--orbit-accao: #b20009;
+	--orbit-accao-escura: #8c0007;
+	--orbit-estrutura: #1a2a33;
+
+	--primary: var(--orbit-accao);
+	--primary-color: var(--orbit-accao);
+	--btn-primary: var(--orbit-accao);
+	--heading-color: var(--orbit-estrutura);
+	--text-color: #22303d;
+}
+
+/* Os botões da secretária. */
+.btn-primary,
+.btn-primary:not(:disabled):not(.disabled) {
+	background-color: var(--orbit-accao) !important;
+	border-color: var(--orbit-accao) !important;
+	color: #fff !important;
+}
+.btn-primary:hover,
+.btn-primary:not(:disabled):not(.disabled):hover {
+	background-color: var(--orbit-accao-escura) !important;
+	border-color: var(--orbit-accao-escura) !important;
+}
+
+/* Os botões do desenho novo (Espresso), usados na entrada e nos ecrãs
+   recentes.
+   **Pinta-se o `background` e não a ficha `--bt-solid-bg`.** A ficha é
+   redefinida dentro do próprio `.es-button` e sobrepõe-se ao `:root`; mudá-la
+   de fora não pegava, e o botão continuava preto sem dar sinal nenhum. */
+.es-button[data-variant="solid"] {
+	background: var(--orbit-accao) !important;
+	border-color: var(--orbit-accao) !important;
+	color: #fff !important;
+}
+.es-button[data-variant="solid"]:hover {
+	background: var(--orbit-accao-escura) !important;
+}
+
+/* O separador activo e o que está seleccionado seguem a acção. */
+.nav-link.active,
+.list-row-col .level-item.active,
+.sidebar-item.selected > .sidebar-item-control + a,
+.widget.links-widget-box .link-item:hover {
+	color: var(--orbit-accao);
+}
+
+/* Modo escuro: o vermelho sobre fundo escuro precisa de ser mais claro, ou
+   lê-se como castanho. */
+[data-theme="dark"] {
+	--orbit-accao: #d4151f;
+	--orbit-accao-escura: #b20009;
+	--heading-color: #e8edf1;
+	--text-color: #c8d0d8;
+}
