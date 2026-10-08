@@ -198,7 +198,7 @@ def ocupado(anfitriao: str, de: str, ate: str) -> dict:
 @frappe.whitelist()
 def criar(anfitriao: str, assunto: str, inicio: str, fim: str,
           descricao: str = None, local: str = None, convidado: str = None,
-          referencia: str = None) -> dict:
+          referencia: str = None, convidados=None) -> dict:
     """Cria o compromisso na agenda do anfitrião.
 
     O `Event` fica **com o anfitrião por dono** — é isso, e não um campo de
@@ -208,6 +208,14 @@ def criar(anfitriao: str, assunto: str, inicio: str, fim: str,
     com a mesma referência não crie um segundo compromisso: o portal repete
     pedidos quando a rede falha, e sem isto repetir era duplicar.
     """
+    # Pelo HTTP uma lista chega como texto JSON; por chamada interna chega
+    # lista. Normaliza-se aqui, que é o único sítio por onde ambas passam.
+    if isinstance(convidados, str):
+        try:
+            convidados = frappe.parse_json(convidados)
+        except Exception:
+            convidados = [c.strip() for c in convidados.split(",") if c.strip()]
+
     email = frappe.db.get_value("User", anfitriao, "email")
     if not email:
         frappe.throw(f"Não há utilizador «{anfitriao}» neste Orbit.")
@@ -237,8 +245,16 @@ def criar(anfitriao: str, assunto: str, inicio: str, fim: str,
     # Corrige-se depois da inserção, que é o que faz o evento ser **dele**.
     frappe.db.set_value("Event", e.name, "owner", email, update_modified=False)
 
-    if convidado:
-        _juntar_convidado(e.name, convidado)
+    # Quem marcou e quem mais foi convidado entram todos no mesmo compromisso.
+    # O `convidado` (singular) fica por compatibilidade: é o que o portal manda
+    # desde o princípio, e partir chamadas antigas por arrumação não compensa.
+    vistos = set()
+    for quem in [convidado] + list(convidados or []):
+        quem = (quem or "").strip().lower()
+        if not quem or quem in vistos:
+            continue
+        vistos.add(quem)
+        _juntar_convidado(e.name, quem)
 
     frappe.db.commit()
     return {"ok": True, "evento": e.name}
