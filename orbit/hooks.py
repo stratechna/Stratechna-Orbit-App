@@ -66,3 +66,10 @@ scheduler_events = {
 # Esta app não tem nada que valha a pena mostrar no ecrã de apps: é marca e
 # extensões, não é um módulo de trabalho.
 add_to_apps_screen = []
+
+
+# Contas só de leitura (demonstrações): inerte sem `orbit_funcao_so_leitura` no site_config — ver so_leitura.py
+doc_events = {
+    "*": {e: "orbit.so_leitura.guarda" for e in
+          ("before_insert", "validate", "on_trash", "before_submit", "before_cancel", "before_update_after_submit")},
+}
