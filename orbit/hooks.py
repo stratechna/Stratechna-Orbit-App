@@ -72,4 +72,6 @@ add_to_apps_screen = []
 doc_events = {
     "*": {e: "orbit.so_leitura.guarda" for e in
           ("before_insert", "validate", "on_trash", "before_submit", "before_cancel", "before_update_after_submit")},
+    # 16-10-2026: utilizadores contratados (orbit_utilizadores_max no site_config, escrito pelo portal)
+    "User": {"validate": "orbit.utilizadores.guarda"},
 }
