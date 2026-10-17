@@ -591,3 +591,26 @@
 		});
 	}
 })();
+
+// Entrada única (17-10-2026): ao sair do desk vai-se directo ao ecrã de entrada do portal (o único), sem passar
+// pela página de entrada do Orbit. A sessão central já foi terminada no servidor (entrada_unica.ao_sair).
+(function () {
+	function ligar() {
+		if (!window.frappe || !frappe.app || frappe.app.__orbit_saida) { return false; }
+		var original = frappe.app.redirect_to_login && frappe.app.redirect_to_login.bind(frappe.app);
+		frappe.app.redirect_to_login = function () {
+			fetch("/api/method/orbit.entrada_unica.automatica", { credentials: "same-origin" })
+				.then(function (r) { return r.json(); })
+				.then(function (d) {
+					if (d.message && d.message.auto) { window.location.replace("https://portal.stratechna.com/login"); }
+					else if (original) { original(); }
+				})
+				.catch(function () { if (original) { original(); } });
+		};
+		frappe.app.__orbit_saida = true;
+		return true;
+	}
+	if (!ligar()) {
+		var n = 0, t = setInterval(function () { if (ligar() || ++n > 50) { clearInterval(t); } }, 200);
+	}
+})();
