@@ -51,8 +51,10 @@ _MARCACAO = ["orbit.marcacao.garantir"]
 _CAIXAS = ["orbit.caixas.garantir"]
 # 17-10-2026: perfis «Orbit · …», equipa Triagem do Desk e o departamento da pessoa (orbit/organizacao.py)
 _ORGANIZACAO = ["orbit.organizacao.garantir"]
+# 17-10-2026: campos de correspondência com o Zoho (zoho_id, crm_account_id…) e a conversão de leads sem negócio
+_MIGRACAO = ["orbit.migracao_zoho.garantir"]
 
-after_migrate = _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO
+after_migrate = _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO
 after_install = _POR_DE_PE + _MARKETING + _MARCACAO + _ORGANIZACAO
 
 # Email marketing: a saída das campanhas corre ao minuto (o ritmo por hora
