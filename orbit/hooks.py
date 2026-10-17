@@ -49,9 +49,11 @@ _MARKETING = ["orbit.marketing.consentimento.garantir", "orbit.marketing.menu.ga
 # um tenant novo tem de nascer com eles.
 _MARCACAO = ["orbit.marcacao.garantir"]
 _CAIXAS = ["orbit.caixas.garantir"]
+# 17-10-2026: perfis «Orbit · …», equipa Triagem do Desk e o departamento da pessoa (orbit/organizacao.py)
+_ORGANIZACAO = ["orbit.organizacao.garantir"]
 
-after_migrate = _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS
-after_install = _POR_DE_PE + _MARKETING + _MARCACAO
+after_migrate = _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO
+after_install = _POR_DE_PE + _MARKETING + _MARCACAO + _ORGANIZACAO
 
 # Email marketing: a saída das campanhas corre ao minuto (o ritmo por hora
 # reparte-se em sessenta lotes), as contagens de aberturas e cliques de hora a
@@ -74,4 +76,7 @@ doc_events = {
           ("before_insert", "validate", "on_trash", "before_submit", "before_cancel", "before_update_after_submit")},
     # 16-10-2026: utilizadores contratados (orbit_utilizadores_max no site_config, escrito pelo portal)
     "User": {"validate": "orbit.utilizadores.guarda"},
+    # 17-10-2026: cada bilhete nasce na equipa da sua marca (formulário, destinatário) ou em Triagem
+    "HD Ticket": {"before_insert": "orbit.organizacao.ticket_equipa"},
+    "Communication": {"after_insert": "orbit.organizacao.ticket_por_destinatario"},
 }
