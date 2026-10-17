@@ -41,8 +41,31 @@ PERFIS = {
 }
 
 
+def _criar_equipa(nome: str) -> bool:
+    """O Helpdesk não aceita uma equipa sem pessoas (`users` obrigatório): nasce com os agentes activos,
+    e o orbit_isolamento.py acerta depois quem fica. Sem agentes, fica para quando os houver."""
+    if frappe.db.exists("HD Team", nome) or not frappe.db.exists("DocType", "HD Team"):
+        return False
+    agentes = frappe.get_all("HD Agent", filters={"is_active": 1}, pluck="name") if \
+        frappe.get_meta("HD Agent").has_field("is_active") else frappe.get_all("HD Agent", pluck="name")
+    if not agentes:
+        return False
+    frappe.get_doc({"doctype": "HD Team", "team_name": nome, "users": [{"user": a} for a in agentes]}).insert(
+        ignore_permissions=True)
+    return True
+
+
 def garantir() -> None:
-    """after_migrate: perfis base, equipa Triagem e o campo de departamento — em todos os tenants."""
+    """after_migrate: perfis base, equipa Triagem e o campo de departamento — em todos os tenants.
+    Nunca faz falhar a migração: um problema aqui fica no Error Log e o resto da migração segue."""
+    try:
+        _garantir()
+    except Exception:
+        frappe.db.rollback()
+        frappe.log_error(title="orbit.organizacao.garantir")
+
+
+def _garantir() -> None:
     existentes = set(frappe.get_all("Role", pluck="name"))
     for nome, funcoes in PERFIS.items():
         rp = PREFIXO + nome
@@ -52,8 +75,7 @@ def garantir() -> None:
         if sorted(r.role for r in doc.get("roles") or []) != sorted(quer):
             doc.set("roles", [{"role": f} for f in quer])
             doc.save(ignore_permissions=True)
-    if frappe.db.exists("DocType", "HD Team") and not frappe.db.exists("HD Team", TRIAGEM):
-        frappe.get_doc({"doctype": "HD Team", "team_name": TRIAGEM}).insert(ignore_permissions=True)
+    _criar_equipa(TRIAGEM)
     if not frappe.db.exists("Custom Field", {"dt": "User", "fieldname": "orbit_departamento"}):
         from frappe.custom.doctype.custom_field.custom_field import create_custom_field
         create_custom_field("User", {"fieldname": "orbit_departamento", "label": "Departamento",
@@ -95,9 +117,8 @@ def configurar_desk(dominios: dict, marcas: list, reconheciveis: list | None = N
             t.append("fields", {"fieldname": "orbit_marca", "required": 1})
             t.save(ignore_permissions=True)
             feito.append("Marca obrigatória no formulário de abertura")
-    for m in marcas:
-        if not frappe.db.exists("HD Team", m):
-            frappe.get_doc({"doctype": "HD Team", "team_name": m}).insert(ignore_permissions=True)
+    for m in list(marcas) + [TRIAGEM]:
+        if _criar_equipa(m):
             feito.append(f"equipa {m}")
     return feito or ["Desk: já estava"]
 
