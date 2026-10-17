@@ -52,7 +52,7 @@ _CAIXAS = ["orbit.caixas.garantir"]
 # 17-10-2026: perfis «Orbit · …», equipa Triagem do Desk e o departamento da pessoa (orbit/organizacao.py)
 _ORGANIZACAO = ["orbit.organizacao.garantir"]
 # 17-10-2026: campos de correspondência com o Zoho (zoho_id, crm_account_id…) e a conversão de leads sem negócio
-_MIGRACAO = ["orbit.migracao_zoho.garantir"]
+_MIGRACAO = ["orbit.migracao_zoho.garantir", "orbit.portal.garantir"]
 
 after_migrate = _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO
 after_install = _POR_DE_PE + _MARKETING + _MARCACAO + _ORGANIZACAO
@@ -81,4 +81,6 @@ doc_events = {
     # 17-10-2026: cada bilhete nasce na equipa da sua marca (formulário, destinatário) ou em Triagem
     "HD Ticket": {"before_insert": "orbit.organizacao.ticket_equipa"},
     "Communication": {"after_insert": "orbit.organizacao.ticket_por_destinatario"},
+    # 17-10-2026 (corte do Zoho): o tempo registado no Orbit vai para o livro de horas do portal
+    "Timesheet": {"on_submit": "orbit.portal.tempo_submetido", "on_cancel": "orbit.portal.tempo_cancelado"},
 }
