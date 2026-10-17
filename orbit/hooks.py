@@ -20,6 +20,11 @@ app_include_css = "/assets/orbit/css/orbit.css?v=21"
 # As cores tambem nas paginas publicas — a entrada e a primeira coisa que
 # alguem ve, e e servida pelo lado do site e nao pela secretaria.
 web_include_css = "/assets/orbit/css/orbit.css?v=21"
+# 17-10-2026: na página de entrada, seguir para o portal (entrada única) quando o tenant o tem ligado
+web_include_js = "/assets/orbit/js/entrada.js?v=1"
+
+# Sair do Orbit sai também do portal e do webmail (entrada_unica.ao_sair)
+on_logout = "orbit.entrada_unica.ao_sair"
 
 # O ecrã precisa de saber, no arranque, que apps é que este tenant tem — para
 # pintar a cinzento as que não tem em vez de as esconder. Vai no boot e não numa
@@ -54,7 +59,10 @@ _ORGANIZACAO = ["orbit.organizacao.garantir"]
 # 17-10-2026: campos de correspondência com o Zoho (zoho_id, crm_account_id…) e a conversão de leads sem negócio
 _MIGRACAO = ["orbit.migracao_zoho.garantir", "orbit.portal.garantir", "orbit.remetentes.garantir"]
 
-after_migrate = _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO
+# 17-10-2026: entrada única — «Entrar com a Stratechna» (OpenID Connect do portal), ver entrada_unica.py
+_ENTRADA = ["orbit.entrada_unica.garantir"]
+
+after_migrate = _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA
 after_install = _POR_DE_PE + _MARKETING + _MARCACAO + _ORGANIZACAO + ["orbit.remetentes.garantir"]
 
 # Email marketing: a saída das campanhas corre ao minuto (o ritmo por hora
