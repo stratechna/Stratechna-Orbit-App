@@ -1,10 +1,8 @@
 // Entrada única (17-10-2026): um só ecrã de entrada — o do portal. Com `orbit_entrada_stratechna_auto` ligado
 // no tenant, qualquer página de entrada do Orbit (/login ou a raiz, que mostra o mesmo formulário) segue logo
 // para o portal; o formulário nem chega a ver-se. Quem já tem sessão no portal entra sem escrever nada.
-// `?senha=1` mostra o formulário de sempre (recurso de emergência, durante a transição).
+// Sem porta alternativa por palavra-passe (decisão do Vítor, 17-10-2026: «não faz sentido, tira»).
 (function () {
-  var q = new URLSearchParams(location.search);
-  if (q.has("senha")) return;
   function botao() { return document.querySelector("a.btn-stratechna"); }
   function seguir() {
     var a = botao();
