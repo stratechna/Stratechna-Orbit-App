@@ -1031,3 +1031,128 @@ def somar_orcamento(id_projeto: str, horas: float):
     frappe.db.set_value("Project", n, "horas_orcamento", novo)
     frappe.db.commit()
     return {"projeto": n, "horas_orcamento": novo}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Webmail ↔ CRM (17-10-2026): o painel do Orbit CRM ao lado do email, à maneira do Zoho
+# ═══════════════════════════════════════════════════════════════════════════
+ESTADOS_FECHADOS = ("Won", "Lost")
+
+
+def _url_crm(tipo: str, nome: str) -> str:
+    from urllib.parse import quote
+    return f"{frappe.utils.get_url()}/crm/{tipo}/{quote(nome)}"
+
+
+@frappe.whitelist()
+def perfil_remetente(email: str):
+    """Quem é este endereço no CRM: contacto, organização, lead, negócios em curso, bilhetes abertos."""
+    _so_portal()
+    e = (email or "").strip().lower()
+    if "@" not in e:
+        return {"encontrado": False}
+    out = {"email": e, "encontrado": False, "contacto": None, "organizacao": None, "lead": None,
+           "negocios": [], "bilhetes": []}
+    cn = (frappe.get_all("Contact Email", filters={"email_id": e, "parenttype": "Contact"}, pluck="parent", limit=1)
+          or frappe.get_all("Contact", filters={"email_id": e}, pluck="name", limit=1))
+    org = None
+    if cn:
+        c = frappe.get_doc("Contact", cn[0])
+        org = _org_do_contacto(c)
+        out["contacto"] = {"nome": c.full_name or c.name, "cargo": c.designation, "telefone": c.mobile_no or c.phone,
+                           "url": _url_crm("contacts", c.name)}
+    else:
+        # sem contacto: a organização pelo domínio do email (se for de empresa e único)
+        dom = e.split("@")[1]
+        if dom not in ("gmail.com", "hotmail.com", "outlook.com", "sapo.pt", "icloud.com", "yahoo.com", "live.com", "outlook.pt"):
+            orgs = frappe.get_all("CRM Organization", filters={"website": ["like", f"%{dom}%"]}, pluck="name", limit=2)
+            org = orgs[0] if len(orgs) == 1 else None
+    if org:
+        o = frappe.db.get_value("CRM Organization", org, ["name", "organization_name", "crm_account_id", "estado_conta",
+                                                          "tipo_conta", "marca", "owner"], as_dict=True)
+        out["organizacao"] = {"nome": o.organization_name, "crm_account_id": o.crm_account_id, "estado": o.estado_conta,
+                              "tipo": o.tipo_conta, "marca": o.marca, "url": _url_crm("organizations", o.name)}
+        for d in frappe.get_all("CRM Deal", filters={"organization": org, "status": ["not in", ESTADOS_FECHADOS]},
+                                fields=["name", "titulo", "status", "deal_value", "deal_owner"], order_by="modified desc", limit=5):
+            out["negocios"].append({"id": d.name, "titulo": d.titulo or d.name, "estado": d.status, "valor": flt(d.deal_value),
+                                    "dono": _nome_utilizador(d.deal_owner), "url": _url_crm("deals", d.name)})
+        cust = frappe.db.get_value("HD Customer", {"crm_account_id": o.crm_account_id}) if o.crm_account_id else None
+        fb = {"status": ["in", ["Open", "Replied"]]}
+        filtros = [dict(fb, customer=cust)] if cust else []
+        filtros.append(dict(fb, raised_by=e))
+        vistos = set()
+        for f in filtros:
+            for t in frappe.get_all("HD Ticket", filters=f, fields=["name", "subject", "status", "agent_group"], limit=5):
+                if t.name not in vistos:
+                    vistos.add(t.name)
+                    out["bilhetes"].append({"id": t.name, "assunto": t.subject, "estado": t.status, "equipa": t.agent_group,
+                                            "url": f"{frappe.utils.get_url()}/helpdesk/tickets/{t.name}"})
+    lead = frappe.get_all("CRM Lead", filters={"email": e, "converted": 0}, fields=["name", "lead_name", "status", "lead_owner"],
+                          order_by="modified desc", limit=1) if frappe.get_meta("CRM Lead").has_field("converted") else \
+        frappe.get_all("CRM Lead", filters={"email": e}, fields=["name", "lead_name", "status", "lead_owner"], order_by="modified desc", limit=1)
+    if lead:
+        l = lead[0]
+        out["lead"] = {"id": l.name, "nome": l.lead_name, "estado": l.status, "dono": _nome_utilizador(l.lead_owner),
+                       "url": _url_crm("leads", l.name)}
+    out["encontrado"] = bool(out["contacto"] or out["organizacao"] or out["lead"])
+    return out
+
+
+@frappe.whitelist()
+def associar_email(email: str, assunto: str = None, data: str = None, resumo: str = None, criar: str = None,
+                   nome: str = None, por: str = None):
+    """Guarda o email como nota no registo do remetente (negócio em curso › lead › contacto).
+    `criar` = "lead" | "contacto" cria o registo quando ainda não existe."""
+    _so_portal()
+    p = perfil_remetente(email)
+    alvo = None
+    if p.get("negocios"):
+        alvo = ("CRM Deal", p["negocios"][0]["id"])
+    elif p.get("lead"):
+        alvo = ("CRM Lead", p["lead"]["id"])
+    if not alvo and criar == "lead":
+        partes = (nome or email.split("@")[0]).strip().split(None, 1)
+        r = criar_lead({"First_Name": partes[0], "Last_Name": partes[1] if len(partes) > 1 else None, "Email": email,
+                        "Lead_Source": "Email"})
+        alvo = ("CRM Lead", r["id"])
+    elif not alvo and criar == "contacto":
+        partes = (nome or email.split("@")[0]).strip().split(None, 1)
+        r = criar_contacto({"First_Name": partes[0], "Last_Name": partes[1] if len(partes) > 1 else None, "Email": email})
+        alvo = ("Contact", frappe.db.get_value("Contact", {"zoho_id": r["id"]}) or r.get("_orbit") or r["id"])
+    if not alvo and p.get("contacto"):
+        cn = frappe.get_all("Contact", filters={"email_id": email.strip().lower()}, pluck="name", limit=1)
+        alvo = ("Contact", cn[0]) if cn else None
+    if not alvo:
+        return {"ok": False, "erro": "sem registo no CRM — crie primeiro a lead ou o contacto"}
+    corpo = (f"<p><b>Email</b> de {frappe.utils.escape_html(email)}"
+             + (f" — {frappe.utils.escape_html(data)}" if data else "") + "</p>"
+             + (f"<p>{frappe.utils.escape_html(resumo)}</p>" if resumo else ""))
+    frappe.get_doc({"doctype": "FCRM Note", "title": (f"Email: {assunto}" if assunto else "Email")[:140], "content": corpo,
+                    "reference_doctype": alvo[0], "reference_docname": alvo[1]}).insert(ignore_permissions=True)
+    frappe.db.commit()
+    return {"ok": True, "doctype": alvo[0], "nome": alvo[1]}
+
+
+@frappe.whitelist()
+def definir_dono(email: str, utilizador: str, assunto: str = None):
+    """O responsável pelo email passa a dono do negócio em curso (ou da lead) do remetente."""
+    _so_portal()
+    if not frappe.db.get_value("User", utilizador, "enabled"):
+        return {"ok": False, "erro": "utilizador desconhecido no Orbit"}
+    p = perfil_remetente(email)
+    if p.get("negocios"):
+        dt, nome, campo = "CRM Deal", p["negocios"][0]["id"], "deal_owner"
+    elif p.get("lead"):
+        dt, nome, campo = "CRM Lead", p["lead"]["id"], "lead_owner"
+    else:
+        return {"ok": False, "erro": "o remetente não tem negócio em curso nem lead"}
+    doc = frappe.get_doc(dt, nome)
+    doc.set(campo, utilizador)
+    doc.flags.ignore_permissions = True
+    doc.save()
+    frappe.get_doc({"doctype": "FCRM Note", "title": "Responsável definido a partir do email",
+                    "content": f"<p>{frappe.utils.escape_html(_nome_utilizador(utilizador) or utilizador)} passou a responsável"
+                               + (f" — a partir do email «{frappe.utils.escape_html(assunto)}»" if assunto else "") + ".</p>",
+                    "reference_doctype": dt, "reference_docname": nome}).insert(ignore_permissions=True)
+    frappe.db.commit()
+    return {"ok": True, "doctype": dt, "nome": nome}
