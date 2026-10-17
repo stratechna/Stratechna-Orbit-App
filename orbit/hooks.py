@@ -21,7 +21,7 @@ app_include_css = "/assets/orbit/css/orbit.css?v=21"
 # alguem ve, e e servida pelo lado do site e nao pela secretaria.
 web_include_css = "/assets/orbit/css/orbit.css?v=21"
 # 17-10-2026: na página de entrada, seguir para o portal (entrada única) quando o tenant o tem ligado
-web_include_js = "/assets/orbit/js/entrada.js?v=1"
+web_include_js = "/assets/orbit/js/entrada.js?v=2"
 
 # Sair do Orbit sai também do portal e do webmail (entrada_unica.ao_sair)
 on_logout = "orbit.entrada_unica.ao_sair"
