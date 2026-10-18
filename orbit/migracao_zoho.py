@@ -13,6 +13,7 @@ O CRM do Frappe já converte um lead em negócio (cria a organização e o conta
 SEM negócio — em contacto e conta. Isso não existe no Frappe: `converter_sem_negocio` faz essa conversão.
 """
 import frappe
+from frappe import _
 
 UNICO = {"unique": 1, "read_only": 1, "no_copy": 1}
 
@@ -123,7 +124,7 @@ def converter_sem_negocio(lead: str) -> dict:
     doc = frappe.get_doc("CRM Lead", lead)
     doc.check_permission("write")
     if doc.converted:
-        frappe.throw("Este lead já foi convertido.")
+        frappe.throw(_("Este lead já foi convertido."))
     contacto = doc.create_contact(throw=False)
     organizacao = doc.create_organization()
     if organizacao and contacto:

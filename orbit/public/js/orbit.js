@@ -115,12 +115,12 @@
 	function saudacao() {
 		const h = new Date().getHours();
 		const periodo = h >= 6 && h < 13 ? "manha" : h >= 13 && h < 20 ? "tarde" : "noite";
-		const ola = { manha: "Bom dia", tarde: "Boa tarde", noite: "Boa noite" }[periodo];
+		const ola = __({ manha: "Bom dia", tarde: "Boa tarde", noite: "Boa noite" }[periodo]);
 		const lista = FRASES[periodo];
 		const nome = (frappe.boot && frappe.boot.user && frappe.boot.user.first_name) || "";
 		return {
 			titulo: nome ? `${ola}, ${nome}.` : `${ola}.`,
-			frase: lista[Math.floor(Math.random() * lista.length)],
+			frase: __(lista[Math.floor(Math.random() * lista.length)]),
 		};
 	}
 
@@ -154,8 +154,15 @@
 	// enchem. Sem isso, a faixa de cima crescia quando a resposta chegasse e o
 	// ecrã inteiro dava um salto — a mesma coisa que já se tinha notado quando a
 	// grelha substitui a do Frappe.
-	const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-		"Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+	// 18-10-2026: meses e dias na língua da pessoa (Intl), não escritos à mão em português.
+	const LINGUA = (frappe.boot && frappe.boot.lang) || "pt";
+	const LOCALE = { pt: "pt-PT", en: "en-GB", es: "es-ES", fr: "fr-FR" }[LINGUA.slice(0, 2)] || LINGUA;
+	const maiuscula = (t) => t.charAt(0).toLocaleUpperCase(LOCALE) + t.slice(1);
+	const MESES = Array.from({ length: 12 }, (_, m) =>
+		maiuscula(new Intl.DateTimeFormat(LOCALE, { month: "long" }).format(new Date(2026, m, 1))));
+	// 05-01-2026 é uma segunda-feira: daí a semana começar à segunda.
+	const DIAS = Array.from({ length: 7 }, (_, d) =>
+		maiuscula(new Intl.DateTimeFormat(LOCALE, { weekday: "narrow" }).format(new Date(2026, 0, 5 + d))));
 
 	function quadroMes() {
 		const el = document.createElement("div");
@@ -168,7 +175,7 @@
 			`<div class="orbit-mes-grelha"></div>`;
 
 		const g = el.querySelector(".orbit-mes-grelha");
-		for (const d of ["S", "T", "Q", "Q", "S", "S", "D"]) {
+		for (const d of DIAS) {
 			const c = document.createElement("span");
 			c.className = "orbit-mes-dia orbit-mes-dia--cab";
 			c.textContent = d;
@@ -329,8 +336,8 @@
 			`<span class="orbit-bloco-risco"></span>` +
 			`<span class="orbit-bloco-nota"></span>` +
 			`</div>`;
-		sec.querySelector(".orbit-bloco-titulo").textContent = g.titulo;
-		sec.querySelector(".orbit-bloco-nota").textContent = g.nota || "";
+		sec.querySelector(".orbit-bloco-titulo").textContent = __(g.titulo);
+		sec.querySelector(".orbit-bloco-nota").textContent = g.nota ? __(g.nota) : "";
 
 		const lista = document.createElement("div");
 		lista.className = "orbit-lista";

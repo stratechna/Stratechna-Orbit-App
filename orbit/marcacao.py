@@ -41,6 +41,7 @@ import secrets
 import zoneinfo
 
 import frappe
+from frappe import _
 
 from orbit import agenda
 
@@ -182,9 +183,9 @@ def ocupado(anfitriao: str, de: str, ate: str) -> dict:
     inicio = frappe.utils.get_datetime(de)
     fim = frappe.utils.get_datetime(ate)
     if fim <= inicio:
-        frappe.throw("O fim tem de ser depois do início.")
+        frappe.throw(_("O fim tem de ser depois do início."))
     if (fim - inicio).days > 120:
-        frappe.throw("Janela demasiado larga: no máximo 120 dias de cada vez.")
+        frappe.throw(_("Janela demasiado larga: no máximo 120 dias de cada vez."))
 
     email = frappe.db.get_value("User", anfitriao, "email") or anfitriao
     tudo = _ocupado_no_sogo(email, inicio, fim) + _ocupado_no_frappe(email, inicio, fim)
@@ -218,7 +219,7 @@ def criar(anfitriao: str, assunto: str, inicio: str, fim: str,
 
     email = frappe.db.get_value("User", anfitriao, "email")
     if not email:
-        frappe.throw(f"Não há utilizador «{anfitriao}» neste Orbit.")
+        frappe.throw(_("Não há utilizador «{0}» neste Orbit.").format(anfitriao))
 
     if referencia:
         ja = frappe.db.get_value("Event", {"custom_referencia_marcacao": referencia}, "name")
@@ -450,7 +451,7 @@ def endereco_do_feed(anfitriao: str = None) -> dict:
     """O endereço a colar no webmail, criando o segredo na primeira vez."""
     email = frappe.db.get_value("User", anfitriao or frappe.session.user, "email")
     if not email:
-        frappe.throw("Utilizador desconhecido.")
+        frappe.throw(_("Utilizador desconhecido."))
     segredo = _segredo_do_feed(email, criar_se_faltar=True)
     base = frappe.utils.get_url()
     return {"url": f"{base}/api/method/orbit.marcacao.feed"

@@ -13,6 +13,7 @@ consentimento que já não existe.
 import base64
 
 import frappe
+from frappe import _
 from frappe.utils import now_datetime, today
 
 from orbit.marketing import mensagem, modelos
@@ -48,14 +49,14 @@ def aberto(t: str = ""):
 def ir(t: str = "", i: int = 0):
     e = _envio(t)
     if not e:
-        frappe.throw("Ligação desconhecida", frappe.DoesNotExistError)
+        frappe.throw(_("Ligação desconhecida"), frappe.DoesNotExistError)
     import json
     c = frappe.get_doc("Automacao de Marketing", e.automacao) if e.get("automacao") else \
         frappe.get_doc("Campanha de Marketing", e.campanha)
     ligacoes = modelos.ligacoes(mensagem.conteudo(c, json.loads(e.dados) if e.get("dados") else None))
     i = int(i)
     if not 0 <= i < len(ligacoes):
-        frappe.throw("Ligação desconhecida", frappe.DoesNotExistError)
+        frappe.throw(_("Ligação desconhecida"), frappe.DoesNotExistError)
     agora = now_datetime()
     frappe.db.set_value("Envio de Marketing", e.name,
                         {"cliques": (e.cliques or 0) + 1, "clicado_em": e.clicado_em or agora,

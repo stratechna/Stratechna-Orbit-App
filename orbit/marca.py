@@ -295,20 +295,11 @@ ESCONDER = ("Framework", "Frappe Framework", "Build")
 
 
 def repor_nomes():
+    # 18-10-2026: os nomes já não se gravam como `Translation` (só existiam na língua do sistema, e quem
+    # estava em en/es/fr via «Helpdesk» e «Frappe CRM»). Vivem em orbit/translations/{pt,en,es,fr}.csv,
+    # gerados a partir de NOMES (ver translations/LEIA-ME.md); `orbit.lingua.garantir` apaga as linhas antigas.
     idioma = frappe.db.get_single_value("System Settings", "language") or "pt"
     novas, actualizadas = 0, 0
-    for origem, texto in NOMES.items():
-        nome = frappe.db.get_value("Translation", {"language": idioma, "source_text": origem})
-        if nome:
-            if frappe.db.get_value("Translation", nome, "translated_text") != texto:
-                frappe.db.set_value("Translation", nome, "translated_text", texto)
-                actualizadas += 1
-        else:
-            frappe.get_doc({"doctype": "Translation", "language": idioma,
-                            "source_text": origem, "translated_text": texto}).insert(
-                ignore_permissions=True)
-            novas += 1
-
     escondidos = 0
     for rotulo in ESCONDER:
         for nome in frappe.get_all("Desktop Icon", filters={"label": rotulo}, pluck="name"):

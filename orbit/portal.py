@@ -1179,3 +1179,29 @@ def definir_dono(email: str, utilizador: str, assunto: str = None):
                     "reference_doctype": dt, "reference_docname": nome}).insert(ignore_permissions=True)
     frappe.db.commit()
     return {"ok": True, "doctype": dt, "nome": nome}
+
+
+# ── língua das pessoas (18-10-2026, docs/PLANO-I18N-ORBIT-APPS.md) ───────────
+# O portal é a fonte (idioma_pessoa; colaboradores da casa = pt). Chama `definir_lingua` quando a língua de
+# alguém muda, e `acertar_linguas` todas as noites com a lista completa do tenant.
+
+@frappe.whitelist(methods=["POST"])
+def definir_lingua(email: str, lingua: str):
+    _so_portal()
+    from orbit.lingua import definir
+    r = definir(email, lingua)
+    frappe.db.commit()
+    return {"email": email, "resultado": r}
+
+
+@frappe.whitelist(methods=["POST"])
+def acertar_linguas(pessoas):
+    """`pessoas` = {email: lingua}. Só mexe em quem existe e está diferente; devolve as contagens."""
+    _so_portal()
+    from orbit.lingua import definir
+    contas = {}
+    for email, lingua in (_dados(pessoas) or {}).items():
+        r = definir(email, lingua)
+        contas[r] = contas.get(r, 0) + 1
+    frappe.db.commit()
+    return contas

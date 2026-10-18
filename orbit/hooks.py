@@ -15,7 +15,7 @@ app_license = "agpl-3.0"
 # chegar a ver-se, por mais vezes que se recarregue.
 #
 # SUBIR ESTE NÚMERO sempre que se mexer no CSS ou no JS.
-app_include_js = "/assets/orbit/js/orbit.js?v=23"
+app_include_js = "/assets/orbit/js/orbit.js?v=24"
 app_include_css = "/assets/orbit/css/orbit.css?v=23"
 # As cores tambem nas paginas publicas — a entrada e a primeira coisa que
 # alguem ve, e e servida pelo lado do site e nao pela secretaria.
@@ -64,8 +64,12 @@ _MIGRACAO = ["orbit.migracao_zoho.garantir", "orbit.portal.garantir", "orbit.rem
 # 17-10-2026: entrada única — «Entrar com a Stratechna» (OpenID Connect do portal), ver entrada_unica.py
 _ENTRADA = ["orbit.entrada_unica.garantir"]
 
-after_migrate = _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA
-after_install = _POR_DE_PE + _MARKETING + _MARCACAO + _ORGANIZACAO + ["orbit.remetentes.garantir"]
+# 18-10-2026: línguas pt/en/es/fr activas, campo «Língua» só de leitura (manda o portal), limpeza das
+# traduções antigas dos módulos — as traduções em si vêm em orbit/translations/*.csv (ver lingua.py)
+_LINGUA = ["orbit.lingua.garantir"]
+
+after_migrate = _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA + _LINGUA
+after_install = _POR_DE_PE + _MARKETING + _MARCACAO + _ORGANIZACAO + ["orbit.remetentes.garantir"] + _LINGUA
 
 # Email marketing: a saída das campanhas corre ao minuto (o ritmo por hora
 # reparte-se em sessenta lotes), as contagens de aberturas e cliques de hora a

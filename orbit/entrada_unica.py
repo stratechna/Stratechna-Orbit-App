@@ -139,7 +139,21 @@ def regresso(code: str | None = None, state: str | None = None, error: str | Non
     dados = {k: idt.get(k) for k in ("sub", "email", "email_verified", "name", "given_name", "family_name",
                                      "first_name", "last_name")}
     frappe.flags.orbit_via_portal = True      # a sessão central já existe: não é preciso a ponte
+    # 18-10-2026: a língua é a do portal (idioma_pessoa; casa = pt) — antes do login_oauth_user, que já
+    # desenha a resposta: a primeira página abre logo na língua certa. Ver orbit/lingua.py.
+    lingua = "sem locale"
+    if idt.get("locale") and idt.get("email"):
+        from orbit.lingua import definir
+        try:
+            lingua = definir(idt["email"], idt["locale"])
+        except Exception:
+            frappe.log_error(title="orbit.entrada_unica.lingua")
     login_oauth_user(dados, provider=PROVEDOR, state=state)
+    if lingua == "sem utilizador":          # primeira entrada: o utilizador acabou de nascer
+        try:
+            definir(idt["email"], idt["locale"])
+        except Exception:
+            frappe.log_error(title="orbit.entrada_unica.lingua")
     sid_frappe = getattr(frappe.local, "session", None) and frappe.local.session.sid
     if sid_frappe and sid_frappe != "Guest" and idt.get("sid"):
         frappe.cache.set_value(_CHAVE_CACHE + sid_frappe, idt["sid"], expires_in_sec=31 * 86400)
