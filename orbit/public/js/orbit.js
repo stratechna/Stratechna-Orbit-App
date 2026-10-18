@@ -592,8 +592,9 @@
 	}
 })();
 
-// Entrada única (17-10-2026): ao sair do desk vai-se directo ao ecrã de entrada do portal (o único), sem passar
-// pela página de entrada do Orbit. A sessão central já foi terminada no servidor (entrada_unica.ao_sair).
+// Entrada única: ao sair do desk vai-se directo ao formulário do Orbit (?nativo=1) — a sessão central já foi
+// terminada no servidor (entrada_unica.ao_sair), não vale a pena perguntar ao portal (18-10-2026: dois ecrãs).
+// E, ao abrir o desk, se a entrada foi pelo formulário e a ponte para o portal ficou por fazer, faz-se agora.
 (function () {
 	function ligar() {
 		if (!window.frappe || !frappe.app || frappe.app.__orbit_saida) { return false; }
@@ -602,12 +603,13 @@
 			fetch("/api/method/orbit.entrada_unica.automatica", { credentials: "same-origin" })
 				.then(function (r) { return r.json(); })
 				.then(function (d) {
-					if (d.message && d.message.auto) { window.location.replace("https://portal.stratechna.com/login"); }
+					if (d.message && d.message.auto) { window.location.replace("/login?nativo=1"); }
 					else if (original) { original(); }
 				})
 				.catch(function () { if (original) { original(); } });
 		};
 		frappe.app.__orbit_saida = true;
+		if (frappe.boot && frappe.boot.orbit_ligar_portal) { window.location.replace(frappe.boot.orbit_ligar_portal); }
 		return true;
 	}
 	if (!ligar()) {

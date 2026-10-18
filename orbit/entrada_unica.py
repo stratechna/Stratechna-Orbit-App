@@ -34,6 +34,11 @@ _CHAVE_CACHE = "orbit_entrada_unica:sid:"
 _JWKS: dict = {}
 
 
+def _q(d: dict) -> str:
+    from urllib.parse import urlencode
+    return urlencode(d)
+
+
 def _conf() -> dict | None:
     c = frappe.conf.get("stratechna_login") or {}
     return c if c.get("client_id") and c.get("client_secret") else None
@@ -110,11 +115,16 @@ def _verificar(token: str, audiencia: str, exigir_exp: bool = True) -> dict:
 def regresso(code: str | None = None, state: str | None = None, error: str | None = None, **_):
     import requests
     from frappe.utils.oauth import login_oauth_user, get_redirect_uri
+    from frappe.utils.oauth import consume_oauth_state
     c = _conf()
     if error or not code or not c:
-        frappe.respond_as_web_page("Entrada com a Stratechna",
-                                   "Não foi possível entrar. Volte à página de entrada e tente de novo.",
-                                   http_status_code=400, indicator_color="red")
+        # A pergunta silenciosa (prompt=none) da página de entrada: sem sessão no portal, mostra-se o ecrã do Orbit.
+        destino = consume_oauth_state(state) if state else None
+        q = {"nativo": 1}
+        if destino:
+            q["redirect-to"] = destino
+        frappe.local.response["type"] = "redirect"
+        frappe.local.response["location"] = "/login?" + _q(q)
         return
     r = requests.post(EMISSOR + "/token", data={
         "grant_type": "authorization_code", "code": code, "redirect_uri": get_redirect_uri(PROVEDOR),
@@ -128,6 +138,7 @@ def regresso(code: str | None = None, state: str | None = None, error: str | Non
     idt = _verificar(tok["id_token"], c["client_id"])
     dados = {k: idt.get(k) for k in ("sub", "email", "email_verified", "name", "given_name", "family_name",
                                      "first_name", "last_name")}
+    frappe.flags.orbit_via_portal = True      # a sessão central já existe: não é preciso a ponte
     login_oauth_user(dados, provider=PROVEDOR, state=state)
     sid_frappe = getattr(frappe.local, "session", None) and frappe.local.session.sid
     if sid_frappe and sid_frappe != "Guest" and idt.get("sid"):
@@ -190,3 +201,70 @@ def saida_canal(logout_token: str | None = None):
 def automatica() -> dict:
     """A página de entrada segue logo para o portal? (`orbit_entrada_stratechna_auto` no site_config)"""
     return {"auto": bool(_conf() and frappe.conf.get("orbit_entrada_stratechna_auto"))}
+
+
+
+# ── Ponte para o portal (18-10-2026) ─────────────────────────────────────────────────────────────────────────
+# Vítor: «Mantemos os logins separados mas a lógica mantém-se: se o utilizador já entrou numa qualquer app do Orbit
+# está logado no portal e vice-versa». Quem entra pelo formulário do Orbit (palavra-passe) fica também com a sessão
+# central do portal: logo a seguir, o navegador passa por ligar_portal → portal /api/oidc/ligar (cookie) → volta.
+_PONTE = "orbit_entrada_unica:ponte:"
+
+
+def sessao_criada(login_manager=None) -> None:
+    """on_session_creation: entrou pelo formulário do Orbit (não pelo portal)? Fica marcado para a ponte."""
+    try:
+        if frappe.flags.get("orbit_via_portal") or not _conf() or not frappe.conf.get("orbit_entrada_stratechna_auto"):
+            return
+        sid = getattr(frappe.local, "session", None) and frappe.local.session.sid
+        if sid and sid != "Guest" and (getattr(login_manager, "user", None) or "") not in ("Administrator", "Guest"):
+            frappe.cache.set_value(_PONTE + sid, 1, expires_in_sec=3600)
+    except Exception:
+        frappe.log_error(title="orbit.entrada_unica.sessao_criada")
+
+
+def boot(bootinfo) -> None:
+    """O desk segue a ponte logo ao abrir, se ficou por fazer (entrada pelo formulário com destino directo)."""
+    sid = frappe.session.sid
+    if sid and frappe.cache.get_value(_PONTE + sid):
+        bootinfo["orbit_ligar_portal"] = "/api/method/orbit.entrada_unica.ligar_portal?" + _q({"volta": frappe.request.url if frappe.request else "/app"})
+
+
+def _volta_local(volta: str) -> str:
+    from urllib.parse import urlparse
+    if not volta:
+        return "/app"
+    u = urlparse(volta)
+    if not u.scheme and volta.startswith("/") and not volta.startswith("//"):
+        return frappe.utils.get_url(volta)
+    h = (u.hostname or "").lower()
+    if u.scheme == "https" and (h == "portal.stratechna.com" or h.endswith("orbit.stratechna.com") or h == (frappe.local.request.host or "").split(":")[0]):
+        return volta
+    return frappe.utils.get_url("/app")
+
+
+@frappe.whitelist(methods=["GET"])
+def ligar_portal(volta: str | None = None):
+    """Dá ao navegador a sessão central do portal e devolve-o a `volta`."""
+    import requests
+    c = _conf()
+    destino = _volta_local(volta or "/app")
+    sid_frappe = frappe.session.sid
+    frappe.cache.delete_value(_PONTE + sid_frappe)
+    frappe.local.response["type"] = "redirect"
+    if not c or frappe.session.user in ("Guest", "Administrator"):
+        frappe.local.response["location"] = destino
+        return
+    try:
+        r = requests.post(EMISSOR + "/bilhete", data={"email": frappe.session.user, "host": frappe.local.request.host},
+                          auth=(c["client_id"], c["client_secret"]), timeout=10)
+        if r.status_code != 200:
+            # sem conta no portal: segue sem ponte; nunca de volta ao portal (que mandaria outra vez para aqui)
+            frappe.local.response["location"] = destino if "portal.stratechna.com" not in destino else frappe.utils.get_url("/app")
+            return
+        d = r.json()
+        frappe.cache.set_value(_CHAVE_CACHE + sid_frappe, d["sid"], expires_in_sec=31 * 86400)
+        frappe.local.response["location"] = EMISSOR + "/ligar?" + _q({"b": d["bilhete"], "volta": destino})
+    except Exception:
+        frappe.log_error(title="orbit.entrada_unica.ligar_portal")
+        frappe.local.response["location"] = destino if "portal.stratechna.com" not in destino else frappe.utils.get_url("/app")

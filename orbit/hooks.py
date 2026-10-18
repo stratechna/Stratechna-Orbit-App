@@ -15,22 +15,24 @@ app_license = "agpl-3.0"
 # chegar a ver-se, por mais vezes que se recarregue.
 #
 # SUBIR ESTE NÚMERO sempre que se mexer no CSS ou no JS.
-app_include_js = "/assets/orbit/js/orbit.js?v=22"
-app_include_css = "/assets/orbit/css/orbit.css?v=22"
+app_include_js = "/assets/orbit/js/orbit.js?v=23"
+app_include_css = "/assets/orbit/css/orbit.css?v=23"
 # As cores tambem nas paginas publicas — a entrada e a primeira coisa que
 # alguem ve, e e servida pelo lado do site e nao pela secretaria.
-web_include_css = "/assets/orbit/css/orbit.css?v=22"
+web_include_css = "/assets/orbit/css/orbit.css?v=23"
 # 17-10-2026: na página de entrada, seguir para o portal (entrada única) quando o tenant o tem ligado
-web_include_js = "/assets/orbit/js/entrada.js?v=3"
+web_include_js = "/assets/orbit/js/entrada.js?v=4"
 
 # Sair do Orbit sai também do portal e do webmail (entrada_unica.ao_sair)
 on_logout = "orbit.entrada_unica.ao_sair"
+# Entrou pelo formulário do Orbit: também fica com sessão no portal (ponte, 18-10-2026)
+on_session_creation = "orbit.entrada_unica.sessao_criada"
 
 # O ecrã precisa de saber, no arranque, que apps é que este tenant tem — para
 # pintar a cinzento as que não tem em vez de as esconder. Vai no boot e não numa
 # chamada à parte porque a grelha se desenha de uma vez: um pedido extra deixava
 # os cartões a mudar de cor depois de já estarem no ecrã.
-extend_bootinfo = "orbit.apps.acrescentar_ao_boot"
+extend_bootinfo = ["orbit.apps.acrescentar_ao_boot", "orbit.entrada_unica.boot"]
 
 # A grelha de módulos põe-se de pé por esta ordem, e a ordem importa: a
 # sincronização traz de volta as fichas que as apps trazem em ficheiro (e que o
