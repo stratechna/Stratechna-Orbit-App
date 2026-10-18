@@ -543,6 +543,11 @@ def _traduzir_fixos(texto: str, intocaveis: set) -> tuple[str, int]:
     texto, k = _re.subn(r'\?([`"])Start now\1:\1Continue\1',
                         lambda m: "?" + _t(m.group(1), "Start now") + ":" + _t(m.group(1), "Continue"), texto)
     n += k
+    # o «Filter» do botão de filtros é o valor por omissão de uma prop: passa a função (Vue chama-a por
+    # instância), para traduzir quando o componente nasce e não ao carregar o módulo
+    texto, k = _re.subn(r'label:\{default:([`"])Filter\1\}',
+                        lambda m: "label:{default:()=>" + _t(m.group(1), "Filter") + "}", texto)
+    n += k
     # «Expand»/«Collapse» em ternário (barra lateral do Desk), `${a}/${b} steps` e `Set ${rótulo}`
     texto, k = _re.subn(r'\?([`"])(Expand|Collapse)\1:\1(Expand|Collapse)\1',
                         lambda m: "?" + _t(m.group(1), m.group(2)) + ":" + _t(m.group(1), m.group(3)), texto)
@@ -603,6 +608,27 @@ for pasta, minimo in (("crm/crm/public/frontend/assets", 150), ("helpdesk/helpde
     print(f"textos escritos no pacote, agora traduzíveis, em {pasta}: {total} ({len(intocaveis)} comparados ficam)")
     if total < minimo:
         falhas.append(f"{pasta}: só {total} textos tratados (esperavam-se {minimo}) — o upstream mudou os pacotes?")
+
+# O marcador dos campos vazios do CRM («Add Website...») é escrito no servidor sem tradução (18-10-2026).
+trocar("crm/crm/fcrm/doctype/crm_fields_layout/crm_fields_layout.py", [
+    ('field["placeholder"] = field.get("placeholder") or "Add " + field.label + "..."',
+     'field["placeholder"] = field.get("placeholder") or _("Add {0}...").format(_(field.label))'),
+])
+
+# As colunas da lista de bilhetes do Desk («Subject», «First response»…) vêm do servidor sem `_()` (18-10-2026).
+_hd = os.path.join(APPS, "helpdesk/helpdesk/helpdesk/doctype/hd_ticket/hd_ticket.py")
+if os.path.exists(_hd):
+    with open(_hd, encoding="utf-8") as fh:
+        _t0 = fh.read()
+    _t1, _k = _re.subn(r'^(\s+"label": )"([^"]+)",$', r'\1_("\2"),', _t0, flags=_re.M)
+    if _k:
+        with open(_hd, "w", encoding="utf-8") as fh:
+            fh.write(_t1)
+        feitos += 1
+    elif '"label": _("Subject")' not in _t0:
+        falhas.append("hd_ticket.py: não encontrei as colunas da lista — o upstream mudou-as?")
+else:
+    falhas.append("ficheiro em falta: helpdesk/.../hd_ticket.py")
 
 # ── Resultado ───────────────────────────────────────────────────────────────
 print(f"marca das apps de frontend próprio: {feitos} ficheiros tratados")

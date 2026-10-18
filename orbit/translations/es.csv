@@ -180,6 +180,7 @@ Add to the dock,Añadir al dock
 Add {0},Añadir {0},Primary action in tree view
 Add {0} Access to {1},Añadir acceso de {0} a {1}
 Add {0} to a module,Añadir {0} a un módulo
+Add {0}...,Añadir {0}...
 Added Roles,Roles añadidos
 Added Widgets,Widgets añadidos
 Added to global search,Añadido a la búsqueda global
@@ -651,6 +652,7 @@ Como aparece na janela de quem a vê,Cómo aparece en la ventana de quien lo ve
 Como fica,Cómo queda
 Compact,Compacto
 Compact (narrow layouts),Compacto (diseños estrechos)
+Company Description,Descripción de la empresa
 Company in ERPNext site,Empresa en el sitio ERPNext
 Company name is required,El nombre de la empresa es obligatorio
 Competition,Competencia

@@ -228,6 +228,7 @@ Add to the dock,Adicionar ao dock
 Add {0},Adicionar {0},Primary action in tree view
 Add {0} Access to {1},Adicionar acesso de {0} a {1}
 Add {0} to a module,Adicionar {0} a um módulo
+Add {0}...,Adicionar {0}...
 "Add, edit, and manage sources for automatic lead syncing to your CRM","Adicione, edite e gira as origens para a sincronização automática de Leads no seu CRM"
 "Add, manage agents and assign roles to them.",Adicione e gira agentes e atribua-lhes perfis.
 Added Roles,Perfis adicionados
@@ -884,6 +885,7 @@ Compact,Compacto
 Compact (narrow layouts),Compacto (disposições estreitas)
 Company,Empresa
 Company Abbreviation (requires ERPNext to be installed),Abreviatura da empresa (requer a instalação do ERPNext)
+Company Description,Descrição da empresa
 Company in ERPNext site,Empresa no site ERPNext
 Company name is required,O nome da empresa é obrigatório
 Competition,Concorrência

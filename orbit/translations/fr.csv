@@ -223,6 +223,7 @@ Add to the dock,Ajouter au dock
 Add {0},Ajouter {0},Primary action in tree view
 Add {0} Access to {1},Ajouter l'accès {0} à {1}
 Add {0} to a module,Ajouter {0} à un module
+Add {0}...,Ajouter {0}...
 "Add, manage agents and assign roles to them.",Ajoutez et gérez des agents et attribuez-leur des rôles.
 Added Roles,Rôles ajoutés
 Added Widgets,Widgets ajoutés
@@ -810,6 +811,7 @@ Como fica,Aperçu
 Compact,Compact
 Compact (narrow layouts),Compact (mises en page étroites)
 Company Abbreviation (requires ERPNext to be installed),Abréviation de l'entreprise (nécessite l'installation d'ERPNext)
+Company Description,Description de l'entreprise
 Competition,Concurrence
 Complete Onboarding,Terminer l'intégration
 Complete registration,Terminer l'inscription
