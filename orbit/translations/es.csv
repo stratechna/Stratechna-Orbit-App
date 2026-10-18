@@ -622,6 +622,7 @@ Code Block,Bloque de código
 Code block,Bloque de código
 Cold,Frío
 Collaborating with my team,Colaborar con mi equipo
+Collapse,Contraer
 Collapse all,Contraer todo
 Collapse sidebar,Contraer barra lateral
 Colon after labels,Dos puntos después de las etiquetas
@@ -1270,6 +1271,7 @@ Exotel Number Missing,Falta el número de Exotel
 Exotel Number {0} is not valid,El número de Exotel {0} no es válido
 Exotel Settings,Configuración de Exotel
 Exotel number,Número de Exotel
+Expand,Expandir
 Expand all,Expandir todo
 Expand sidebar,Expandir barra lateral
 Expand/Collapse,Expandir/Contraer
@@ -2050,6 +2052,7 @@ Multiple actions (create button + docs link),Varias acciones (botón de crear + 
 Mute sounds,Silenciar sonidos
 Muted,Silenciado
 My Dashboard,Mi panel
+My Feedback,Mis valoraciones
 My Open Deals,Mis oportunidades abiertas
 My Open Tickets,Mis tickets abiertos
 My Organization,Mi organización
@@ -2677,6 +2680,7 @@ Receive a copy of every email you send in your inbox.,Reciba en su bandeja de en
 Recent,Recientes
 Recent Tickets,Tickets recientes
 Recent activity,Actividad reciente
+Recently Assigned Tickets,Tickets asignados recientemente
 Record,Registro
 Record Calls,Grabar llamadas
 Record Outgoing Calls,Grabar llamadas salientes
@@ -3123,6 +3127,7 @@ Set up my sales pipeline,Configurar mi embudo de ventas
 Set up your authenticator app,Configure su aplicación de autenticación
 Set your availability so your team knows when you're reachable.,Defina su disponibilidad para que su equipo sepa cuándo está localizable.
 Set {0} in {1} to finish this step.,Establezca {0} en {1} para completar este paso.
+Set {0}...,Establecer {0}...
 Set {0}…,Establecer {0}…
 Setting Field,Campo de configuración
 Setting Up,Configurando
@@ -4309,6 +4314,7 @@ wkhtmltopdf is deprecated and will be removed in version 17. Switch this format 
 {0}'s dock belongs to its app and can only be authored in developer mode. Arrange the dock instead to change it for this site.,El dock de {0} pertenece a su aplicación y solo se puede crear en modo desarrollador. Organice el dock para cambiarlo en este sitio.
 {0}'s dock is now standard and exported to the app.,El dock de {0} ahora es estándar y se ha exportado a la aplicación.
 {0}'s roles come from the Role Profile {1}. Edit that to change this.,Los roles de {0} proceden del perfil de rol {1}. Edítelo para cambiarlos.
+{0}/{1} steps,{0}/{1} pasos
 {0}/{1} steps completed,{0}/{1} pasos completados
 {0}: pre-upgrade edits restored,{0}: ediciones previas a la actualización restauradas
 {0}: {1} did not match any results.,{0}: {1} no coincidió con ningún resultado.

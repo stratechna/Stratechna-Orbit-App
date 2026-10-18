@@ -778,6 +778,7 @@ Code Block,Bloc de code
 Code block,Bloc de code
 Cold,Froid
 Collaborating with my team,Collaborer avec mon équipe
+Collapse,Réduire
 Collapse all,Tout réduire
 Collapse sidebar,Réduire la barre latérale
 Colon after labels,Deux-points après les étiquettes
@@ -1429,6 +1430,7 @@ Existing contacts are being made customer managers in the background,Les contact
 Existing users join instantly. Others get an invite.,Les utilisateurs existants rejoignent immédiatement. Les autres reçoivent une invitation.
 Exit full screen,Quitter le plein écran
 Exotel number,Numéro Exotel
+Expand,Développer
 Expand all,Tout développer
 Expand sidebar,Développer la barre latérale
 Expand/Collapse,Développer/Réduire
@@ -2294,6 +2296,7 @@ Mute sounds,Couper les sons
 Muted,En sourdine
 Mx,Mx
 My Dashboard,Mon tableau de bord
+My Feedback,Mes évaluations
 My Open Tickets,Mes tickets ouverts
 My Organization,Mon organisation
 My Recent Activity,Mon activité récente
@@ -2968,6 +2971,7 @@ Receive an email for notifications of these types. Remove a type to stop its ema
 Recent,Récents
 Recent Tickets,Tickets récents
 Recent activity,Activité récente
+Recently Assigned Tickets,Tickets récemment attribués
 Recipient & Status,Destinataire et statut
 Record,Enregistrement
 Record alias could not be resolved,L'alias de l'enregistrement n'a pas pu être résolu
@@ -3452,8 +3456,8 @@ Set up my sales pipeline,Configurer mon pipeline de vente
 Set up your authenticator app,Configurez votre application d'authentification
 Set your availability so your team knows when you're reachable.,Définissez votre disponibilité pour que votre équipe sache quand vous êtes joignable.
 "Set your team’s working days, hours, and holidays using a template or custom schedule.","Définissez les jours ouvrés, les horaires et les jours fériés de votre équipe à l'aide d'un modèle ou d'un planning personnalisé."
-Set {0},Définir {0}
 Set {0} in {1} to finish this step.,Définissez {0} dans {1} pour terminer cette étape.
+Set {0}...,Définir {0}...
 Set {0}…,Définir {0}…
 Setting <strong>{0}</strong> as the default SLA removes <strong>{1}</strong> as the default SLA. You’ll need to add a condition in <strong>{1}</strong> for the SLA to work.,Définir <strong>{0}</strong> comme SLA par défaut supprime <strong>{1}</strong> comme SLA par défaut. Vous devrez ajouter une condition dans <strong>{1}</strong> pour que le SLA fonctionne.
 Setting Field,Champ de paramètre
@@ -4771,6 +4775,7 @@ yyyy-mm-dd,aaaa-mm-jj
 {0}'s dock is now standard and exported to the app.,Le dock de {0} est désormais standard et a été exporté vers l'application.
 {0}'s roles come from the Role Profile {1}. Edit that to change this.,Les rôles de {0} proviennent du profil de rôle {1}. Modifiez-le pour changer cela.
 "{0}, list item {1} of {2}","{0}, élément de liste {1} sur {2}"
+{0}/{1} steps,{0}/{1} étapes
 {0}/{1} steps completed,{0}/{1} étapes terminées
 {0}: Link field cannot reference DocType {1} without Guest read permission,{0} : le champ Lien ne peut pas référencer le DocType {1} sans autorisation de lecture pour les invités
 {0}: pre-upgrade edits restored,{0} : modifications antérieures à la mise à niveau restaurées

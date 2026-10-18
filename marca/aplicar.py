@@ -543,6 +543,18 @@ def _traduzir_fixos(texto: str, intocaveis: set) -> tuple[str, int]:
     texto, k = _re.subn(r'\?([`"])Start now\1:\1Continue\1',
                         lambda m: "?" + _t(m.group(1), "Start now") + ":" + _t(m.group(1), "Continue"), texto)
     n += k
+    # «Expand»/«Collapse» em ternário (barra lateral do Desk), `${a}/${b} steps` e `Set ${rótulo}`
+    texto, k = _re.subn(r'\?([`"])(Expand|Collapse)\1:\1(Expand|Collapse)\1',
+                        lambda m: "?" + _t(m.group(1), m.group(2)) + ":" + _t(m.group(1), m.group(3)), texto)
+    n += k
+    texto, k = _re.subn(r"`\$\{([^{}`]+)\}/\$\{([^{}`]+)\} steps`",
+                        lambda m: f"(window.__?window.__(`{{0}}/{{1}} steps`,[{m.group(1)},{m.group(2)}]):`${{{m.group(1)}}}/${{{m.group(2)}}} steps`)",
+                        texto)
+    n += k
+    texto, k = _re.subn(r"`Set \$\{(\([^`]{1,80}?\)\|\|[\w$.]+)\}\.\.\.`",
+                        lambda m: f"(window.__?window.__(`Set {{0}}...`,[{m.group(1)}]):`Set ${{{m.group(1)}}}...`)",
+                        texto)
+    n += k
     # SLA do Desk: `Due in ${x}`, `Overdue by ${x}`, `Failed by ${x}`, `Fulfilled in ${x}`
     texto, k = _re.subn(r"`(Due in|Overdue by|Failed by|Fulfilled in) \$\{([^{}`]+)\}`",
                         lambda m: f"(window.__?window.__(`{m.group(1)} {{0}}`,[{m.group(2)}]):`{m.group(1)} ${{{m.group(2)}}}`)",

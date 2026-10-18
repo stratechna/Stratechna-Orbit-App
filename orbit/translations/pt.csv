@@ -853,6 +853,7 @@ Code Block,Bloco de código
 Code block,Bloco de código
 Cold,Frio
 Collaborating with my team,Colaborar com a minha equipa
+Collapse,Recolher
 Collapse all,Recolher tudo
 Collapse sidebar,Recolher barra lateral
 Colon after labels,Dois pontos a seguir às etiquetas
@@ -1587,6 +1588,7 @@ Exotel Number Missing,Número do Exotel em falta
 Exotel Number {0} is not valid,O número do Exotel {0} não é válido
 Exotel Settings,Definições do Exotel
 Exotel number,Número do Exotel
+Expand,Expandir
 Expand all,Expandir tudo
 Expand sidebar,Expandir barra lateral
 Expand/Collapse,Expandir/Recolher
@@ -2585,6 +2587,7 @@ Mute sounds,Silenciar sons
 Muted,Silenciado
 Mx,Mx
 My Dashboard,O meu painel
+My Feedback,A minha avaliação
 My Open Deals,Os meus negócios em aberto
 My Open Tickets,Os meus bilhetes abertos
 My Organization,A minha organização
@@ -3297,6 +3300,7 @@ Receive an email for notifications of these types. Remove a type to stop its ema
 Recent,Recentes
 Recent Tickets,Bilhetes recentes
 Recent activity,Atividade recente
+Recently Assigned Tickets,Bilhetes atribuídos recentemente
 Recipient & Status,Destinatário e estado
 Record,Registo
 Record Calls,Gravar chamadas
@@ -3828,8 +3832,8 @@ Set up your authenticator app,Configure a sua aplicação de autenticação
 "Set working days, hours, and holidays by selecting a predefined schedule or creating a new one.","Defina os dias úteis, o horário e os feriados selecionando um horário predefinido ou criando um novo."
 Set your availability so your team knows when you're reachable.,Defina a sua disponibilidade para que a equipa saiba quando pode ser contactado.
 "Set your team’s working days, hours, and holidays using a template or custom schedule.","Defina os dias úteis, o horário e os feriados da sua equipa através de um modelo ou de um horário personalizado."
-Set {0},Definir {0}
 Set {0} in {1} to finish this step.,Defina {0} em {1} para concluir este passo.
+Set {0}...,Definir {0}...
 Set {0}…,Definir {0}…
 Setting <strong>{0}</strong> as the default SLA removes <strong>{1}</strong> as the default SLA. You’ll need to add a condition in <strong>{1}</strong> for the SLA to work.,Definir <strong>{0}</strong> como SLA predefinido remove <strong>{1}</strong> como SLA predefinido. Terá de adicionar uma condição em <strong>{1}</strong> para que o SLA funcione.
 Setting Field,Campo de definição
@@ -5331,6 +5335,7 @@ yyyy-mm-dd,aaaa-mm-dd
 {0}'s dock is now standard and exported to the app.,O dock de {0} passou a padrão e foi exportado para a aplicação.
 {0}'s roles come from the Role Profile {1}. Edit that to change this.,Os perfis de {0} provêm do perfil de função {1}. Edite-o para alterar isto.
 "{0}, list item {1} of {2}","{0}, item da lista {1} de {2}"
+{0}/{1} steps,{0}/{1} passos
 {0}/{1} steps completed,{0}/{1} passos concluídos
 {0}: Cannot set Assign Amend if not Submittable,{0}: Não é possível definir Atribuir correção se não for submetível
 {0}: Cannot set Assign Submit if not Submittable,{0}: Não é possível definir Atribuir submissão se não for submetível
