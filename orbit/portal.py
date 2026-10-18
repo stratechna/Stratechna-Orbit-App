@@ -470,7 +470,21 @@ def criar_deal(dados):
                            (frappe.db.get_value("CRM Organization", org, "marca") if org else None)})
     if cont:
         deal.append("contacts", {"contact": cont, "is_primary": 1})
+    # Negócio em nome do lead (propostas, 18-10-2026): fica ligado ao lead e com os dados dele.
+    lead = d.get("Lead") if d.get("Lead") and frappe.db.exists("CRM Lead", d.get("Lead")) else None
+    if lead:
+        l = frappe.db.get_value("CRM Lead", lead, ["first_name", "last_name", "email", "mobile_no", "phone",
+                                                  "organization", "source", "marca", "lead_name"], as_dict=True)
+        deal.update({"lead": lead, "lead_name": l.lead_name, "first_name": l.first_name, "last_name": l.last_name,
+                     "email": l.email, "mobile_no": l.mobile_no, "phone": l.phone, "source": l.source,
+                     "organization_name": l.organization})
+        if not deal.marca and l.marca:
+            deal.marca = l.marca
+    elif d.get("Lead_Source") and frappe.db.exists("CRM Lead Source", d.get("Lead_Source")):
+        deal.source = d.get("Lead_Source")
     deal.insert(ignore_permissions=True)
+    if lead and frappe.db.get_value("CRM Lead", lead, "status") in ("New", "Contacted", "Nurture"):
+        frappe.db.set_value("CRM Lead", lead, "status", "Qualified")
     if d.get("Description"):
         frappe.get_doc({"doctype": "FCRM Note", "title": "Descrição", "content": frappe.utils.escape_html(d["Description"]).replace("\n", "<br>"),
                         "reference_doctype": "CRM Deal", "reference_docname": deal.name}).insert(ignore_permissions=True)
@@ -488,6 +502,15 @@ def atualizar_deal(id_deal: str, dados):
     deal = frappe.get_doc("CRM Deal", n)
     if d.get("Stage"):
         deal.status = FASES.get(d["Stage"], d["Stage"] if frappe.db.exists("CRM Deal Status", d["Stage"]) else deal.status)
+        if deal.status in ("Won", "Lost") and d.get("Closing_Date"):
+            deal.closed_date = d["Closing_Date"]
+        if deal.status == "Won":
+            deal.probability = 100
+        if deal.status == "Lost":
+            motivo = d.get("Lost_Reason") if frappe.db.exists("CRM Lost Reason", d.get("Lost_Reason") or "") else "Other"
+            deal.lost_reason = deal.lost_reason or motivo
+            if deal.lost_reason == "Other" and not deal.lost_notes:
+                deal.lost_notes = _limpo(d.get("Lost_Notes")) or "Sem motivo indicado."
     for k, f in (("Amount", "deal_value"), ("Closing_Date", "expected_closure_date"), ("Moloni_Document_ID", "moloni_document_id"),
                  ("Deal_Name", "titulo")):
         if k in d:
