@@ -361,6 +361,11 @@
 	// As apps com casa própria: as que vivem fora do Frappe (link externo) e as
 	// quatro que, dentro dele, são aplicações inteiras com arranque próprio.
 	const APPS_PROPRIAS = new Set(["Frappe CRM", "Helpdesk", "Wiki", "Frappe HR"]);
+	// Regra da marca (14-09-2026): os produtos vendidos à parte não se traduzem — em nenhuma língua.
+	// Pelo `__()` o fr.po do Frappe dava «Courrier», «Documentation», «Événements» (18-10-2026).
+	// «Frappe CRM» e «Helpdesk» passam pelo tradutor de propósito: é lá que ficam «CRM» e «Desk».
+	const PRODUTOS = new Set(["CRM", "Desk", "Mail", "Docs", "Sign", "Events", "Social", "Wiki", "Meet", "Chat"]);
+	const nomeVisivel = (rotulo) => (PRODUTOS.has(rotulo) ? rotulo : __(rotulo));
 
 	function eApp(icone) {
 		return icone.link_type === "External" || APPS_PROPRIAS.has(icone.label);
@@ -374,7 +379,7 @@
 			const portal = (frappe.boot.orbit_apps && frappe.boot.orbit_apps.portal) || "#";
 			a.href = portal;
 			a.target = "_blank";
-			a.title = __("{0} — não subscrito. Clique para subscrever.", [__(icone.label)]);
+			a.title = __("{0} — não subscrito. Clique para subscrever.", [nomeVisivel(icone.label)]);
 			a.innerHTML =
 				`<img class="orbit-cartao-img" alt="">` +
 				`<span class="orbit-cartao-nome"></span>` +
@@ -382,7 +387,7 @@
 			const url = frappe.utils.get_desktop_icon(icone.label, frappe.boot.desktop_icon_style);
 			const fonte = (icone.icon_type !== "Folder" && url) || icone.logo_url || icone.icon_image;
 			if (fonte) a.querySelector(".orbit-cartao-img").src = fonte;
-			a.querySelector(".orbit-cartao-nome").textContent = __(icone.label);
+			a.querySelector(".orbit-cartao-nome").textContent = nomeVisivel(icone.label);
 			return a;
 		}
 		a.href = frappe.utils.get_route_for_icon(icone) || "#";
@@ -398,7 +403,7 @@
 		// páginas da MESMA aplicação e continuam a abrir aqui: um separador por
 		// módulo seria uma dúzia de separadores para uma tarefa só.
 		if (eApp(icone)) a.target = "orbit-" + frappe.scrub(icone.label);
-		a.title = __(icone.label);
+		a.title = nomeVisivel(icone.label);
 
 		const url = frappe.utils.get_desktop_icon(icone.label, frappe.boot.desktop_icon_style);
 		const fonte = (icone.icon_type !== "Folder" && url) || icone.logo_url || icone.icon_image;
@@ -406,7 +411,7 @@
 			(fonte ? `<img class="orbit-cartao-img" alt="">` : `<span class="orbit-cartao-vazio"></span>`) +
 			`<span class="orbit-cartao-nome"></span>`;
 		if (fonte) a.querySelector(".orbit-cartao-img").src = fonte;
-		a.querySelector(".orbit-cartao-nome").textContent = __(icone.label);
+		a.querySelector(".orbit-cartao-nome").textContent = nomeVisivel(icone.label);
 		return a;
 	}
 
