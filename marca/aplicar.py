@@ -557,7 +557,7 @@ def _traduzir_fixos(texto: str, intocaveis: set) -> tuple[str, int]:
                         texto)
     n += k
     texto, k = _re.subn(r"`Set \$\{(\([^`]{1,80}?\)\|\|[\w$.]+)\}\.\.\.`",
-                        lambda m: f"(window.__?window.__(`Set {{0}}...`,[{m.group(1)}]):`Set ${{{m.group(1)}}}...`)",
+                        lambda m: f"(window.__?window.__(`Set {{0}}...`,[window.__?window.__({m.group(1)}):{m.group(1)}]):`Set ${{{m.group(1)}}}...`)",
                         texto)
     n += k
     # SLA do Desk: `Due in ${x}`, `Overdue by ${x}`, `Failed by ${x}`, `Fulfilled in ${x}`
@@ -573,6 +573,51 @@ def _traduzir_fixos(texto: str, intocaveis: set) -> tuple[str, int]:
         pares = _re.findall(r'(\w+):' + q + r'([^' + q + r']*)' + q, m.group(0))
         return "{" + ",".join(f"get {c}(){{return window.__?window.__({q}{v}{q}):{q}{v}{q}}}" for c, v in pares) + "}"
     texto, k = _re.subn(r'\{future:([`"])in %s\1,past:\1%s ago\1(?:,\w+:\1[^`"]*\1){11}\}', _relativo, texto)
+    n += k
+    # Valores de registos (estado, prioridade, tipo) mostrados sem `__()`. O valor guardado e o que o código
+    # compara nunca mudam: traduz-se só o que se desenha. Nomes de utilizador (@, Administrator) ficam.
+    V = "((v)=>window.__&&typeof v===`string`&&!/@|^(Administrator|Guest)$/.test(v)?window.__(v):v)"
+    # prioridade na lista e no cabeçalho (TicketPriority)
+    texto, k = _re.subn(r'title:(\w+)\.priority,class:"truncate"\},(\w+)\(\1\.priority\)',
+                        lambda m: f'title:{V}({m.group(1)}.priority),class:"truncate"}},{m.group(2)}({V}({m.group(1)}.priority))', texto)
+    n += k
+    # estado do bilhete na lista
+    texto, k = _re.subn(r'(\{class:"truncate flex-1 text-base"\},)(\w+)\)',
+                        lambda m: f'{m.group(1)}{V}({m.group(2)}))', texto)
+    n += k
+    # opções de estado e de prioridade em menus (vista móvel, acções em massa, partilha)
+    texto, k = _re.subn(r'label:(\w+)\.label_agent\b(?=,value:\1\.label_agent)',
+                        lambda m: f'label:{V}({m.group(1)}.label_agent)', texto)
+    n += k
+    texto, k = _re.subn(r'label:(\w+)\.name,value:\1\.name\b',
+                        lambda m: f'label:{V}({m.group(1)}.name),value:{m.group(1)}.name', texto)
+    n += k
+    # opções dos campos de ligação (prioridade, tipo, equipa…): o rótulo vem de `search_link` em inglês
+    texto, k = _re.subn(r'label:(\((\w+)==null\?void 0:\2\.label\)\|\|\2\.value)',
+                        lambda m: f'label:{V}({m.group(1)})', texto)
+    n += k
+    texto, k = _re.subn(r'label:((\w+)\.label\|\|\2\.value)\b',
+                        lambda m: f'label:{V}({m.group(1)})', texto)
+    n += k
+    # durações («2 days 18h», «3 hours»): unidades no plural/singular pelo tradutor
+    texto, k = _re.subn(r'\$\{(\w+)===1\?"(year|month|day|hour|minute|second)":"(years|months|days|hours|minutes|seconds)"\}',
+                        lambda m: '${window.__?window.__(%s===1?"%s":"%s"):(%s===1?"%s":"%s")}' % (m.group(1), m.group(2), m.group(3), m.group(1), m.group(2), m.group(3)), texto)
+    n += k
+    # histórico do bilhete («X assigned Y: Automatic Assignment»): o Frappe grava o texto em inglês e o Desk
+    # lê-o com estes modelos; passam a ser mostrados pelo tradutor (o motivo também)
+    mu = _re.search(r'function (\w+)\(e,n\)\{const t=\[\];let a="\^"', texto)
+    if mu:
+        UL = mu.group(1)
+        hist = ('((d,w)=>{if(!window.__)return d;for(const p of ["{0} self assigned this task: {1}","{0} assigned {1}: {2}",'
+                '"{0} removed their assignment.","Assignment of {0} removed by {1}"]){const o=%s(p,d);if(o){'
+                'const r=p.includes("{2}")?2:p.includes("self assigned")?1:-1;'
+                'return window.__(p,Object.keys(o).sort().map(k=>+k===r?window.__(o[k]):o[k]))}}return d})' % UL)
+        texto, k = _re.subn(r'subtype:(\w+)\?"assignment_completed":"assigned",text:(\w+),',
+                            lambda m: f'subtype:{m.group(1)}?"assignment_completed":"assigned",text:{hist}({m.group(2)}),', texto)
+        n += k
+    # título do separador do CRM («Deals - Lista»): o nome da rota também se traduz
+    texto, k = _re.subn(r'=`\$\{(\w+)\.name\} - \$\{(\w+)\}`',
+                        lambda m: f'=`${{window.__?window.__({m.group(1)}.name):{m.group(1)}.name}} - ${{{m.group(2)}}}`', texto)
     n += k
     texto, k = _re.subn(r'([`"])Welcome to \1\+([\w$.]+)',
                         lambda m: f"(window.__?window.__({m.group(1)}Welcome to {{0}}{m.group(1)},[{m.group(2)}]):{m.group(1)}Welcome to {m.group(1)}+{m.group(2)})",
