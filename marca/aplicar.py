@@ -585,6 +585,10 @@ def _traduzir_fixos(texto: str, intocaveis: set) -> tuple[str, int]:
     texto, k = _re.subn(r'(\{class:"truncate flex-1 text-base"\},)(\w+)\)',
                         lambda m: f'{m.group(1)}{V}({m.group(2)}))', texto)
     n += k
+    # tipo do bilhete na lista: coluna sem desenho próprio, mostra o valor tal como está
+    texto, k = _re.subn(r'priority:\{custom:\(\{item:([\w$]+)\}\)=>(\w+)\([\w$]+,\{priority:\1\}\)\},',
+                        lambda m: m.group(0) + f'ticket_type:{{custom:({{item:{m.group(1)}}})=>{m.group(2)}("span",{{class:"truncate"}},{V}({m.group(1)}))}},', texto)
+    n += k
     # opções de estado e de prioridade em menus (vista móvel, acções em massa, partilha)
     texto, k = _re.subn(r'label:(\w+)\.label_agent\b(?=,value:\1\.label_agent)',
                         lambda m: f'label:{V}({m.group(1)}.label_agent)', texto)
