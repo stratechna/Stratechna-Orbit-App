@@ -603,18 +603,6 @@ def _traduzir_fixos(texto: str, intocaveis: set) -> tuple[str, int]:
     texto, k = _re.subn(r'\$\{(\w+)===1\?"(year|month|day|hour|minute|second)":"(years|months|days|hours|minutes|seconds)"\}',
                         lambda m: '${window.__?window.__(%s===1?"%s":"%s"):(%s===1?"%s":"%s")}' % (m.group(1), m.group(2), m.group(3), m.group(1), m.group(2), m.group(3)), texto)
     n += k
-    # histórico do bilhete («X assigned Y: Automatic Assignment»): o Frappe grava o texto em inglês e o Desk
-    # lê-o com estes modelos; passam a ser mostrados pelo tradutor (o motivo também)
-    mu = _re.search(r'function (\w+)\(e,n\)\{const t=\[\];let a="\^"', texto)
-    if mu:
-        UL = mu.group(1)
-        hist = ('((d,w)=>{if(!window.__)return d;for(const p of ["{0} self assigned this task: {1}","{0} assigned {1}: {2}",'
-                '"{0} removed their assignment.","Assignment of {0} removed by {1}"]){const o=%s(p,d);if(o){'
-                'const r=p.includes("{2}")?2:p.includes("self assigned")?1:-1;'
-                'return window.__(p,Object.keys(o).sort().map(k=>+k===r?window.__(o[k]):o[k]))}}return d})' % UL)
-        texto, k = _re.subn(r'subtype:(\w+)\?"assignment_completed":"assigned",text:(\w+),',
-                            lambda m: f'subtype:{m.group(1)}?"assignment_completed":"assigned",text:{hist}({m.group(2)}),', texto)
-        n += k
     # título do separador do CRM («Deals - Lista»): o nome da rota também se traduz
     texto, k = _re.subn(r'=`\$\{(\w+)\.name\} - \$\{(\w+)\}`',
                         lambda m: f'=`${{window.__?window.__({m.group(1)}.name):{m.group(1)}.name}} - ${{{m.group(2)}}}`', texto)
@@ -658,6 +646,34 @@ for pasta, minimo in (("crm/crm/public/frontend/assets", 150), ("helpdesk/helpde
 trocar("crm/crm/fcrm/doctype/crm_fields_layout/crm_fields_layout.py", [
     ('field["placeholder"] = field.get("placeholder") or "Add " + field.label + "..."',
      'field["placeholder"] = field.get("placeholder") or _("Add {0}...").format(_(field.label))'),
+])
+
+# O histórico do bilhete («X assigned Y: Automatic Assignment») chega do servidor já em texto: o Frappe grava-o na
+# língua de quem atribuiu (ou em inglês, nos registos criados por código) e só o reconhece na língua de quem lê.
+# Passa a mostrar-se na língua de quem lê, reconhecendo o texto em qualquer das quatro línguas (18-10-2026).
+trocar("frappe/frappe/desk/form/activity.py", [
+    ("def assignee_from_assignment(text: str, comment_type: str) -> str | None:",
+     '''def orbit_texto_atribuicao(text: str, comment_type: str) -> str:
+	"""O texto da atribuição foi gravado na língua de quem a fez; mostra-se na de quem lê (Orbit)."""
+	if comment_type == "Assigned":
+		ids = ("{0} self assigned this task: {1}", "{0} assigned {1}: {2}")
+	else:
+		ids = ("{0} removed their assignment.", "Assignment of {0} removed by {1}")
+	for msgid in ids:
+		for lang in ("en", "pt", "es", "fr"):
+			groups = match_format_template(msgid if lang == "en" else _(msgid, lang=lang), text)
+			if groups is None:
+				continue
+			args = [groups[i] for i in sorted(groups)]
+			if msgid != "Assignment of {0} removed by {1}" and msgid != "{0} removed their assignment." and args:
+				args[-1] = _(args[-1])
+			return _(msgid).format(*args)
+	return text
+
+
+def assignee_from_assignment(text: str, comment_type: str) -> str | None:'''),
+    ("\t\ttext = activity_text(c.content)\n\t\tassignee = assignee_from_assignment(text, c.comment_type)",
+     "\t\ttext = orbit_texto_atribuicao(activity_text(c.content), c.comment_type)\n\t\tassignee = assignee_from_assignment(text, c.comment_type)"),
 ])
 
 # As colunas da lista de bilhetes do Desk («Subject», «First response»…) vêm do servidor sem `_()` (18-10-2026).
