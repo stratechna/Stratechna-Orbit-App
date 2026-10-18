@@ -31,5 +31,10 @@
     "url": "https://github.com/stratechna/Stratechna-Orbit-App",
     "branch": "main",
     "app": "orbit"
+  },
+  {
+    "url": "https://github.com/stratechna/Stratechna-Orbit-Tempo",
+    "branch": "main",
+    "app": "orbit_tempo"
   }
 ]
