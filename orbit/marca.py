@@ -267,9 +267,9 @@ NOMES = {
     "Support": "Suporte",
     "Automation": "Automação",
     "Printing": "Impressão",
-    # «E-mail» (tradução do Frappe) ficava ao lado do produto Mail e confundia
-    # duas coisas diferentes: este módulo é a configuração de contas do ERP.
-    "Email": "Contas de correio",
+    # «Email» já não se traduz como «Contas de correio» (18-10-2026): a tradução é da
+    # frase inteira, e «Email» é também o rótulo de todos os campos de email — a coluna
+    # da lista de leads aparecia como «Contas de correio». Fica «Email» (translations/*.csv).
     # Recursos humanos
     "HR Setup": "Configuração de RH",
     "Recruitment": "Recrutamento",

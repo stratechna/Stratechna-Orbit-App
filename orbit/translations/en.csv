@@ -119,7 +119,7 @@ Cor principal,Main colour
 Credencial do feed iCalendar subscrito pelo webmail,Credential for the iCalendar feed subscribed to by the webmail
 Cupão,Coupon
 Código postal,Postcode
-Data,Date
+Data da supressão,Suppression date
 Data do consentimento,Consent date
 Data limite,Deadline
 De onde vem,Where it comes from
@@ -148,7 +148,6 @@ ERPNext,ERP
 ERPNext Settings,Settings
 Em simulação o ciclo corre inteiro e nada sai.,In simulation the whole run goes through and nothing is sent.
 Em simulação: nada sai.,In simulation: nothing is sent.
-Email,Email accounts
 Email da contabilidade,Accounts email
 Email geral,General email
 Empresa pequena/média,Small/medium business

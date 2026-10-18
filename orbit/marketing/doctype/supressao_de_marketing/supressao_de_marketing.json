@@ -44,7 +44,7 @@
   {
    "fieldname": "data",
    "fieldtype": "Datetime",
-   "label": "Data",
+   "label": "Data da supressão",
    "in_list_view": 1,
    "idx": 5
   }
@@ -70,7 +70,7 @@
  "states": [],
  "links": [],
  "creation": "2026-10-03 14:00:00.000000",
- "modified": "2026-10-03 14:00:00.000000",
+ "modified": "2026-10-18 17:40:00.000000",
  "owner": "Administrator",
  "modified_by": "Administrator",
  "idx": 0

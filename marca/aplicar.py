@@ -481,6 +481,117 @@ RODAPE_NOSSO = '''default_mail_footer = """
 
 trocar("erpnext/erpnext/hooks.py", [(RODAPE_ERPNEXT, RODAPE_NOSSO)])
 
+# ── Textos escritos no pacote, sem tradução (18-10-2026) ────────────────────
+#
+# O CRM e o Desk (e o frappe-ui que trazem dentro) têm textos ingleses escritos
+# no pacote compilado sem passar pelo `__()`: o painel «Getting started», a
+# ajuda, os separadores do bilhete no Desk de computador (`label:"Activity"`,
+# quando a versão móvel tem `label:d("Activity")`), botões e marcadores. Nenhum
+# catálogo lá chega, e um utilizador em pt/es/fr via-os em inglês no meio do
+# resto traduzido (docs/PLANO-I18N-ORBIT-APPS.md).
+#
+# Os dois pacotes expõem o tradutor em `window.__`. Envolvem-se:
+#  · os VALORES de label/placeholder/title/aria-label/tooltip/description — são
+#    sempre texto mostrado, nunca identificador;
+#  · os textos do painel «Getting started» em qualquer posição de valor;
+#  · `${a}/${b} steps completed`, `${a}% completed`, "Welcome to "+título e o
+#    ternário «Start now»/«Continue».
+# EXCEPTO os textos que o código compara (`.title==\`Emails\``, `.label==="Status"`):
+# esses são recolhidos primeiro, no pacote inteiro, e ficam como estão — traduzi-los
+# partia a lógica dos separadores.
+# As traduções estão em orbit/translations/*.csv. Cada ficheiro tratado leva à
+# cabeça o marcador /*orbit-i18n*/ (a troca não é idempotente). Abaixo de um
+# mínimo de trocas por pacote, a construção falha — o upstream mudou os textos.
+import re as _re
+MARCADOR_I18N = "/*orbit-i18n*/"
+TEXTOS_FIXOS = ["Getting started", "Skip all", "Reset all", "Help centre", "Help center",
+                "All articles", "Search articles...", "Open docs", "You are all set",
+                "All steps are completed successfully", "Reset onboarding steps",
+                "Upgrade plan", "Trial ends tomorrow"]
+_ROTULO = _re.compile(r'(?<![\w$])(label|placeholder|title|"aria-label"|tooltip|description):([`"])([A-Z][^`"$\\{}]{1,80})\2')
+_COMPARADOS = (_re.compile(r'\.(?:label|title|placeholder)\s*[!=]==?\s*([`"])([^`"]+)\1'),
+               _re.compile(r'([`"])([^`"]+)\1\s*[!=]==?\s*[\w$.]+\.(?:label|title|placeholder)\b'))
+
+
+def _t(q: str, t: str, args: str = "") -> str:
+    return f"(window.__?window.__({q}{t}{q}{args}):{q}{t}{q})"
+
+
+def _traduzir_fixos(texto: str, intocaveis: set) -> tuple[str, int]:
+    n = 0
+
+    def rotulo(m):
+        nonlocal n
+        chave, q, t = m.group(1), m.group(2), m.group(3)
+        if t in intocaveis or not _re.search(r"[a-z]{2}", t):
+            return m.group(0)
+        n += 1
+        return f"{chave}:{_t(q, t)}"
+    texto = _ROTULO.sub(rotulo, texto)
+    for t in TEXTOS_FIXOS:
+        padrao = _re.compile(r'(?:(?<=[(,?=\[])|(?<=return))(?<!__\()([`"])' + _re.escape(t) + r'\1(?!\s*:[^:])')
+        texto, k = padrao.subn(lambda m: _t(m.group(1), t), texto)
+        n += k
+    texto, k = _re.subn(r"`\$\{([^{}`]+)\}/\$\{([^{}`]+)\} steps completed`",
+                        lambda m: f"(window.__?window.__(`{{0}}/{{1}} steps completed`,[{m.group(1)},{m.group(2)}]):`${{{m.group(1)}}}/${{{m.group(2)}}} steps completed`)",
+                        texto)
+    n += k
+    texto, k = _re.subn(r"`\$\{([^{}`]+)\}% completed`",
+                        lambda m: f"(window.__?window.__(`{{0}}% completed`,[{m.group(1)}]):`${{{m.group(1)}}}% completed`)",
+                        texto)
+    n += k
+    texto, k = _re.subn(r'\?([`"])Start now\1:\1Continue\1',
+                        lambda m: "?" + _t(m.group(1), "Start now") + ":" + _t(m.group(1), "Continue"), texto)
+    n += k
+    # SLA do Desk: `Due in ${x}`, `Overdue by ${x}`, `Failed by ${x}`, `Fulfilled in ${x}`
+    texto, k = _re.subn(r"`(Due in|Overdue by|Failed by|Fulfilled in) \$\{([^{}`]+)\}`",
+                        lambda m: f"(window.__?window.__(`{m.group(1)} {{0}}`,[{m.group(2)}]):`{m.group(1)} ${{{m.group(2)}}}`)",
+                        texto)
+    n += k
+    # Tempo relativo do dayjs («2 days ago»): o pacote não traz as localizações do dayjs e cai nos textos de
+    # origem. Passam a «getters», que traduzem no momento de mostrar — e não ao carregar o módulo, quando as
+    # traduções ainda não chegaram.
+    def _relativo(m):
+        q = m.group(1)
+        pares = _re.findall(r'(\w+):' + q + r'([^' + q + r']*)' + q, m.group(0))
+        return "{" + ",".join(f"get {c}(){{return window.__?window.__({q}{v}{q}):{q}{v}{q}}}" for c, v in pares) + "}"
+    texto, k = _re.subn(r'\{future:([`"])in %s\1,past:\1%s ago\1(?:,\w+:\1[^`"]*\1){11}\}', _relativo, texto)
+    n += k
+    texto, k = _re.subn(r'([`"])Welcome to \1\+([\w$.]+)',
+                        lambda m: f"(window.__?window.__({m.group(1)}Welcome to {{0}}{m.group(1)},[{m.group(2)}]):{m.group(1)}Welcome to {m.group(1)}+{m.group(2)})",
+                        texto)
+    return texto, n + k
+
+
+for pasta, minimo in (("crm/crm/public/frontend/assets", 150), ("helpdesk/helpdesk/public/desk/assets", 150)):
+    caminho = os.path.join(APPS, pasta)
+    if not os.path.isdir(caminho):
+        falhas.append(f"pasta de pacotes em falta: {pasta}")
+        continue
+    ficheiros = [os.path.join(caminho, f) for f in sorted(os.listdir(caminho)) if f.endswith(".js")]
+    intocaveis = set()
+    for alvo in ficheiros:
+        with open(alvo, encoding="utf-8", errors="surrogateescape") as fh:
+            texto = fh.read()
+        for r in _COMPARADOS:
+            intocaveis |= {m.group(2) for m in r.finditer(texto)}
+    total = 0
+    for alvo in ficheiros:
+        with open(alvo, encoding="utf-8", errors="surrogateescape") as fh:
+            texto = fh.read()
+        if texto.startswith(MARCADOR_I18N):
+            total += texto.count("window.__?window.__(")
+            continue
+        novo, n = _traduzir_fixos(texto, intocaveis)
+        if n:
+            with open(alvo, "w", encoding="utf-8", errors="surrogateescape") as fh:
+                fh.write(MARCADOR_I18N + novo)
+            feitos += 1
+            total += n
+    print(f"textos escritos no pacote, agora traduzíveis, em {pasta}: {total} ({len(intocaveis)} comparados ficam)")
+    if total < minimo:
+        falhas.append(f"{pasta}: só {total} textos tratados (esperavam-se {minimo}) — o upstream mudou os pacotes?")
+
 # ── Resultado ───────────────────────────────────────────────────────────────
 print(f"marca das apps de frontend próprio: {feitos} ficheiros tratados")
 if falhas:
