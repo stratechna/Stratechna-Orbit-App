@@ -1,4 +1,5 @@
  Search..., Rechercher...
+ and , et 
  commented, a commenté
 !=,!=
 """{0}"" does not match any field. Map it in the Preview step, otherwise it will be ignored.","""{0}"" ne correspond à aucun champ. Associez-le à l'étape d'aperçu, sinon il sera ignoré."
@@ -21,6 +22,8 @@
 (required),(obligatoire)
 ({0}s),({0}s)
 +{0} more,+{0} de plus
++{0} more keyword(s) on this rule,+{0} mot(s)-clé de plus dans cette règle
++{0} more pattern(s) on this rule,+{0} motif(s) de plus dans cette règle
 -,-
 - Default Ticket Status<br>,- Statut par défaut du ticket<br>
 - Ticket Reopen Status<br>,- Statut de réouverture du ticket<br>
@@ -74,12 +77,14 @@ A button (blood type),Bouton A (groupe sanguin)
 A campanha está «{0}» — este passo não se aplica.,La campagne est « {0} » — cette étape ne s'applique pas.
 A custom settings map already exists for {0}.,Une carte de paramètres personnalisée existe déjà pour {0}.
 A customization for {0} already exists for this layer.,Une personnalisation de {0} existe déjà pour cette couche.
+"A deal is a sale you are working on. Create one, or convert a lead into a deal once it looks promising.",Une opportunité est une vente sur laquelle vous travaillez. Créez-en une ou convertissez un lead en opportunité lorsqu'il semble prometteur.
 A enviar,Envoi en cours
 A file with same name {} already exists,Un fichier du même nom {} existe déjà
 A folder cannot have a File URL,Un dossier ne peut pas avoir d'URL de fichier
 A friend or colleague,Un ami ou collègue
 A layout saved on {0} could not be read and was skipped.,Une mise en page enregistrée dans {0} n'a pas pu être lue et a été ignorée.
 A layout with this name already exists,Une mise en page portant ce nom existe déjà
+"A lead is someone who might buy from you. Add one yourself, import a list, or capture them from a web form.","Un lead est une personne susceptible de vous acheter. Ajoutez-en un, importez une liste ou captez-les depuis un formulaire web."
 A ligação ao portal não está configurada neste site.,La connexion au portail n'est pas configurée sur ce site.
 A linha pequena em maiúsculas por cima do título (ex.: «Só esta semana»).,La petite ligne en majuscules au-dessus du titre (ex. : « Cette semaine seulement »).
 A marca (vem do portal),La marque (provient du portail)
@@ -91,6 +96,7 @@ A palavra-passe de {0} não está certa.,Le mot de passe de {0} est incorrect.
 "A postal address of a customer, supplier, company or contact.","Une adresse postale d'un client, d'un fournisseur, d'une entreprise ou d'un contact."
 A private workspace is yours alone. Only you can see it.,Un espace de travail privé n'appartient qu'à vous. Vous seul pouvez le voir.
 A quem,À qui
+A rule for {0} already exists,Une règle pour {0} existe déjà
 A section can have up to {0} columns,Une section peut avoir jusqu'à {0} colonnes
 A senha com que se entra nesta caixa. Não é guardada: é confirmada e esquecida.,Le mot de passe de cette boîte mail. Il n'est pas enregistré : il est vérifié puis oublié.
 A shared workspace needs a module other than {0}.,Un espace de travail partagé nécessite un module autre que {0}.
@@ -137,6 +143,7 @@ Access,Accès
 Access added.,Accès ajouté.
 Access all team tickets,Accéder à tous les tickets de l'équipe
 Access denied,Accès refusé
+Access key for {0}. Required for fetching exchange rates.,Clé d'accès pour {0}. Nécessaire pour obtenir les taux de change.
 Access only this team's tickets,Accéder uniquement aux tickets de cette équipe
 Account Setup,Configuration des comptes
 Accounting,Comptabilité
@@ -211,19 +218,27 @@ Add field,Ajouter un champ
 Add field...,Ajouter un champ...
 Add fields to see them here.,Ajoutez des champs pour les voir ici.
 Add holidays here to make sure they’re excluded from SLA calculations.,Ajoutez ici les jours fériés pour qu'ils soient exclus des calculs de SLA.
+Add industry rule,Ajouter une règle de secteur
 Add members to this team to get started.,Ajoutez des membres à cette équipe pour commencer.
 Add new attachments,Ajouter de nouvelles pièces jointes
+Add one to tell enrichment which keywords point at which industry.,Ajoutez-en une pour indiquer à l'enrichissement quels mots-clés renvoient à quel secteur.
+Add one to tell enrichment which profile links to look for.,Ajoutez-en une pour indiquer à l'enrichissement quels liens de profil rechercher.
+Add or invite users and choose their role to control what they can see and do.,Ajoutez ou invitez des utilisateurs et choisissez leur rôle pour contrôler ce qu'ils peuvent voir et faire.
 Add recurring holidays such as weekends.,"Ajoutez des jours fériés récurrents, comme les week-ends."
 Add role,Ajouter un rôle
+Add social rule,Ajouter une règle sociale
 Add tags,Ajouter des étiquettes
 Add time targets around support milestones like first reply and resolution times.,"Ajoutez des objectifs de délai pour les jalons du support, comme la première réponse et la résolution."
 Add to recipients,Ajouter aux destinataires
 Add to the Sidebar,Ajouter à la barre latérale
 Add to the dock,Ajouter au dock
+Add website to auto enrich,Ajoutez un site web pour enrichir automatiquement
 Add {0},Ajouter {0},Primary action in tree view
 Add {0} Access to {1},Ajouter l'accès {0} à {1}
 Add {0} to a module,Ajouter {0} à un module
 Add {0}...,Ajouter {0}...
+"Add, edit, and manage email templates for various CRM communications.","Ajoutez, modifiez et gérez les modèles d'e-mail des différentes communications du CRM."
+"Add, edit, and manage sources for automatic lead syncing to your CRM.","Ajoutez, modifiez et gérez les sources pour la synchronisation automatique des leads avec votre CRM."
 "Add, manage agents and assign roles to them.",Ajoutez et gérez des agents et attribuez-leur des rôles.
 Added Roles,Rôles ajoutés
 Added Widgets,Widgets ajoutés
@@ -233,6 +248,8 @@ Adquirido,Acquise
 Advanced,Avancé
 Advanced Condition,Condition avancée
 Advanced Expression using Python,Expression avancée en Python
+Advertisement,Publicité
+Advertising,Publicité
 After branches,Après les branches
 Agenda indisponível.,Agenda indisponible.
 Agent Configuration,Configuration des agents
@@ -328,6 +345,7 @@ App that produced this notification; used to scope app-specific panels. Derived 
 "App {0} is not installed, so a standard sidebar cannot be written to it.","L'application {0} n'est pas installée, une barre latérale standard ne peut donc pas y être écrite."
 App {} is not installed,L'application {} n'est pas installée
 App-shipped roles whose access is revoked on this site.,Rôles fournis par des applications dont l'accès est révoqué sur ce site.
+Apparel & Accessories,Habillement et accessoires
 Appearance,Apparence
 Appears in the left sidebar. Recommended size is minimum 32x32 px in PNG or SVG.,"S'affiche dans la barre latérale gauche. Taille recommandée : 32x32 px minimum, en PNG ou SVG."
 Appears next to the title in your browser tab. Recommended size is minimum 32x32 px in PNG or ICO,"S'affiche à côté du titre dans l'onglet du navigateur. Taille recommandée : 32x32 px minimum, en PNG ou ICO"
@@ -357,22 +375,31 @@ Aquarius,Verseau
 Ar,Ar,Number system
 Archive of the previous navigation. Nothing reads it at runtime; it is kept as the migration's source so the conversion to module sidebars can be run again.,Archive de la navigation précédente. Rien ne la lit à l'exécution ; elle est conservée comme source de la migration afin de pouvoir relancer la conversion vers les barres latérales de module.
 Are you sure you want to change tabs? Unsaved changes will be lost.,Voulez-vous vraiment changer d'onglet ? Les modifications non enregistrées seront perdues.
+Are you sure you want to clear assignment for {0} item(s)?,Voulez-vous vraiment effacer l'assignation de {0} élément(s) ?
 Are you sure you want to close this ticket?,Voulez-vous vraiment fermer ce ticket ?
+Are you sure you want to convert {0} lead(s) to deal(s)?,Voulez-vous vraiment convertir {0} lead(s) en opportunité(s) ?
+"Are you sure you want to delete ""{0}"" view?",Voulez-vous vraiment supprimer la vue « {0} » ?
 Are you sure you want to delete the trigger and all workflow steps?,Voulez-vous vraiment supprimer le déclencheur et toutes les étapes du flux de travail ?
 Are you sure you want to delete these articles?,Voulez-vous vraiment supprimer ces articles ?
 Are you sure you want to delete this contact? The contact will be permanently deleted and unlinked from any associated customers and tickets.,Voulez-vous vraiment supprimer ce contact ? Il sera supprimé définitivement et dissocié de tous les clients et tickets associés.
 Are you sure you want to delete this customer? The reference to this customer will be removed from all the related tickets.,Voulez-vous vraiment supprimer ce client ? La référence à ce client sera retirée de tous les tickets associés.
 Are you sure you want to delete this step?,Voulez-vous vraiment supprimer cette étape ?
 Are you sure you want to delete this ticket? This is an irreversible action and cannot be undone.,Voulez-vous vraiment supprimer ce ticket ? Cette action est irréversible et ne peut pas être annulée.
+Are you sure you want to delete {0} - {1}?,Voulez-vous vraiment supprimer {0} - {1} ?
+Are you sure you want to delete {0} items?,Voulez-vous vraiment supprimer {0} éléments ?
+Are you sure you want to delete {0} linked doc(s)?,Voulez-vous vraiment supprimer {0} document(s) lié(s) ?
 Are you sure you want to discard changes?,Voulez-vous vraiment abandonner les modifications ?
 Are you sure you want to discard this article?,Voulez-vous vraiment abandonner cet article ?
 Are you sure you want to leave? Unsaved changes will be lost.,Voulez-vous vraiment quitter ? Les modifications non enregistrées seront perdues.
 Are you sure you want to log out?,Voulez-vous vraiment vous déconnecter ?
+Are you sure you want to make this attachment {0}?,Voulez-vous vraiment rendre cette pièce jointe {0} ?
 Are you sure you want to relink this communication?,Voulez-vous vraiment relier à nouveau cette communication ?
 Are you sure you want to remove the logo?,Voulez-vous vraiment supprimer le logo ?
 Are you sure you want to remove this contact from the customer?,Voulez-vous vraiment retirer ce contact du client ?
+Are you sure you want to remove {0} from the hierarchy?,Voulez-vous vraiment retirer {0} de la hiérarchie ?
 Are you sure you want to resend the invitation?,Voulez-vous vraiment renvoyer l'invitation ?
 Are you sure you want to reset the content? Current content will be overridden.,Voulez-vous vraiment réinitialiser le contenu ? Le contenu actuel sera écrasé.
+Are you sure you want to unlink {0} linked doc(s)?,Voulez-vous vraiment dissocier {0} document(s) lié(s) ?
 Arguments,Arguments
 Arial,Arial
 Aries,Bélier
@@ -432,6 +459,7 @@ Async items (loading state),Éléments asynchrones (état de chargement)
 At least one assignee is required,Au moins un assigné est requis
 At least one enabled status for <u>{0}</u> category must be enabled.,Au moins un statut activé doit l'être pour la catégorie <u>{0}</u>.
 At least one feedback option must be enabled for rating {0},Au moins une option de retour doit être activée pour la note {0}
+At least one keyword is required,Au moins un mot-clé est requis
 At least one recipient is required,Au moins un destinataire est requis
 At least one team is required,Au moins une équipe est requise
 "At least one valid workday with a day, start time, and end time is required","Au moins un jour ouvré valide avec jour, heure de début et heure de fin est requis"
@@ -453,9 +481,11 @@ Até quantos dias depois,Jusqu'à combien de jours après
 Authorization POST requests must use application/x-www-form-urlencoded,Les requêtes POST d'autorisation doivent utiliser application/x-www-form-urlencoded
 Auto repeat skipped. The owner cannot access the reference document.,Répétition automatique ignorée. Le propriétaire ne peut pas accéder au document de référence.
 Auto update status,Mise à jour automatique du statut
+Auto-assign leads/deals to the right sales user based on predefined conditions.,Assignez automatiquement les leads et opportunités au bon commercial selon des conditions prédéfinies.
 Auto-close after (Days),Fermeture automatique après (jours)
 Auto-close tickets that remain in a status for the specified number of days.,Fermer automatiquement les tickets restés dans un statut pendant le nombre de jours indiqué.
 Auto-disabled after {0} consecutive failures,Désactivé automatiquement après {0} échecs consécutifs
+Auto-enrich new records,Enrichir automatiquement les nouveaux enregistrements
 Auto-generated thumbnail of this format. Use the 'Generate Preview' button to (re)generate.,Miniature générée automatiquement de ce format. Utilisez le bouton 'Générer l'aperçu' pour la (re)générer.
 Auto-reply received from {0}.,Réponse automatique reçue de {0}.
 Auto-rotate,Rotation automatique
@@ -466,6 +496,7 @@ Automatic Assignment,Attribution automatique
 Automatically Close Tickets when,Fermer automatiquement les tickets lorsque
 Automatically close stale tickets,Fermer automatiquement les tickets inactifs
 Automatically create a lead when an incoming email is received from an unknown contact,Créer automatiquement un lead à la réception d'un e-mail d'un contact inconnu
+"Automatically enrich new Leads, Deals and Organizations in the background when they have a website. When off, use the Enrich button on the record.","Enrichit automatiquement, en arrière-plan, les nouveaux leads, opportunités et organisations qui ont un site web. Si l'option est désactivée, utilisez le bouton Enrichir sur l'enregistrement."
 Automatically set the customer on a ticket based on the contact's linked customer(s),Définit automatiquement le client d'un ticket d'après le ou les clients liés au contact
 Automatically sets communication status to “Open” for the lead or deal when a new communication is created. Applies only when SLA is enabled,Définit automatiquement le statut de communication sur « Ouvert » pour le lead ou l'opportunité lorsqu'une nouvelle communication est créée. S'applique uniquement lorsque le SLA est activé
 Automatically sets communication status to “Replied” for the lead or deal when a response is received. Applies only when SLA is enabled,Définit automatiquement le statut de communication sur « Répondu » pour le lead ou l'opportunité lorsqu'une réponse est reçue. S'applique uniquement lorsque le SLA est activé
@@ -550,6 +581,7 @@ Barcode value must be text under 2000 characters,La valeur du code-barres doit �
 Base Support Rotation,Rotation de support de base
 Base legal,Base légale
 Based on,Basé sur
+Based on the selected filters no tickets found. Try adjusting the date range or filters applied.,Aucun ticket trouvé avec les filtres sélectionnés. Essayez d'ajuster la période ou les filtres appliqués.
 "Based on your HR Policy, select your leave allocation period's start date","D'après votre politique RH, sélectionnez la date de début de votre période d'attribution de congés"
 Basic,De base
 Basic (active + completed states),De base (états actif + terminé)
@@ -567,6 +599,7 @@ Belonging to,Appartenant à
 Beverage & Tobacco,Boissons et tabac
 Bidirectional Product Sync,Synchronisation bidirectionnelle des produits
 Bilhete do Desk,Ticket Desk
+Biotechnology,Biotechnologie
 "Blank means the site layer, which applies to everyone and is overridden by each user's own arrangement.","Vide signifie la couche du site, qui s'applique à tous et est remplacée par l'organisation propre à chaque utilisateur."
 Blocked for child tables (istable). Required for document and date-based triggers.,Bloqué pour les tables enfants (istable). Obligatoire pour les déclencheurs basés sur les documents et les dates.
 Blockquote,Citation
@@ -598,6 +631,8 @@ Branco,Blanc
 Brand name,Nom de la marque
 Breadcrumb,Fil d'Ariane
 Bring every entry back onto the dock.,Remettre toutes les entrées dans le dock.
+Broadcasting,Radiodiffusion
+Brokerage,Courtage
 Budget,Budgets
 Budget Constraints,Contraintes budgétaires
 Bug,Bogue
@@ -632,6 +667,7 @@ Call Logs,Journaux d'appels
 "Call connected, but the call log could not be saved. Please contact your administrator.","L'appel a été connecté, mais le journal d'appel n'a pas pu être enregistré. Veuillez contacter votre administrateur."
 Call contact,Appeler le contact
 Call duration in seconds,Durée de l'appel en secondes
+"Calls made through Twilio or Exotel are logged here, along with calls you log by hand on a lead or deal.","Les appels passés via Twilio ou Exotel sont enregistrés ici, ainsi que ceux que vous consignez à la main sur un lead ou une opportunité."
 Camera access needs a secure (HTTPS) connection and a browser with camera support.,L'accès à la caméra nécessite une connexion sécurisée (HTTPS) et un navigateur prenant en charge la caméra.
 Camera permission was denied. Allow camera access in your browser settings and try again.,L'autorisation de la caméra a été refusée. Autorisez l'accès à la caméra dans les paramètres du navigateur et réessayez.
 Campanha,Campagne
@@ -720,7 +756,9 @@ Choose a numeric field,Choisissez un champ numérique
 Choose a starting point for your print format.,Choisissez un point de départ pour votre format d'impression.
 Choose an event,Choisissez un événement
 Choose field,Choisir un champ
+Choose how the dashboard forecasts deals and shows currency.,Choisissez comment le tableau de bord prévoit les opportunités et affiche la devise.
 Choose how tickets are distributed among selected assignees.,Choisissez comment les tickets sont répartis entre les assignés sélectionnés.
+Choose how {0} are assigned among the selected assignees.,Choisissez comment {0} sont assignés parmi les responsables sélectionnés.
 Choose the duration of this holiday list.,Choisissez la durée de cette liste de jours fériés.
 Choose the email service provider you want to configure.,Choisissez le fournisseur de service e-mail que vous souhaitez configurer.
 Choose value,Choisir une valeur
@@ -730,6 +768,7 @@ Choose which notification types are emailed to you. Unchecked types still show a
 Choose which tickets are affected by this assignment rule.,Choisissez les tickets concernés par cette règle d'assignation.
 Choose which tickets are affected by this policy.,Choisissez les tickets concernés par cette politique.
 Choose which tickets are affected by this un-assignment rule.,Choisissez les tickets concernés par cette règle de désassignation.
+Choose which {0} are affected by this assignment rule.,Choisissez quels {0} sont concernés par cette règle d'assignation.
 Choose who can view and use this response.,Choisissez qui peut voir et utiliser cette réponse.
 Choose who receives the tickets.,Choisissez qui reçoit les tickets.
 Choose {0},Choisir {0}
@@ -781,6 +820,7 @@ Cloud settings,Paramètres du cloud
 Code Block,Bloc de code
 Code block,Bloc de code
 Cold,Froid
+Cold Calling,Prospection téléphonique
 Collaborating with my team,Collaborer avec mon équipe
 Collapse,Réduire
 Collapse all,Tout réduire
@@ -835,10 +875,12 @@ Conditions,Conditions
 Configuration,Configuration
 Configuração da plataforma,Configuration de la plateforme
 Configure action,Configurer l'action
+Configure actions that appear on the home dropdown.,Configurez les actions qui apparaissent dans le menu d'accueil.
 Configure conditional naming rules for {0}. Rules are applied in priority order.,Configurez des règles de nommage conditionnelles pour {0}. Les règles sont appliquées par ordre de priorité.
 Configure fields,Configurer les champs
 Configure fields to show when searching for {0} globally. Open global search via {1}.,Configurez les champs à afficher lors d'une recherche globale de {0}. Ouvrez la recherche globale via {1}.
 Configure form view behaviour.,Configurez le comportement de la vue formulaire.
+Configure general settings for your application.,Configurez les paramètres généraux de votre application.
 Configure list view behaviour.,Configurez le comportement de la vue liste.
 Configure naming series options for {0}. You can choose a series when creating a document.,Configurez les options de séries de nommage pour {0}. Vous pouvez choisir une série lors de la création d'un document.
 Configure print formats for {0}. You can choose a format when printing or emailing a document.,Configurez les formats d'impression pour {0}. Vous pouvez choisir un format lors de l'impression ou de l'envoi d'un document par e-mail.
@@ -846,21 +888,26 @@ Configure report view behaviour.,Configurez le comportement de la vue rapport.
 Configure search fields,Configurer les champs de recherche
 Configure search settings,Configurer les paramètres de recherche
 Configure telephony settings for your CRM,Configurez les paramètres de téléphonie de votre CRM
+Configure telephony settings for your CRM.,Configurez les paramètres de téléphonie de votre CRM.
 Configure the exchange rate provider for your CRM,Configurez le fournisseur de taux de change de votre CRM
 Configure your Exotel settings for Helpdesk.,Configurez vos paramètres Exotel pour Desk.
 Configure your Exotel telephony integration settings here,Configurez ici les paramètres de l'intégration de téléphonie Exotel
 Configure your Twilio settings for Helpdesk.,Configurez vos paramètres Twilio pour Desk.
 Configure your Twilio telephony integration settings here,Configurez ici les paramètres de l'intégration de téléphonie Twilio
 "Configure your brand name, logo and favicon","Configurez le nom de la marque, le logo et le favicon"
+"Configure your brand name, logo and favicon.","Configurez le nom de la marque, le logo et le favicon."
 Configure your email settings.,Configurez vos paramètres e-mail.
 Configure your telephony settings.,Configurez vos paramètres de téléphonie.
 Confirm Changes,Confirmer les modifications
 Confirm overwrite,Confirmer l'écrasement
 Conjunto de configuração do relay,Jeu de configuration du relais
+Connect ERPNext to Stratechna CRM,Connectez ERPNext à Stratechna CRM
+Connect email accounts to send and receive emails from CRM. Set one as the default for incoming and outgoing emails.,Connectez des comptes e-mail pour envoyer et recevoir des e-mails depuis le CRM. Définissez-en un par défaut pour les e-mails entrants et sortants.
 Connect my support email,Connecter mon e-mail de support
 Connect your support email,Connectez votre e-mail de support
 Consecutive failures after which a flow is auto-disabled and its owner notified.,Nombre d'échecs consécutifs après lequel un flux est désactivé automatiquement et son propriétaire notifié.
 Console,Console
+Consumer Products,Biens de consommation
 Conta de envio (relay),Compte d'envoi (relais)
 Conta no portal,Compte sur le portail
 Conta-corrente MBontime,Compte courant MBontime
@@ -875,6 +922,7 @@ Contacted,Contacté
 Contactos (JSON),Contacts (JSON)
 "Contactos contactáveis, no máximo","Contacts joignables, au maximum"
 Contacts added successfully,Contacts ajoutés avec succès
+"Contacts are the people you talk to at your leads and customers. They are added when you convert a lead, or you can add them here.","Les contacts sont les personnes avec qui vous échangez chez vos leads et clients. Ils sont ajoutés lorsque vous convertissez un lead, ou vous pouvez les ajouter ici."
 Contactáveis na última contagem,Joignables au dernier comptage
 Content must be a JSON object,Le contenu doit être un objet JSON
 Content must be valid JSON,Le contenu doit être un JSON valide
@@ -902,18 +950,24 @@ Cor do botão,Couleur du bouton
 Cor principal,Couleur principale
 Core,Cœur
 Correlation Key,Clé de corrélation
+Could not add industry rule,Impossible d'ajouter la règle de secteur
+Could not add social rule,Impossible d'ajouter la règle sociale
 Could not an email due to: {0},Impossible d'envoyer un e-mail en raison de : {0}
 Could not apply actions from the saved reply.,Impossible d'appliquer les actions de la réponse enregistrée.
 Could not convert this print format,Impossible de convertir ce format d'impression
 Could not create document,Impossible de créer le document
 Could not create form,Impossible de créer le formulaire
 "Could not create the Frappe CRM custom fields on {0} automatically. If it is running the latest ERPNext, enable <b>Frappe CRM Data Synchronization</b> in its CRM Settings, Otherwise check the Error Log.","Impossible de créer automatiquement les champs personnalisés du CRM sur {0}. S'il exécute la dernière version d'ERPNext, activez <b>Frappe CRM Data Synchronization</b> dans les paramètres du CRM ; sinon, consultez le journal d'erreurs."
+Could not delete industry rule,Impossible de supprimer la règle de secteur
+Could not delete social rule,Impossible de supprimer la règle sociale
 Could not duplicate automation,Impossible de dupliquer l'automatisation
 Could not find the `name` column in tabHD Ticket,Colonne `name` introuvable dans tabHD Ticket
 Could not generate PDF,Impossible de générer le PDF
 Could not grant guest access.,Impossible d'accorder l'accès invité.
 Could not load groups.,Impossible de charger les groupes.
 Could not load import file,Impossible de charger le fichier d'importation
+Could not load industry rules,Impossible de charger les règles de secteur
+Could not load social rules,Impossible de charger les règles sociales
 Could not load the dock. Please try again.,Impossible de charger le dock. Veuillez réessayer.
 Could not load the saved field rules,Impossible de charger les règles de champ enregistrées
 Could not load the sidebar. Please try again.,Impossible de charger la barre latérale. Veuillez réessayer.
@@ -935,10 +989,15 @@ Could not render the preview,Impossible d'afficher l'aperçu
 Could not resolve host: {0},Impossible de résoudre l'hôte : {0}
 Could not save,Impossible d'enregistrer
 Could not save automation,Impossible d'enregistrer l'automatisation
+Could not save industry rule,Impossible d'enregistrer la règle de secteur
+Could not save settings,Impossible d'enregistrer les paramètres
+Could not save social rule,Impossible d'enregistrer la règle sociale
 "Could not save, try again","Impossible d'enregistrer, réessayez"
 Could not send an acknowledgement email due to: {0},Impossible d'envoyer un e-mail d'accusé de réception en raison de : {0}
 "Could not send feedback email,due to: {0}",Impossible d'envoyer l'e-mail de retour en raison de : {0}
+Could not start enrichment.,Impossible de démarrer l'enrichissement.
 Could not start the camera.,Impossible de démarrer la caméra.
+Could not undo enrichment.,Impossible d'annuler l'enrichissement.
 Could not update,Impossible de mettre à jour
 Could not update automation,Impossible de mettre à jour l'automatisation
 Could not update document,Impossible de mettre à jour le document
@@ -977,11 +1036,14 @@ Create form,Créer un formulaire
 Create layout,Créer une mise en page
 Create my first ticket,Créer mon premier ticket
 Create new business holiday,Créer un nouveau jour férié de l'entreprise
+Create new {0} using the Create button.,Créez un nouvel enregistrement {0} avec le bouton Créer.
 Create one to start capturing leads.,Créez-en un pour commencer à capter des leads.
 Create products as Items in ERPNext,Créer les produits comme articles dans ERPNext
 Create workflow automations for CRM documents,Créez des automatisations de flux de travail pour les documents du CRM
+Create workflow automations for CRM documents.,Créez des automatisations de flux de travail pour les documents du CRM.
 Create your account,Créez votre compte
 Create your first {0} to get started.,Créez votre premier {0} pour commencer.
+Create {0},Créer {0}
 Created,Créé
 Created By,Créé par
 Created Deal {0},Opportunité {0} créée
@@ -995,6 +1057,7 @@ Credencial do feed iCalendar subscrito pelo webmail,Identifiant du flux iCalenda
 Cron Expression,Expression Cron
 Crop image,Recadrer l'image
 Cupão,Coupon
+Currency for dashboard cards and charts. Can't be changed once set.,Devise des cartes et graphiques du tableau de bord. Ne peut plus être modifiée une fois définie.
 Current Series,Série actuelle
 Current icon,Icône actuelle
 Current value,Valeur actuelle
@@ -1029,6 +1092,7 @@ Customer portal,Portail client
 Customer portal permissions have changed,Les autorisations du portail client ont changé
 Customer portal update,Mise à jour du portail client
 Customer updated,Client mis à jour
+Customer's Vendor,Fournisseur du client
 Customers & Contacts,Clients et contacts
 Customers are in sync,Les clients sont synchronisés
 Customizations,Personnalisations
@@ -1040,8 +1104,10 @@ DB Tables,Tables de la BD
 DELETE,DELETE
 DESC,DESC
 DLE,DLE
+Daily tag volume will appear here once tickets are tagged.,Le volume quotidien d'étiquettes apparaîtra ici dès que les tickets seront étiquetés.
 Daily volume of the top {0} tags,Volume quotidien des {0} principaux tags
 Danger,Danger
+Dashboard charts will appear here once you start receiving or creating tickets.,Les graphiques du tableau de bord apparaîtront ici dès que vous commencerez à recevoir ou créer des tickets.
 Dashboard saved,Tableau de bord enregistré
 Data Import Skipped Row,Ligne ignorée de l'importation de données
 Data Import Value Mapping,Correspondance des valeurs de l'importation de données
@@ -1100,6 +1166,7 @@ Delete snippet,Supprimer l'extrait
 Delete step,Supprimer l'étape
 Delete the <b>{0}</b> workspace? This cannot be undone.,Supprimer l'espace de travail <b>{0}</b> ? Cette action est irréversible.
 Delete the snippet '{0}'?,Supprimer l'extrait « {0} » ?
+Delete this rule?,Supprimer cette règle ?
 Delete this user permission?,Supprimer cette autorisation utilisateur ?
 Delete this version,Supprimer cette version
 Delete trigger,Supprimer le déclencheur
@@ -1275,6 +1342,7 @@ Each relationship needs an alias and relationship name,Chaque relation nécessit
 Each row maps a field on a Single (Settings) doctype to surface for this doctype.,Chaque ligne associe un champ d'un doctype Unique (de paramètres) à exposer pour ce doctype.
 "Earlier, every contact could see all the tickets of their company. Now, contacts only see the tickets they raised themselves.","Auparavant, chaque contact pouvait voir tous les tickets de son entreprise. Désormais, les contacts ne voient que les tickets qu'ils ont eux-mêmes créés."
 "Easily invite new agents, managers, or admins.","Invitez facilement de nouveaux agents, gestionnaires ou administrateurs."
+Ecommerce,E-commerce
 Edit Contact,Modifier le contact
 Edit Customer,Modifier le client
 Edit Domain,Modifier le domaine
@@ -1285,6 +1353,7 @@ Edit Section,Modifier la section
 Edit Series,Modifier la série
 Edit Title,Modifier le titre
 Edit Typst,Modifier Typst
+Edit deal's mandatory fields layout,Modifier la disposition des champs obligatoires de l'opportunité
 Edit field,Modifier le champ
 Edit gallery,Modifier la galerie
 Edit in the visual builder.,Modifiez dans le constructeur visuel.
@@ -1310,7 +1379,10 @@ Email account created,Compte e-mail créé
 Email account created successfully,Compte e-mail créé avec succès
 Email account name,Nom du compte e-mail
 Email account updated successfully,Compte e-mail mis à jour avec succès
+Email address added,Adresse e-mail ajoutée
 Email address of the primary contact,Adresse e-mail du contact principal
+Email address removed,Adresse e-mail supprimée
+Email address updated,Adresse e-mail mise à jour
 Email content,Contenu de l'e-mail
 Email da contabilidade,E-mail de la comptabilité
 Email everyone for <b>{0}</b> notifications? This adds it to every user's email preferences. Users can still opt out individually afterwards.,Envoyer un e-mail à tous pour les notifications <b>{0}</b> ? Cela l'ajoute aux préférences d'e-mail de chaque utilisateur. Les utilisateurs pourront ensuite s'en désinscrire individuellement.
@@ -1345,6 +1417,7 @@ Enable comment reactions,Activer les réactions aux commentaires
 Enable developer mode to change whether a dock is standard -- it is backed by a file in its app.,Activez le mode développeur pour modifier si un dock est standard -- il repose sur un fichier de son application.
 Enable developer mode to change whether a sidebar is standard -- it is backed by a file in its app.,Activez le mode développeur pour modifier si une barre latérale est standard -- elle repose sur un fichier de son application.
 Enable developer mode to create a standard Print Format Snippet,Activez le mode développeur pour créer un extrait de format d'impression standard
+Enable enrichment,Activer l'enrichissement
 Enable feedback for Customer Portal,Activer les retours sur le portail client
 Enable the integration to create quotations and more in ERPNext.,Activez l'intégration pour créer des devis et plus encore dans ERPNext.
 Enable the notification type before emailing it to users.,Activez le type de notification avant de l'envoyer par e-mail aux utilisateurs.
@@ -1359,6 +1432,17 @@ End time must be after start time,L'heure de fin doit être postérieure à l'he
 End time must be after start time for: {0},L'heure de fin doit être postérieure à l'heure de début pour : {0}
 Endereço,Adresse
 Endereço de quem vê,Adresse de la personne qui consulte
+Enrich,Enrichir
+Enrich from website,Enrichir depuis le site web
+Enriched from website,Enrichi depuis le site web
+Enriching…,Enrichissement…
+Enrichment,Enrichissement
+Enrichment Settings,Paramètres d'enrichissement
+Enrichment failed.,L'enrichissement a échoué.
+Enrichment is off. These rules apply once it is turned on.,L'enrichissement est désactivé. Ces règles s'appliquent dès qu'il est activé.
+Enrichment successful,Enrichissement réussi
+Enrichment undone,Enrichissement annulé
+Enrichment undone. Kept your edits to: {0},Enrichissement annulé. Vos modifications ont été conservées pour : {0}
 Enter Notification Message,Saisissez le message de notification
 Enter Personal Mobile Number,Saisissez le numéro de mobile personnel
 Enter Value,Saisir une valeur,Title of prompt dialog
@@ -1430,6 +1514,8 @@ Exception,Exception
 Exchangerate API,Exchangerate API
 Exchangerate Host,Exchangerate Host
 Executive,Executive
+Exhibition,Salon
+Existing Customer,Client existant
 Existing Gravatar URLs may still be stored on User and Contact records. Do you want to delete these URLs now?,Des URL Gravatar peuvent encore être stockées sur les fiches Utilisateur et Contact. Voulez-vous supprimer ces URL maintenant ?
 "Existing Gravatar URLs may still be stored on User, Contact, and Lead records. Do you want to delete these URLs now?","Des URL Gravatar peuvent encore être stockées sur les fiches Utilisateur, Contact et Lead. Voulez-vous supprimer ces URL maintenant ?"
 Existing contacts are being made customer managers in the background,Les contacts existants sont en train de devenir gestionnaires de clients en arrière-plan
@@ -1497,6 +1583,7 @@ Failed to update email account: invalid credentials,Échec de la mise à jour du
 Failed to update field dependency.,Échec de la mise à jour de la dépendance du champ.
 Failed to update setting,Échec de la mise à jour du paramètre
 Failed to update tags,Échec de la mise à jour des tags
+Failed to update {0} record(s): {1},Échec de la mise à jour de {0} enregistrement(s) : {1}
 Failure Threshold,Seuil d'échec
 Faixa de chamada,Bandeau d'appel à l'action
 Faixa de destaque,Bandeau de mise en avant
@@ -1520,6 +1607,7 @@ Feedback Trend,Tendance des retours
 Feedback Widget,Widget de retour
 Feedback email has been sent to the customer,L'e-mail de demande de retour a été envoyé au client
 Feedback from this contact will appear here once available.,Les retours de ce contact apparaîtront ici dès qu'ils seront disponibles.
+Feedback insights will appear once responses are collected.,Les enseignements des évaluations apparaîtront dès que des réponses auront été recueillies.
 Feedback submitted successfully.,Retour envoyé avec succès.
 Feira ou evento,Salon ou événement
 Feito é sempre melhor que perfeito.,Fait vaut toujours mieux que parfait.
@@ -1555,8 +1643,11 @@ Fields the board can group cards by (swimlanes). New boards are pre-filled with 
 Fields the board can group cards into swimlanes by.,Champs selon lesquels le tableau peut regrouper les cartes en couloirs.
 Fieldtype of {0} in {1} cannot be changed from {2} to {3},Le type de champ de {0} dans {1} ne peut pas être changé de {2} en {3}
 Fila de email,File d'attente des e-mails
+"File ""{0}"" was skipped because size exceeds {1} MB",Le fichier « {0} » a été ignoré car sa taille dépasse {1} Mo
 File upload,Téléversement de fichier
 Filename,Nom du fichier
+"Fill in company details on Leads, Deals and Organizations from their website.","Renseignez les informations de l'entreprise sur les leads, opportunités et organisations à partir de leur site web."
+Filled: {0},Renseigné : {0}
 Filter,Filtrer
 "Filter Name, Reference Document Type and Module are required for a standard list layout","Le nom du filtre, le type de document de référence et le module sont obligatoires pour une mise en page de liste standard"
 Filter import log,Filtrer le journal d'importation
@@ -1570,6 +1661,7 @@ Filters applied to Link queries and Attachment Gallery files.,Filtres appliqués
 Filters {0},Filtres {0}
 Finance,Finance
 Financial Reports,Rapports financiers
+Financial Services,Services financiers
 Find out all of the variables that can be used in the content,Découvrez toutes les variables utilisables dans le contenu
 Finding past conversations,Retrouver les conversations passées
 Fingerprint,Empreinte
@@ -1591,6 +1683,7 @@ Fiscal Year (requires ERPNext to be installed),Exercice fiscal (nécessite l'ins
 Fit entire flow,Ajuster tout le flux
 Fix issues,Corriger les problèmes
 Fix issues summary,Résumé de la correction des problèmes
+Fix the highlighted fields before saving,Corrigez les champs en surbrillance avant d'enregistrer
 Fixed text like a title or a note,"Texte fixe, comme un titre ou une note"
 Floating,Flottant
 Flow,Flux
@@ -1607,6 +1700,7 @@ For {0},Pour {0}
 Force a new page,Forcer une nouvelle page
 Forced,Forcé
 Forced the {0} branch,Branche {0} forcée
+Forecasted,Prévu
 Forgot password?,Mot de passe oublié ?
 Form created,Formulaire créé
 Form deleted,Formulaire supprimé
@@ -1632,6 +1726,7 @@ Frappe Framework Version,Version de Frappe Framework
 Frappe HR,RH
 Frappe Helpdesk Mobile,Frappe Helpdesk Mobile
 Frappe Mail,Frappe Mail
+"Frappe expression referencing other fields as doc.<fieldname>, e.g. eval:doc.country == 'India'. Leave blank for no condition.","Expression Frappe faisant référence à d'autres champs sous la forme doc.<fieldname>, par ex. eval:doc.country == 'India'. Laissez vide pour aucune condition."
 "Frappe no longer uses Gravatar because it can disclose hashed email addresses to a third-party service. To fully stop this behavior, existing Gravatar image URLs must be deleted.","Frappe n'utilise plus Gravatar car celui-ci peut divulguer des adresses e-mail hachées à un service tiers. Pour mettre complètement fin à ce comportement, les URL d'images Gravatar existantes doivent être supprimées."
 Free,Gratuit
 Freshdesk,Freshdesk
@@ -1674,6 +1769,7 @@ Global search updated,Recherche globale mise à jour
 Go back to the current version before applying,Revenez à la version actuelle avant d'appliquer
 Go to Access Control section,Aller à la section Contrôle d'accès
 Go to list,Aller à la liste
+Go to pinned comment {0},Aller au commentaire épinglé {0}
 Go to tab,Aller à l'onglet
 Go to {0},Aller à {0}
 Going to Projects,Accès à Projets
@@ -1699,10 +1795,12 @@ Great! All your tickets are within SLA,Super ! Tous vos tickets respectent le SL
 Greater Than or Equal To,Supérieur ou égal à
 Grid,Grille
 Grid lines,Lignes de grille
+Grocery,Épicerie
 Groups and submenus,Groupes et sous-menus
 "Groups, shortcuts and disabled rows","Groupes, raccourcis et lignes désactivées"
 Guests are not allowed to upload files for {0} Doctype,Les invités ne sont pas autorisés à téléverser des fichiers pour le Doctype {0}
 Guests can now select {0} records.,Les invités peuvent désormais sélectionner les enregistrements {0}.
+Guests can't see {0} records yet. Open to grant access.,Les invités ne peuvent pas encore voir les enregistrements de {0}. Ouvrez pour accorder l'accès.
 Guests can't see {0} records. Grant select access to list them publicly.,Les invités ne peuvent pas voir les enregistrements {0}. Accordez l'accès en sélection pour les afficher publiquement.
 Guide users to articles before tickets.,Orienter les utilisateurs vers des articles avant de créer des tickets.
 HD Agent,Agent HD
@@ -1753,6 +1851,7 @@ HTML message with inline link,Message HTML avec lien intégré
 Handlers,Gestionnaires
 Heading {0},Titre {0}
 Headings Weight,Poids des titres
+Health Care,Santé
 Healthcare,Santé
 Height,Hauteur
 "Hello {{ contact }}, \n\nWe are sorry for the inconvenience, we will get back to you soon. \n\nRegards, \n{{ full_name }}","Bonjour {{ contact }}, \n\nNous sommes désolés pour le désagrément, nous reviendrons vers vous très prochainement. \n\nCordialement, \n{{ full_name }}"
@@ -1804,6 +1903,7 @@ How do your customers currently contact your support team?,Comment vos clients c
 How it reads on the rail.,Son apparence sur la barre.
 How long a claimed row may stay Running before it is assumed crashed and requeued.,Durée pendant laquelle une ligne réclamée peut rester en cours d'exécution avant d'être considérée comme plantée et remise en file d'attente.
 How many people will use Frappe CRM?,Combien de personnes utiliseront le CRM ?
+How many people will use Stratechna CRM?,Combien de personnes utiliseront Stratechna CRM ?
 "How many times a claimed row is retried when its run fails outside the flow's own steps, before the row is marked Failed.","Nombre de nouvelles tentatives d'une ligne réclamée lorsque son exécution échoue en dehors des étapes propres au flux, avant que la ligne ne soit marquée Échouée."
 How many times an automation may trigger another before the chain is refused.,Nombre de fois qu'une automatisation peut en déclencher une autre avant que la chaîne ne soit refusée.
 "How this entry reads on the rail. Required when the row adds and optional when it references, exactly as `icon` is -- and outside the row's identity, so re-labelling can never detach a row from itself.","Apparence de cette entrée sur la barre. Obligatoire lorsque la ligne ajoute et facultatif lorsqu'elle référence, comme `icon` -- et hors de l'identité de la ligne, de sorte que renommer ne peut jamais détacher une ligne d'elle-même."
@@ -1894,6 +1994,9 @@ Incorrect value:,Valeur incorrecte :
 Increase,Augmenter
 Increase indent,Augmenter le retrait
 Index,Index
+India,Inde
+Industry is required,Le secteur est obligatoire
+Industry rules,Règles de secteur
 Info,Infos
 Inherit,Hériter
 InnoDB,InnoDB
@@ -1918,6 +2021,7 @@ Interactive content (a filters panel),Contenu interactif (un panneau de filtres)
 Intercom,Intercom
 Internal comments,Commentaires internes
 Internal note. Type / for commands,Note interne. Tapez / pour afficher les commandes
+Internet Publishing,Édition en ligne
 Interval,Intervalle
 Intervals,Intervalles
 Introduction,Introduction
@@ -1957,6 +2061,7 @@ Invalid recording URL,URL d'enregistrement invalide
 Invalid role {0},Rôle invalide {0}
 Invalid site URL,URL du site invalide
 Invalid value for {0},Valeur non valide pour {0}
+Investment Banking,Banque d'investissement
 Invitation Expired,Invitation expirée
 Invitation cancelled successfully,Invitation annulée avec succès
 Invitation expired. Resend to invite again.,Invitation expirée. Renvoyez-la pour inviter à nouveau.
@@ -1969,6 +2074,7 @@ Invite agents,Inviter des agents
 Invite my support team,Inviter mon équipe de support
 Invite my team,Inviter mon équipe
 Invite sent. Waiting for the user to accept.,Invitation envoyée. En attente de l'acceptation de l'utilisateur.
+Invite users to access CRM. Specify their roles to control access and permissions.,Invitez des utilisateurs à accéder au CRM. Précisez leurs rôles pour contrôler l'accès et les autorisations.
 Invite via email,Inviter par e-mail
 Invited by,Invité par
 Invoicing,Facturation
@@ -1986,6 +2092,7 @@ Is setup complete,Configuration terminée
 Issues,Problèmes
 It expires in 1 minute.,Il expire dans 1 minute.
 It expires in {0} minutes.,Il expire dans {0} minutes.
+It will be removed when you click Update.,Il sera retiré lorsque vous cliquerez sur Mettre à jour.
 Italic,Italique
 Item,Article
 Item Group,Groupe d'articles
@@ -2049,6 +2156,8 @@ Keeping track of customer requests,Suivre les demandes des clients
 Key Required,Clé obligatoire
 Key required,Clé obligatoire
 Keycloak,Keycloak
+Keywords,Mots-clés
+"Keywords, comma separated","Mots-clés, séparés par des virgules"
 Kh,Kh,Number system
 Kind,Type
 L,L,Number system
@@ -2174,6 +2283,7 @@ Male,Homme
 Malformed Address Header,En-tête d'adresse mal formé
 Manage,Gérer
 Manage Dock,Gérer le dock
+Manage ERPNext integration settings.,Gérez les paramètres de l'intégration ERPNext.
 Manage Layouts,Gérer les dispositions
 Manage Workspaces,Gérer les espaces de travail
 Manage general settings of your app.,Gérez les paramètres généraux de votre application.
@@ -2183,9 +2293,11 @@ Manage your email accounts and configure incoming and outgoing settings.,Gérez 
 Manage your personal preferences.,Gérez vos préférences personnelles.
 Manage your profile information and display picture.,Gérez les informations de votre profil et votre photo d'affichage.
 Manage your profile information.,Gérez les informations de votre profil.
+Manage your service level agreement policies.,Gérez vos politiques d'accord de niveau de service.
 Manage {0} Dock,Gérer le dock de {0}
 Manage {0} Sidebar,Gérer la barre latérale de {0}
 Manager,Responsable
+Manager Dashboard,Tableau de bord du responsable
 Managing contacts and companies,Gestion des contacts et des entreprises
 Managing customer conversations across channels,Gérer les conversations avec les clients sur tous les canaux
 Mandatory Fields,Champs obligatoires
@@ -2208,6 +2320,7 @@ Mark as group,Marquer comme groupe
 Mark as leaf,Marquer comme feuille
 Markdown,Markdown
 "Marks this DocType as deprecated. It will continue to work, but users will be warned against using it.","Marque ce DocType comme obsolète. Il continuera de fonctionner, mais les utilisateurs seront avertis de ne pas l'utiliser."
+Mass Mailing,Publipostage
 Master,Maître
 Match Fields,Faire correspondre les champs
 Matched,Correspondance trouvée
@@ -2220,6 +2333,9 @@ Maximum Attempts,Nombre maximal de tentatives
 Maximum Recursion Depth,Profondeur de récursion maximale
 Maximum number of bulk PDF export jobs a single user can have queued or running at once.,Nombre maximal de tâches d'exportation PDF en masse qu'un même utilisateur peut avoir en file d'attente ou en cours d'exécution simultanément.
 Maximum number of documents that can be combined into a single bulk PDF export.,Nombre maximal de documents pouvant être combinés dans une seule exportation PDF en masse.
+Maximum number of pages that can be crawled during a single enrichment run.,Nombre maximal de pages pouvant être explorées lors d'une même exécution d'enrichissement.
+Maximum pages,Nombre maximal de pages
+Maximum pages must be a whole number between 1 and {0},Le nombre maximal de pages doit être un entier compris entre 1 et {0}
 Maximum total size a ZIP archive is allowed to expand to when extracted.,Taille totale maximale à laquelle une archive ZIP peut s'étendre lors de son extraction.
 Meaning of Different Permission Types,Signification des différents types de permission
 Measuring team performance,Mesurer la performance de l'équipe
@@ -2258,7 +2374,10 @@ Missing or delayed responses,Réponses manquantes ou tardives
 Mixed,Mixte
 Mobile,Mobile
 Mobile no. of the primary contact,N° de mobile du contact principal
+Mobile number added,Numéro de mobile ajouté
+Mobile number removed,Numéro de mobile supprimé
 Mobile number should be a number,Le numéro de mobile doit être un nombre
+Mobile number updated,Numéro de mobile mis à jour
 Modelo,Modèle
 Modelos de email,Modèles d'e-mail
 Modified,Modifié
@@ -2283,6 +2402,7 @@ More options,Plus d'options
 More send options,Plus d'options d'envoi
 More than 20,Plus de 20
 Most used tags in this period,Tags les plus utilisés sur cette période
+Motion Picture & Video,Cinéma et vidéo
 Motivo,Motif
 Mount On,Monter sur
 Move cancelled: a lost reason is required for this status.,Déplacement annulé : un motif de perte est requis pour ce statut.
@@ -2298,6 +2418,7 @@ Mrs. Claus,Mère Noël
 Ms,Mme
 "Muda-se no portal Stratechna, em «Os Meus Dados».","Se modifie dans le portail Stratechna, dans « Mes données »."
 Multiple actions (create button + docs link),Plusieurs actions (bouton de création + lien vers la documentation)
+Music,Musique
 Mute sounds,Couper les sons
 Muted,En sourdine
 Mx,Mx
@@ -2342,6 +2463,7 @@ New Article,Nouvel article
 New Business Holiday,Nouveau jour férié de l'entreprise
 New Call Log,Nouveau journal d'appels
 New Data Import,Nouvelle importation de données
+New Deal,Nouvelle opportunité
 New Field Dependency,Nouvelle dépendance de champ
 New Format Name,Nom du nouveau format
 New Holiday List Name,Nom de la nouvelle liste de jours fériés
@@ -2360,11 +2482,13 @@ New Workflow,Nouveau workflow
 New and old title cannot be same,Le nouveau titre et l'ancien ne peuvent pas être identiques
 New and updated customers sync automatically between Helpdesk and ERPNext.,Les clients nouveaux et mis à jour sont synchronisés automatiquement entre Desk et ERPNext.
 New form,Nouveau formulaire
+"New industry, created on save","Nouveau secteur, créé à l'enregistrement"
 New login to the Administrator account,Nouvelle connexion au compte Administrateur
 New team,Nouvelle équipe
 New title is required,Le nouveau titre est obligatoire
 Newest First,Plus récents d'abord
 Newsletter,Newsletter
+Newspaper Publishers,Éditeurs de presse
 Next,Suivant
 Next Document,Document suivant
 Next Run,Prochaine exécution
@@ -2416,6 +2540,7 @@ No attachments,Aucune pièce jointe
 No available parents,Aucun parent disponible
 No average metrics,Aucune métrique moyenne
 No barcode value — set one in the panel,Aucune valeur de code-barres — définissez-en une dans le panneau
+No call logs yet,Aucun journal d'appels pour l'instant
 No cards to group.,Aucune carte à regrouper.
 No categories available,Aucune catégorie disponible
 No channel data,Aucune donnée de canal
@@ -2428,12 +2553,16 @@ No contacts added yet,Aucun contact ajouté pour l'instant
 No contacts found,Aucun contact trouvé
 No contacts found for the applied filters. Try adjusting or clearing your filters.,Aucun contact trouvé pour les filtres appliqués. Essayez d'ajuster ou d'effacer vos filtres.
 No contacts to add,Aucun contact à ajouter
+No contacts yet,Aucun contact pour l'instant
 No country found,Aucun pays trouvé
 No customers found,Aucun client trouvé
 No customers found for the applied filters. Try adjusting or clearing your filters.,Aucun client trouvé pour les filtres appliqués. Essayez d'ajuster ou d'effacer vos filtres.
+No data,Aucune donnée
 No data available,Aucune donnée disponible
 No data fields have been added yet.,Aucun champ de données n'a encore été ajouté.
+No data to show,Aucune donnée à afficher
 No data yet,Pas encore de données
+No deals yet,Aucune opportunité pour l'instant
 No delay,Aucun délai
 No document available to preview,Aucun document disponible pour l'aperçu
 No document to preview,Aucun document à afficher en aperçu
@@ -2455,7 +2584,9 @@ No fields match,Aucun champ ne correspond
 No files have been attached yet. Upload files to see them here.,Aucun fichier n'a encore été joint. Téléversez des fichiers pour les voir ici.
 No filters available for this report,Aucun filtre disponible pour ce rapport
 No image — set one in the panel,Aucune image — définissez-en une dans le panneau
+No industry rules yet,Aucune règle de secteur pour l'instant
 No issues to fix,Aucun problème à corriger
+No leads yet,Aucun lead pour l'instant
 No letter head,Aucun en-tête de lettre
 No linked field set,Aucun champ lié défini
 No matching field,Aucun champ correspondant
@@ -2467,9 +2598,11 @@ No naming series defined,Aucune série de nommage définie
 No new notifications,Aucune nouvelle notification
 No new tickets assigned to you in the last 7 days,Aucun nouveau ticket qui vous a été attribué ces 7 derniers jours
 No next ticket,Aucun ticket suivant
+No notes yet,Aucune note pour l'instant
 No notifications configured,Aucune notification configurée
 No one,Personne
 No options,Aucune option
+No organizations yet,Aucune organisation pour l'instant
 No other document types.,Aucun autre type de document.
 "No pagamento por concluir, vai para a loja de onde veio a encomenda.","Pour un paiement non finalisé, il renvoie vers la boutique d'où vient la commande."
 No pages found.,Aucune page trouvée.
@@ -2505,11 +2638,13 @@ No saved replies found,Aucune réponse enregistrée trouvée
 No sections yet,Pas encore de sections
 No session defaults configured.,Aucune valeur de session par défaut configurée.
 No settings from other areas are linked to {0}.,Aucun paramètre d'autres domaines n'est lié à {0}.
+No social rules yet,Aucune règle sociale pour l'instant
 No source table selected,Aucune table source sélectionnée
 No successful log entries,Aucune entrée de journal réussie
 No tag activity,Aucune activité d'étiquette
 No tags used yet,Aucune étiquette utilisée pour l'instant
 "No tags yet, type to create one","Aucun tag pour le moment, saisissez pour en créer un"
+No tasks yet,Aucune tâche pour l'instant
 No team data,Aucune donnée d'équipe
 No team found,Aucune équipe trouvée
 No templates,Aucun modèle
@@ -2555,6 +2690,7 @@ Not Set,Non défini
 Not Used,Non utilisé
 Not a CRM form,N'est pas un formulaire du CRM
 Not a builder format,Pas un format du générateur
+Not a valid domain and will be ignored: {0},"Domaine non valide, il sera ignoré : {0}"
 Not configured,Non configuré
 Not imported:,Non importé :
 Not in any app,Dans aucune application
@@ -2564,6 +2700,7 @@ Not set,Non défini
 Not something filters can express. Edit it below.,Les filtres ne peuvent pas exprimer cela. Modifiez-le ci-dessous.
 Not yet overwritten,Pas encore écrasé
 Not your workspace,Ce n'est pas votre espace de travail
+Notes keep what you learned on a call or in a meeting next to the lead or deal it belongs to.,"Les notes conservent ce que vous avez appris lors d'un appel ou d'une réunion, à côté du lead ou de l'opportunité concernés."
 Nothing has been added yet.,Rien n'a encore été ajouté.
 Nothing here,Rien ici
 Nothing here for now. Add a note to keep track of things.,Rien pour l'instant. Ajoutez une note pour garder une trace.
@@ -2575,6 +2712,7 @@ Nothing on the sidebar,Rien dans la barre latérale
 Nothing to do at the moment. Start organizing by adding one here.,Rien à faire pour le moment. Commencez à vous organiser en en ajoutant une ici.
 Nothing to paste,Rien à coller
 Nothing to restore,Rien à restaurer
+"Nothing to undo, you've edited all enriched fields",Rien à annuler : vous avez modifié tous les champs enrichis
 Notification,Notification
 Notification Type,Type de notification
 Notification Type Preference,Préférence de type de notification
@@ -2625,6 +2763,7 @@ On ticket status,Sur le statut du ticket
 "One layer of one app's dock. Three of them share this table, told apart by `app`, `user` and `standard`: the app's own dock, which an app ships as an exported document and a developer authors; the site's arrangement of it, curated by a Workspace Manager and applying to everyone; and one person's own, applied last and winning. A dock belongs to an app, so arranging ERPNext's rail does not touch frappe's -- and a layer is addressed by app plus user rather than by user alone. Same shape at all three, because the rows are identical and the parent is what says whose they are; see `Custom Sidebar`, which layers a sidebar the same way in a table of its own.","Une couche du dock d'une application. Trois d'entre elles partagent cette table et se distinguent par `app`, `user` et `standard` : le dock propre de l'application, qu'elle livre comme document exporté et qu'un développeur rédige ; l'arrangement du site, géré par un Workspace Manager et applicable à tous ; et celui d'une personne, appliqué en dernier et prioritaire. Un dock appartient à une application, donc organiser la barre d'ERPNext ne touche pas celle de frappe -- et une couche s'adresse par application plus utilisateur, et non par utilisateur seul. Même forme pour les trois, car les lignes sont identiques et le parent indique à qui elles appartiennent ; voir `Custom Sidebar`, qui superpose une barre latérale de la même façon dans sa propre table."
 "One ordered list holding both references to base items (`added` unset -- non-empty fields override, empty fields mean no opinion) and items this layer added (`added` set -- full items, rendered as they stand). Row order is the arrangement; base items not named here keep their base order and follow the ones that are, which is how a newly installed app's items still reach someone who has already reordered.","Une liste ordonnée contenant à la fois des références à des éléments de base (`added` non défini -- les champs non vides prévalent, les champs vides signifient aucun avis) et des éléments ajoutés par cette couche (`added` défini -- éléments complets, affichés tels quels). L'ordre des lignes est l'arrangement ; les éléments de base non nommés ici gardent leur ordre de base et suivent ceux qui le sont, ce qui permet aux éléments d'une application nouvellement installée d'atteindre quand même quelqu'un qui a déjà réorganisé."
 One {0} record,Un enregistrement {0}
+Online Auctions,Enchères en ligne
 Only CSV and Excel formats are supported for export,Seuls les formats CSV et Excel sont pris en charge pour l'exportation
 Only a System Manager can write a script step,Seul un System Manager peut écrire une étape de script
 Only a new Kanban Board can be made standard,Seul un nouveau tableau Kanban peut être rendu standard
@@ -2641,6 +2780,7 @@ Only own,Seulement les siens
 Only pending invitations can be resent,Seules les invitations en attente peuvent être renvoyées
 Only run when,Exécuter uniquement lorsque
 Only standard (app-shipped) workspaces can be customized.,Seuls les espaces de travail standard (fournis avec l'application) peuvent être personnalisés.
+Only start when the record's fields match these filters.,Ne démarrer que lorsque les champs de l'enregistrement correspondent à ces filtres.
 Only the 'color' and 'order' fields of the 'Closed' status can be modified.,Seuls les champs « couleur » et « ordre » du statut « Fermé » peuvent être modifiés.
 Only to you,Seulement pour vous
 Only users with one of these roles can send SMS. Leave empty to allow only System Manager.,Seuls les utilisateurs ayant l'un de ces rôles peuvent envoyer des SMS. Laissez vide pour autoriser uniquement System Manager.
@@ -2702,6 +2842,7 @@ Ordered List,Liste numérotée
 Organization,Organisation
 Organization Dashboard,Tableau de bord de l'organisation
 Organization or a primary Contact is required to create a customer,Une organisation ou un contact principal est requis pour créer un client
+Organizations are the companies your contacts and deals belong to.,Les organisations sont les entreprises auxquelles appartiennent vos contacts et opportunités.
 Organização contém,L'organisation contient
 Organize my contacts,Organiser mes contacts
 Orientation,Orientation
@@ -2758,6 +2899,8 @@ Partnership,Partenariat
 Pass either an existing {0} name or a {1} to import into.,Indiquez le nom d'un {0} existant ou un {1} dans lequel importer.
 Password changed,Mot de passe modifié
 "Path to the template file inside the app, e.g. templates/print_formats/my_template.html","Chemin du fichier de modèle dans l'application, par exemple templates/print_formats/my_template.html"
+Pattern,Motif
+Pattern is required,Le motif est obligatoire
 Pausada,En pause
 Pausar,Mettre en pause
 Pause the run,Mettre l'exécution en pause
@@ -2771,6 +2914,7 @@ Payroll,Paie
 País,Pays
 "Pedida sempre que se dá acesso a mais alguém. As permissões dizem quem pode administrar; isto diz de quem é a caixa — partilhar uma caixa de departamento é administração, partilhar a caixa pessoal de alguém é outra coisa.","Demandé chaque fois que l'on donne accès à quelqu'un d'autre. Les permissions indiquent qui peut administrer ; ceci indique à qui appartient la boîte — partager la boîte d'un service relève de l'administration, partager la boîte personnelle de quelqu'un est tout autre chose."
 Pending Tickets,Tickets en attente
+Pension Funds,Fonds de pension
 "Per-row parent / is_group overrides for tree DocType imports, keyed by sheet row number. Applied at import time.","Remplacements de parent / is_group par ligne pour les imports de DocTypes arborescents, indexés par le numéro de ligne de la feuille. Appliqués au moment de l'import."
 Percentage of total tickets by channel,Pourcentage du total des tickets par canal
 Percentage of total tickets by priority,Pourcentage du total des tickets par priorité
@@ -2792,6 +2936,7 @@ Personal mobile no,N° de mobile personnel
 Pesquisa na Internet,Recherche sur Internet
 Pessoa com Acesso a Caixa,Personne ayant accès à la boîte mail
 Pessoas,Personnes
+Pharmaceuticals,Pharmaceutique
 Phone calls,Appels téléphoniques
 Photo,Photo
 "Pick a Server Script or write one here, not both","Choisissez un Server Script ou écrivez-en un ici, pas les deux"
@@ -2812,6 +2957,8 @@ Pick {0},Choisissez : {0}
 Pilot returned an invalid domain.,Pilot a renvoyé un domaine invalide.
 Pin,Épingler
 Pin to sidebar,Épingler à la barre latérale
+Pin to top,Épingler en haut
+Pinned by {0} · {1},Épinglé par {0} · {1}
 Pinned sits beside the sidebar. Floating slides in from the left edge.,Épinglée se place à côté de la barre latérale. Flottante glisse depuis le bord gauche.
 Pipedrive,Pipedrive
 Pisces,Poissons
@@ -2821,6 +2968,8 @@ Placement and empty state,Emplacement et état vide
 Plain,Simple
 "Plain text (strings render as text, never HTML)","Texte brut (les chaînes sont affichées comme du texte, jamais comme du HTML)"
 Plano,Offre
+Platform,Plateforme
+Platform is required,La plateforme est obligatoire
 Play video,Lire la vidéo
 Please add at least one naming series.,Veuillez ajouter au moins une série de numérotation.
 Please add this priority in the <a href='/app/hd-service-level-agreement'>required SLA documents</a>,Veuillez ajouter cette priorité aux <a href='/app/hd-service-level-agreement'>documents SLA requis</a>
@@ -2833,14 +2982,17 @@ Please configure your Twilio settings correctly,Veuillez configurer correctement
 Please create a new ticket to proceed with the next step.,Veuillez créer un nouveau ticket pour passer à l'étape suivante.
 Please enter a subject to continue,Veuillez saisir un objet pour continuer
 Please enter a valid URL,Veuillez saisir une URL valide
+Please enter a valid email address,Saisissez une adresse e-mail valide
 Please enter a valid email.,Veuillez saisir une adresse e-mail valide.
 Please enter a valid phone number,Veuillez saisir un numéro de téléphone valide
 Please enter at least one valid email to send an invite.,Veuillez saisir au moins une adresse e-mail valide pour envoyer une invitation.
+Please enter the {0} access key.,Saisissez la clé d'accès de {0}.
 "Please enter your email, we'll send you password reset link","Veuillez saisir votre e-mail, nous vous enverrons un lien de réinitialisation du mot de passe"
 Please fill all required fields,Veuillez remplir tous les champs obligatoires
 Please fill all required fields for Exotel,Veuillez remplir tous les champs obligatoires pour Exotel
 Please fill all required fields for Twilio,Veuillez remplir tous les champs obligatoires pour Twilio
 Please fill the following mandatory fields before saving:,Veuillez renseigner les champs obligatoires suivants avant d'enregistrer :
+Please provide a reason for marking this {0} as lost,Indiquez un motif pour marquer ce {0} comme perdu
 Please provide saved_reply_id,Veuillez fournir saved_reply_id
 Please select Document Type and Import Type.,Veuillez sélectionner le type de document et le type d'import.
 Please select Document Type first.,Veuillez d'abord sélectionner le type de document.
@@ -2889,6 +3041,8 @@ Preço (como se escreve),Prix (tel qu'il s'écrit)
 Preço antes,Prix avant
 Primary contact must be one of the listed contacts,Le contact principal doit être l'un des contacts de la liste
 Primary contact updated,Contact principal mis à jour
+Primary email address updated,Adresse e-mail principale mise à jour
+Primary mobile number updated,Numéro de mobile principal mis à jour
 Print Format Snippet,Extrait de format d'impression
 Print Formats,Formats d'impression
 Print Settings updated,Paramètres d'impression mis à jour
@@ -2898,6 +3052,7 @@ Printing,Impression
 Priority in use,Priorité utilisée
 Priority {0}: priority name is required,Priorité {0} : le nom de la priorité est obligatoire
 Priority {0}: response time is required,Priorité {0} : le temps de réponse est obligatoire
+Private Equity,Capital-investissement
 Private Views,Vues privées
 Product Experts,Experts produit
 Product Sync Issues,Problèmes de synchronisation des produits
@@ -2930,6 +3085,7 @@ Publish,Publier
 Published,Publié
 Published articles must have content.,Les articles publiés doivent avoir du contenu.
 Published version,Version publiée
+Publishing,Édition
 "Pulling emails, this may take a few minutes.","Récupération des e-mails en cours, cela peut prendre quelques minutes."
 Purple,Violet
 "Put <b>{0}</b> back to the sidebar its app ships? This removes the site's arrangement and every person's own, so nobody keeps a customization of this module.","Rétablir <b>{0}</b> sur la barre latérale fournie par son application ? Cela supprime la disposition du site et celle de chaque personne, de sorte que personne ne conserve de personnalisation de ce module."
@@ -2937,6 +3093,7 @@ Put this sidebar back to the site's arrangement? Everything you have arranged he
 "Put this sidebar back to what the apps ship? Everything the site has arranged here is dropped, for everyone.","Rétablir cette barre latérale sur ce que fournissent les applications ? Tout ce que le site a organisé ici est abandonné, pour tout le monde."
 Python,Python
 "Python, evaluated against doc, target and context.","Python, évalué sur doc, target et context."
+Qualified,Qualifié
 Quality,Qualité
 Quando sai,Quand il part
 Quantos recebem,Combien le reçoivent
@@ -2966,6 +3123,7 @@ Raw HTML or Jinja template,HTML brut ou modèle Jinja
 Raw Method,Méthode brute
 Raw Typst markup,Balisage Typst brut
 Re-check filters and condition in the worker before executing.,Revérifier les filtres et la condition dans le worker avant l'exécution.
+Re-enrich this record?,Enrichir à nouveau cet enregistrement ?
 Reaction,Réaction
 Reactions,Réactions
 Reactivação,Réactivation
@@ -2973,6 +3131,7 @@ Read the migration guide,Lire le guide de migration
 Read-only if,Lecture seule si
 Ready to Close,Prête à conclure
 Real,Réel
+Real Estate,Immobilier
 Receive a copy of every email you send in your inbox.,Recevoir dans votre boîte de réception une copie de chaque e-mail que vous envoyez.
 Receive an email for notifications of these types. Remove a type to stop its emails (in-app notifications are unaffected).,Recevoir un e-mail pour les notifications de ces types. Retirez un type pour ne plus recevoir ses e-mails (les notifications dans l'application ne sont pas concernées).
 Recent,Récents
@@ -3044,6 +3203,7 @@ Remove Contact,Retirer le contact
 Remove Default,Supprimer la valeur par défaut
 Remove Logo,Retirer le logo
 Remove Permission,Supprimer l'autorisation
+Remove and move columns to {0} section,Retirer et déplacer les colonnes vers la section {0}
 Remove comment,Supprimer le commentaire
 Remove context,Supprimer le contexte
 Remove field,Supprimer le champ
@@ -3154,6 +3314,7 @@ Resume From Step,Reprendre à partir de l'étape
 Resume Queue,Reprendre la file d'attente
 Resume Run,Reprendre l'exécution
 Retail,Commerce de détail
+Retail & Wholesale,Commerce de détail et de gros
 Retention,Conservation
 Retirou,A retiré
 Retomada,Reprise
@@ -3276,7 +3437,9 @@ Save the document to attach files.,Enregistrez le document pour joindre des fich
 Save the flow before testing it.,Enregistrez le flux avant de le tester.
 Save the role first to view this information.,Enregistrez d'abord le rôle pour afficher ces informations.
 Save version,Enregistrer la version
+Save your changes before enriching,Enregistrez vos modifications avant d'enrichir
 Save your changes before importing.,Enregistrez vos modifications avant d'importer.
+Save your changes before undoing,Enregistrez vos modifications avant d'annuler
 Saved Replies,Réponses enregistrées
 Saved Reports,Rapports enregistrés
 Saved Snippets,Extraits enregistrés
@@ -3338,6 +3501,7 @@ Section,Section
 Section saved as snippet,Section enregistrée comme extrait
 Section title,Titre de la section
 Sections hold the columns and fields of your document.,Les sections contiennent les colonnes et les champs de votre document.
+Securities & Commodity Exchanges,Bourses de valeurs et de matières premières
 Security.txt,Security.txt
 See all {0} tickets,Voir les {0} tickets
 See warning icons on nodes below or check the Warnings section.,Consultez les icônes d'avertissement sur les nœuds ci-dessous ou la section Avertissements.
@@ -3445,6 +3609,7 @@ Set a condition,Définir une condition
 Set a default agent status in HD Settings.,Définissez un statut d'agent par défaut dans les paramètres HD.
 Set a default value before publishing for: {0},Définissez une valeur par défaut avant de publier pour : {0}
 Set a default value for each field to publish this form.,Définissez une valeur par défaut pour chaque champ afin de publier ce formulaire.
+Set a default value for hidden required field(s): {0},Définissez une valeur par défaut pour les champs obligatoires masqués : {0}
 Set as Primary,Définir comme principal
 Set as default,Définir par défaut
 Set as primary,Définir comme principal
@@ -3459,9 +3624,11 @@ Set once the first admin completes the onboarding persona questionnaire,Défini 
 Set primary contact,Définir le contact principal
 Set status,Définir le statut
 Set status: {0},Définir le statut : {0}
+"Set the currency, number, date and time formats used across your CRM.","Définissez la devise et les formats de nombre, de date et d'heure utilisés dans tout votre CRM."
 "Set the default status assigned when a ticket is created, and the status to apply when a ticket is reopened. If not specified, the default status from HD Settings will be used.","Définissez le statut attribué par défaut lors de la création d'un ticket et le statut à appliquer lors de sa réouverture. S'il n'est pas précisé, le statut par défaut des paramètres HD sera utilisé."
 Set this to decide which position a layout appears in the dropdown,Définissez ceci pour choisir la position d'une disposition dans la liste déroulante
 Set up a customer portal,Configurer un portail client
+Set up enrichment availability and match website data to CRM fields.,Configurez la disponibilité de l'enrichissement et associez les données du site web aux champs du CRM.
 Set up my sales pipeline,Configurer mon pipeline de vente
 Set up your authenticator app,Configurez votre application d'authentification
 Set your availability so your team knows when you're reachable.,Définissez votre disponibilité pour que votre équipe sache quand vous êtes joignable.
@@ -3536,6 +3703,7 @@ Show with Undo,Afficher avec Annuler
 Show with description,Afficher avec la description
 Showing all {0} rows,Affichage des {0} lignes
 Showing first {0} rows of {1},Affichage des {0} premières lignes sur {1}
+Showing the first {0} rules,Affichage des {0} premières règles
 Showing {0},Affichage de {0}
 Showing {0} of {1},Affichage de {0} sur {1}
 Showing {0} of {1} columns.,Affichage de {0} colonnes sur {1}.
@@ -3565,6 +3733,7 @@ Similar Tickets,Tickets similaires
 Simulado,Simulé
 Simular,Simuler
 Simulação (nada saiu),Simulation (rien n'est parti)
+"Since you added a new assignee, the {0} has been set to {1}.","Comme vous avez ajouté un nouveau responsable, le {0} a été défini sur {1}."
 Single DocTypes cannot be renamed,Les DocTypes uniques ne peuvent pas être renommés
 Sistema,Système
 Site,Site
@@ -3592,9 +3761,12 @@ Snapshot Report,Rapport instantané
 Snapshot Reports,Rapports instantanés
 Snippet Type,Type d'extrait
 Snippet name,Nom de l'extrait
+Soap & Detergent,Savons et détergents
 Sobretítulo,Surtitre
 Social media,Réseaux sociaux
+Social profile rules,Règles de profils sociaux
 Some cards were saved in another column,Certaines cartes ont été enregistrées dans une autre colonne
+Some changes could not be saved,Certaines modifications n'ont pas pu être enregistrées
 "Some columns have invalid values. Map them to valid values below, or skip the rows that have them. Affected columns: {0}.",Certaines colonnes contiennent des valeurs non valides. Faites-les correspondre ci-dessous à des valeurs valides ou ignorez les lignes concernées. Colonnes concernées : {0}.
 Some error occurred while creating SLA policy,Une erreur s'est produite lors de la création de la politique de SLA
 Some error occurred while renaming holiday list,Une erreur s'est produite lors du renommage de la liste des jours fériés
@@ -3690,6 +3862,7 @@ Stop dispatching automations site-wide. Queued rows are left untouched.,Arrêter
 Stop on Error,Arrêter en cas d'erreur
 "Stop shipping this sidebar with {0}? Its document and its exported file are both removed, and the module goes back to the sidebar generated from its contents.","Ne plus livrer cette barre latérale avec {0} ? Son document et son fichier exporté sont tous deux supprimés, et le module revient à la barre latérale générée à partir de son contenu."
 "Stop shipping {0} with its app? Its exported file and this document are removed, and {1} goes back to the sidebar computed from its contents.","Ne plus livrer {0} avec son application ? Son fichier exporté et ce document sont supprimés, et {1} revient à la barre latérale calculée à partir de son contenu."
+Stratechna CRM mobile,Stratechna CRM mobile
 Stratechna Desk,Stratechna Desk
 Strength:,Robustesse :
 Strike,Barré
@@ -3718,6 +3891,7 @@ Success message,Message de réussite
 Successfully inserted {0},{0} inséré avec succès
 Successfully inserted {0} and updated {1} out of {2} records.,{0} inséré(s) et {1} mis à jour avec succès sur {2} enregistrements.
 Superscript,Exposant
+Supplier Reference,Recommandation d'un fournisseur
 Support,Support
 Support Issues,Problèmes de support
 Support Policy,Politique de support
@@ -3781,6 +3955,7 @@ Target ticket does not exist,Le ticket cible n'existe pas
 Task List,Liste de tâches
 Task id is required.,L'identifiant de la tâche est obligatoire.
 Task list,Liste de tâches
+"Tasks are to-dos for you and your team, like a follow-up call or sending a quote. Add them here or from a lead or deal.","Les tâches sont des choses à faire pour vous et votre équipe, comme un appel de suivi ou l'envoi d'un devis. Ajoutez-les ici ou depuis un lead ou une opportunité."
 Taurus,Taureau
 Tax & Benefits,Impôts et avantages
 Taxes,Taxes
@@ -3799,9 +3974,12 @@ Team name,Nom de l'équipe
 Team renamed successfully.,Équipe renommée avec succès.
 Team will only see their own tickets.,L'équipe ne verra que ses propres tickets.
 Teams,Équipes
+Technology,Technologie
 Telecom,Télécommunications
+Telecommunications,Télécommunications
 Telefone,Téléphone
 Telephony settings updated successfully.,Paramètres de téléphonie mis à jour avec succès.
+Television,Télévision
 Tell us about your organization,Parlez-nous de votre organisation
 Tell us more,Dites-nous-en plus
 Tem pelo menos N encomendas,A au moins N commandes
@@ -3867,6 +4045,7 @@ The link expires in {0} minutes.,Le lien expire dans {0} minutes.
 The link {0} was added to a shipped card and cannot be carried by a customization.,Le lien {0} a été ajouté à une carte livrée et ne peut pas être porté par une personnalisation.
 "The module this sidebar belongs to. Neither required nor unique: one module may own several sidebars, and which of them answers for the module itself is decided by the name -- the one called after the module -- rather than by a column here. May also be blank, which means the sidebar belongs to its app rather than to any one of the app's modules; such a sidebar is exported to the app's own folder and says which app in `app`.","Le module auquel appartient cette barre latérale. Ni obligatoire ni unique : un module peut avoir plusieurs barres latérales, et celle qui répond pour le module lui-même est déterminée par le nom -- celle qui porte le nom du module -- et non par une colonne ici. Peut aussi rester vide, ce qui signifie que la barre latérale appartient à son application plutôt qu'à l'un des modules de l'application ; une telle barre latérale est exportée dans le dossier propre de l'application et indique l'application dans `app`."
 The module this workspace belongs to. Decides which module's dock entry and sidebar it appears under.,Le module auquel appartient cet espace de travail. Détermine sous quelle entrée de dock et barre latérale du module il apparaît.
+The most used tags will be ranked here once tickets are tagged.,Les étiquettes les plus utilisées seront classées ici dès que les tickets seront étiquetés.
 The next generated name continues after this number.,Le prochain nom généré continue à partir de ce numéro.
 The number of days must be 1 or more,Le nombre de jours doit être égal ou supérieur à 1
 "The ordered entries this layer has an opinion about. Row order is the arrangement; an entry this layer never names keeps its incoming order and follows the ones it does, which is how a newly installed app's modules still reach someone who has already arranged their dock.","Les entrées ordonnées sur lesquelles cette couche a un avis. L'ordre des lignes est l'agencement ; une entrée que cette couche ne nomme jamais conserve son ordre d'arrivée et suit celles qu'elle nomme, ce qui permet aux modules d'une application nouvellement installée d'atteindre quand même quelqu'un qui a déjà organisé son dock."
@@ -3904,6 +4083,7 @@ There should be at least 1 assignment rule for ticket,Il doit exister au moins 1
 These announcements will appear inside an alert below the Navbar.,Ces annonces apparaîtront dans une alerte sous la barre de navigation.
 These fields aren't shown to users. Default values are used when the form is submitted.,Ces champs ne sont pas affichés aux utilisateurs. Des valeurs par défaut sont utilisées lors de l'envoi du formulaire.
 These fields no longer exist in the DocType and were removed from the layout: {0},Ces champs n'existent plus dans le DocType et ont été retirés de la disposition : {0}
+These fields you edited will be replaced: {0},Les champs que vous avez modifiés seront remplacés : {0}
 "These set how dates, numbers and money look across the app.","Ils définissent l'apparence des dates, des nombres et des montants dans toute l'application."
 They'll get access to tickets raised by everyone in the organisation.,Ils auront accès aux tickets créés par tous les membres de l'organisation.
 They'll only see their own tickets going forward.,"Désormais, ils ne verront que leurs propres tickets."
@@ -3929,6 +4109,7 @@ This document is cancelled and cannot be printed.,Ce document est annulé et ne 
 This document type has no fields to print.,Ce type de document n'a aucun champ à imprimer.
 "This drops the dock arrangement of every person on this site for {0}, and the site's own, back to what the app ships. It cannot be undone.","Cela ramène, pour {0}, l'agencement du dock de chaque personne de ce site, ainsi que celui du site, à ce que livre l'application. Cette action est irréversible."
 This feature is deprecated and may be removed in a future release,Cette fonctionnalité est obsolète et pourrait être supprimée dans une version future
+This field is required by the record and can't be made optional. Remove it to move it to hidden fields.,Ce champ est exigé par l'enregistrement et ne peut pas devenir facultatif. Retirez-le pour le déplacer vers les champs masqués.
 "This field is used to send an email instantly without adding it into the queue. If this field is checked, the email will be sent immediately after clicking the ""Send"" button, instead of being added to the email queue for later processing.","Ce champ sert à envoyer un e-mail immédiatement sans le placer dans la file d'attente. S'il est coché, l'e-mail sera envoyé dès le clic sur le bouton « Envoyer », au lieu d'être ajouté à la file d'attente des e-mails pour un traitement ultérieur."
 "This field is used to skip email-related workflows for tickets. If this field is checked, no emails will be sent related to tickets, such as new ticket creation, status updates, or notifications.","Ce champ sert à ignorer les workflows e-mail des tickets. S'il est coché, aucun e-mail lié aux tickets ne sera envoyé, comme la création de nouveaux tickets, les mises à jour de statut ou les notifications."
 This flow has no steps to run.,Ce flux n'a aucune étape à exécuter.
@@ -3950,7 +4131,10 @@ This label is already used by another {0} in this workspace.,Ce libellé est dé
 This method is only meant for developer mode,Cette méthode est réservée au mode développeur
 This module has nothing to arrange,Ce module n'a rien à agencer
 "This module is the linked entity's default home — where it opens when nothing else decides — even when another app defines it. A sidebar that already lists the entity still holds you, so this settles cold entry rather than overriding where you are. Flag what you mean to own: a claim is declarative, so set it on the entities your app is about rather than only where you expect the default to disagree with you. Only an app-shipped sidebar may claim.","Ce module est le foyer par défaut de l'entité liée -- l'endroit où elle s'ouvre quand rien d'autre n'en décide -- même lorsqu'une autre application la définit. Une barre latérale qui liste déjà l'entité vous retient toujours, de sorte que ceci règle l'entrée à froid plutôt que de remplacer l'endroit où vous vous trouvez. Cochez ce que vous comptez posséder : une revendication est déclarative, définissez-la donc sur les entités dont traite votre application plutôt que seulement là où vous pensez que la valeur par défaut ne vous conviendra pas. Seule une barre latérale livrée par l'application peut revendiquer."
+This note is empty.,Cette note est vide.
+This record was already enriched. Enriching again may update those fields with newer values from the website.,Cet enregistrement a déjà été enrichi. Un nouvel enrichissement peut mettre à jour ces champs avec des valeurs plus récentes du site web.
 This restores the classic layout backup and discards the converted layout. Continue?,Cela restaure la sauvegarde de la disposition classique et abandonne la disposition convertie. Continuer ?
+This restores the values these fields had before the last enrichment.,Cela rétablit les valeurs de ces champs avant le dernier enrichissement.
 This role does not have access to any pages.,Ce rôle n'a accès à aucune page.
 This role does not have access to any reports.,Ce rôle n'a accès à aucun rapport.
 This role does not have access to any workspaces.,Ce rôle n'a accès à aucun espace de travail.
@@ -3997,11 +4181,13 @@ Ticket must be resolved with a feedback,Le ticket doit être résolu avec un fee
 Ticket must not already be merged.,Le ticket ne doit pas être déjà fusionné.
 Ticket not found,Ticket introuvable
 Ticket not found for the provided key.,Ticket introuvable pour la clé fournie.
+Ticket priorities will be reflected here once assigned.,Les priorités des tickets apparaîtront ici dès qu'elles seront attribuées.
 Ticket raised outside working hours,Ticket créé en dehors des heures de travail
 Ticket reopen status,Statut de réouverture du ticket
 Ticket split successfully.,Ticket scindé avec succès.
 Ticket status,Statut du ticket
 Ticket to merged with is required,Le ticket avec lequel fusionner est obligatoire
+Ticket trends will appear here once tickets are created.,Les tendances des tickets apparaîtront ici dès que des tickets seront créés.
 Ticket updated succesfully.,Ticket mis à jour avec succès.
 Ticket {0} not found.,Ticket {0} introuvable.
 Ticket-Search Analysis,Analyse des recherches de tickets
@@ -4016,6 +4202,9 @@ Tickets can only be assigned to agents,Les tickets ne peuvent être attribués q
 Tickets must meet the following conditions:,Les tickets doivent remplir les conditions suivantes :
 Tickets recently raised by this contact/customer,Tickets créés récemment par ce contact/client
 Tickets that are awaiting your response,Tickets en attente de votre réponse
+Tickets will be categorized by type once created.,Les tickets seront classés par type dès leur création.
+Tickets will be grouped by channel once received.,Les tickets seront regroupés par canal dès leur réception.
+Tickets will be grouped by team once available.,Les tickets seront regroupés par équipe dès que des données seront disponibles.
 Tickets with similar queries,Tickets avec des demandes similaires
 Tickets you act on will show up here,Les tickets sur lesquels vous agissez apparaîtront ici
 Time on hold with the SLA clock paused,Temps en attente avec l'horloge du SLA en pause
@@ -4068,6 +4257,7 @@ Transaction,Transaction
 Transgender,Transgenre
 Transitions,Transitions
 Transparent,Transparent
+Transportation,Transports
 Tree Parent Overrides,Remplacements du parent de l'arborescence
 Tree Preview,Aperçu de l'arborescence
 Tree preview of {0} nodes,Aperçu de l'arborescence de {0} nœuds
@@ -4092,6 +4282,7 @@ Try the new navigation,Essayez la nouvelle navigation
 Turn into a group,Transformer en groupe
 TwiML App Name,Nom de l'application TwiML
 TwiML App SID,SID de l'application TwiML
+Twilio error: {0},Erreur Twilio : {0}
 Twilio number,Numéro Twilio
 Type,Type
 Type Name,Nom du type
@@ -4145,6 +4336,8 @@ Understanding ticket view,Comprendre la vue des tickets
 Undo,Annuler
 Undo Skip,Annuler l'omission
 Undo Skip Duplicates,Annuler l'omission des doublons
+Undo enrichment?,Annuler l'enrichissement ?
+Undo last enrichment,Annuler le dernier enrichissement
 Undo skip,Annuler l'omission
 Ungroup conditions,Dissocier les conditions
 Unique,Unique
@@ -4167,6 +4360,7 @@ Unmark as Standard,Décocher comme standard
 Unnamed field,Champ sans nom
 Unpin,Détacher
 Unpublish,Dépublier
+Unqualified,Non qualifié
 Unregistered automation event: {0},Événement d'automatisation non enregistré : {0}
 Unresponsive Prospect,Prospect sans réponse
 Unsafe html gets stripped,Le HTML non sécurisé est supprimé
@@ -4210,6 +4404,8 @@ Use 'Download Skipped Rows' on the Skipped metric to export the skipped rows.,Ut
 Use ERPNext to Create Products,Utiliser ERPNext pour créer des produits
 Use HTML editor,Utiliser l'éditeur HTML
 Use Kanban v2 (New Experience),Utiliser Kanban v2 (nouvelle expérience)
+Use New Deal to create a deal for this contact.,Utilisez « Nouvelle opportunité » pour créer une opportunité pour ce contact.
+Use New Deal to create a deal for this organization.,Utilisez « Nouvelle opportunité » pour créer une opportunité pour cette organisation.
 Use Number Format from Currency,Utiliser le format numérique de la devise
 Use POST for a Cloud Settings action.,Utilisez POST pour une action des Paramètres Cloud.
 Use ampersand to match multiple terms,Utilisez l'esperluette pour faire correspondre plusieurs termes
@@ -4225,6 +4421,8 @@ User added to hierarchy,Utilisateur ajouté à la hiérarchie
 User added.,Utilisateur ajouté.
 User created.,Utilisateur créé.
 User permission added,Autorisation utilisateur ajoutée
+User with email {0} already exists,Un utilisateur avec l'e-mail {0} existe déjà
+User with email {0} already invited,L'utilisateur avec l'e-mail {0} a déjà été invité
 User {0} is already mapped to hierarchy node {1}.,L'utilisateur {0} est déjà associé au nœud de hiérarchie {1}.
 Users who have this role.,Utilisateurs ayant ce rôle.
 Users with any of these roles can see this workspace,Les utilisateurs ayant l'un de ces rôles peuvent voir cet espace de travail
@@ -4248,6 +4446,7 @@ Vantagens ou serviços,Avantages ou services
 Variants,Variantes
 Vazio = todas. Vem do portal.,Vide = toutes. Provient du portail.
 Venda cruzada,Vente croisée
+Venture Capital,Capital-risque
 Verdana,Verdana
 Version,Version
 Version History,Historique des versions
@@ -4293,6 +4492,7 @@ Waited {0} {1} (simulated),A attendu {0} {1} (simulé)
 Waiting,En attente
 Waiting for {0},En attente de {0}
 Waiting {0} seconds,Attente de {0} secondes
+Walk In,Visite sur place
 Walk-ins,Visites spontanées
 Warm,Tiède
 Was this article Helpful?,Cet article vous a-t-il été utile ?
@@ -4324,6 +4524,7 @@ Websocket,Websocket
 Week of the year,Semaine de l'année
 Welcome to Frappe CRM,Bienvenue dans le CRM
 Welcome to Frappe Helpdesk,Bienvenue dans Frappe Helpdesk
+Welcome to Stratechna CRM,Bienvenue sur Stratechna CRM
 Welcome to the Portal,Bienvenue sur le portail
 Welcome to {0},Bienvenue dans {0}
 Welcome! Please sign in to continue.,Bienvenue ! Veuillez vous connecter pour continuer.
@@ -4427,6 +4628,7 @@ You can only raise tickets for your own contact.,Vous ne pouvez créer des ticke
 You can set a high value here if multiple users will be logging in from the same network.,Vous pouvez définir ici une valeur élevée si plusieurs utilisateurs se connectent depuis le même réseau.
 You cannot set more than one Default Priority.,Vous ne pouvez pas définir plus d'une priorité par défaut.
 You do not have access to Cloud Settings for this site.,Vous n'avez pas accès aux Paramètres Cloud de ce site.
+You do not have enough permissions to access Stratechna CRM. Please contact your administrator if you believe this is an error.,Vous n'avez pas les autorisations suffisantes pour accéder à Stratechna CRM. Contactez votre administrateur si vous pensez qu'il s'agit d'une erreur.
 You do not have permission to access Assignment Rules,Vous n'avez pas l'autorisation d'accéder aux règles d'attribution
 You do not have permission to access this file,Vous n'avez pas la permission d'accéder à ce fichier
 You do not have permission to access this resource,Vous n'avez pas l'autorisation d'accéder à cette ressource
@@ -4506,6 +4708,7 @@ a year,un an
 actions must be a list of objects,les actions doivent être une liste d'objets
 active ticket,ticket actif
 active tickets,tickets actifs
+added a note,a ajouté une note
 added {0} row(s) to {1},a ajouté {0} ligne(s) à {1}
 after_insert,after_insert
 an event,un événement
@@ -4584,6 +4787,7 @@ months,mois
 next day,jour suivant
 nonce,nonce
 none,aucun
+note updates from,mises à jour de notes de
 number card,carte numérique
 o texto,le texte
 on {0},le {0}
@@ -4599,6 +4803,7 @@ or image URL,ou URL de l'image
 orange,orange
 pelo menos um segmento,au moins un segment
 pending,en attente
+pinned the note,a épinglé la note
 plain,simple
 poor,médiocre
 product,produit
@@ -4631,6 +4836,7 @@ to open Global Search,pour ouvrir la recherche globale
 twitter,twitter
 unlinked,dissocié
 unlinked_orphan,unlinked_orphan
+unpinned the note,a désépinglé la note
 updated {0},mis à jour {0}
 version_table,version_table
 via Email,par e-mail
@@ -4687,8 +4893,10 @@ yyyy-mm-dd,aaaa-mm-jj
 {0} does not exist,{0} n'existe pas
 {0} does not support {1} triggers,{0} ne prend pas en charge les déclencheurs {1}
 {0} está repetido.,{0} est en double.
+{0} field(s) removed. Not available on {1}.,{0} champ(s) supprimé(s). Non disponible sur {1}.
 {0} fields,{0} champs
 {0} h,{0} h
+{0} has been granted {1} access,L'accès {1} a été accordé à {0}
 {0} has changed since you opened it. Refresh to get the latest version.,{0} a changé depuis son ouverture. Actualisez pour obtenir la dernière version.
 {0} has children but Is Group is 0 — parent must be a group node,{0} a des enfants mais Est un groupe vaut 0 : le parent doit être un nœud de groupe
 {0} has invited you to join {1}.,{0} vous a invité à rejoindre {1}.
@@ -4743,6 +4951,7 @@ yyyy-mm-dd,aaaa-mm-jj
 {0} matches,{0} correspondances
 {0} missing,{0} manquant
 {0} more not shown,{0} de plus non affichés
+{0} moved to hidden required fields. Set a default value.,{0} a été déplacé vers les champs obligatoires masqués. Définissez une valeur par défaut.
 {0} moved under {1},{0} déplacé sous {1}
 "{0} must act on {1}, not {2}","{0} doit agir sur {1}, et non sur {2}"
 {0} must be a JSON object,{0} doit être un objet JSON
@@ -4773,6 +4982,7 @@ yyyy-mm-dd,aaaa-mm-jj
 {0} results found,{0} résultats trouvés
 {0} reviews,{0} avis
 {0} role changes,{0} changements de rôle
+{0} routing,Routage de {0}
 {0} rows,{0} lignes
 {0} saved section(s) already exist by name and were not imported,{0} section(s) enregistrée(s) existent déjà sous ce nom et n'ont pas été importées
 {0} selected,{0} sélectionné(s)
@@ -4800,6 +5010,7 @@ yyyy-mm-dd,aaaa-mm-jj
 {0}'s dock is now standard and exported to the app.,Le dock de {0} est désormais standard et a été exporté vers l'application.
 {0}'s roles come from the Role Profile {1}. Edit that to change this.,Les rôles de {0} proviennent du profil de rôle {1}. Modifiez-le pour changer cela.
 "{0}, list item {1} of {2}","{0}, élément de liste {1} sur {2}"
+{0}. Save to try deleting it again.,{0}. Enregistrez pour réessayer la suppression.
 {0}/{1} steps,{0}/{1} étapes
 {0}/{1} steps completed,{0}/{1} étapes terminées
 {0}: Link field cannot reference DocType {1} without Guest read permission,{0} : le champ Lien ne peut pas référencer le DocType {1} sans autorisation de lecture pour les invités

@@ -607,6 +607,23 @@ def _traduzir_fixos(texto: str, intocaveis: set) -> tuple[str, int]:
     texto, k = _re.subn(r'\$\{(\w+)===1\?"(year|month|day|hour|minute|second)":"(years|months|days|hours|minutes|seconds)"\}',
                         lambda m: '${window.__?window.__(%s===1?"%s":"%s"):(%s===1?"%s":"%s")}' % (m.group(1), m.group(2), m.group(3), m.group(1), m.group(2), m.group(3)), texto)
     n += k
+    # legendas dos gráficos («Won Deals», «Forecasted»…): o servidor manda o nome da série («won_deals») e o
+    # pacote põe-no em maiúsculas por palavras; passa a ser traduzido
+    texto, k = _re.subn(r'(function \w+\((\w)\)\{return \2\?)(\2\.split\((["`])_\4\)\.map\((\w)=>\5\.charAt\(0\)\.toUpperCase\(\)\+\5\.slice\(1\)\)\.join\(\4 \4\))(:\4\4\})',
+                        lambda m: m.group(1) + V + "(" + m.group(3) + ")" + m.group(6), texto)
+    n += k
+    # «No data to show» / «No data» dos gráficos e cartões
+    texto, k = _re.subn(r',(["`])(No data to show|No data)\1(?=[,)])',
+                        lambda m: "," + V + "(" + m.group(1) + m.group(2) + m.group(1) + ")", texto)
+    n += k
+    # mensagens de estados vazios do painel do Desk (objectos com `message:"…"`): lidas só quando se mostram
+    texto, k = _re.subn(r'([{,])(message|filterMessage):"([A-Z][^"\\]{3,200})"',
+                        lambda m: f'{m.group(1)}get {m.group(2)}(){{return window.__?window.__("{m.group(3)}"):"{m.group(3)}"}}', texto)
+    n += k
+    # «Create new <tipo> using the Create button.» (ecrãs vazios do Desk)
+    texto, k = _re.subn(r"`Create new \$\{([^`]+?)\} using the Create button\.`",
+                        lambda m: f"(window.__?window.__(`Create new {{0}} using the Create button.`,[{m.group(1)}]):`Create new ${{{m.group(1)}}} using the Create button.`)", texto)
+    n += k
     # título do separador do CRM («Deals - Lista»): o nome da rota também se traduz
     texto, k = _re.subn(r'=`\$\{(\w+)\.name\} - \$\{(\w+)\}`',
                         lambda m: f'=`${{window.__?window.__({m.group(1)}.name):{m.group(1)}.name}} - ${{{m.group(2)}}}`', texto)
@@ -678,6 +695,12 @@ trocar("frappe/frappe/desk/form/activity.py", [
 def assignee_from_assignment(text: str, comment_type: str) -> str | None:'''),
     ("\t\ttext = activity_text(c.content)\n\t\tassignee = assignee_from_assignment(text, c.comment_type)",
      "\t\ttext = orbit_texto_atribuicao(activity_text(c.content), c.comment_type)\n\t\tassignee = assignee_from_assignment(text, c.comment_type)"),
+])
+
+# O painel do CRM manda «days» escrito sem `_()` (tempo médio para fechar) — 19-10-2026.
+trocar("crm/crm/api/dashboard.py", [
+    ('"suffix": " days",', '"suffix": " " + _("days"),'),
+    ('"deltaSuffix": " days",', '"deltaSuffix": " " + _("days"),'),
 ])
 
 # As colunas da lista de bilhetes do Desk («Subject», «First response»…) vêm do servidor sem `_()` (18-10-2026).

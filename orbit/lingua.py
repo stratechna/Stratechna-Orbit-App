@@ -80,6 +80,14 @@ def _garantir() -> None:
     make_property_setter("User", "language", "description", "Muda-se no portal Stratechna, em «Os Meus Dados».",
                          "Small Text", validate_fields_for_doctype=False)
 
+    # 5. a moeda do CRM vem em INR (rupia) de fábrica; fica a do tenant (EUR). Só se mexe enquanto for a de
+    #    fábrica — quem escolheu outra moeda de propósito não é tocado.
+    if frappe.db.exists("DocType", "FCRM Settings") and \
+            frappe.db.get_single_value("FCRM Settings", "currency") == "INR":
+        moeda = frappe.db.get_single_value("Global Defaults", "default_currency") or "EUR"
+        if moeda != "INR" and frappe.db.exists("Currency", moeda):
+            frappe.db.set_single_value("FCRM Settings", "currency", moeda)
+
     frappe.db.commit()
     from frappe.translate import clear_cache
     clear_cache()
