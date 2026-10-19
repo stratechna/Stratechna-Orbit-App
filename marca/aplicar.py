@@ -618,7 +618,8 @@ def _traduzir_fixos(texto: str, intocaveis: set) -> tuple[str, int]:
     n += k
     # mensagens de estados vazios do painel do Desk (objectos com `message:"…"`): lidas só quando se mostram
     texto, k = _re.subn(r'([{,])(message|filterMessage):"([A-Z][^"\\]{3,200})"',
-                        lambda m: f'{m.group(1)}get {m.group(2)}(){{return window.__?window.__("{m.group(3)}"):"{m.group(3)}"}}', texto)
+                        lambda m: f'{m.group(1)}get {m.group(2)}(){{return window.__?window.__("{m.group(3)}"):"{m.group(3)}"}}', texto) \
+        if ("will appear" in texto or "filterMessage:" in texto) else (texto, 0)
     n += k
     # «Create new <tipo> using the Create button.» (ecrãs vazios do Desk)
     texto, k = _re.subn(r"`Create new \$\{([^`]+?)\} using the Create button\.`",
