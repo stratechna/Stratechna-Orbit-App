@@ -981,8 +981,8 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
    entrada (body[data-path="login"]), em todos os tenants. Só CSS: o comportamento
    da entrada única (entrada.js, ?nativo=1) não muda. */
 /* Fundo (19-10-2026, Vítor): o das imagens dos produtos do stratechna.com — ardósia, um brilho suave e círculos
-   concêntricos ténues, aqui em cima à esquerda; só CSS, sem imagem. O símbolo do Orbit em negro entra pelo canto
-   inferior direito, como a marca de água dentro do Orbit. A caixa fica centrada no ecrã. */
+   concêntricos ténues, aqui em cima à esquerda; só CSS, sem imagem. O símbolo do Orbit entra pelo canto inferior
+   direito, esbatido como na faixa escura do Orbit (Vítor preferiu essas cores). A caixa fica centrada no ecrã. */
 body[data-path="login"] { color: #e6e8eb; background-color: #1c2a35 !important; background-attachment: fixed !important;
 	background-image:
 		radial-gradient(circle at 28% 22%, rgba(70, 100, 118, .30) 0, rgba(70, 100, 118, .10) 22vmax, rgba(0, 0, 0, 0) 40vmax),
@@ -991,8 +991,8 @@ body[data-path="login"] { color: #e6e8eb; background-color: #1c2a35 !important; 
 		radial-gradient(circle at 28% 22%, rgba(0, 0, 0, 0) 0 42vmax, rgba(255, 255, 255, .025) 42vmax 42.4vmax, rgba(0, 0, 0, 0) 42.4vmax),
 		linear-gradient(160deg, #22313c 0%, #1a2731 55%, #16212a 100%) !important; }
 body[data-path="login"]::after { content: ""; position: fixed; right: -16vmin; bottom: -18vmin; width: 70vmin; height: 70vmin;
-	opacity: .6; pointer-events: none; z-index: 0;
-	background: no-repeat center / contain url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='none'%3E%3Cellipse cx='256' cy='256' rx='230' ry='112' stroke='%230a0e12' stroke-width='14' transform='rotate(-30 256 256)'/%3E%3Cellipse cx='256' cy='256' rx='168' ry='82' stroke='%230a0e12' stroke-width='12' transform='rotate(-30 256 256)'/%3E%3Ccircle cx='256' cy='256' r='44' fill='%23880000'/%3E%3C/svg%3E"); }
+	opacity: .1; pointer-events: none; z-index: 0;   /* as cores e o esbatido da faixa escura do Orbit (#orbit-saudacao) */
+	background: no-repeat center / contain url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='none'%3E%3Cellipse cx='256' cy='256' rx='230' ry='112' stroke='%23c8d0d8' stroke-width='14' transform='rotate(-30 256 256)'/%3E%3Cellipse cx='256' cy='256' rx='168' ry='82' stroke='%23c8d0d8' stroke-width='12' transform='rotate(-30 256 256)'/%3E%3Ccircle cx='256' cy='256' r='44' fill='%23ea5c55'/%3E%3C/svg%3E"); }
 body[data-path="login"] .page-content-wrapper { min-height: 100vh; display: flex; align-items: center; justify-content: center;
 	padding: 24px 16px !important; position: relative; z-index: 1; }
 body[data-path="login"] main.container { width: 100%; max-width: 440px; margin: 0 auto; }

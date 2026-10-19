@@ -31,7 +31,8 @@
   if (!new URLSearchParams(location.search).has("nativo")) return;
   function esconder() {
     var a = document.querySelector("a.btn-stratechna");
-    if (a) { a.style.display = "none"; return true; }
+    // o contentor inteiro, e não só o botão: escondido só o botão, deixava um espaço vazio por baixo de «Continuar»
+    if (a) { (a.closest(".social-logins") || a).style.display = "none"; return true; }
     return false;
   }
   if (!esconder()) { document.addEventListener("DOMContentLoaded", esconder); }
