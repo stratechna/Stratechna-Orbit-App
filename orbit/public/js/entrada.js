@@ -37,3 +37,26 @@
   }
   if (!esconder()) { document.addEventListener("DOMContentLoaded", esconder); }
 })();
+
+// Vindo do portal com uma sessão de alguém que não tem conta neste Orbit (?sem_conta=1, 19-10-2026): uma nota
+// por cima do formulário, para se perceber porque não entrou sozinho.
+(function () {
+  if (!new URLSearchParams(location.search).has("sem_conta")) return;
+  var pt = (document.documentElement.lang || "pt").slice(0, 2);
+  var txt = {
+    pt: "A sua sessão Stratechna não tem conta neste Orbit. Entre com uma conta deste Orbit.",
+    en: "Your Stratechna session has no account in this Orbit. Sign in with an account from this Orbit.",
+    es: "Su sesión Stratechna no tiene cuenta en este Orbit. Entre con una cuenta de este Orbit.",
+    fr: "Votre session Stratechna n’a pas de compte dans cet Orbit. Connectez-vous avec un compte de cet Orbit."
+  }[pt] || "";
+  function nota() {
+    var f = document.querySelector("section.for-login form.form-login");
+    if (!f) return false;
+    var d = document.createElement("div");
+    d.className = "orbit-sem-conta";
+    d.textContent = txt;
+    f.parentNode.insertBefore(d, f);
+    return true;
+  }
+  if (!nota()) { document.addEventListener("DOMContentLoaded", nota); }
+})();

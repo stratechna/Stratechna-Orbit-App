@@ -1015,3 +1015,5 @@ body[data-path="login"] .page-card a.es-button.btn-login-option { background: tr
 	border: 1px solid #2f3540 !important; box-shadow: none !important; }
 body[data-path="login"] .page-card a.es-button.btn-login-option:hover { background: #232831 !important; }
 body[data-path="login"] .page-card .toggle-password { color: #a9b1bb; }
+body[data-path="login"] .orbit-sem-conta { background: rgba(234, 92, 85, .12); border: 1px solid rgba(234, 92, 85, .35); color: #f0c9c6;
+	border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.45; }

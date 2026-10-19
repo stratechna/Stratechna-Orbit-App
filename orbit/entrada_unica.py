@@ -142,6 +142,19 @@ def regresso(code: str | None = None, state: str | None = None, error: str | Non
     idt = _verificar(tok["id_token"], c["client_id"])
     dados = {k: idt.get(k) for k in ("sub", "email", "email_verified", "name", "given_name", "family_name",
                                      "first_name", "last_name")}
+    # 19-10-2026 (Vítor): a sessão do portal pode ser de alguém que não tem conta NESTE tenant (ex.: o Vítor a abrir o
+    # tenant de demonstração). Em vez do «Signup is Disabled» do Frappe, mostra-se o formulário do Orbit, para entrar
+    # com uma conta deste tenant. Nunca se cria conta pela entrada única (sign_ups = Deny).
+    email = (idt.get("email") or "").strip().lower()
+    utilizador = frappe.db.get_value("User", {"email": email}, ["name", "enabled"], as_dict=True) if email else None
+    if not utilizador or not utilizador.enabled or utilizador.name in ("Guest", "Administrator"):
+        destino = consume_oauth_state(state) if state else None
+        q = {"nativo": 1, "sem_conta": 1}
+        if destino:
+            q["redirect-to"] = destino
+        frappe.local.response["type"] = "redirect"
+        frappe.local.response["location"] = "/login?" + _q(q)
+        return
     frappe.flags.orbit_via_portal = True      # a sessão central já existe: não é preciso a ponte
     # 18-10-2026: a língua é a do portal (idioma_pessoa; casa = pt) — antes do login_oauth_user, que já
     # desenha a resposta: a primeira página abre logo na língua certa. Ver orbit/lingua.py.
