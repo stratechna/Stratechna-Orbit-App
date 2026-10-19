@@ -418,7 +418,13 @@
 	function pagina(container) {
 		const icones = (frappe.boot && frappe.boot.desktop_icons) || [];
 		if (!icones.length) return false;
-		if (document.getElementById("orbit-pagina")) return true;
+		// O Frappe pode voltar a desenhar a grelha dele (ao regressar ao ecrã de
+		// apps) num contentor novo, sem a nossa classe: escondem-se todos, não só
+		// o primeiro, ou a grelha de origem aparece repetida por baixo da nossa.
+		if (document.getElementById("orbit-pagina")) {
+			document.querySelectorAll(".desktop-container").forEach((c) => c.classList.add("orbit-escondido"));
+			return true;
+		}
 
 		const visiveis = icones.filter((i) => !i.hidden && !i.parent_icon);
 		const usados = new Set();
@@ -496,7 +502,7 @@
 		raiz.appendChild(corpo);
 
 		container.parentNode.insertBefore(raiz, container);
-		container.classList.add("orbit-escondido");
+		document.querySelectorAll(".desktop-container").forEach((c) => c.classList.add("orbit-escondido"));
 		ajustarDensidade(raiz);
 		return true;
 	}

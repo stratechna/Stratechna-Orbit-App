@@ -37,8 +37,13 @@
 }
 
 /* A grelha de origem fica no sítio, apenas escondida: se a nossa falhar, basta
-   tirar esta classe para o ecrã do Frappe voltar. */
-.desktop-container.orbit-escondido {
+   tirar esta classe para o ecrã do Frappe voltar. O Frappe v16 tem dois modelos
+   com `.desktop-container` (desktop.html e desktop_icons.html) e pode desenhar o
+   segundo depois de a nossa página existir: escondem-se todos enquanto ela lá
+   estiver, ou a grelha de origem aparece repetida por baixo (Vítor, 19-10). */
+.desktop-container.orbit-escondido,
+#orbit-pagina ~ .desktop-container,
+body:has(#orbit-pagina) .desktop-container {
 	display: none;
 }
 
