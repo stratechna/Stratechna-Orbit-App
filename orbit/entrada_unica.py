@@ -54,6 +54,10 @@ def garantir() -> None:
 
 
 def _garantir() -> None:
+    # A «ligação por e-mail» do Frappe não faz sentido com a entrada única (Vítor, 19-10-2026): entra-se pelo portal
+    # sem se ver nada, ou pelo formulário com as credenciais do Orbit. Desligada em todos os tenants, também nos novos.
+    if frappe.db.get_single_value("System Settings", "login_with_email_link"):
+        frappe.db.set_single_value("System Settings", "login_with_email_link", 0)
     c = _conf()
     if not c:
         return

@@ -16,10 +16,10 @@ app_license = "agpl-3.0"
 #
 # SUBIR ESTE NÚMERO sempre que se mexer no CSS ou no JS.
 app_include_js = "/assets/orbit/js/orbit.js?v=25"
-app_include_css = "/assets/orbit/css/orbit.css?v=24"
+app_include_css = "/assets/orbit/css/orbit.css?v=25"
 # As cores tambem nas paginas publicas — a entrada e a primeira coisa que
 # alguem ve, e e servida pelo lado do site e nao pela secretaria.
-web_include_css = "/assets/orbit/css/orbit.css?v=24"
+web_include_css = "/assets/orbit/css/orbit.css?v=25"
 # 17-10-2026: na página de entrada, seguir para o portal (entrada única) quando o tenant o tem ligado
 web_include_js = "/assets/orbit/js/entrada.js?v=4"
 

@@ -980,11 +980,27 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
    escuro, cartão ardósia, campos escuros e o botão vermelho — só na página de
    entrada (body[data-path="login"]), em todos os tenants. Só CSS: o comportamento
    da entrada única (entrada.js, ?nativo=1) não muda. */
-body[data-path="login"] { background: radial-gradient(1100px 620px at 25% 35%, #1d2128 0%, #121417 62%) fixed !important; color: #e6e8eb; }
+/* Fundo (19-10-2026, Vítor): o das imagens dos produtos do stratechna.com — ardósia, um brilho suave e círculos
+   concêntricos ténues, aqui em cima à esquerda; só CSS, sem imagem. O símbolo do Orbit em negro entra pelo canto
+   inferior direito, como a marca de água dentro do Orbit. A caixa fica centrada no ecrã. */
+body[data-path="login"] { color: #e6e8eb; background-color: #1c2a35 !important; background-attachment: fixed !important;
+	background-image:
+		radial-gradient(circle at 28% 22%, rgba(70, 100, 118, .30) 0, rgba(70, 100, 118, .10) 22vmax, rgba(0, 0, 0, 0) 40vmax),
+		radial-gradient(circle at 28% 22%, rgba(0, 0, 0, 0) 0 21vmax, rgba(255, 255, 255, .035) 21vmax 21.4vmax, rgba(0, 0, 0, 0) 21.4vmax),
+		radial-gradient(circle at 28% 22%, rgba(0, 0, 0, 0) 0 31vmax, rgba(255, 255, 255, .03) 31vmax 31.4vmax, rgba(0, 0, 0, 0) 31.4vmax),
+		radial-gradient(circle at 28% 22%, rgba(0, 0, 0, 0) 0 42vmax, rgba(255, 255, 255, .025) 42vmax 42.4vmax, rgba(0, 0, 0, 0) 42.4vmax),
+		linear-gradient(160deg, #22313c 0%, #1a2731 55%, #16212a 100%) !important; }
+body[data-path="login"]::after { content: ""; position: fixed; right: -16vmin; bottom: -18vmin; width: 70vmin; height: 70vmin;
+	opacity: .6; pointer-events: none; z-index: 0;
+	background: no-repeat center / contain url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='none'%3E%3Cellipse cx='256' cy='256' rx='230' ry='112' stroke='%230a0e12' stroke-width='14' transform='rotate(-30 256 256)'/%3E%3Cellipse cx='256' cy='256' rx='168' ry='82' stroke='%230a0e12' stroke-width='12' transform='rotate(-30 256 256)'/%3E%3Ccircle cx='256' cy='256' r='44' fill='%23880000'/%3E%3C/svg%3E"); }
+body[data-path="login"] .page-content-wrapper { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+	padding: 24px 16px !important; position: relative; z-index: 1; }
+body[data-path="login"] main.container { width: 100%; max-width: 440px; margin: 0 auto; }
+body[data-path="login"] .btn-login-with-email-link { display: none !important; }
 body[data-path="login"] .navbar, body[data-path="login"] .web-footer, body[data-path="login"] footer { display: none !important; }
 body[data-path="login"] main, body[data-path="login"] .page-content-wrapper, body[data-path="login"] .page_content,
 body[data-path="login"] .container { background: transparent !important; }
-body[data-path="login"] .page-card { background: #1c2026 !important; border: 1px solid #2c323b !important; border-radius: 14px !important;
+body[data-path="login"] .page-card { background: rgba(22, 30, 37, .92) !important; border: 1px solid #2c323b !important; border-radius: 14px !important;
 	box-shadow: 0 22px 60px rgba(0, 0, 0, .45) !important; padding: 32px !important; max-width: 400px !important; }
 body[data-path="login"] .page-card-head { flex-direction: row !important; align-items: center !important; gap: 14px !important; }
 body[data-path="login"] .page-card-head .app-logo { height: 52px !important; width: auto !important; max-height: none !important; margin: 0 !important; }
