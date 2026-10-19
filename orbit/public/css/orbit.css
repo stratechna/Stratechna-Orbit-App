@@ -973,3 +973,29 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 	--heading-color: #e8edf1;
 	--text-color: #c8d0d8;
 }
+
+/* ── Ecrã de entrada com o aspecto Stratechna (19-10-2026) ─────────────────────
+   O Vítor achou o formulário genérico do Frappe (fundo branco, logótipo pequeno)
+   estranho ao lado do ecrã do portal. Fica com o mesmo aspecto do portal — fundo
+   escuro, cartão ardósia, campos escuros e o botão vermelho — só na página de
+   entrada (body[data-path="login"]), em todos os tenants. Só CSS: o comportamento
+   da entrada única (entrada.js, ?nativo=1) não muda. */
+body[data-path="login"] { background: radial-gradient(1100px 620px at 25% 35%, #1d2128 0%, #121417 62%) fixed !important; color: #e6e8eb; }
+body[data-path="login"] .navbar, body[data-path="login"] .web-footer, body[data-path="login"] footer { display: none !important; }
+body[data-path="login"] main, body[data-path="login"] .page-content-wrapper, body[data-path="login"] .page_content,
+body[data-path="login"] .container { background: transparent !important; }
+body[data-path="login"] .page-card { background: #1c2026 !important; border: 1px solid #2c323b !important; border-radius: 14px !important;
+	box-shadow: 0 22px 60px rgba(0, 0, 0, .45) !important; padding: 32px !important; max-width: 400px !important; }
+body[data-path="login"] .page-card-head { flex-direction: row !important; align-items: center !important; gap: 14px !important; }
+body[data-path="login"] .page-card-head .app-logo { height: 52px !important; width: auto !important; max-height: none !important; margin: 0 !important; }
+body[data-path="login"] .page-card-head h4 { color: #f1f3f5 !important; font-size: 22px !important; font-weight: 700 !important; }
+body[data-path="login"] .page-card-subtitle, body[data-path="login"] .page-card a.text-ink-gray-5 { color: #a9b1bb !important; }
+body[data-path="login"] .page-card label { color: #c3c9d1 !important; text-transform: uppercase; font-size: 11.5px !important; letter-spacing: .06em; font-weight: 700; }
+body[data-path="login"] .page-card .form-control { background: #121418 !important; border: 1px solid #2f3540 !important; color: #e6e8eb !important; min-height: 40px; }
+body[data-path="login"] .page-card .form-control:focus { border-color: #880000 !important; box-shadow: 0 0 0 2px rgba(136, 0, 0, .25) !important; }
+body[data-path="login"] .page-card .es-button[data-variant="solid"] { background: #7d1414 !important; color: #fff !important; border: none !important; font-weight: 700; }
+body[data-path="login"] .page-card .es-button[data-variant="solid"]:hover { background: #931a1a !important; }
+body[data-path="login"] .page-card a.es-button.btn-login-option { background: transparent !important; color: #cfd5dc !important;
+	border: 1px solid #2f3540 !important; box-shadow: none !important; }
+body[data-path="login"] .page-card a.es-button.btn-login-option:hover { background: #232831 !important; }
+body[data-path="login"] .page-card .toggle-password { color: #a9b1bb; }
