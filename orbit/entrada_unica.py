@@ -147,6 +147,9 @@ def regresso(code: str | None = None, state: str | None = None, error: str | Non
     # com uma conta deste tenant. Nunca se cria conta pela entrada única (sign_ups = Deny).
     email = (idt.get("email") or "").strip().lower()
     utilizador = frappe.db.get_value("User", {"email": email}, ["name", "enabled"], as_dict=True) if email else None
+    # 21-10-2026: um administrador do portal sem conta neste tenant entra em assistência (ver _assistencia).
+    if (not utilizador or not utilizador.enabled) and idt.get("stratechna_equipa") is True and email != ASSISTENCIA:
+        return _assistencia(idt, state)
     if not utilizador or not utilizador.enabled or utilizador.name in ("Guest", "Administrator"):
         destino = consume_oauth_state(state) if state else None
         q = {"nativo": 1, "sem_conta": 1}
@@ -176,6 +179,96 @@ def regresso(code: str | None = None, state: str | None = None, error: str | Non
         frappe.cache.set_value(_CHAVE_CACHE + sid_frappe, idt["sid"], expires_in_sec=31 * 86400)
 
 
+# ── assistência (21-10-2026) ─────────────────────────────────────────────────
+# Pedido do Vítor: quem está no portal como administrador tem de conseguir entrar no Orbit de qualquer cliente
+# (assistência), mesmo sem conta lá. Decisões A1–A3 (21-10): um só utilizador por tenant, suporte@stratechna.com,
+# com os papéis de um administrador do tenant, que não conta para os utilizadores contratados; o nome de quem
+# entrou fica registado (Activity Log do tenant e `orbit_assistencias` no portal); sem email ao cliente.
+# O portal só põe `stratechna_equipa` no id_token de um administrador (is_admin). A conta nunca tem palavra-passe:
+# só se entra nela por aqui. Sair da assistência fecha só esta sessão — a do portal continua.
+ASSISTENCIA = "suporte@stratechna.com"
+_ASSIST = "orbit_entrada_unica:assistencia:"
+_PAPEIS_FORA = {"Administrator", "Guest", "All", "Desk User"}
+
+
+def _papeis_de_admin() -> set:
+    """Os papéis que têm os administradores (System Manager) activos deste tenant — «iguais às de um admin»."""
+    adm = [u for u in frappe.get_all("Has Role", filters={"role": "System Manager", "parenttype": "User"},
+                                     pluck="parent")
+           if u not in ("Administrator", ASSISTENCIA) and frappe.db.get_value("User", u, "enabled")]
+    papeis = set(frappe.get_all("Has Role", filters={"parenttype": "User", "parent": ["in", adm]}, pluck="role")) if adm else set()
+    return (papeis | {"System Manager"}) - _PAPEIS_FORA
+
+
+def _garantir_assistencia() -> None:
+    if not frappe.db.exists("User", ASSISTENCIA):
+        u = frappe.get_doc({"doctype": "User", "email": ASSISTENCIA, "first_name": "Assistência",
+                            "last_name": "Stratechna", "user_type": "System User", "enabled": 1,
+                            "send_welcome_email": 0, "language": "pt"})
+        u.flags.ignore_permissions = True
+        u.flags.no_welcome_mail = True
+        u.insert()
+    u = frappe.get_doc("User", ASSISTENCIA)
+    mudou = False
+    if not u.enabled or u.user_type != "System User":
+        u.enabled, u.user_type, mudou = 1, "System User", True
+    falta = _papeis_de_admin() - {r.role for r in u.roles}
+    for p in sorted(falta):
+        u.append("roles", {"role": p})
+        mudou = True
+    if mudou:
+        u.flags.ignore_permissions = True
+        u.save()
+
+
+def _assistencia(idt: dict, state: str | None):
+    from frappe.utils.oauth import consume_oauth_state
+    destino = (consume_oauth_state(state) if state else None) or "/app"
+    quem = {"nome": idt.get("name") or idt.get("email"), "email": (idt.get("email") or "").lower(),
+            "sid": idt.get("sid")}
+    try:
+        frappe.set_user("Administrator")
+        _garantir_assistencia()
+        frappe.get_doc({"doctype": "Activity Log", "user": ASSISTENCIA, "full_name": quem["nome"],
+                        "operation": "Login", "status": "Success", "reference_doctype": "User",
+                        "reference_name": ASSISTENCIA,
+                        "subject": f"Assistência Stratechna: {quem['nome']} <{quem['email']}>"}
+                       ).insert(ignore_permissions=True)
+        frappe.db.commit()
+    except Exception:
+        frappe.log_error(title="orbit.entrada_unica.assistencia")
+        frappe.set_user("Guest")
+        frappe.respond_as_web_page("Assistência Stratechna", "Não foi possível abrir a assistência neste Orbit.",
+                                   http_status_code=500, indicator_color="red")
+        return
+    frappe.flags.orbit_via_portal = True
+    # audit_user (Frappe 16): cada Version gravada nesta sessão leva o email de quem está em assistência.
+    frappe.local.login_manager.login_as(ASSISTENCIA, audit_user=quem["email"])
+    sid_frappe = frappe.local.session.sid
+    if quem["sid"]:
+        frappe.cache.set_value(_CHAVE_CACHE + sid_frappe, quem["sid"], expires_in_sec=31 * 86400)
+    frappe.cache.set_value(_ASSIST + sid_frappe, quem, expires_in_sec=31 * 86400)
+    c = _conf()
+    try:
+        import requests
+        requests.post(EMISSOR + "/assistencia", data={"sid": quem["sid"] or "", "host": frappe.local.request.host},
+                      auth=(c["client_id"], c["client_secret"]), timeout=8)
+    except Exception:
+        frappe.log_error(title="orbit.entrada_unica.assistencia (registo no portal)")
+    frappe.local.response["type"] = "redirect"
+    from urllib.parse import urlparse
+    u = urlparse(destino)
+    proprio = (frappe.local.request.host or "").split(":")[0].lower()
+    if destino.startswith("//") or (u.netloc and (u.scheme != "https" or (u.hostname or "").lower() != proprio)):
+        destino = "/app"
+    frappe.local.response["location"] = destino
+
+
+def em_assistencia() -> dict | None:
+    sid = getattr(frappe.session, "sid", None)
+    return frappe.cache.get_value(_ASSIST + sid) if sid and frappe.session.user == ASSISTENCIA else None
+
+
 # ── sair ─────────────────────────────────────────────────────────────────────
 
 def ao_sair(login_manager=None) -> None:
@@ -187,6 +280,11 @@ def ao_sair(login_manager=None) -> None:
                 and not (frappe.request and frappe.request.path.rstrip("/").endswith(("/logout", "/web_logout"))):
             return
         sid_frappe = frappe.session.sid
+        if sid_frappe and frappe.cache.get_value(_ASSIST + sid_frappe):
+            # Sair da assistência fecha só esta sessão; quem estava em assistência continua no portal.
+            frappe.cache.delete_value(_ASSIST + sid_frappe)
+            frappe.cache.delete_value(_CHAVE_CACHE + sid_frappe)
+            return
         sid = frappe.cache.get_value(_CHAVE_CACHE + sid_frappe) if sid_frappe else None
         c = _conf()
         if not sid or not c:
@@ -214,16 +312,20 @@ def saida_canal(logout_token: str | None = None):
         frappe.local.response.http_status_code = 400
         return
     email = (d.get("email") or "").lower()
-    if not email or not frappe.db.exists("User", email):
+    # A sessão central pode ter aberto aqui a conta da própria pessoa ou a da assistência (suporte@).
+    contas = [u for u in {email, ASSISTENCIA} if u and frappe.db.exists("User", u)]
+    if not contas:
         return {"saidas": 0}
     from frappe.sessions import delete_session
     n = 0
     t = frappe.qb.DocType("Sessions")
-    for s in frappe.qb.from_(t).where(t.user == email).select(t.sid).run(pluck=True):
-        if frappe.cache.get_value(_CHAVE_CACHE + s) == d["sid"]:
-            delete_session(s, user=email, reason="Saiu noutra aplicação Stratechna")
-            frappe.cache.delete_value(_CHAVE_CACHE + s)
-            n += 1
+    for conta in contas:
+        for s in frappe.qb.from_(t).where(t.user == conta).select(t.sid).run(pluck=True):
+            if frappe.cache.get_value(_CHAVE_CACHE + s) == d["sid"]:
+                delete_session(s, user=conta, reason="Saiu noutra aplicação Stratechna")
+                frappe.cache.delete_value(_CHAVE_CACHE + s)
+                frappe.cache.delete_value(_ASSIST + s)
+                n += 1
     frappe.db.commit()
     return {"saidas": n}
 
@@ -248,7 +350,7 @@ def sessao_criada(login_manager=None) -> None:
         if frappe.flags.get("orbit_via_portal") or not _conf() or not frappe.conf.get("orbit_entrada_stratechna_auto"):
             return
         sid = getattr(frappe.local, "session", None) and frappe.local.session.sid
-        if sid and sid != "Guest" and (getattr(login_manager, "user", None) or "") not in ("Administrator", "Guest"):
+        if sid and sid != "Guest" and (getattr(login_manager, "user", None) or "") not in ("Administrator", "Guest", ASSISTENCIA):
             frappe.cache.set_value(_PONTE + sid, 1, expires_in_sec=3600)
     except Exception:
         frappe.log_error(title="orbit.entrada_unica.sessao_criada")
@@ -257,6 +359,10 @@ def sessao_criada(login_manager=None) -> None:
 def boot(bootinfo) -> None:
     """O desk segue a ponte logo ao abrir, se ficou por fazer (entrada pelo formulário com destino directo)."""
     sid = frappe.session.sid
+    quem = em_assistencia()
+    if quem:
+        bootinfo["orbit_assistencia"] = {"nome": quem.get("nome"), "email": quem.get("email")}
+        return
     if sid and frappe.cache.get_value(_PONTE + sid):
         bootinfo["orbit_ligar_portal"] = "/api/method/orbit.entrada_unica.ligar_portal?" + _q({"volta": frappe.request.url if frappe.request else "/app"})
 
@@ -283,7 +389,7 @@ def ligar_portal(volta: str | None = None):
     sid_frappe = frappe.session.sid
     frappe.cache.delete_value(_PONTE + sid_frappe)
     frappe.local.response["type"] = "redirect"
-    if not c or frappe.session.user in ("Guest", "Administrator"):
+    if not c or frappe.session.user in ("Guest", "Administrator", ASSISTENCIA):
         frappe.local.response["location"] = destino
         return
     try:

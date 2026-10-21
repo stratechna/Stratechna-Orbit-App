@@ -634,3 +634,39 @@
 		var n = 0, t = setInterval(function () { if (ligar() || ++n > 50) { clearInterval(t); } }, 200);
 	}
 })();
+
+// Assistência Stratechna (21-10-2026): um administrador do portal entrou neste Orbit como suporte@stratechna.com
+// (entrada_unica._assistencia). Aviso fixo com o nome de quem está; «Sair da assistência» fecha só esta sessão
+// e volta ao portal (a sessão do portal continua).
+(function () {
+	function aviso() {
+		if (!window.frappe || !frappe.boot) { return false; }
+		var q = frappe.boot.orbit_assistencia;
+		if (!q || document.getElementById("orbit-assistencia")) { return true; }
+		var d = document.createElement("div");
+		d.id = "orbit-assistencia";
+		d.setAttribute("role", "status");
+		d.style.cssText = "position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:1060;" +
+			"display:flex;gap:12px;align-items:center;padding:8px 10px 8px 16px;border-radius:999px;" +
+			"background:#b45309;color:#fff;font-size:13px;line-height:1.3;box-shadow:0 4px 16px rgba(0,0,0,.25);max-width:calc(100vw - 32px)";
+		var t = document.createElement("span");
+		t.textContent = "Em assistência — " + (q.nome || q.email) + " (Stratechna)";
+		var b = document.createElement("button");
+		b.type = "button";
+		b.textContent = "Sair da assistência";
+		b.style.cssText = "border:0;border-radius:999px;padding:4px 12px;background:#fff;color:#b45309;font-weight:600;cursor:pointer";
+		b.onclick = function () {
+			b.disabled = true;
+			fetch("/api/method/logout", { method: "POST", credentials: "same-origin",
+				headers: { "X-Frappe-CSRF-Token": frappe.csrf_token || "" } })
+				.finally(function () { window.location.replace("https://portal.stratechna.com/"); });
+		};
+		d.appendChild(t);
+		d.appendChild(b);
+		document.body.appendChild(d);
+		return true;
+	}
+	if (!aviso()) {
+		var n = 0, t = setInterval(function () { if (aviso() || ++n > 50) { clearInterval(t); } }, 200);
+	}
+})();
