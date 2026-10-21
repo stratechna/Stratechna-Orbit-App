@@ -90,8 +90,13 @@
     var p = f.querySelector("input[type=password]");
     var pwd = p ? p.value : "";
     if (!pwd) {
+      // só serve com sessão de administrador já aberta no portal (pergunta-se sem se ver, prompt=none); sem ela o
+      // portal devolve aqui e mostra-se a nota abaixo
       var a = document.querySelector("a.btn-stratechna");
-      if (a && a.href) { location.assign(a.href); } else { mensagem(f, "Escreva a palavra-passe da caixa."); }
+      if (a && a.href) {
+        try { sessionStorage.setItem("orbit_assistencia_tentou", "1"); } catch (x) { /* sem armazenamento */ }
+        location.assign(a.href + (a.href.indexOf("?") >= 0 ? "&" : "?") + "prompt=none");
+      } else { mensagem(f, "Escreva a palavra-passe da caixa."); }
       return;
     }
     fetch("/api/method/orbit.entrada_unica.entrar_assistencia", {
@@ -102,6 +107,20 @@
       mensagem(f, r.status === 429 ? "Demasiadas tentativas. Espere alguns minutos." : "Credenciais inválidas.");
     }).catch(function () { mensagem(f, "Não foi possível entrar. Tente outra vez."); });
   }, true);
+  // voltou sem entrar: não havia sessão de administrador no portal
+  (function () {
+    var tentou = false;
+    try { tentou = sessionStorage.getItem("orbit_assistencia_tentou") === "1"; sessionStorage.removeItem("orbit_assistencia_tentou"); } catch (x) { /* nada */ }
+    if (!tentou) return;
+    function nota() {
+      var f = document.querySelector("form.form-login");
+      if (!f) return false;
+      mensagem(f, "Sem sessão de administrador no portal. Escreva a palavra-passe da caixa suporte@stratechna.pt, ou entre primeiro no portal.");
+      var c = f.querySelector("#login_email"); if (c) { c.value = ASSIST; }
+      return true;
+    }
+    if (!nota()) { document.addEventListener("DOMContentLoaded", nota); }
+  })();
   // sem palavra-passe também se pode seguir (para o portal): o navegador não deve exigi-la para este endereço
   document.addEventListener("input", function (e) {
     var t = e.target;
