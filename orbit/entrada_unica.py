@@ -191,7 +191,7 @@ def regresso(code: str | None = None, state: str | None = None, error: str | Non
 # só se entra nela por aqui. Sair da assistência fecha só esta sessão — a do portal continua.
 ASSISTENCIA = "suporte@stratechna.pt"   # .pt, não .com (Vítor, 21-10)
 _ASSIST = "orbit_entrada_unica:assistencia:"
-_PAPEIS_FORA = {"Administrator", "Guest", "All", "Desk User"}
+_PAPEIS_FORA = {"Administrator", "Guest", "All", "Desk User", "Customer", "Supplier", "HD Customer"}  # papéis de terceiros, não de admin
 
 
 def _papeis_de_admin() -> set:
@@ -235,7 +235,7 @@ def _assistencia(idt: dict, state: str | None):
         frappe.get_doc({"doctype": "Activity Log", "user": ASSISTENCIA, "full_name": quem["nome"],
                         "operation": "Login", "status": "Success", "reference_doctype": "User",
                         "reference_name": ASSISTENCIA,
-                        "subject": f"Assistência Stratechna: {quem['nome']} <{quem['email']}>"}
+                        "subject": f"Assistência Stratechna: {quem['nome']} ({quem['email']})"}
                        ).insert(ignore_permissions=True)
         frappe.db.commit()
     except Exception:
