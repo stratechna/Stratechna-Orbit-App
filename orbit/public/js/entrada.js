@@ -60,3 +60,53 @@
   }
   if (!nota()) { document.addEventListener("DOMContentLoaded", nota); }
 })();
+
+// Assistência (21-10-2026): no formulário do Orbit, suporte@stratechna.pt + a palavra-passe da caixa abre a
+// assistência (entrada_unica.entrar_assistencia — verificada no servidor de correio). Sem palavra-passe, segue
+// para o portal, que pede a conta de administrador e devolve a pessoa aqui em assistência com o nome dela.
+(function () {
+  var ASSIST = "suporte@stratechna.pt";
+  function destino() {
+    var r = new URLSearchParams(location.search).get("redirect-to") || "/app";
+    return (r.charAt(0) === "/" && r.charAt(1) !== "/") ? r : "/app";
+  }
+  function mensagem(f, txt) {
+    var m = f.querySelector(".orbit-assistencia-erro");
+    if (!m) {
+      m = document.createElement("div");
+      m.className = "orbit-assistencia-erro orbit-sem-conta";
+      m.setAttribute("role", "alert");
+      f.insertBefore(m, f.firstChild);
+    }
+    m.textContent = txt;
+  }
+  document.addEventListener("submit", function (e) {
+    var f = e.target;
+    if (!f || !f.matches || !f.matches("form.form-login")) return;
+    var campo = f.querySelector("#login_email, input[type=email], input[name=usr]");
+    if (!campo || (campo.value || "").trim().toLowerCase() !== ASSIST) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    var p = f.querySelector("input[type=password]");
+    var pwd = p ? p.value : "";
+    if (!pwd) {
+      var a = document.querySelector("a.btn-stratechna");
+      if (a && a.href) { location.assign(a.href); } else { mensagem(f, "Escreva a palavra-passe da caixa."); }
+      return;
+    }
+    fetch("/api/method/orbit.entrada_unica.entrar_assistencia", {
+      method: "POST", credentials: "same-origin", body: new URLSearchParams({ usr: ASSIST, pwd: pwd }),
+      headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" }
+    }).then(function (r) {
+      if (r.ok) { location.replace(destino()); return; }
+      mensagem(f, r.status === 429 ? "Demasiadas tentativas. Espere alguns minutos." : "Credenciais inválidas.");
+    }).catch(function () { mensagem(f, "Não foi possível entrar. Tente outra vez."); });
+  }, true);
+  // sem palavra-passe também se pode seguir (para o portal): o navegador não deve exigi-la para este endereço
+  document.addEventListener("input", function (e) {
+    var t = e.target;
+    if (!t || !t.matches || !t.matches("form.form-login input[type=email], form.form-login #login_email")) return;
+    var p = t.form && t.form.querySelector("input[type=password]");
+    if (p) { p.required = (t.value || "").trim().toLowerCase() !== ASSIST; }
+  }, true);
+})();

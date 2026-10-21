@@ -635,34 +635,71 @@
 	}
 })();
 
-// Assistência Stratechna (21-10-2026): um administrador do portal entrou neste Orbit como suporte@stratechna.com
-// (entrada_unica._assistencia). Aviso fixo com o nome de quem está; «Sair da assistência» fecha só esta sessão
-// e volta ao portal (a sessão do portal continua).
+// Assistência Stratechna (21-10-2026): um administrador do portal entrou neste Orbit como suporte@stratechna.pt
+// (entrada_unica._assistencia). Aviso fixo com o nome de quem está; minimiza-se num ícone (Vítor, 21-10) e fica
+// minimizado nas páginas seguintes. «Sair da assistência» fecha só esta sessão e volta ao portal (a sessão do
+// portal continua).
 (function () {
+	var CHAVE = "orbit_assistencia_minimizada";
+	function lerMin() { try { return localStorage.getItem(CHAVE) === "1"; } catch (e) { return false; } }
+	function gravarMin(v) { try { localStorage.setItem(CHAVE, v ? "1" : "0"); } catch (e) { /* sem armazenamento */ } }
 	function aviso() {
 		if (!window.frappe || !frappe.boot) { return false; }
 		var q = frappe.boot.orbit_assistencia;
 		if (!q || document.getElementById("orbit-assistencia")) { return true; }
+		var nome = q.nome || q.email;
 		var d = document.createElement("div");
 		d.id = "orbit-assistencia";
 		d.setAttribute("role", "status");
-		d.style.cssText = "position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:1060;" +
-			"display:flex;gap:12px;align-items:center;padding:8px 10px 8px 16px;border-radius:999px;" +
-			"background:#b45309;color:#fff;font-size:13px;line-height:1.3;box-shadow:0 4px 16px rgba(0,0,0,.25);max-width:calc(100vw - 32px)";
-		var t = document.createElement("span");
-		t.textContent = "Em assistência — " + (q.nome || q.email) + " (Stratechna)";
-		var b = document.createElement("button");
-		b.type = "button";
-		b.textContent = "Sair da assistência";
-		b.style.cssText = "border:0;border-radius:999px;padding:4px 12px;background:#fff;color:#b45309;font-weight:600;cursor:pointer";
-		b.onclick = function () {
-			b.disabled = true;
-			fetch("/api/method/logout", { method: "POST", credentials: "same-origin",
-				headers: { "X-Frappe-CSRF-Token": frappe.csrf_token || "" } })
-				.finally(function () { window.location.replace("https://portal.stratechna.com/"); });
-		};
-		d.appendChild(t);
-		d.appendChild(b);
+		var cor = "#b45309";
+		var base = "position:fixed;z-index:1060;color:#fff;background:" + cor + ";box-shadow:0 4px 16px rgba(0,0,0,.25);";
+		var barra = base + "left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:10px;align-items:center;" +
+			"padding:6px 6px 6px 16px;border-radius:999px;font-size:13px;line-height:1.3;max-width:calc(100vw - 32px)";
+		var icone = base + "right:16px;bottom:16px;width:40px;height:40px;border-radius:50%;display:flex;" +
+			"align-items:center;justify-content:center;cursor:pointer;padding:0;border:0";
+		// boia (lucide life-buoy), em linha: sem pedidos nem bibliotecas
+		var svg = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+			'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/>' +
+			'<path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/>' +
+			'<path d="m9.17 14.83-4.24 4.24"/><circle cx="12" cy="12" r="4"/></svg>';
+		function desenhar() {
+			d.innerHTML = "";
+			if (lerMin()) {
+				d.style.cssText = icone;
+				d.title = "Em assistência — " + nome + " (Stratechna). Clique para mostrar.";
+				d.setAttribute("aria-label", d.title);
+				d.setAttribute("tabindex", "0");
+				d.innerHTML = svg;
+				d.onclick = function () { gravarMin(false); desenhar(); };
+				d.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); d.onclick(); } };
+				return;
+			}
+			d.style.cssText = barra;
+			d.removeAttribute("title"); d.removeAttribute("tabindex"); d.onclick = null; d.onkeydown = null;
+			var t = document.createElement("span");
+			t.textContent = "Em assistência — " + nome + " (Stratechna)";
+			t.style.cssText = "white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
+			var b = document.createElement("button");
+			b.type = "button";
+			b.textContent = "Sair da assistência";
+			b.style.cssText = "border:0;border-radius:999px;padding:4px 12px;background:#fff;color:" + cor + ";font-weight:600;cursor:pointer;white-space:nowrap";
+			b.onclick = function () {
+				b.disabled = true;
+				fetch("/api/method/logout", { method: "POST", credentials: "same-origin",
+					headers: { "X-Frappe-CSRF-Token": frappe.csrf_token || "" } })
+					.finally(function () { window.location.replace("https://portal.stratechna.com/"); });
+			};
+			var m = document.createElement("button");
+			m.type = "button";
+			m.title = "Minimizar";
+			m.setAttribute("aria-label", "Minimizar o aviso de assistência");
+			m.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" ' +
+				'stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg>';
+			m.style.cssText = "border:0;background:transparent;color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer";
+			m.onclick = function () { gravarMin(true); desenhar(); };
+			d.appendChild(t); d.appendChild(b); d.appendChild(m);
+		}
+		desenhar();
 		document.body.appendChild(d);
 		return true;
 	}

@@ -24,6 +24,7 @@ import json
 import time
 
 import frappe
+from frappe.rate_limiter import rate_limit
 
 PROVEDOR = "stratechna"
 PORTAL = "https://portal.stratechna.com"
@@ -148,8 +149,10 @@ def regresso(code: str | None = None, state: str | None = None, error: str | Non
     email = (idt.get("email") or "").strip().lower()
     utilizador = frappe.db.get_value("User", {"email": email}, ["name", "enabled"], as_dict=True) if email else None
     # 21-10-2026: um administrador do portal sem conta neste tenant entra em assistência (ver _assistencia).
-    if (not utilizador or not utilizador.enabled) and idt.get("stratechna_equipa") is True and email != ASSISTENCIA:
+    if (not utilizador or not utilizador.enabled or email == ASSISTENCIA) and idt.get("stratechna_equipa") is True:
         return _assistencia(idt, state)
+    if email == ASSISTENCIA:
+        utilizador = None          # a conta de assistência só abre com uma sessão de administrador do portal
     if not utilizador or not utilizador.enabled or utilizador.name in ("Guest", "Administrator"):
         destino = consume_oauth_state(state) if state else None
         q = {"nativo": 1, "sem_conta": 1}
@@ -181,12 +184,12 @@ def regresso(code: str | None = None, state: str | None = None, error: str | Non
 
 # ── assistência (21-10-2026) ─────────────────────────────────────────────────
 # Pedido do Vítor: quem está no portal como administrador tem de conseguir entrar no Orbit de qualquer cliente
-# (assistência), mesmo sem conta lá. Decisões A1–A3 (21-10): um só utilizador por tenant, suporte@stratechna.com,
+# (assistência), mesmo sem conta lá. Decisões A1–A3 (21-10): um só utilizador por tenant, suporte@stratechna.pt,
 # com os papéis de um administrador do tenant, que não conta para os utilizadores contratados; o nome de quem
 # entrou fica registado (Activity Log do tenant e `orbit_assistencias` no portal); sem email ao cliente.
 # O portal só põe `stratechna_equipa` no id_token de um administrador (is_admin). A conta nunca tem palavra-passe:
 # só se entra nela por aqui. Sair da assistência fecha só esta sessão — a do portal continua.
-ASSISTENCIA = "suporte@stratechna.com"
+ASSISTENCIA = "suporte@stratechna.pt"   # .pt, não .com (Vítor, 21-10)
 _ASSIST = "orbit_entrada_unica:assistencia:"
 _PAPEIS_FORA = {"Administrator", "Guest", "All", "Desk User"}
 
@@ -262,6 +265,69 @@ def _assistencia(idt: dict, state: str | None):
     if destino.startswith("//") or (u.netloc and (u.scheme != "https" or (u.hostname or "").lower() != proprio)):
         destino = "/app"
     frappe.local.response["location"] = destino
+
+
+# Entrada com a própria caixa (Vítor, 21-10): no formulário do Orbit, suporte@stratechna.pt + a palavra-passe da
+# caixa. A palavra-passe verifica-se no IMAP do BDS (rede privada, 10.0.0.4) e nunca se guarda no Orbit. O BDS
+# apresenta um certificado próprio (CN/SAN StratechnaHostingBDS, até 2036 — o mesmo que o SOGo usa,
+# /opt/orbit/config/bds-mail.crt): é ele a única autoridade aceite, com o nome verificado. Aqui não se sabe quem
+# é a pessoa: o registo diz «caixa suporte@». Sobrepõe-se com `orbit_assistencia_imap` no site_config.
+_IMAP = {"host": "10.0.0.4", "porta": 993, "nome": "StratechnaHostingBDS"}
+
+
+def _caixa_aceita(pwd: str) -> bool:
+    import imaplib
+    import os
+    import socket
+    import ssl
+    c = {**_IMAP, **(frappe.conf.get("orbit_assistencia_imap") or {})}
+    ctx = ssl.create_default_context(cafile=os.path.join(os.path.dirname(__file__), "bds-mail.crt"))
+
+    class _Imap(imaplib.IMAP4_SSL):
+        # liga ao endereço privado mas verifica o certificado pelo nome do BDS (não há DNS para ele aqui)
+        def _create_socket(self, timeout):
+            return self.ssl_context.wrap_socket(socket.create_connection((c["host"], int(c["porta"])), timeout),
+                                                server_hostname=c["nome"])
+
+    m = _Imap(c["nome"], int(c["porta"]), ssl_context=ctx, timeout=10)
+    try:
+        m.login(ASSISTENCIA, pwd)
+    except imaplib.IMAP4.error:
+        return False
+    finally:
+        try:
+            m.logout()
+        except Exception:
+            pass
+    return True
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+@rate_limit(limit=5, seconds=600)
+def entrar_assistencia(usr: str | None = None, pwd: str | None = None):
+    if (usr or "").strip().lower() != ASSISTENCIA or not pwd:
+        frappe.throw("Credenciais inválidas.", frappe.AuthenticationError)
+    try:
+        ok = _caixa_aceita(pwd)
+    except Exception:
+        frappe.log_error(title="orbit.entrada_unica.caixa")
+        frappe.throw("Não foi possível verificar a caixa de correio. Tente outra vez.")
+    if not ok:
+        frappe.throw("Credenciais inválidas.", frappe.AuthenticationError)
+    ip = frappe.local.request_ip
+    frappe.set_user("Administrator")
+    _garantir_assistencia()
+    frappe.get_doc({"doctype": "Activity Log", "user": ASSISTENCIA, "full_name": "Assistência Stratechna",
+                    "operation": "Login", "status": "Success", "reference_doctype": "User",
+                    "reference_name": ASSISTENCIA,
+                    "subject": f"Assistência Stratechna: entrada com a caixa {ASSISTENCIA} (IP {ip})"}
+                   ).insert(ignore_permissions=True)
+    frappe.db.commit()
+    frappe.flags.orbit_via_portal = True      # sem ponte para o portal: esta entrada não é de ninguém do portal
+    frappe.local.login_manager.login_as(ASSISTENCIA, audit_user=ASSISTENCIA)
+    frappe.cache.set_value(_ASSIST + frappe.local.session.sid, {"nome": ASSISTENCIA, "email": ASSISTENCIA, "sid": None},
+                           expires_in_sec=31 * 86400)
+    return {"ok": 1}
 
 
 def em_assistencia() -> dict | None:

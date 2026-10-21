@@ -10,7 +10,7 @@ crie pessoas directamente no Orbit.
 import frappe
 from frappe import _
 
-SEMPRE = {"administrator", "guest", "suporte@stratechna.com"}   # suporte@ = assistência (entrada_unica)
+SEMPRE = {"administrator", "guest", "suporte@stratechna.pt"}   # suporte@ = assistência (entrada_unica)
 
 
 def _conta(user: str, servico: set) -> bool:
