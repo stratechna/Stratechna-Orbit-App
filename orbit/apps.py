@@ -82,6 +82,13 @@ def acrescentar_ao_boot(bootinfo) -> None:
     estarem no ecrã.
     """
     act = activas()
+    # Assistência Stratechna (21-10-2026, Vítor): quem está em assistência tem de poder ajudar em qualquer serviço que
+    # exista neste tenant — o Marketing (app orbit, sempre instalada) em especial. Activa-se o que está mesmo
+    # instalado; as apps de fora do Frappe só existem se aprovisionadas, e essas continuam como estão.
+    from orbit.entrada_unica import em_assistencia
+    if em_assistencia():
+        instaladas = set(frappe.get_installed_apps())
+        act = act | {n for n, d in APPS.items() if d["frappe"] and d["frappe"] in instaladas}
     bootinfo.orbit_apps = {
         "activas": sorted(act),
         "inactivas": {
