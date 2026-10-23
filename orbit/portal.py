@@ -908,8 +908,50 @@ def _nova_tarefa(projeto: str, nome: str, mae: str = None, grupo: int = 0, horas
                         "exp_start_date": inicio or None, "exp_end_date": fim or inicio or None,
                         "chave_portal": chave, "ordem": ordem, "description": descricao})
     t.flags.ignore_permissions = True
-    t.insert()
+    if not mae:
+        t.insert()
+        return t.name
+    # Com mãe, o ERPNext (Task.populate_depends_on) acrescenta a filha à mãe e grava-a com `parent.save()`, sem
+    # ignore_permissions — e o utilizador do portal não tem função no Task (403). Só esse passo corre como
+    # Administrator; o dono da tarefa continua a ser quem a pediu.
+    quem = frappe.session.user
+    try:
+        frappe.set_user("Administrator")
+        t.insert()
+    finally:
+        frappe.set_user(quem)
+    if quem != "Administrator":
+        frappe.db.set_value("Task", t.name, {"owner": quem, "modified_by": quem}, update_modified=False)
     return t.name
+
+
+def _reabrir_grupo(g: str) -> None:
+    """O Frappe recusa uma filha aberta debaixo de uma mãe concluída («Cannot add an open task under completed
+    Parent Task»): reabre-se a mãe (e as mães dela) sem validação; o fecho volta a concluí-las."""
+    while g:
+        estado, mae = frappe.db.get_value("Task", g, ["status", "parent_task"]) or (None, None)
+        if estado in ("Completed", "Cancelled"):
+            frappe.db.set_value("Task", g, {"status": "Open", "progress": 0, "completed_on": None})
+        g = mae
+
+
+def _concluir_grupos(tarefas) -> None:
+    """Sobe das tarefas fechadas e conclui cada tarefa-grupo que ficou sem filhas abertas."""
+    vistos = set()
+    maes = {frappe.db.get_value("Task", t, "parent_task") for t in tarefas}
+    while maes:
+        g = maes.pop()
+        if not g or g in vistos:
+            continue
+        vistos.add(g)
+        abertas = frappe.db.count("Task", {"parent_task": g, "status": ["not in", ["Completed", "Cancelled"]]})
+        if abertas:
+            continue
+        estado, mae = frappe.db.get_value("Task", g, ["status", "parent_task"])
+        if estado not in ("Completed", "Cancelled"):
+            frappe.db.set_value("Task", g, {"status": "Completed", "progress": 100,
+                                            "completed_on": frappe.utils.nowdate()})
+        maes.add(mae)
 
 
 @frappe.whitelist()
@@ -986,6 +1028,8 @@ def garantir_lista(id_projeto: str, nome: str, tarefas=None):
         t = t if isinstance(t, dict) else {"nome": t}
         if (t.get("nome") or "")[:140] in ja:
             continue
+        if not criadas:
+            _reabrir_grupo(g)
         _nova_tarefa(n, t.get("nome"), mae=g, horas=t.get("horas"), chave=t.get("chave"), ordem=j + 1,
                      descricao=t.get("descricao"))
         criadas += 1
@@ -1016,6 +1060,7 @@ def fechar_tarefas(id_projeto: str, nomes=None, lista: str = None, chaves=None):
     for t in alvos:
         frappe.db.set_value("Task", t, {"status": "Completed", "progress": 100, "completed_on": frappe.utils.nowdate()})
     if alvos:
+        _concluir_grupos(alvos)
         try:
             frappe.get_doc("Project", n).update_percent_complete()
             frappe.db.set_value("Project", n, "percent_complete", frappe.get_doc("Project", n).percent_complete)
