@@ -210,13 +210,74 @@
 		return el;
 	}
 
+	// ── Compromissos de um dia do mês, ao passar o rato ──────────────────────
+	// Uma caixa só, presa ao <body> com posição fixa: dentro do quadro do mês
+	// ficava cortada pela margem do cartão e por cima da faixa da saudação. Sai
+	// ao rolar porque deixaria de estar ao lado do dia a que se refere.
+	const MAX_NA_CAIXA = 6;
+	let caixaDia = null;
+
+	function esconderDia() {
+		if (caixaDia) caixaDia.hidden = true;
+	}
+	window.addEventListener("scroll", esconderDia, { passive: true });
+	if (frappe.router && frappe.router.on) frappe.router.on("change", esconderDia);
+
+	function mostrarDia(celula, eventos) {
+		if (!caixaDia) {
+			caixaDia = document.createElement("div");
+			caixaDia.className = "orbit-mes-caixa";
+			caixaDia.setAttribute("role", "tooltip");
+			document.body.appendChild(caixaDia);
+		}
+		const hoje = new Date();
+		const data = new Date(hoje.getFullYear(), hoje.getMonth(), Number(celula.dataset.dia));
+		caixaDia.textContent = "";
+		const cab = document.createElement("div");
+		cab.className = "orbit-mes-caixa-data";
+		cab.textContent = maiuscula(new Intl.DateTimeFormat(LOCALE,
+			{ weekday: "long", day: "numeric", month: "long" }).format(data));
+		caixaDia.appendChild(cab);
+		for (const e of eventos.slice(0, MAX_NA_CAIXA)) {
+			const linha = document.createElement("div");
+			linha.className = "orbit-agenda-linha";
+			linha.innerHTML = `<span class="orbit-agenda-hora"></span><span class="orbit-agenda-nome"></span>`;
+			linha.querySelector(".orbit-agenda-hora").textContent = e.dia_inteiro ? __("dia") : e.hora;
+			linha.querySelector(".orbit-agenda-nome").textContent = e.titulo;
+			caixaDia.appendChild(linha);
+		}
+		if (eventos.length > MAX_NA_CAIXA) {
+			const mais = document.createElement("div");
+			mais.className = "orbit-mes-caixa-mais";
+			mais.textContent = __("and {0} more", [eventos.length - MAX_NA_CAIXA]);
+			caixaDia.appendChild(mais);
+		}
+		caixaDia.hidden = false;
+		// Por baixo do dia, alinhada ao centro; se não couber em baixo vai para
+		// cima, e nunca sai pelas margens da janela.
+		const r = celula.getBoundingClientRect();
+		const w = caixaDia.offsetWidth, h = caixaDia.offsetHeight;
+		let x = r.left + r.width / 2 - w / 2;
+		x = Math.max(8, Math.min(x, window.innerWidth - w - 8));
+		let y = r.bottom + 6;
+		if (y + h > window.innerHeight - 8) y = r.top - h - 6;
+		caixaDia.style.left = `${Math.round(x)}px`;
+		caixaDia.style.top = `${Math.round(y)}px`;
+	}
+
 	function encherAgenda(mes, dia) {
 		frappe.call({ method: "orbit.agenda.resumo", type: "GET" })
 			.then((r) => {
 				const d = (r && r.message) || {};
-				for (const n of d.ocupados || []) {
+				for (const [n, eventos] of Object.entries(d.dias || {})) {
 					const c = mes.querySelector(`.orbit-mes-dia[data-dia="${n}"]`);
-					if (c) c.classList.add("orbit-mes-dia--ocupado");
+					if (!c || !eventos.length) continue;
+					c.classList.add("orbit-mes-dia--ocupado");
+					c.tabIndex = 0;
+					c.addEventListener("mouseenter", () => mostrarDia(c, eventos));
+					c.addEventListener("focus", () => mostrarDia(c, eventos));
+					c.addEventListener("mouseleave", esconderDia);
+					c.addEventListener("blur", esconderDia);
 				}
 				const lista = dia.querySelector(".orbit-agenda-lista");
 				lista.textContent = "";
