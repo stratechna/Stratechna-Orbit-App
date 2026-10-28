@@ -91,7 +91,9 @@ doc_events = {
     "*": {e: "orbit.so_leitura.guarda" for e in
           ("before_insert", "validate", "on_trash", "before_submit", "before_cancel", "before_update_after_submit")},
     # 16-10-2026: utilizadores contratados (orbit_utilizadores_max no site_config, escrito pelo portal)
-    "User": {"validate": "orbit.utilizadores.guarda"},
+    # 28-10-2026: a palavra-passe mudada pela própria pessoa (Definições) sobe ao portal (palavra_passe.py)
+    "User": {"validate": ["orbit.utilizadores.guarda", "orbit.palavra_passe.validar"],
+             "on_update": "orbit.palavra_passe.gravado"},
     # 17-10-2026: cada bilhete nasce na equipa da sua marca (formulário, destinatário) ou em Triagem
     "HD Ticket": {"before_insert": "orbit.organizacao.ticket_equipa"},
     "Communication": {"after_insert": "orbit.organizacao.ticket_por_destinatario"},
@@ -99,4 +101,10 @@ doc_events = {
     "Timesheet": {"on_submit": "orbit.portal.tempo_submetido", "on_cancel": "orbit.portal.tempo_cancelado"},
     # 17-10-2026: a conta de saída por omissão é o remetente dos avisos — chama-se «Stratechna Orbit»
     "Email Account": {"on_update": "orbit.remetentes.conta_gravada"},
+}
+
+# 28-10-2026: palavra-passe universal — «Esqueci-me» e «Mudar palavra-passe» do Frappe avisam o portal, que a
+# copia para a caixa, as lojas e os outros sítios (orbit/palavra_passe.py; plano das entradas independentes, passo 1)
+override_whitelisted_methods = {
+    "frappe.core.doctype.user.user.update_password": "orbit.palavra_passe.update_password",
 }
