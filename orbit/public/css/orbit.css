@@ -391,7 +391,11 @@ body:has(#orbit-pagina) .desktop-container {
 	color: var(--text-color, #22303d);
 }
 
-.orbit-mes-caixa .orbit-agenda-linha { margin: 0; padding: 2px 0; }
+.orbit-mes-caixa .orbit-agenda-linha { margin: 0; padding: 2px 0; align-items: baseline; }
+
+/* Aqui o título parte em linhas: a caixa existe para o ler por inteiro, e
+   cortado a meio («EDNA BER…») não respondia a nada. */
+.orbit-mes-caixa .orbit-agenda-nome { white-space: normal; overflow-wrap: anywhere; }
 
 .orbit-mes-caixa-mais {
 	margin-top: 2px;
