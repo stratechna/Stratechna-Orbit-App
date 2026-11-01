@@ -44,6 +44,11 @@ APPS = {
     "events":   {"codigo": "W1500020", "frappe": None,       "rotulo": "Events",     "nome": "Events"},
     "erp":      {"codigo": "W1500021", "frappe": "erpnext",  "rotulo": "ERP",        "nome": "ERP"},
     "social":   {"codigo": "W1500022", "frappe": None,       "rotulo": "Social",     "nome": "Social"},
+    # O Stratechna Booking (marcações de serviços) vive no portal, em booking.<domínio das
+    # apps>: a equipa entra com a conta do portal e escolhe o negócio. Vem no Orbit
+    # completo e vende-se à parte (W1500023 Booking, W1500024 Booking Pro) — §20.2 do
+    # plano das marcações. O cinzento leva ao nível de entrada.
+    "booking":  {"codigo": "W1500023", "frappe": None,       "rotulo": "Booking",    "nome": "Booking"},
     # O email marketing vende-se nos planos Launch/Grow/Lead Mail (W0502), não
     # como app do Orbit por utilizador. O código é o do plano de entrada, que é
     # para onde o cinzento leva quem não o tem.

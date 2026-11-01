@@ -105,7 +105,7 @@ def _limpar_cache():
 
 
 # ── Atalhos para os módulos que vivem fora do Frappe ────────────────────────
-# O Mail, o Docs, o Sign, o Events e o Social são sistemas separados, cada um no
+# O Mail, o Docs, o Sign, o Events, o Social e o Booking são sistemas separados, cada um no
 # seu domínio. Entram na grelha como Desk Icon com link externo — o mesmo
 # mecanismo que o Frappe usa para o CRM e o Helpdesk, que também têm frontend
 # próprio.
@@ -126,6 +126,9 @@ ATALHOS = [
     {"nome": "Social", "url": "https://social.{dominio}", "simbolo": "social", "ordem": 5},
     {"nome": "Meet", "url": "/api/method/orbit.meet.entrar", "simbolo": "meet", "ordem": 6},
     {"nome": "Chat", "url": "https://{chat}", "simbolo": "chat", "ordem": 7},
+    # O Booking é um só endereço para todos os tenants do mesmo domínio de apps
+    # (como o Docs): lá dentro cada pessoa vê os negócios a que tem acesso.
+    {"nome": "Booking", "url": "https://booking.{dominio}", "simbolo": "booking", "ordem": 9},
     # O Marketing vive dentro do Frappe (módulo desta app) mas não tem
     # espaço de trabalho próprio: entra na grelha pelo mesmo mecanismo, com um
     # caminho do próprio site, e abre na lista de campanhas — que é onde o
