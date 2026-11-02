@@ -198,14 +198,29 @@
 		return el;
 	}
 
+	// «Marcar reunião» (02-11-2026, Vítor): com o Booking, é lá que se marca — com cliente, sala
+	// do Meet, confirmação e o evento de volta na agenda. O formulário de Evento do Frappe só
+	// fechava as horas de quem o criava. Sem o Booking, fica o evento simples.
+	function enderecoMarcar() {
+		const apps = (frappe.boot && frappe.boot.orbit_apps) || {};
+		const icones = (frappe.boot && frappe.boot.desktop_icons) || [];
+		const booking = icones.find((i) => i.label === "Booking");
+		const destino = booking && ((frappe.utils.get_route_for_icon && frappe.utils.get_route_for_icon(booking)) || booking.link);
+		if (destino && /^https:\/\//.test(destino) && (apps.activas || []).includes("booking")) {
+			return { href: destino.replace(/\/+$/, "") + "/?nova=1", fora: true };
+		}
+		return { href: "/app/event/new", fora: false };
+	}
+
 	function quadroDia() {
 		const el = document.createElement("div");
+		const marcar = enderecoMarcar();
 		el.className = "orbit-agenda";
 		el.innerHTML =
 			`<div class="orbit-agenda-cab">` +
 			`<span class="orbit-agenda-titulo">${__("Hoje")}</span>` +
 			`<span class="orbit-agenda-risco"></span>` +
-			`<a class="orbit-agenda-marcar" href="/app/event/new">${__("Marcar reunião")}</a>` +
+			`<a class="orbit-agenda-marcar" href="${marcar.href}"${marcar.fora ? ' target="_blank" rel="noopener"' : ""}>${__("Marcar reunião")}</a>` +
 			`</div><div class="orbit-agenda-lista"></div>`;
 		return el;
 	}
