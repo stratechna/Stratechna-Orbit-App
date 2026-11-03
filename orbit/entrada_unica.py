@@ -289,7 +289,7 @@ def _assistencia(idt: dict, state: str | None):
 _IMAP = {"host": "10.0.0.4", "porta": 993, "nome": "StratechnaHostingBDS"}
 
 
-def _caixa_aceita(pwd: str) -> bool:
+def _caixa_aceita(pwd: str, endereco: str = ASSISTENCIA) -> bool:
     import imaplib
     import os
     import socket
@@ -305,7 +305,7 @@ def _caixa_aceita(pwd: str) -> bool:
 
     m = _Imap(c["nome"], int(c["porta"]), ssl_context=ctx, timeout=10)
     try:
-        m.login(ASSISTENCIA, pwd)
+        m.login(endereco, pwd)
     except imaplib.IMAP4.error:
         return False
     finally:
@@ -485,3 +485,50 @@ def ligar_portal(volta: str | None = None):
     except Exception:
         frappe.log_error(title="orbit.entrada_unica.ligar_portal")
         frappe.local.response["location"] = destino if "portal.stratechna.com" not in destino else frappe.utils.get_url("/app")
+
+
+# ── 1.ª entrada pela palavra-passe da caixa (03-11-2026, plano das entradas §7, R3) ─────────────────────────────
+# Vítor: «desde que uma caixa seja atribuída como utilizador do Orbit, deve ser criada no Orbit automaticamente» —
+# com a palavra-passe. O portal não a guarda em claro, por isso quem nasceu sem ela (ou ficou com uma antiga) entra
+# com o email e a palavra-passe da caixa: se a do Orbit falha e o servidor de correio aceita a da caixa, grava-se no
+# Orbit e a entrada segue normalmente. Grava-se por `frappe.utils.password.update_password`, que não volta a subir
+# ao portal (a caixa já a tem). Só caixas do nosso servidor de correio (BDS); `orbit_entrada_caixa = 0` desliga.
+_TENTATIVAS_CAIXA = "orbit_entrada_caixa:tentativas:"
+
+
+def antes_de_entrar(login_manager=None) -> None:
+    """before_login."""
+    try:
+        if frappe.conf.get("orbit_entrada_caixa", 1) in (0, "0", False):
+            return
+        usr = (frappe.form_dict.get("usr") or "").strip().lower()
+        pwd = frappe.form_dict.get("pwd") or ""
+        if not usr or not pwd or "@" not in usr or usr == ASSISTENCIA or len(pwd) > 128:
+            return
+        u = frappe.db.get_value("User", {"name": usr}, ["name", "enabled", "user_type"], as_dict=True)
+        if not u or not u.enabled or u.user_type != "System User" or u.name in ("Administrator", "Guest"):
+            return
+        from frappe.utils.password import check_password, update_password
+        try:
+            check_password(u.name, pwd, delete_tracker_cache=False)
+            return                                   # a do Orbit já serve
+        except frappe.AuthenticationError:
+            pass
+        # no máximo 5 confirmações no correio por pessoa a cada 10 min (o correio também tem as suas travas)
+        chave = _TENTATIVAS_CAIXA + u.name
+        n = int(frappe.cache.get_value(chave) or 0)
+        if n >= 5:
+            return
+        frappe.cache.set_value(chave, n + 1, expires_in_sec=600)
+        if not _caixa_aceita(pwd, u.name):
+            return
+        update_password(u.name, pwd)
+        frappe.cache.delete_value(chave)
+        frappe.get_doc({"doctype": "Activity Log", "user": u.name, "operation": "Login", "status": "Success",
+                        "reference_doctype": "User", "reference_name": u.name,
+                        "subject": "Palavra-passe do Orbit gravada a partir da caixa de correio (1.ª entrada)"}
+                       ).insert(ignore_permissions=True)
+        frappe.db.commit()
+    except Exception:
+        frappe.log_error(title="orbit.entrada_unica.antes_de_entrar")
+

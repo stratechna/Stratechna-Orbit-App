@@ -27,6 +27,8 @@ web_include_js = "/assets/orbit/js/entrada.js?v=9"
 on_logout = "orbit.entrada_unica.ao_sair"
 # Entrou pelo formulário do Orbit: também fica com sessão no portal (ponte, 18-10-2026)
 on_session_creation = "orbit.entrada_unica.sessao_criada"
+# 03-11-2026: quem ainda não tem a palavra-passe da caixa no Orbit entra com ela (entrada_unica.antes_de_entrar)
+before_login = "orbit.entrada_unica.antes_de_entrar"
 
 # O ecrã precisa de saber, no arranque, que apps é que este tenant tem — para
 # pintar a cinzento as que não tem em vez de as esconder. Vai no boot e não numa
