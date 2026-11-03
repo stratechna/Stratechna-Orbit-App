@@ -18,7 +18,12 @@
       .then(function (d) {
         if (d.message && d.message.auto && a.href) {
           location.replace(a.href + (a.href.indexOf("?") >= 0 ? "&" : "?") + "prompt=none");
-        } else { document.documentElement.style.visibility = ""; a.style.display = ""; }
+        } else {
+          // 03-11-2026 (§7 R1): sem entrada automática o botão não volta — a entrada é a do Orbit. Fica no DOM,
+          // escondido, porque a assistência (suporte@ sem palavra-passe) usa o endereço dele.
+          document.documentElement.style.visibility = "";
+          (a.closest(".social-logins") || a).style.display = "none";
+        }
       })
       .catch(function () { document.documentElement.style.visibility = ""; a.style.display = ""; });
     return true;

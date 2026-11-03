@@ -151,6 +151,20 @@ def regresso(code: str | None = None, state: str | None = None, error: str | Non
     # 21-10-2026: um administrador do portal sem conta neste tenant entra em assistência (ver _assistencia).
     if (not utilizador or not utilizador.enabled or email == ASSISTENCIA) and idt.get("stratechna_equipa") is True:
         return _assistencia(idt, state)
+    # 03-11-2026 (plano das entradas, §7 R1): com `orbit_entrada_stratechna_auto` desligado o portal deixa de abrir o
+    # Orbit — cada um tem a sua entrada, para se poder entrar com perfis diferentes. Só fica a assistência: um
+    # administrador do portal entra como suporte@ (mesmo que tenha conta aqui); qualquer outra sessão do portal volta
+    # ao formulário do Orbit.
+    if not frappe.conf.get("orbit_entrada_stratechna_auto"):
+        if idt.get("stratechna_equipa") is True:
+            return _assistencia(idt, state)
+        destino = consume_oauth_state(state) if state else None
+        q = {"nativo": 1}
+        if destino:
+            q["redirect-to"] = destino
+        frappe.local.response["type"] = "redirect"
+        frappe.local.response["location"] = "/login?" + _q(q)
+        return
     if email == ASSISTENCIA:
         utilizador = None          # a conta de assistência só abre com uma sessão de administrador do portal
     if not utilizador or not utilizador.enabled or utilizador.name in ("Guest", "Administrator"):
