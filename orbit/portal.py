@@ -988,8 +988,13 @@ def criar_projeto(spec):
     p.insert()
     detalhe = []
     for i, f in enumerate(s.get("fases") or []):
-        g = _nova_tarefa(p.name, f.get("nome"), grupo=1, inicio=f.get("inicio"), fim=f.get("fim"), ordem=i + 1,
-                         chave=f.get("chave"))
+        # 04-11-2026: o Orbit recusa uma tarefa que acabe depois da tarefa-mãe («A Data de Término Prevista deve ser
+        # menor ou igual…» — a sub 104 falhava assim). A fase passa a abranger as datas das suas tarefas.
+        datas_t = [t for t in (f.get("tarefas") or []) if isinstance(t, dict)]
+        inicios = [str(x)[:10] for x in [f.get("inicio")] + [t.get("inicio") for t in datas_t] if x]
+        fins = [str(x)[:10] for x in [f.get("fim")] + [t.get("fim") for t in datas_t] if x]
+        g = _nova_tarefa(p.name, f.get("nome"), grupo=1, inicio=min(inicios) if inicios else None,
+                         fim=max(fins) if fins else None, ordem=i + 1, chave=f.get("chave"))
         criadas = sub = 0
         for j, t in enumerate(f.get("tarefas") or []):
             t = t if isinstance(t, dict) else {"nome": t}
