@@ -91,6 +91,44 @@ def perfil_do_nome(nome: str) -> str | None:
     return None
 
 
+# ── Apps por pessoa (04-11-2026, plano das entradas §7, N9/R2) ───────────────────────────────────────────
+# Um cliente pode ter 10 caixas e só 3 utilizadores do Orbit, ou apps compradas à parte: cada pessoa escolhe as
+# apps a que tem acesso. As funções do perfil que pertencem a uma app não escolhida saem; as que não são de
+# nenhuma app (Employee, Report Manager, System Manager…) ficam. O Docs, o Social, o Booking, o Meet, o Chat, o
+# Events e o Sign não têm funções do Frappe — a escolha guarda-se no portal e aplica-se nessas apps (R5).
+FUNCOES_POR_APP = {
+    "crm": {"Sales User", "Sales Manager", "Marketing Manager"},
+    "desk": {"Agent", "Agent Manager", "Knowledge Base Editor"},
+    "projects": {"Projects User", "Projects Manager"},
+    "rh": {"HR User", "HR Manager"},
+    "erp": {"Accounts User", "Accounts Manager", "Purchase User", "Purchase Manager", "Stock User", "Stock Manager"},
+    "wiki": {"Wiki Approver"},
+    "mail": {"Gestor de Correio"},
+}
+NOMES_APPS = {"crm": "CRM", "desk": "Desk", "projects": "Projects", "rh": "RH", "erp": "ERP", "wiki": "Wiki",
+              "mail": "Mail"}
+
+
+def perfil_para_apps(perfil: str | None, apps) -> str | None:
+    """«Orbit · Gestão» + [crm, desk] → Role Profile «Orbit · Gestão · CRM+Desk» com as funções do perfil
+    restritas a essas apps. `apps` = "todas"/vazio devolve o perfil tal como está. Idempotente."""
+    if not perfil or not apps or apps == "todas" or not isinstance(apps, (list, tuple)):
+        return perfil
+    escolhidas = [a for a in apps if a in FUNCOES_POR_APP]
+    de_apps = set().union(*FUNCOES_POR_APP.values())
+    permitidas = set().union(*(FUNCOES_POR_APP[a] for a in escolhidas)) if escolhidas else set()
+    base = frappe.get_doc("Role Profile", perfil)
+    funcoes = [r.role for r in base.get("roles") or [] if r.role not in de_apps or r.role in permitidas]
+    sufixo = "+".join(NOMES_APPS[a] for a in sorted(escolhidas)) or "sem apps"
+    nome = f"{perfil} · {sufixo}"[:140]
+    doc = frappe.get_doc("Role Profile", nome) if frappe.db.exists("Role Profile", nome) else \
+        frappe.get_doc({"doctype": "Role Profile", "role_profile": nome})
+    if sorted(r.role for r in doc.get("roles") or []) != sorted(funcoes) or doc.is_new():
+        doc.set("roles", [{"role": f} for f in funcoes])
+        doc.save(ignore_permissions=True)
+    return nome
+
+
 def configurar_desk(dominios: dict, marcas: list, reconheciveis: list | None = None) -> list:
     """Chamado pelo marcas-tenant: o mapa domínio → marca, o campo «Marca» no bilhete e no formulário."""
     from frappe.installer import update_site_config
