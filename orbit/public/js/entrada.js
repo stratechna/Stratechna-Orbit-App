@@ -134,3 +134,21 @@
     if (p) { p.required = (t.value || "").trim().toLowerCase() !== ASSIST; }
   }, true);
 })();
+
+// «Abrir em assistência» no admin do portal (04-11-2026, plano das entradas R1/D7): o botão abre
+// /login?assistencia=1 e daqui segue logo a entrada de assistência — o portal confirma, sem se ver
+// (prompt=none), que há uma sessão de administrador e devolve a pessoa como suporte@stratechna.pt. Sem essa
+// sessão volta ao formulário com a nota de sempre. Mais nenhuma sessão do portal entra (R1).
+(function () {
+  var q = new URLSearchParams(location.search);
+  if (!q.has("assistencia") || q.has("nativo")) return;
+  function seguir() {
+    var a = document.querySelector("a.btn-stratechna");
+    if (!a || !a.href) return false;
+    try { sessionStorage.setItem("orbit_assistencia_tentou", "1"); } catch (x) { /* sem armazenamento */ }
+    document.documentElement.style.visibility = "hidden";
+    location.replace(a.href + (a.href.indexOf("?") >= 0 ? "&" : "?") + "prompt=none");
+    return true;
+  }
+  if (!seguir()) { document.addEventListener("DOMContentLoaded", seguir); }
+})();
