@@ -1149,17 +1149,7 @@ def perfil_remetente(email: str):
                                 fields=["name", "titulo", "status", "deal_value", "deal_owner"], order_by="modified desc", limit=5):
             out["negocios"].append({"id": d.name, "titulo": d.titulo or d.name, "estado": d.status, "valor": flt(d.deal_value),
                                     "dono": _nome_utilizador(d.deal_owner), "url": _url_crm("deals", d.name)})
-        cust = frappe.db.get_value("HD Customer", {"crm_account_id": o.crm_account_id}) if o.crm_account_id else None
-        fb = {"status": ["in", ["Open", "Replied"]]}
-        filtros = [dict(fb, customer=cust)] if cust else []
-        filtros.append(dict(fb, raised_by=e))
-        vistos = set()
-        for f in filtros:
-            for t in frappe.get_all("HD Ticket", filters=f, fields=["name", "subject", "status", "agent_group"], limit=5):
-                if t.name not in vistos:
-                    vistos.add(t.name)
-                    out["bilhetes"].append({"id": t.name, "assunto": t.subject, "estado": t.status, "equipa": t.agent_group,
-                                            "url": f"{frappe.utils.get_url()}/helpdesk/tickets/{t.name}"})
+    _casos_desk(out, e, o.crm_account_id if org else None)
     lead = frappe.get_all("CRM Lead", filters={"email": e, "converted": 0}, fields=["name", "lead_name", "status", "lead_owner"],
                           order_by="modified desc", limit=1) if frappe.get_meta("CRM Lead").has_field("converted") else \
         frappe.get_all("CRM Lead", filters={"email": e}, fields=["name", "lead_name", "status", "lead_owner"], order_by="modified desc", limit=1)
@@ -1167,8 +1157,51 @@ def perfil_remetente(email: str):
         l = lead[0]
         out["lead"] = {"id": l.name, "nome": l.lead_name, "estado": l.status, "dono": _nome_utilizador(l.lead_owner),
                        "url": _url_crm("leads", l.name)}
+    ult = frappe.get_all("Communication", filters={"sender": e, "communication_type": "Communication"},
+                         fields=["communication_date", "communication_medium"], order_by="communication_date desc", limit=1)
+    if ult:
+        out["ultimo_contacto"] = {"data": str(ult[0].communication_date), "meio": ult[0].communication_medium}
     out["encontrado"] = bool(out["contacto"] or out["organizacao"] or out["lead"])
     return out
+
+
+ESTADOS_ABERTOS_DESK = ("Open", "Replied", "Paused")
+
+
+def _casos_desk(out: dict, email: str, crm_account_id: str = None) -> None:
+    """Casos do Desk do remetente (pelo cliente da organização e pelo próprio endereço), abertos primeiro e
+    depois os fechados mais recentes. `bilhetes` fica só com os abertos, como antes (webmail anterior a 05-11)."""
+    if not frappe.db.exists("DocType", "HD Ticket"):
+        return
+    base = frappe.utils.get_url()
+    out["novo_caso_url"] = f"{base}/desk/hd-ticket/new"
+    meta = frappe.get_meta("HD Ticket")
+    campos = ["name", "subject", "status", "agent_group", "creation", "_assign"] + \
+        [c for c in ("priority", "resolution_date", "resolution_time") if meta.has_field(c)]
+    cust = frappe.db.get_value("HD Customer", {"crm_account_id": crm_account_id}) if crm_account_id else None
+    filtros = ([{"customer": cust}] if cust else []) + [{"raised_by": email}]
+    vistos, casos = set(), []
+    for aberto in (True, False):
+        for f in filtros:
+            f = dict(f, status=["in" if aberto else "not in", ESTADOS_ABERTOS_DESK])
+            for t in frappe.get_all("HD Ticket", filters=f, fields=campos, order_by="modified desc", limit=10):
+                if t.name in vistos:
+                    continue
+                vistos.add(t.name)
+                try:
+                    resp = [_nome_utilizador(u) for u in json.loads(t._assign or "[]")]
+                except ValueError:
+                    resp = []
+                fim = t.get("resolution_date")
+                dur = t.get("resolution_time") or ((get_datetime(fim) - get_datetime(t.creation)).total_seconds() if fim else None)
+                casos.append({"id": t.name, "assunto": t.subject, "estado": t.status, "aberto": aberto,
+                              "equipa": t.agent_group, "prioridade": t.get("priority"), "responsaveis": resp,
+                              "criado": str(t.creation), "resolvido_em_s": int(dur) if dur and not aberto else None,
+                              "url": f"{base}/helpdesk/tickets/{t.name}"})
+    out["abertos"] = sum(1 for c in casos if c["aberto"])
+    out["casos"] = [c for c in casos if c["aberto"]] + [c for c in casos if not c["aberto"]][:10]
+    out["bilhetes"] = [{"id": c["id"], "assunto": c["assunto"], "estado": c["estado"], "equipa": c["equipa"], "url": c["url"]}
+                       for c in casos if c["aberto"]][:5]
 
 
 @frappe.whitelist()
