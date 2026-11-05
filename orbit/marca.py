@@ -105,7 +105,7 @@ def _limpar_cache():
 
 
 # ── Atalhos para os módulos que vivem fora do Frappe ────────────────────────
-# O Mail, o Docs, o Sign, o Events, o Social e o Booking são sistemas separados, cada um no
+# O Mail, o Docs, o Sign e o Booking são sistemas separados, cada um no
 # seu domínio. Entram na grelha como Desk Icon com link externo — o mesmo
 # mecanismo que o Frappe usa para o CRM e o Helpdesk, que também têm frontend
 # próprio.
@@ -122,8 +122,10 @@ ATALHOS = [
     {"nome": "Mail", "url": "https://mail.orbit.{dominio}", "simbolo": "mail", "ordem": 1},
     {"nome": "Docs", "url": "https://docs.{dominio}", "simbolo": "docs", "ordem": 2},
     {"nome": "Sign", "url": "https://sign.{dominio}", "simbolo": "sign", "ordem": 3},
-    {"nome": "Events", "url": "https://events.{dominio}", "simbolo": "events", "ordem": 4},
-    {"nome": "Social", "url": "https://social.{dominio}", "simbolo": "social", "ordem": 5},
+    # O Events e o Social saíram do Orbit a 05-11-2026 (decisão do Vítor, DP1/DP7 de
+    # docs/PLANO-PENDENCIAS-ORBIT-PRIMEIRO.md): são ferramentas internas da Stratechna, o
+    # cliente vê as redes e os inscritos no portal e no CRM. Os atalhos antigos apagam-se em
+    # repor_atalhos (RETIRADOS).
     {"nome": "Meet", "url": "/api/method/orbit.meet.entrar", "simbolo": "meet", "ordem": 6},
     {"nome": "Chat", "url": "https://{chat}", "simbolo": "chat", "ordem": 7},
     # O Booking é um só endereço para todos os tenants do mesmo domínio de apps
@@ -135,6 +137,10 @@ ATALHOS = [
     # trabalho começa.
     {"nome": "Marketing", "url": "/app/campanha-de-marketing", "simbolo": "marketing", "ordem": 8},
 ]
+
+
+# Atalhos que já existiram e saíram do Orbit: repor_atalhos apaga-os em cada tenant.
+RETIRADOS = ("Events", "Social")
 
 
 # As apps com frontend próprio, que já vêm na grelha e só precisam do símbolo
@@ -210,6 +216,11 @@ def repor_atalhos():
             ignore_permissions=True)
         criados.append(a["nome"])
 
+    retirados = frappe.get_all("Desktop Icon", filters={"label": ["in", RETIRADOS], "app": "orbit"},
+                               pluck="name")
+    for nome in retirados:
+        frappe.delete_doc("Desktop Icon", nome, ignore_permissions=True, force=True)
+
     # As apps que têm frontend próprio não passam pelos símbolos dos módulos: o
     # `get_desktop_icon` não encontra ficheiro para o rótulo delas e cai no
     # `logo_url`. Sem isto, o RH aparecia com o logótipo verde do Frappe HR no
@@ -227,7 +238,7 @@ def repor_atalhos():
     frappe.cache.delete_key("bootinfo")
     frappe.clear_cache()
 
-    aviso = f"Orbit: atalhos — {len(criados)} criados, {mantidos} actualizados (domínio {dominio})"
+    aviso = f"Orbit: atalhos — {len(criados)} criados, {mantidos} actualizados, {len(retirados)} retirados (domínio {dominio})"
     print(aviso)
     frappe.logger().info(aviso)
 

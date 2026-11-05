@@ -41,9 +41,10 @@ APPS = {
     "mail":     {"codigo": "W1500017", "frappe": None,       "rotulo": "Mail",       "nome": "Mail"},
     "meet":     {"codigo": "W1500018", "frappe": None,       "rotulo": "Meet",       "nome": "Meet"},
     "chat":     {"codigo": "W1500019", "frappe": None,       "rotulo": "Chat",       "nome": "Chat"},
-    "events":   {"codigo": "W1500020", "frappe": None,       "rotulo": "Events",     "nome": "Events"},
     "erp":      {"codigo": "W1500021", "frappe": "erpnext",  "rotulo": "ERP",        "nome": "ERP"},
-    "social":   {"codigo": "W1500022", "frappe": None,       "rotulo": "Social",     "nome": "Social"},
+    # Events (W1500020) e Social (W1500022) saíram do Orbit a 05-11-2026 (DP1/DP7): já não
+    # aparecem na grelha, nem a cinzento. Um «events»/«social» que ainda esteja no orbit_apps
+    # de um tenant é ignorado por activas().
     # O Stratechna Booking (marcações de serviços) vive no portal, em booking.<domínio das
     # apps>: a equipa entra com a conta do portal e escolhe o negócio. Vem no Orbit
     # completo e vende-se à parte (W1500023 Booking, W1500024 Booking Pro) — §20.2 do
