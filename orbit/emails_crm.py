@@ -223,7 +223,10 @@ def pode(doc, ptype=None, user=None):
     dono = doc.get("orbit_privado_de") if hasattr(doc, "get") else None
     if dono and dono != user and not _ve_tudo(user):
         return False
-    return None   # o resto decide-o o Frappe
+    # True e não None: o Frappe (permissions.has_controller_permissions) trata qualquer valor falso como recusa —
+    # com None, ninguém abria emails nem notas (05-11, apanhado no ensaio). True só quer dizer «este gancho não
+    # se opõe»; as permissões normais continuam a valer.
+    return True
 
 
 def _privados_de_outros(doctype: str, nomes: list) -> set:
