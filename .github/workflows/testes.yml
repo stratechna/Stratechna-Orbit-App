@@ -58,6 +58,13 @@ jobs:
           bench new-site teste.local --db-root-password root --admin-password admin \
             --mariadb-user-host-login-scope=% --install-app crm --install-app orbit
           bench --site teste.local set-config allow_tests true
+      - name: Faturação certificada
+        # 05-11-2026 (DP8): sem rede; o site já tem os DocTypes Ligacao Faturacao e Documento Certificado instalados
+        working-directory: bench
+        run: |
+          bench --site teste.local run-tests --app orbit --module orbit.test_faturacao
+          bench --site teste.local execute frappe.db.exists --args '["DocType", "Ligacao Faturacao"]'
+          bench --site teste.local execute frappe.db.exists --args '["DocType", "Documento Certificado"]'
       - name: Testes
         working-directory: bench
         run: bench --site teste.local run-tests --app orbit --module orbit.marketing.test_marketing
