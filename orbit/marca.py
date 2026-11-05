@@ -120,7 +120,8 @@ def _limpar_cache():
 # com a identidade dele (ver orbit/meet.py).
 ATALHOS = [
     {"nome": "Mail", "url": "https://mail.orbit.{dominio}", "simbolo": "mail", "ordem": 1},
-    {"nome": "Docs", "url": "https://docs.{dominio}", "simbolo": "docs", "ordem": 2},
+    # O Docs é um arquivo por cliente (05-11-2026, R4): <slug>.docs.orbit.stratechna.com — ver _docs_do_tenant.
+    {"nome": "Docs", "url": "https://{docs}", "simbolo": "docs", "ordem": 2},
     {"nome": "Sign", "url": "https://sign.{dominio}", "simbolo": "sign", "ordem": 3},
     # O Events e o Social saíram do Orbit a 05-11-2026 (decisão do Vítor, DP1/DP7 de
     # docs/PLANO-PENDENCIAS-ORBIT-PRIMEIRO.md): são ferramentas internas da Stratechna, o
@@ -177,6 +178,19 @@ def _chat_do_tenant() -> str:
     return raiz if slug in ("", "stratechna", "orbit") else f"{slug}.{raiz}"
 
 
+def _docs_do_tenant() -> str:
+    """O endereço do Docs deste tenant. O da Stratechna ficou em docs.<domínio>; cada cliente tem o seu arquivo em
+    <slug>.docs.orbit.stratechna.com, criado na compra por docs-novo-cliente.sh (05-11-2026). `orbit_docs_host`
+    ganha a tudo (ex.: um domínio próprio do cliente)."""
+    explicito = frappe.conf.get("orbit_docs_host")
+    if explicito:
+        return explicito
+    slug = frappe.conf.get("orbit_slug") or (frappe.local.site or "").split(".")[0]
+    if slug in ("", "stratechna", "orbit"):
+        return f"docs.{_dominio_do_tenant()}"
+    return f"{slug}.docs.orbit.stratechna.com"
+
+
 def repor_atalhos():
     """Os atalhos da grelha que não vêm de nenhuma app (os sete módulos de fora
     do Frappe, e o Marketing), com endereço deste tenant.
@@ -195,7 +209,7 @@ def repor_atalhos():
     chat = _chat_do_tenant()
     criados, mantidos = [], 0
     for a in ATALHOS:
-        url = a["url"].format(dominio=dominio, chat=chat)
+        url = a["url"].format(dominio=dominio, chat=chat, docs=_docs_do_tenant())
         valores = {
             "link": url,
             "app": "orbit",
