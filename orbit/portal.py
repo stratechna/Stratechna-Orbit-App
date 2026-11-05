@@ -1165,6 +1165,36 @@ def perfil_remetente(email: str):
     return out
 
 
+_SEGUIMENTO = {"aberto": "Email aberto", "clique": "Ligação clicada", "resposta": "Email respondido"}
+
+
+@frappe.whitelist()
+def registar_seguimento(email: str, assunto: str = None, evento: str = None, ligacao: str = None, por: str = None):
+    """Seguimento de um email do webmail (05-11-2026): a 1.ª abertura, o 1.º clique e a resposta ficam como nota no
+    registo do destinatário (negócio em curso › lead › contacto). Sem registo no CRM não se cria nada."""
+    _so_portal()
+    if evento not in _SEGUIMENTO:
+        return {"ok": False, "erro": "evento desconhecido"}
+    p = perfil_remetente(email)
+    alvo = (("CRM Deal", p["negocios"][0]["id"]) if p.get("negocios")
+            else ("CRM Lead", p["lead"]["id"]) if p.get("lead") else None)
+    if not alvo and p.get("contacto"):
+        cn = frappe.get_all("Contact Email", filters={"email_id": email.strip().lower(), "parenttype": "Contact"},
+                            pluck="parent", limit=1)
+        alvo = ("Contact", cn[0]) if cn else None
+    if not alvo:
+        return {"ok": False, "erro": "sem registo no CRM"}
+    esc = frappe.utils.escape_html
+    corpo = (f"<p><b>{_SEGUIMENTO[evento]}</b> por {esc(email)}"
+             + (f" — «{esc(assunto)}»" if assunto else "") + "</p>"
+             + (f"<p>{esc(ligacao)}</p>" if ligacao else "")
+             + (f"<p>Enviado por {esc(por)}, seguido no Orbit Mail.</p>" if por else ""))
+    frappe.get_doc({"doctype": "FCRM Note", "title": f"{_SEGUIMENTO[evento]}: {assunto or ''}"[:140], "content": corpo,
+                    "reference_doctype": alvo[0], "reference_docname": alvo[1]}).insert(ignore_permissions=True)
+    frappe.db.commit()
+    return {"ok": True, "alvo": list(alvo)}
+
+
 ESTADOS_ABERTOS_DESK = ("Open", "Replied", "Paused")
 
 
