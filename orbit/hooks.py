@@ -72,7 +72,8 @@ _LINGUA = ["orbit.lingua.garantir"]
 
 # 05-11-2026: os emails no CRM (orbit/emails_crm.py; docs/PLANO-EMAILS-NO-CRM.md) — campos próprios
 _EMAILS_CRM = ["orbit.emails_crm.instalar"]
-after_migrate = _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA + _LINGUA + _EMAILS_CRM
+_FATURACAO = ["orbit.faturacao.instalar.garantir"]   # DP8, 05-11-2026
+after_migrate = _FATURACAO + _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA + _LINGUA + _EMAILS_CRM
 after_install = _POR_DE_PE + _MARKETING + _MARCACAO + _ORGANIZACAO + ["orbit.remetentes.garantir"] + _LINGUA
 
 # Email marketing: a saída das campanhas corre ao minuto (o ritmo por hora
@@ -81,6 +82,8 @@ after_install = _POR_DE_PE + _MARKETING + _MARCACAO + _ORGANIZACAO + ["orbit.rem
 scheduler_events = {
     "cron": {
         "* * * * *": ["orbit.marketing.envio.processar"],
+        # 05-11-2026 (DP8): faturação certificada — repetir o que ficou por emitir e ler anulações do programa
+        "*/15 * * * *": ["orbit.faturacao.emissao.periodico"],
     },
     "hourly": ["orbit.marketing.envio.contagens_do_dia", "orbit.marketing.automacoes.correr"],
 }
@@ -105,6 +108,11 @@ doc_events = {
     "Timesheet": {"on_submit": "orbit.portal.tempo_submetido", "on_cancel": "orbit.portal.tempo_cancelado"},
     # 17-10-2026: a conta de saída por omissão é o remetente dos avisos — chama-se «Stratechna Orbit»
     "Email Account": {"on_update": "orbit.remetentes.conta_gravada"},
+    # 05-11-2026 (DP8): o documento fiscal só nasce no programa certificado (Moloni, …) — inerte sem Ligacao activa
+    "Sales Invoice": {"validate": "orbit.faturacao.emissao.validar_fatura",
+                      "on_submit": "orbit.faturacao.emissao.ao_submeter_fatura",
+                      "before_cancel": "orbit.faturacao.emissao.antes_de_cancelar_fatura"},
+    "Payment Entry": {"on_submit": "orbit.faturacao.emissao.ao_submeter_pagamento"},
 }
 
 # 28-10-2026: palavra-passe universal — «Esqueci-me» e «Mudar palavra-passe» do Frappe avisam o portal, que a

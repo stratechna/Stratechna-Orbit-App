@@ -1,0 +1,251 @@
+{
+ "doctype": "DocType",
+ "name": "Ligacao Faturacao",
+ "module": "Orbit",
+ "custom": 0,
+ "engine": "InnoDB",
+ "autoname": "field:company",
+ "naming_rule": "By fieldname",
+ "track_changes": 1,
+ "description": "Ligação da empresa a um programa de faturação certificado pela AT (DP8). O Orbit nunca emite documentos fiscais: prepara a venda e pede a emissão ao programa. Uma ligação nova nasce em Ensaio — só cria rascunhos, que se apagam.",
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Empresa",
+   "options": "Company",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "programa",
+   "fieldtype": "Select",
+   "label": "Programa certificado",
+   "options": "moloni",
+   "reqd": 1,
+   "default": "moloni",
+   "in_list_view": 1,
+   "description": "InvoiceXpress, TOConline e Vendus entram nas fases C2–C4."
+  },
+  {
+   "fieldname": "activa",
+   "fieldtype": "Check",
+   "label": "Activa",
+   "default": "0",
+   "in_list_view": 1,
+   "description": "Sem ligação activa, as faturas desta empresa ficam como estavam (nada é enviado)."
+  },
+  {
+   "fieldname": "modo",
+   "fieldtype": "Select",
+   "label": "Modo",
+   "options": "Ensaio\nReal",
+   "default": "Ensaio",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "Ensaio: só rascunhos, apagados a seguir. Real: documentos fiscais definitivos — só depois de um ensaio bem-sucedido."
+  },
+  {
+   "fieldname": "sec_cred",
+   "fieldtype": "Section Break",
+   "label": "Credenciais"
+  },
+  {
+   "fieldname": "client_id",
+   "fieldtype": "Data",
+   "label": "ID da app de programador"
+  },
+  {
+   "fieldname": "client_secret",
+   "fieldtype": "Password",
+   "label": "Segredo da app de programador"
+  },
+  {
+   "fieldname": "utilizador",
+   "fieldtype": "Data",
+   "label": "Utilizador de integração",
+   "description": "Um utilizador próprio para o Orbit no programa (não a conta pessoal de ninguém)."
+  },
+  {
+   "fieldname": "palavra_passe",
+   "fieldtype": "Password",
+   "label": "Palavra-passe do utilizador de integração"
+  },
+  {
+   "fieldname": "col_cred",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "empresa_id",
+   "fieldtype": "Data",
+   "label": "ID da empresa no programa"
+  },
+  {
+   "fieldname": "zona_fiscal",
+   "fieldtype": "Data",
+   "label": "Zona fiscal do IVA",
+   "default": "PT"
+  },
+  {
+   "fieldname": "access_token",
+   "fieldtype": "Password",
+   "label": "Token de acesso",
+   "hidden": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "refresh_token",
+   "fieldtype": "Password",
+   "label": "Token de renovação",
+   "hidden": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "token_expira",
+   "fieldtype": "Float",
+   "label": "Token expira (época)",
+   "hidden": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_series",
+   "fieldtype": "Section Break",
+   "label": "Séries",
+   "description": "O nome exacto da série no programa, por tipo de documento."
+  },
+  {
+   "fieldname": "serie_fatura",
+   "fieldtype": "Data",
+   "label": "Faturas"
+  },
+  {
+   "fieldname": "serie_fatura_recibo",
+   "fieldtype": "Data",
+   "label": "Faturas-recibo"
+  },
+  {
+   "fieldname": "col_series",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "serie_nota_credito",
+   "fieldtype": "Data",
+   "label": "Notas de crédito"
+  },
+  {
+   "fieldname": "serie_recibo",
+   "fieldtype": "Data",
+   "label": "Recibos"
+  },
+  {
+   "fieldname": "sec_pred",
+   "fieldtype": "Section Break",
+   "label": "Predefinições do programa",
+   "description": "Ids do próprio programa — escolhidos a partir de «Ler opções do programa»."
+  },
+  {
+   "fieldname": "prazo_id",
+   "fieldtype": "Data",
+   "label": "Prazo de vencimento (id)"
+  },
+  {
+   "fieldname": "metodo_pagamento_id",
+   "fieldtype": "Data",
+   "label": "Método de pagamento (id)"
+  },
+  {
+   "fieldname": "metodo_envio_id",
+   "fieldtype": "Data",
+   "label": "Método de envio (id)"
+  },
+  {
+   "fieldname": "col_pred",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "categoria_id",
+   "fieldtype": "Data",
+   "label": "Categoria dos artigos novos (id)"
+  },
+  {
+   "fieldname": "unidade_id",
+   "fieldtype": "Data",
+   "label": "Unidade dos artigos novos (id)"
+  },
+  {
+   "fieldname": "motivo_isencao",
+   "fieldtype": "Data",
+   "label": "Motivo de isenção por omissão",
+   "description": "Código M01…M99 usado nas linhas a 0 % quando a fatura não indica outro."
+  },
+  {
+   "fieldname": "sec_estado",
+   "fieldtype": "Section Break",
+   "label": "Estado"
+  },
+  {
+   "fieldname": "ultimo_teste",
+   "fieldtype": "Datetime",
+   "label": "Último teste da ligação",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ultimo_ensaio_ok",
+   "fieldtype": "Datetime",
+   "label": "Último ensaio bem-sucedido",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ultima_leitura",
+   "fieldtype": "Datetime",
+   "label": "Última leitura de volta",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_estado",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ultimo_erro",
+   "fieldtype": "Small Text",
+   "label": "Último erro",
+   "read_only": 1
+  },
+  {
+   "fieldname": "opcoes",
+   "fieldtype": "Code",
+   "label": "Opções lidas do programa",
+   "options": "JSON",
+   "read_only": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 0,
+   "email": 0,
+   "share": 0
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 0,
+   "email": 0,
+   "share": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}
