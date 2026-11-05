@@ -70,7 +70,9 @@ _ENTRADA = ["orbit.entrada_unica.garantir"]
 # traduções antigas dos módulos — as traduções em si vêm em orbit/translations/*.csv (ver lingua.py)
 _LINGUA = ["orbit.lingua.garantir"]
 
-after_migrate = _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA + _LINGUA
+# 05-11-2026: os emails no CRM (orbit/emails_crm.py; docs/PLANO-EMAILS-NO-CRM.md) — campos próprios
+_EMAILS_CRM = ["orbit.emails_crm.instalar"]
+after_migrate = _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA + _LINGUA + _EMAILS_CRM
 after_install = _POR_DE_PE + _MARKETING + _MARCACAO + _ORGANIZACAO + ["orbit.remetentes.garantir"] + _LINGUA
 
 # Email marketing: a saída das campanhas corre ao minuto (o ritmo por hora
@@ -98,7 +100,7 @@ doc_events = {
              "on_update": "orbit.palavra_passe.gravado"},
     # 17-10-2026: cada bilhete nasce na equipa da sua marca (formulário, destinatário) ou em Triagem
     "HD Ticket": {"before_insert": "orbit.organizacao.ticket_equipa"},
-    "Communication": {"after_insert": "orbit.organizacao.ticket_por_destinatario"},
+    "Communication": {"after_insert": ["orbit.organizacao.ticket_por_destinatario", "orbit.emails_crm.filtrar"]},
     # 17-10-2026 (corte do Zoho): o tempo registado no Orbit vai para o livro de horas do portal
     "Timesheet": {"on_submit": "orbit.portal.tempo_submetido", "on_cancel": "orbit.portal.tempo_cancelado"},
     # 17-10-2026: a conta de saída por omissão é o remetente dos avisos — chama-se «Stratechna Orbit»
@@ -109,4 +111,17 @@ doc_events = {
 # copia para a caixa, as lojas e os outros sítios (orbit/palavra_passe.py; plano das entradas independentes, passo 1)
 override_whitelisted_methods = {
     "frappe.core.doctype.user.user.update_password": "orbit.palavra_passe.update_password",
+    # 05-11-2026: «só para mim» — as actividades do CRM sem os emails e notas privados de outra pessoa
+    "crm.api.activities.get_activities": "orbit.emails_crm.filtrar_actividades",
+}
+
+# 05-11-2026: os emails e notas «só para mim» (orbit_privado_de) ficam fora das listas, da pesquisa e da
+# abertura directa para quem não é o dono (os administradores do sistema continuam a ver).
+permission_query_conditions = {
+    "Communication": "orbit.emails_crm.condicao",
+    "FCRM Note": "orbit.emails_crm.condicao_nota",
+}
+has_permission = {
+    "Communication": "orbit.emails_crm.pode",
+    "FCRM Note": "orbit.emails_crm.pode",
 }

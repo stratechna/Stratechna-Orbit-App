@@ -1121,6 +1121,11 @@ def _url_crm(tipo: str, nome: str) -> str:
 def perfil_remetente(email: str):
     """Quem é este endereço no CRM: contacto, organização, lead, negócios em curso, bilhetes abertos."""
     _so_portal()
+    return _perfil(email)
+
+
+def _perfil(email: str):
+    """O perfil_remetente sem a verificação de quem chama (também corre nos ganchos da leitura do correio)."""
     e = (email or "").strip().lower()
     if "@" not in e:
         return {"encontrado": False}
@@ -1165,6 +1170,21 @@ def perfil_remetente(email: str):
     return out
 
 
+def _alvo_crm(email: str):
+    """Onde um email deste endereço fica no CRM: negócio em curso › lead › contacto (None = não está no CRM).
+    O mesmo alvo do «Associar este email», do seguimento e das caixas ligadas ao CRM (orbit/emails_crm.py)."""
+    p = _perfil(email)
+    if p.get("negocios"):
+        return ("CRM Deal", p["negocios"][0]["id"])
+    if p.get("lead"):
+        return ("CRM Lead", p["lead"]["id"])
+    if p.get("contacto"):
+        cn = frappe.get_all("Contact Email", filters={"email_id": (email or "").strip().lower(), "parenttype": "Contact"},
+                            pluck="parent", limit=1)
+        return ("Contact", cn[0]) if cn else None
+    return None
+
+
 _SEGUIMENTO = {"aberto": "Email aberto", "clique": "Ligação clicada", "resposta": "Email respondido"}
 
 
@@ -1175,13 +1195,7 @@ def registar_seguimento(email: str, assunto: str = None, evento: str = None, lig
     _so_portal()
     if evento not in _SEGUIMENTO:
         return {"ok": False, "erro": "evento desconhecido"}
-    p = perfil_remetente(email)
-    alvo = (("CRM Deal", p["negocios"][0]["id"]) if p.get("negocios")
-            else ("CRM Lead", p["lead"]["id"]) if p.get("lead") else None)
-    if not alvo and p.get("contacto"):
-        cn = frappe.get_all("Contact Email", filters={"email_id": email.strip().lower(), "parenttype": "Contact"},
-                            pluck="parent", limit=1)
-        alvo = ("Contact", cn[0]) if cn else None
+    alvo = _alvo_crm(email)
     if not alvo:
         return {"ok": False, "erro": "sem registo no CRM"}
     esc = frappe.utils.escape_html
