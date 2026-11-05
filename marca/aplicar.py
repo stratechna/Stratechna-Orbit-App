@@ -238,9 +238,12 @@ NOMES_COMPOSTOS = [
     ("Frappe HR", "Stratechna RH"),
 ]
 
+# O Desk passou de 2 para 1 a 04-11-2026: o upstream retirou o questionário de
+# boas-vindas (helpdesk a3f586a2b, PersonaForm.vue). No ecrã o nome fica só na
+# barra lateral (Sidebar.vue: título e «… Mobile»), que vai num pacote só.
 PACOTES = {
     "crm/crm/public/frontend/assets": 3,
-    "helpdesk/helpdesk/public/desk/assets": 2,
+    "helpdesk/helpdesk/public/desk/assets": 1,
     "hrms/hrms/public/frontend/assets": 3,
 }
 
