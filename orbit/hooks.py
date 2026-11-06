@@ -73,7 +73,8 @@ _LINGUA = ["orbit.lingua.garantir"]
 # 05-11-2026: os emails no CRM (orbit/emails_crm.py; docs/PLANO-EMAILS-NO-CRM.md) — campos próprios
 _EMAILS_CRM = ["orbit.emails_crm.instalar"]
 _FATURACAO = ["orbit.faturacao.instalar.garantir"]   # DP8, 05-11-2026
-after_migrate = _FATURACAO + _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA + _LINGUA + _EMAILS_CRM
+_BOOKING = ["orbit.booking.garantir"]   # O1/I1, 06-11-2026: negócio do CRM ligado à marcação do Booking
+after_migrate = _FATURACAO + _BOOKING + _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA + _LINGUA + _EMAILS_CRM
 after_install = _POR_DE_PE + _MARKETING + _MARCACAO + _ORGANIZACAO + ["orbit.remetentes.garantir"] + _LINGUA
 
 # Email marketing: a saída das campanhas corre ao minuto (o ritmo por hora
