@@ -69,10 +69,14 @@ def _dominio_email(email: str) -> str | None:
     return frappe.db.get_value("Email Domain", {"domain_name": dom}) or frappe.db.get_value("Email Domain", dom)
 
 
-def _imap_estado(email: str, senha: str, dominio: str) -> dict:
-    """Pastas a ler (Entrada + a pasta \\Sent) e o uidvalidity/uidnext de cada uma AGORA."""
-    d = frappe.get_doc("Email Domain", dominio)
-    m = imaplib.IMAP4_SSL(d.email_server, int(d.incoming_port or 993)) if d.use_ssl else imaplib.IMAP4(d.email_server, int(d.incoming_port or 143))
+def _imap_estado(email: str, senha: str, dominio: str | None, servidor: str | None = None, porta: int | None = None) -> dict:
+    """Pastas a ler (Entrada + a pasta \\Sent) e o uidvalidity/uidnext de cada uma AGORA.
+    Com `servidor` (conta de fora: Gmail, Zoho…, 06-11-2026) liga-se a esse servidor por SSL em vez do do domínio."""
+    if servidor:
+        m = imaplib.IMAP4_SSL(servidor, int(porta or 993), timeout=30)
+    else:
+        d = frappe.get_doc("Email Domain", dominio)
+        m = imaplib.IMAP4_SSL(d.email_server, int(d.incoming_port or 993)) if d.use_ssl else imaplib.IMAP4(d.email_server, int(d.incoming_port or 143))
     try:
         m.login(email, senha)
         pastas = ["INBOX"]
@@ -100,8 +104,11 @@ def _imap_estado(email: str, senha: str, dominio: str) -> dict:
 
 
 @frappe.whitelist()
-def ligar_caixa(email: str, senha: str = None, nivel: str = "equipa", dono: str = None, exclusoes=None):
-    """Liga (ou actualiza) uma caixa no CRM. `nivel`: equipa | so_eu. `dono`: o User do Orbit da pessoa (só_eu)."""
+def ligar_caixa(email: str, senha: str = None, nivel: str = "equipa", dono: str = None, exclusoes=None,
+                servidor: str = None, porta=None):
+    """Liga (ou actualiza) uma caixa no CRM. `nivel`: equipa | so_eu. `dono`: o User do Orbit da pessoa (só_eu).
+    `servidor`/`porta` (06-11-2026): conta de fora (Gmail, Zoho…) — IMAP por SSL nesse servidor, com a palavra-passe
+    de aplicação do fornecedor; sem eles, o servidor é o do domínio configurado no Orbit (caixas da casa)."""
     _so_portal()
     instalar()
     email = (email or "").strip().lower()
@@ -115,10 +122,15 @@ def ligar_caixa(email: str, senha: str = None, nivel: str = "equipa", dono: str 
     existe = frappe.db.exists("Email Account", nome)
     if not existe and not senha:
         return {"ok": False, "erro": "falta a palavra-passe de aplicação"}
-    dominio = _dominio_email(email)
-    if not dominio:
+    servidor = (servidor or "").strip().lower() or None
+    if servidor and not re.fullmatch(r"[a-z0-9-]+(\.[a-z0-9-]+)+", servidor):
+        return {"ok": False, "erro": "servidor IMAP inválido"}
+    dominio = None if servidor else _dominio_email(email)
+    if not servidor and not dominio:
         return {"ok": False, "erro": f"o domínio de {email} não está configurado no Orbit"}
     acc = frappe.get_doc("Email Account", nome) if existe else frappe.new_doc("Email Account")
+    if servidor:
+        acc.update({"email_server": servidor, "incoming_port": str(int(porta or 993)), "use_ssl": 1})
     acc.update({"email_account_name": nome, "email_id": email, "domain": dominio, "use_imap": 1,
                 "enable_incoming": 1, "enable_outgoing": 0, "default_incoming": 0, "default_outgoing": 0,
                 "create_contact": 0, "enable_automatic_linking": 0, "awaiting_password": 0,
@@ -130,7 +142,10 @@ def ligar_caixa(email: str, senha: str = None, nivel: str = "equipa", dono: str 
         acc.password = senha
     novas = {}
     if senha:
-        novas = _imap_estado(email, senha, dominio)
+        try:
+            novas = _imap_estado(email, senha, dominio, servidor, porta)
+        except Exception as e:  # noqa: BLE001 — a mensagem do servidor ajuda quem liga (palavra-passe, IMAP desligado…)
+            return {"ok": False, "erro": f"o servidor {servidor or dominio} recusou: {str(e)[:200]}"}
         if not novas:
             return {"ok": False, "erro": "a caixa não respondeu por IMAP com esta palavra-passe"}
         acc.set("imap_folder", [{"folder_name": p, "append_to": None} for p in novas])
