@@ -125,7 +125,7 @@ override_whitelisted_methods = {
 }
 
 # 05-11-2026: os emails e notas «só para mim» (orbit_privado_de) ficam fora das listas, da pesquisa e da
-# abertura directa para quem não é o dono (os administradores do sistema continuam a ver).
+# abertura directa para quem não é o dono, administradores do tenant incluídos (06-11-2026).
 permission_query_conditions = {
     "Communication": "orbit.emails_crm.condicao",
     "FCRM Note": "orbit.emails_crm.condicao_nota",

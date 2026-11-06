@@ -10,7 +10,7 @@ pessoa ligado** («para a equipa» ou «só para mim»). O portal decide e chama
   (negócio em curso › lead › contacto — o mesmo alvo do «Associar este email») e não está na lista de exclusões;
   senão apaga-se logo. Nunca cria contactos nem leads;
 * «só para mim»: o email (e as notas que daí nascem) leva `orbit_privado_de` = o utilizador dono da caixa, e
-  `filtrar_actividades` / as permissões escondem-no dos outros. Os administradores do sistema continuam a ver.
+  `filtrar_actividades` / as permissões escondem-no dos outros, também dos administradores do tenant (06-11-2026).
 
 A ligação automática do Frappe não serve aqui: só existe para uma Email Account por site e liga por endereços
 com etiqueta (`caixa+Doctype=nome@`), não pelo endereço de quem escreve.
@@ -218,7 +218,10 @@ def filtrar(doc, method=None):
 
 # ── «Só para mim»: esconder dos outros ─────────────────────────────────────────────────────────────────
 def _ve_tudo(user: str) -> bool:
-    return user == "Administrator" or "System Manager" in frappe.get_roles(user)
+    # 06-11-2026 (segurança das contas, plano das pendências): «só para mim» quer dizer só para o dono — nem os
+    # administradores do tenant («System Manager», que o perfil Gestão traz) nem a assistência o vêem. Fica só o
+    # Administrator técnico do Frappe, que ninguém usa para trabalhar.
+    return user == "Administrator"
 
 
 def condicao(user=None, doctype="Communication"):
