@@ -204,7 +204,8 @@ def resumo(ano: int = None, mes: int = None) -> dict:
             "dia_inteiro": bool(dia_inteiro),
             "local": local or "",
             # O que tem sala do Meet mostra o símbolo e leva lá directamente.
-            "meet": "meet.orbit.stratechna.com" in (local or ""),
+            # S4 (08-11-2026): o Meet também responde em meet.<casa do tenant> (meet.orbit.shopinox.eu…).
+            "meet": "://meet." in (local or "") or "meet.orbit.stratechna.com" in (local or ""),
         }
 
     # Um compromisso de vários dias aparece em cada um deles, e não só no

@@ -19,7 +19,21 @@ import unicodedata
 
 import frappe
 
-MEET = "https://meet.orbit.stratechna.com"
+MEET = "https://meet.orbit.stratechna.com"   # o endereço partilhado: tenants sem domínio e ligações antigas
+
+
+def _meet_base() -> str:
+    """O Meet no endereço do tenant (S4 de docs/PLANO-ORBIT-SUBDOMINIOS.md, 08-11-2026).
+
+    Com `orbit_meet_host` no site_config (ex.: `meet.orbit.shopinox.eu`), as salas abrem nesse
+    nome — a mesma instalação do Jitsi, com o router e o certificado já postos pelo Traefik.
+    Sem ele, fica o endereço partilhado de sempre. O inquilino no caminho NÃO muda, por isso
+    as salas e as ligações antigas continuam a encontrar-se.
+    """
+    host = (frappe.conf.get("orbit_meet_host") or "").strip().lower()
+    if host and re.fullmatch(r"[a-z0-9.-]+", host):
+        return f"https://{host}"
+    return MEET
 EMISSOR = "orbit"          # asap_accepted_issuers no prosody
 AUDIENCIA = "orbit"        # asap_accepted_audiences
 VALIDADE = 4 * 60 * 60     # 4 horas: cobre uma reunião longa sem deixar um
@@ -118,9 +132,9 @@ def entrar(sala: str = None):
     if not nome:
         # Sem sala indicada vai-se à página inicial do Meet, que é onde se
         # escolhe ou cria uma. O token cobre qualquer sala (`room: "*"`).
-        destino = f"{MEET}/{_inquilino()}/"
+        destino = f"{_meet_base()}/{_inquilino()}/"
     else:
-        destino = f"{MEET}/{_inquilino()}/{nome}"
+        destino = f"{_meet_base()}/{_inquilino()}/{nome}"
 
     token = emitir_token("*" if not nome else nome)
     separador = "&" if "?" in destino else "?"
