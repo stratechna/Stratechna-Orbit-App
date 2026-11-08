@@ -119,7 +119,8 @@ def _limpar_cache():
 # o atalho tem de passar pelo site do cliente para o token de sessão ser emitido
 # com a identidade dele (ver orbit/meet.py).
 ATALHOS = [
-    {"nome": "Mail", "url": "https://mail.orbit.{dominio}", "simbolo": "mail", "ordem": 1},
+    # S8 de docs/PLANO-ORBIT-SUBDOMINIOS.md (D10): o Mail no endereço do correio do cliente — ver _mail_do_tenant.
+    {"nome": "Mail", "url": "https://{mail}", "simbolo": "mail", "ordem": 1},
     # O Docs é um arquivo por cliente (05-11-2026, R4): <slug>.docs.orbit.stratechna.com — ver _docs_do_tenant.
     {"nome": "Docs", "url": "https://{docs}", "simbolo": "docs", "ordem": 2},
     {"nome": "Sign", "url": "https://sign.{dominio}", "simbolo": "sign", "ordem": 3},
@@ -178,6 +179,13 @@ def _chat_do_tenant() -> str:
     return raiz if slug in ("", "stratechna", "orbit") else f"{slug}.{raiz}"
 
 
+def _mail_do_tenant() -> str:
+    """O webmail deste tenant. `orbit_mail_host` (ex.: mail.shopinox.eu, o mesmo nome do correio, servido pelo BDS como
+    procurador do SOGo) ganha a tudo; por omissão, o SOGo directo da casa (mail.orbit.<orbit_dominio_apps>).
+    Não se deriva do host_name: um domínio cujo correio não é nosso (ex.: no Zoho) não tem webmail em mail.<domínio>."""
+    return frappe.conf.get("orbit_mail_host") or f"mail.orbit.{_dominio_do_tenant()}"
+
+
 def _docs_do_tenant() -> str:
     """O endereço do Docs deste tenant. O da Stratechna ficou em docs.<domínio>; cada cliente tem o seu arquivo em
     <slug>.docs.orbit.stratechna.com, criado na compra por docs-novo-cliente.sh (05-11-2026). `orbit_docs_host`
@@ -209,7 +217,7 @@ def repor_atalhos():
     chat = _chat_do_tenant()
     criados, mantidos = [], 0
     for a in ATALHOS:
-        url = a["url"].format(dominio=dominio, chat=chat, docs=_docs_do_tenant())
+        url = a["url"].format(dominio=dominio, chat=chat, docs=_docs_do_tenant(), mail=_mail_do_tenant())
         valores = {
             "link": url,
             "app": "orbit",
