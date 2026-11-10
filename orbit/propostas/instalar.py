@@ -111,11 +111,22 @@ def garantir():
             for c in campos:
                 if not frappe.db.exists("Custom Field", {"dt": dt, "fieldname": c["fieldname"]}):
                     create_custom_field(dt, {**c, "module": "Orbit"})
+        _reparar_percentagens()
         _servicos()
         _formato()
         frappe.db.commit()
     except Exception:
         frappe.log_error(title="orbit.propostas.garantir")
+
+
+def _reparar_percentagens():
+    """Ao acrescentar a coluna com valor por omissão às linhas que já existem, o Frappe grava «50 %%» (escapa o %
+    para o SQL e o escape fica). Visto a 10-11-2026 nas três marcas da JF."""
+    for dt in ("Brand", "Quotation"):
+        for campo in ("orbit_pagamento", "orbit_garantia", "orbit_prazo"):
+            for r in frappe.get_all(dt, filters={campo: ["is", "set"], "docstatus": ["<", 2]}, fields=["name", campo]):
+                if "%%" in (r[campo] or ""):
+                    frappe.db.set_value(dt, r.name, campo, r[campo].replace("%%", "%"), update_modified=False)
 
 
 def _servicos():

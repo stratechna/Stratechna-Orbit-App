@@ -117,7 +117,8 @@ doc_events = {
                       "before_cancel": "orbit.faturacao.emissao.antes_de_cancelar_fatura"},
     "Payment Entry": {"on_submit": "orbit.faturacao.emissao.ao_submeter_pagamento"},
     # 10-11-2026: marca → série/timbre/textos, linhas de transporte e montagem, IVA (orbit/propostas/regras.py)
-    "Quotation": {"before_validate": "orbit.propostas.regras.antes_de_validar"},
+    "Quotation": {"before_insert": "orbit.propostas.regras.antes_de_inserir",
+                  "before_validate": "orbit.propostas.regras.antes_de_validar"},
 }
 
 # 10-11-2026: «Adicionar por referência» e a marca no Orçamento; o modelo de impressão lê orbit_proposta(doc)

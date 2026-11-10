@@ -17,6 +17,23 @@ from orbit.propostas.instalar import SERVICOS
 _SEM_MODO = "Não incluir"
 
 
+def antes_de_inserir(doc, method=None):
+    """A série tem de estar certa ANTES de o Frappe dar o nome (o nome nasce antes do before_validate)."""
+    marca = _marca(doc)
+    if marca:
+        _serie(doc, marca)
+
+
+def _serie(doc, marca):
+    serie = (marca.get("orbit_serie") or "").strip().upper()
+    if not serie:
+        return
+    opcoes = (frappe.get_meta("Quotation").get_field("naming_series").options or "").split("\n")
+    alvo = next((o for o in opcoes if f"-{serie}-" in o), None)
+    if alvo:
+        doc.naming_series = alvo
+
+
 def antes_de_validar(doc, method=None):
     if doc.docstatus != 0:
         return
@@ -35,12 +52,7 @@ def _marca(doc):
 
 def _aplicar_marca(doc, marca):
     if doc.is_new():
-        serie = (marca.get("orbit_serie") or "").strip().upper()
-        if serie:
-            opcoes = (frappe.get_meta("Quotation").get_field("naming_series").options or "").split("\n")
-            alvo = next((o for o in opcoes if f"-{serie}-" in o), None)
-            if alvo:
-                doc.naming_series = alvo
+        _serie(doc, marca)
         dias = cint(marca.get("orbit_validade_dias")) or 15
         if not doc.valid_till and doc.transaction_date:
             doc.valid_till = add_days(doc.transaction_date, dias)
