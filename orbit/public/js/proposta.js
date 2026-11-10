@@ -74,7 +74,9 @@ function orbitPorReferencia(frm) {
 	const mostrar = (produto) => {
 		["sec1", "sec2"].forEach((f) => d.set_df_property(f, "hidden", 0));
 		if (!produto) {
-			d.fields_dict.estado.$wrapper.html(`<p class="text-muted">${__("Não encontrada no catálogo nem na loja da marca. Pode preencher à mão ou procurar na internet.")}</p>`);
+			// com marca escolhida só se procura no site dela (10-11-2026); sem marca, no catálogo da conta
+			const onde = frm.doc.orbit_marca ? __("no site da {0}", [frm.doc.orbit_marca]) : __("no catálogo");
+			d.fields_dict.estado.$wrapper.html(`<p class="text-muted">${__("Não encontrada {0}. Pode preencher à mão ou procurar na internet (a descrição vem neutra, sem marcas).", [onde])}</p>`);
 			d.set_df_property("internet", "hidden", 0);
 			return;
 		}
