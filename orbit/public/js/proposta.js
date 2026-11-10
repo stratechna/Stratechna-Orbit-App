@@ -41,9 +41,12 @@ function orbitPorReferencia(frm) {
 		size: "large",
 		fields: [
 			{ fieldname: "referencia", fieldtype: "Data", label: __("Referência"), reqd: 1 },
-			{ fieldname: "procurar", fieldtype: "Button", label: __("Procurar") },
+			// A acção vai no próprio campo (`click`): um botão escondido não tem $input até aparecer, e ligar-lhe
+			// o clique por $input.on rebentava antes de a janela abrir (10-11-2026, «não abre nenhuma janela»).
+			{ fieldname: "procurar", fieldtype: "Button", label: __("Procurar"), click: () => procurar() },
 			{ fieldname: "estado", fieldtype: "HTML" },
-			{ fieldname: "internet", fieldtype: "Button", label: __("Procurar na internet (gasta créditos de IA)"), hidden: 1 },
+			{ fieldname: "internet", fieldtype: "Button", label: __("Procurar na internet (gasta créditos de IA)"), hidden: 1,
+			  click: () => internet() },
 			{ fieldname: "sec1", fieldtype: "Section Break", label: __("Produto"), hidden: 1 },
 			{ fieldname: "titulo", fieldtype: "Data", label: __("Designação"), reqd: 1 },
 			{ fieldname: "descricao", fieldtype: "Small Text", label: __("Descrição curta") },
@@ -91,14 +94,14 @@ function orbitPorReferencia(frm) {
 			`<p class="text-muted small">${__("Imagem encontrada. Para usar outra, carregue-a acima.")}</p>` : "");
 		d.fields_dict.preco_nota.$wrapper.html(produto.preco_nota ? `<p class="text-muted small">${frappe.utils.escape_html(produto.preco_nota)}</p>` : "");
 	};
-	d.fields_dict.procurar.$input.on("click", () => {
+	const procurar = () => {
 		const ref = d.get_value("referencia");
 		if (!ref) return;
 		d.fields_dict.estado.$wrapper.html(`<p class="text-muted">${__("A procurar…")}</p>`);
 		frappe.call({ method: "orbit.propostas.referencia.procurar", args: { referencia: ref, marca: frm.doc.orbit_marca || null } })
 			.then((r) => mostrar(r.message && r.message.produto));
-	});
-	d.fields_dict.internet.$input.on("click", () => {
+	};
+	const internet = () => {
 		const ref = d.get_value("referencia");
 		if (!ref) return;
 		d.fields_dict.estado.$wrapper.html(`<p class="text-muted">${__("A procurar na internet… (pode levar um minuto)")}</p>`);
@@ -108,7 +111,7 @@ function orbitPorReferencia(frm) {
 				if (!p) d.fields_dict.estado.$wrapper.html(`<p class="text-muted">${__("Também não se encontrou na internet. Preencha à mão.")}</p>`);
 				else mostrar(p);
 			});
-	});
+	};
 	d.show();
 }
 
