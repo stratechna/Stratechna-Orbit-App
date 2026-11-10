@@ -4527,3 +4527,4 @@ years,años
 "⚠️ No class found for doctype: {0}, it is mandatory to have a class for the parent doctype. it can be empty, but it should be present.","⚠️ No se encontró ninguna clase para el doctype: {0}; es obligatorio que exista una clase para el doctype principal. Puede estar vacía, pero debe existir."
 ⚠️ No data found for parent field: {0},⚠️ No se encontraron datos para el campo principal: {0}
 ⚠️ No row found for idx: {0} in parent field: {1},⚠️ No se encontró ninguna fila para idx: {0} en el campo principal: {1}
+Propostas,Propuestas

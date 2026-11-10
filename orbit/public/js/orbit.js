@@ -55,7 +55,8 @@
 			// benefícios — é obrigação da casa e vai para «Gestão», ao lado da
 			// facturação e dos pagamentos. Quem trata de uma coisa raramente
 			// trata da outra.
-			itens: ["Frappe CRM", "Helpdesk", "Mail", "Docs", "Sign", "Events",
+			// As Propostas (10-11-2026) ficam logo a seguir ao CRM: é de lá que nascem.
+			itens: ["Frappe CRM", "Propostas", "Helpdesk", "Mail", "Docs", "Sign", "Events",
 				"Social", "Marketing", "Meet", "Chat", "Wiki", "Projects",
 				"Frappe HR", "HR Setup", "Recruitment", "Leaves",
 				"Performance", "Tenure", "Shift & Attendance"],

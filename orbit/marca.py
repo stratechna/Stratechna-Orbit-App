@@ -138,6 +138,9 @@ ATALHOS = [
     # caminho do próprio site, e abre na lista de campanhas — que é onde o
     # trabalho começa.
     {"nome": "Marketing", "url": "/app/campanha-de-marketing", "simbolo": "marketing", "ordem": 8},
+    # 10-11-2026 (pedido do Vítor): as propostas comerciais (orbit/propostas) com ícone próprio na grelha, ao
+    # lado do CRM — abrem na lista de Orçamentos. Só onde há ERPNext (`precisa`).
+    {"nome": "Propostas", "url": "/app/quotation", "simbolo": "propostas", "ordem": 10, "precisa": "Quotation"},
 ]
 
 
@@ -217,6 +220,8 @@ def repor_atalhos():
     chat = _chat_do_tenant()
     criados, mantidos = [], 0
     for a in ATALHOS:
+        if a.get("precisa") and not frappe.db.exists("DocType", a["precisa"]):
+            continue
         url = a["url"].format(dominio=dominio, chat=chat, docs=_docs_do_tenant(), mail=_mail_do_tenant())
         valores = {
             "link": url,
