@@ -74,7 +74,9 @@ _LINGUA = ["orbit.lingua.garantir"]
 _EMAILS_CRM = ["orbit.emails_crm.instalar"]
 _FATURACAO = ["orbit.faturacao.instalar.garantir"]   # DP8, 05-11-2026
 _BOOKING = ["orbit.booking.garantir"]   # O1/I1, 06-11-2026: negócio do CRM ligado à marcação do Booking
-after_migrate = _FATURACAO + _BOOKING + _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA + _LINGUA + _EMAILS_CRM
+# 10-11-2026: propostas comerciais por cima do Orçamento (orbit/propostas; docs/PLANO-PROPOSTAS-ORBIT.md)
+_PROPOSTAS = ["orbit.propostas.instalar.garantir"]
+after_migrate = _FATURACAO + _BOOKING + _PROPOSTAS + _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA + _LINGUA + _EMAILS_CRM
 after_install = _POR_DE_PE + _MARKETING + _MARCACAO + _ORGANIZACAO + ["orbit.remetentes.garantir"] + _LINGUA
 
 # Email marketing: a saída das campanhas corre ao minuto (o ritmo por hora
@@ -114,7 +116,13 @@ doc_events = {
                       "on_submit": "orbit.faturacao.emissao.ao_submeter_fatura",
                       "before_cancel": "orbit.faturacao.emissao.antes_de_cancelar_fatura"},
     "Payment Entry": {"on_submit": "orbit.faturacao.emissao.ao_submeter_pagamento"},
+    # 10-11-2026: marca → série/timbre/textos, linhas de transporte e montagem, IVA (orbit/propostas/regras.py)
+    "Quotation": {"before_validate": "orbit.propostas.regras.antes_de_validar"},
 }
+
+# 10-11-2026: «Adicionar por referência» e a marca no Orçamento; o modelo de impressão lê orbit_proposta(doc)
+doctype_js = {"Quotation": "public/js/proposta.js"}
+jinja = {"methods": ["orbit.propostas.impressao.orbit_proposta"]}
 
 # 28-10-2026: palavra-passe universal — «Esqueci-me» e «Mudar palavra-passe» do Frappe avisam o portal, que a
 # copia para a caixa, as lojas e os outros sítios (orbit/palavra_passe.py; plano das entradas independentes, passo 1)
