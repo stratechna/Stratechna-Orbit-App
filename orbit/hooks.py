@@ -75,7 +75,7 @@ _EMAILS_CRM = ["orbit.emails_crm.instalar"]
 _FATURACAO = ["orbit.faturacao.instalar.garantir"]   # DP8, 05-11-2026
 _BOOKING = ["orbit.booking.garantir"]   # O1/I1, 06-11-2026: negócio do CRM ligado à marcação do Booking
 # 10-11-2026: propostas comerciais por cima do Orçamento (orbit/propostas; docs/PLANO-PROPOSTAS-ORBIT.md)
-_PROPOSTAS = ["orbit.propostas.instalar.garantir"]
+_PROPOSTAS = ["orbit.propostas.instalar.garantir", "orbit.marcas_artigos.garantir"]
 after_migrate = _FATURACAO + _BOOKING + _PROPOSTAS + _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA + _LINGUA + _EMAILS_CRM
 after_install = _POR_DE_PE + _MARKETING + _MARCACAO + _ORGANIZACAO + ["orbit.remetentes.garantir"] + _LINGUA
 
@@ -117,6 +117,8 @@ doc_events = {
                       "before_cancel": "orbit.faturacao.emissao.antes_de_cancelar_fatura"},
     "Payment Entry": {"on_submit": "orbit.faturacao.emissao.ao_submeter_pagamento"},
     # 10-11-2026: marca → série/timbre/textos, linhas de transporte e montagem, IVA (orbit/propostas/regras.py)
+    # 10-11-2026: a marca do artigo pelo prefixo da referência (A… JFusados, N… Arnox) → armazém da marca
+    "Item": {"before_validate": "orbit.marcas_artigos.antes_de_validar_artigo"},
     "Quotation": {"before_insert": "orbit.propostas.regras.antes_de_inserir",
                   "before_validate": "orbit.propostas.regras.antes_de_validar"},
 }
