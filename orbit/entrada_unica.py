@@ -205,7 +205,7 @@ def regresso(code: str | None = None, state: str | None = None, error: str | Non
 # só se entra nela por aqui. Sair da assistência fecha só esta sessão — a do portal continua.
 ASSISTENCIA = "suporte@stratechna.pt"   # .pt, não .com (Vítor, 21-10)
 _ASSIST = "orbit_entrada_unica:assistencia:"
-_PAPEIS_FORA = {"Administrator", "Guest", "All", "Desk User", "Customer", "Supplier", "HD Customer"}  # papéis de terceiros, não de admin
+_PAPEIS_FORA = {"Administrator", "Guest", "All", "Desk User", "Customer", "Supplier", "HD Customer", "HD Customer Manager"}  # papéis de terceiros, não de admin
 
 
 def _papeis_de_admin() -> set:
