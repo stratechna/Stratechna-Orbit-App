@@ -139,6 +139,9 @@ input[type="checkbox"]:checked {
 	--outline-gray-2: rgba(255, 255, 255, .10);
 	--outline-gray-3: rgba(255, 255, 255, .16);
 	--outline-gray-modals: rgba(255, 255, 255, .10);
+	--surface-elevation-1: rgba(255, 255, 255, .06);
+	--surface-elevation-2: rgba(255, 255, 255, .06);
+	--surface-elevation-3: rgba(255, 255, 255, .06);
 	color: var(--ink-gray-8);
 	border-color: rgba(0, 0, 0, .2) !important;
 	position: relative;
@@ -164,7 +167,9 @@ input[type="checkbox"]:checked {
 .bg-surface-sidebar .bg-surface-white:not(.h-7),
 .bg-surface-sidebar .bg-surface-base:not(.h-7),
 .bg-surface-sidebar .bg-surface-cards:not(.h-7),
-.bg-surface-sidebar .bg-surface-elevation-1:not(.h-7) {
+.bg-surface-sidebar .bg-surface-elevation-1:not(.h-7),
+.bg-surface-sidebar .bg-surface-elevation-2:not(.h-7),
+.bg-surface-sidebar .bg-surface-elevation-3:not(.h-7) {
 	background-color: rgba(255, 255, 255, .06) !important;
 	border-color: rgba(255, 255, 255, .10) !important;
 	box-shadow: none !important;
