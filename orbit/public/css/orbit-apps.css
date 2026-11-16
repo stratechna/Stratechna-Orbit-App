@@ -62,7 +62,6 @@ html:root[data-theme="light"] {
 	--outline-gray-4: oklch(68.3% .018 235);
 	--outline-gray-5: oklch(58.6% .021 235);
 
-	--surface-sidebar: var(--orbit-estrutura);
 }
 
 /* ── Fichas, tema escuro ────────────────────────────────────────────────────
@@ -75,7 +74,6 @@ html:root[data-theme="dark"] {
 	--orbit-estrutura: #121b21;
 	--orbit-estrutura-2: #1a262e;
 	--orbit-estrutura-3: #24333d;
-	--surface-sidebar: var(--orbit-estrutura);
 }
 
 /* ── Letra ─────────────────────────────────────────────────────────────────── */
@@ -119,6 +117,10 @@ input[type="checkbox"]:checked {
    itens. Os menus que se abrem a partir dela vivem no <body> (teleport) e
    ficam claros, como devem. */
 .bg-surface-sidebar {
+	/* Só a barra é ardósia. A ficha --surface-sidebar fica a original: as
+	   linhas das listas usam-na no hover (hover:bg-surface-sidebar) e ficavam
+	   ardósia com texto escuro por cima. */
+	background-color: var(--orbit-estrutura) !important;
 	--ink-gray-9: #f1f4f6;
 	--ink-gray-8: #e4e9ed;
 	--ink-gray-7: #cfd7de;

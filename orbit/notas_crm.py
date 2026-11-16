@@ -5,7 +5,7 @@ ligadas a uma organização ou a um contacto (todas as que vieram do Zoho para
 contas e contactos, por exemplo) existem, mas não tinham onde se ver a partir
 da ficha — só na lista geral de Notas, sem dizer de quem eram.
 
-Fica um botão «Notas» no cabeçalho da organização e do contacto, por CRM Form
+Fica um botão «Notas (N)» — com o número de notas — no cabeçalho da organização e do contacto, por CRM Form
 Script (configuração do próprio CRM — nenhum ficheiro do CRM é alterado). Na
 organização mostra as notas dela e as dos contactos dela; no contacto, as do
 contacto. Abre numa janela, da mais recente para a mais antiga.
@@ -37,6 +37,14 @@ async function _orbitNotas(call, refs) {
   return todas
 }
 
+function _orbitBotao($dialog, router, notas) {
+  return {
+    label: notas.length ? `Notas (${notas.length})` : 'Notas',
+    icon: 'lucide-sticky-note',
+    onClick: () => _orbitJanela($dialog, router, notas),
+  }
+}
+
 function _orbitJanela($dialog, router, notas) {
   const cartoes = notas.map((n) => `
     <div class="mb-3 rounded-lg border border-outline-gray-2 p-3">
@@ -61,40 +69,27 @@ SCRIPTS = {
     "Orbit · Notas da organização": ("CRM Organization", _COMUM + r"""
 class CRMOrganization {}
 
-function setupForm({ doc, $dialog, call, router }) {
-  return {
-    actions: [{
-      label: 'Notas',
-      onClick: async () => {
-        const contactos = await call('frappe.client.get_list', {
-          doctype: 'Contact',
-          filters: [['Dynamic Link', 'link_doctype', '=', 'CRM Organization'], ['Dynamic Link', 'link_name', '=', doc.name]],
-          fields: ['name'],
-          limit_page_length: 500,
-        })
-        const notas = await _orbitNotas(call, [
-          ['CRM Organization', [doc.name], ''],
-          ['Contact', (contactos || []).map((c) => c.name), 'Contacto'],
-        ])
-        _orbitJanela($dialog, router, notas)
-      },
-    }],
-  }
+async function setupForm({ doc, $dialog, call, router }) {
+  // As notas lêem-se já ao abrir a ficha, para o botão dizer quantas há.
+  const contactos = await call('frappe.client.get_list', {
+    doctype: 'Contact',
+    filters: [['Dynamic Link', 'link_doctype', '=', 'CRM Organization'], ['Dynamic Link', 'link_name', '=', doc.name]],
+    fields: ['name'],
+    limit_page_length: 500,
+  })
+  const notas = await _orbitNotas(call, [
+    ['CRM Organization', [doc.name], ''],
+    ['Contact', (contactos || []).map((c) => c.name), 'Contacto'],
+  ])
+  return { actions: [_orbitBotao($dialog, router, notas)] }
 }
 """),
     "Orbit · Notas do contacto": ("Contact", _COMUM + r"""
 class Contact {}
 
-function setupForm({ doc, $dialog, call, router }) {
-  return {
-    actions: [{
-      label: 'Notas',
-      onClick: async () => {
-        const notas = await _orbitNotas(call, [['Contact', [doc.name], '']])
-        _orbitJanela($dialog, router, notas)
-      },
-    }],
-  }
+async function setupForm({ doc, $dialog, call, router }) {
+  const notas = await _orbitNotas(call, [['Contact', [doc.name], '']])
+  return { actions: [_orbitBotao($dialog, router, notas)] }
 }
 """),
 }

@@ -1142,3 +1142,99 @@ body[data-path="login"] .page-card, body[data-path="login"] .page-card * { font-
 	box-shadow: inset 2px 0 0 #b20009;
 }
 [data-theme="dark"] .dock { background: #121b21 !important; }
+
+/* ── Wiki (páginas públicas) com o aspecto Stratechna (16-11-2026) ──────────
+   O wiki.bundle carrega DEPOIS desta folha e volta a definir --font-stack e os
+   --gray-* em :root e em body — por isso o var(--font-stack) de cima resolvia
+   para Inter. Aqui as fichas redefinem-se em `html body:has(.wiki-page-content)`
+   (mais específico do que :root, body e body.dark), e a letra vai por nome.
+   Nenhum ficheiro da app wiki é alterado. */
+html body:has(.wiki-page-content) {
+	--font-stack: "DM Sans", "InterVariable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--gray-50: #f6f9fa;
+	--gray-100: #eff3f6;
+	--gray-200: #e8edf1;
+	--gray-300: #dbe3e8;
+	--gray-400: #bec9d0;
+	--gray-500: #8e9ca4;
+	--gray-600: #707f87;
+	--gray-700: #45555e;
+	--gray-800: #2b3b44;
+	--gray-900: #16252e;
+	--text-color: #3f4d56;
+	--content-text-color: #3f4d56;
+	--border-color: #dbe3e8;
+	--searchbar-color: #eff3f6;
+	--table-header-color: #eff3f6;
+	--table-border-color: #c9d3da;
+	--badge-bg-color: #e3e9ee;
+	--badge-color: #45555e;
+	--editor-background-color: #eff3f6;
+	--btn-primary-color: #fff;
+	--btn-primary-bg-color: #b20009;
+	--btn-primary-hover-bg-color: #8c0007;
+	--btn-primary-active-bg-color: #730006;
+	--btn-secondary-color: #2b3b44;
+	--btn-secondary-bg-color: #eff3f6;
+	--btn-secondary-hover-bg-color: #e8edf1;
+	--btn-secondary-active-bg-color: #dbe3e8;
+	--sidebar-bg-color: #1a2a33;
+	font-family: "DM Sans", "InterVariable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+html body.dark:has(.wiki-page-content) {
+	--background-color: #0f171c;
+	--text-color: #e4e9ed;
+	--content-text-color: #cfd7de;
+	--table-header-color: #16222b;
+	--table-border-color: #2c414e;
+	--editor-background-color: #1a262e;
+	--btn-primary-bg-color: #d4151f;
+	--btn-primary-hover-bg-color: #b20009;
+	--btn-primary-active-bg-color: #8c0007;
+	--btn-secondary-color: #e4e9ed;
+	--btn-secondary-bg-color: #24333d;
+	--btn-secondary-hover-bg-color: #2c414e;
+	--btn-secondary-active-bg-color: #33495a;
+	--sidebar-bg-color: #121b21;
+	--border-color: #24333d;
+	--searchbar-color: #1a262e;
+	--badge-bg-color: #24333d;
+	--badge-color: #cfd7de;
+}
+body:has(.wiki-page-content) :is(h1, h2, h3, h4, h5, h6, p, li, td, th, a, span, input, button, .wiki-title, .wiki-content) {
+	font-family: inherit;
+}
+body:has(.wiki-page-content) code, body:has(.wiki-page-content) pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+/* A barra lateral (e a casa do logótipo por cima dela) em ardósia: as fichas de
+   texto mudam DENTRO dela, como no CRM; os menus e o resto da página ficam claros. */
+body:has(.wiki-page-content) .doc-sidebar,
+body:has(.wiki-page-content) .navbar-brand-container,
+body:has(.wiki-page-content) .sidebar-options {
+	--text-color: #e4e9ed;
+	--sidebar-text-color: #93a2af;
+	--sidebar-font-color: #e4e9ed;
+	--sidebar-hover-color: rgba(255, 255, 255, .07);
+	--sidebar-active-item-color: rgba(255, 255, 255, .11);
+	--icon-stroke: #cfd7de;
+	color: #e4e9ed;
+}
+body:has(.wiki-page-content) .doc-sidebar { border-right-color: rgba(0, 0, 0, .2) !important; }
+body:has(.wiki-page-content) .doc-sidebar .sidebar-group-title,
+body:has(.wiki-page-content) .doc-sidebar .sidebar-group-item-title,
+body:has(.wiki-page-content) .doc-sidebar .text-muted { color: #cfd7de !important; }
+body:has(.wiki-page-content) .doc-sidebar svg,
+body:has(.wiki-page-content) .navbar-brand-container svg { stroke: #cfd7de; color: #cfd7de; }
+/* O item activo: fundo um pouco mais claro e o traço vermelho do portal. */
+body:has(.wiki-page-content) .doc-sidebar .sidebar-item.active,
+body:has(.wiki-page-content) .doc-sidebar .sidebar-item-active {
+	background-color: rgba(255, 255, 255, .11) !important;
+	box-shadow: inset 2px 0 0 #ea5c55 !important;
+	border-radius: .625rem;
+}
+body:has(.wiki-page-content) .doc-sidebar .sidebar-item-active a { color: #fff !important; }
+/* No telemóvel a casa do logótipo passa a ter o fundo da página (regra do wiki). */
+@media (max-width: 991.98px) {
+	body:has(.wiki-page-content) .navbar-brand-container { background-color: var(--background-color); color: var(--gray-800); }
+	body:has(.wiki-page-content) .navbar-brand-container svg { stroke: currentColor; color: currentColor; }
+}
