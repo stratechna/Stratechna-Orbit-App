@@ -1,3 +1,4 @@
+@import url("/assets/orbit/css/orbit-fontes.css?v=1");
 /* Ecrã de apps do Stratechna Orbit.
  *
  * As cores vêm das variáveis do próprio Frappe sempre que existem, para o ecrã
@@ -1085,3 +1086,59 @@ body[data-path="login"] .page-card a.es-button.btn-login-option:hover { backgrou
 body[data-path="login"] .page-card .toggle-password { color: #a9b1bb; }
 body[data-path="login"] .orbit-sem-conta { background: rgba(234, 92, 85, .12); border: 1px solid rgba(234, 92, 85, .35); color: #f0c9c6;
 	border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.45; }
+
+/* ── Secretária (ERPNext/Projects, RH, …) com o aspecto Stratechna (16-11-2026) ──
+   Mesma regra das apps em frappe-ui (orbit-apps.css): letra DM Sans, cinzentos
+   neutros passados a cinzentos-ardósia com a mesma luminosidade, a doca da
+   esquerda em ardósia escura (é a «barra lateral» da secretária). */
+:root,
+[data-theme="light"] {
+	--font-stack: "DM Sans", "InterVariable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--gray-50: #f7f9fa;
+	--gray-100: #f1f4f6;
+	--gray-200: #eaeef1;
+	--gray-300: #dee4e9;
+	--gray-400: #c3ccd4;
+	--gray-500: #94a1ac;
+	--gray-600: #6b7a87;
+	--gray-700: #4b5a66;
+	--gray-800: #2f3d48;
+	--gray-900: #16222b;
+	--navbar-bg: #f7f9fa;
+	--border-color: #e6ebef;
+	--sidebar-select-color: #e9eef2;
+}
+/* A letra serve-se de /assets/orbit/fonts (as @font-face estão em orbit-fontes.css). */
+body, input, select, textarea, button, .form-control, .btn { font-family: var(--font-stack) !important; }
+body[data-path="login"] .page-card, body[data-path="login"] .page-card * { font-family: var(--font-stack) !important; }
+
+/* A doca (os símbolos dos módulos, à esquerda) em ardósia. */
+.dock {
+	background: #1a2a33 !important;
+	border-right-color: rgba(0, 0, 0, .25) !important;
+	--icon-stroke: #cfd7de;
+	--text-color: #e4e9ed;
+	color: #cfd7de;
+}
+.dock .dock-item { color: #cfd7de; }
+.dock svg.icon,
+.dock .dock-item svg { stroke: #cfd7de !important; color: #cfd7de !important; }
+.dock .dock-item:hover svg.icon { stroke: #fff !important; }
+/* O símbolo da app no topo da doca: aro claro, senão some na ardósia. */
+.dock .header-logo img { box-shadow: 0 0 0 1px rgba(255, 255, 255, .22); border-radius: 8px; }
+.dock hr, .dock .dock-divider { border-color: rgba(255, 255, 255, .12) !important; background: rgba(255, 255, 255, .12) !important; }
+.dock .dock-item:hover,
+.dock .dock-item.active,
+.dock .dock-item[aria-current="page"],
+.dock .dock-item.selected {
+	background: rgba(255, 255, 255, .10) !important;
+	color: #fff;
+}
+.dock .dock-item.active,
+.dock .dock-item.selected { box-shadow: inset 2px 0 0 #ea5c55; }
+/* O item activo da barra lateral clara: o traço vermelho do portal. */
+.body-sidebar .sidebar-item-container .selected,
+.body-sidebar .standard-sidebar-item.selected {
+	box-shadow: inset 2px 0 0 #b20009;
+}
+[data-theme="dark"] .dock { background: #121b21 !important; }

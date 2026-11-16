@@ -1,0 +1,193 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   STRATECHNA ORBIT — tema das apps em frappe-ui (CRM, Desk/Helpdesk, …)
+   ══════════════════════════════════════════════════════════════════════════
+
+   As apps do Frappe novas (CRM, Helpdesk) são feitas com o frappe-ui, que pinta
+   tudo a partir de fichas semânticas (--surface-*, --ink-*, --outline-*). Este
+   ficheiro só redefine essas fichas e uma mão-cheia de classes — nenhum ficheiro
+   do CRM nem do Helpdesk é alterado (AGPL, art.º 13; e as actualizações deles
+   continuam a entrar sem conflitos).
+
+   A regra é a mesma da secretária, do site e do webmail:
+   - ARDÓSIA para a estrutura (barra lateral, cinzentos com um toque azulado);
+   - VERMELHO #b20009 só para a ACÇÃO (o botão principal). Se tudo for vermelho,
+     nada é;
+   - os azuis/verdes/âmbar de informação ficam como estão — distinguem um aviso
+     de um erro de uma confirmação;
+   - DM Sans, a letra do portal e do stratechna.com, servida por nós (RGPD:
+     nada vai ao Google).
+
+   Entra pelas páginas /crm e /helpdesk da app orbit (orbit/www), que embrulham
+   as originais e lhes acrescentam esta folha no fim. */
+
+@import url("/assets/orbit/css/orbit-fontes.css?v=1");
+
+/* ── Fichas, tema claro ─────────────────────────────────────────────────────
+   Os cinzentos neutros do frappe-ui (croma 0) passam a cinzentos-ardósia
+   (matiz 235, a da #1a2a33), com a mesma luminosidade degrau a degrau — o
+   contraste entre texto e fundo fica igual ao original. */
+html:root,
+html:root[data-theme="light"] {
+	--orbit-accao: #b20009;
+	--orbit-accao-hover: #8c0007;
+	--orbit-accao-activo: #730006;
+	--orbit-estrutura: #1a2a33;
+	--orbit-estrutura-2: #22343f;
+	--orbit-estrutura-3: #2c414e;
+
+	--surface-gray-1: oklch(97.9% .004 235);
+	--surface-gray-2: oklch(96.3% .006 235);
+	--surface-gray-3: oklch(94.4% .008 235);
+	--surface-gray-4: oklch(91.1% .011 235);
+	--surface-gray-5: oklch(83% .015 235);
+	--surface-gray-6: oklch(68.3% .02 235);
+	--surface-gray-7: oklch(58.6% .022 235);
+	--surface-gray-8: oklch(43.9% .025 235);
+	--surface-gray-9: oklch(34.1% .026 235);
+	--surface-gray-10: oklch(25.5% .026 235);
+
+	--ink-gray-1: oklch(94.6% .006 235);
+	--ink-gray-2: oklch(91.3% .008 235);
+	--ink-gray-3: oklch(83% .012 235);
+	--ink-gray-4: oklch(66% .018 235);
+	--ink-gray-5: oklch(55.5% .021 235);
+	--ink-gray-6: oklch(43.9% .024 235);
+	--ink-gray-7: oklch(34.1% .025 235);
+	--ink-gray-8: oklch(25.5% .026 235);
+	--ink-gray-9: oklch(20% .025 235);
+
+	--outline-gray-1: oklch(93.8% .007 235);
+	--outline-gray-2: oklch(90.6% .009 235);
+	--outline-gray-3: oklch(83% .012 235);
+	--outline-gray-4: oklch(68.3% .018 235);
+	--outline-gray-5: oklch(58.6% .021 235);
+
+	--surface-sidebar: var(--orbit-estrutura);
+}
+
+/* ── Fichas, tema escuro ────────────────────────────────────────────────────
+   No escuro o frappe-ui já é quase preto; aqui puxa-se para a ardósia do
+   portal (#111314 / #1a1f23) e o vermelho sobe um tom, ou lê-se castanho. */
+html:root[data-theme="dark"] {
+	--orbit-accao: #d4151f;
+	--orbit-accao-hover: #b20009;
+	--orbit-accao-activo: #8c0007;
+	--orbit-estrutura: #121b21;
+	--orbit-estrutura-2: #1a262e;
+	--orbit-estrutura-3: #24333d;
+	--surface-sidebar: var(--orbit-estrutura);
+}
+
+/* ── Letra ─────────────────────────────────────────────────────────────────── */
+html, body, button, input, select, textarea,
+.font-sans, .prose, .ProseMirror {
+	font-family: "DM Sans", InterVar, ui-sans-serif, system-ui, sans-serif !important;
+	font-feature-settings: normal;
+}
+body { -webkit-font-smoothing: antialiased; }
+
+/* ── O botão principal: vermelho de acção ─────────────────────────────────
+   No frappe-ui o botão «solid» cinzento (Criar, Gravar, Enviar…) é
+   `bg-surface-gray-10 text-ink-base`. Só esse muda; os cinzentos de superfície
+   noutros sítios (avatares, interruptores) não. */
+button.bg-surface-gray-10.text-ink-base:not(.bg-surface-gray-2),
+a.bg-surface-gray-10.text-ink-base:not(.bg-surface-gray-2) {
+	background-color: var(--orbit-accao) !important;
+	color: #fff !important;
+}
+button.bg-surface-gray-10.text-ink-base:not(.bg-surface-gray-2):hover,
+a.bg-surface-gray-10.text-ink-base:not(.bg-surface-gray-2):hover {
+	background-color: var(--orbit-accao-hover) !important;
+}
+button.bg-surface-gray-10.text-ink-base:not(.bg-surface-gray-2):active,
+a.bg-surface-gray-10.text-ink-base:not(.bg-surface-gray-2):active {
+	background-color: var(--orbit-accao-activo) !important;
+}
+button.bg-surface-gray-10.text-ink-base:disabled {
+	background-color: var(--surface-gray-5) !important;
+}
+
+/* Caixas de verificação e interruptores ligados: estrutura, não acção. */
+input[type="checkbox"]:checked {
+	background-color: var(--orbit-estrutura-3) !important;
+	border-color: var(--orbit-estrutura-3) !important;
+}
+
+/* ── Barra lateral em ardósia ─────────────────────────────────────────────
+   As fichas redefinem-se DENTRO da barra: o que lá dentro é texto escuro
+   sobre claro passa a texto claro sobre ardósia, sem tocar numa só classe dos
+   itens. Os menus que se abrem a partir dela vivem no <body> (teleport) e
+   ficam claros, como devem. */
+.bg-surface-sidebar {
+	--ink-gray-9: #f1f4f6;
+	--ink-gray-8: #e4e9ed;
+	--ink-gray-7: #cfd7de;
+	--ink-gray-6: #b5c0ca;
+	--ink-gray-5: #93a2af;
+	--ink-gray-4: #7a8b99;
+	--ink-gray-3: #5d6e7b;
+	--ink-red-3: #f2564a;
+	--ink-red-4: #f2564a;
+	--surface-gray-1: rgba(255, 255, 255, .04);
+	--surface-gray-2: rgba(255, 255, 255, .07);
+	--surface-gray-3: rgba(255, 255, 255, .10);
+	--surface-gray-4: rgba(255, 255, 255, .14);
+	--surface-selected: rgba(255, 255, 255, .11);
+	--surface-white: rgba(255, 255, 255, .11);
+	--surface-base: rgba(255, 255, 255, .11);
+	--outline-gray-1: rgba(255, 255, 255, .06);
+	--outline-gray-2: rgba(255, 255, 255, .10);
+	--outline-gray-3: rgba(255, 255, 255, .16);
+	--outline-gray-modals: rgba(255, 255, 255, .10);
+	color: var(--ink-gray-8);
+	border-color: rgba(0, 0, 0, .2) !important;
+	position: relative;
+}
+/* O item activo: fundo um pouco mais claro e um traço vermelho à esquerda —
+   a mesma marca do item activo no portal. */
+.bg-surface-sidebar .router-link-active,
+.bg-surface-sidebar .bg-surface-selected,
+.bg-surface-sidebar [aria-current="page"] {
+	box-shadow: none !important;
+}
+/* Só os itens do menu (h-7) — os avisos em cartão também têm sombra e não
+   são selecção. */
+.bg-surface-sidebar .h-7.bg-surface-selected,
+.bg-surface-sidebar .h-7.bg-surface-white,
+.bg-surface-sidebar .h-7.shadow-sm {
+	background-color: rgba(255, 255, 255, .11) !important;
+	box-shadow: inset 2px 0 0 var(--orbit-accao-sidebar, #ea5c55) !important;
+}
+.bg-surface-sidebar svg { color: inherit; }
+/* O símbolo da app no topo da barra é um quadrado ardósia — sobre ardósia
+   desaparecia. Um aro claro devolve-lhe o contorno. */
+.bg-surface-sidebar img:first-of-type,
+.bg-surface-sidebar .rounded-md > img,
+.bg-surface-sidebar button img {
+	box-shadow: 0 0 0 1px rgba(255, 255, 255, .22);
+	border-radius: 8px;
+}
+
+/* O círculo da elipse do Orbit, muito esbatido, no fundo da barra — o mesmo
+   grafismo da faixa do ecrã de apps e da entrada. */
+.bg-surface-sidebar::after {
+	content: "";
+	position: absolute;
+	left: -80px;
+	bottom: -130px;
+	width: 260px;
+	height: 260px;
+	opacity: .06;
+	pointer-events: none;
+	background: no-repeat center / contain url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='none'%3E%3Cellipse cx='256' cy='256' rx='230' ry='112' stroke='%23c8d0d8' stroke-width='14' transform='rotate(-30 256 256)'/%3E%3Cellipse cx='256' cy='256' rx='168' ry='82' stroke='%23c8d0d8' stroke-width='12' transform='rotate(-30 256 256)'/%3E%3Ccircle cx='256' cy='256' r='44' fill='%23ea5c55'/%3E%3C/svg%3E");
+}
+.bg-surface-sidebar > * { position: relative; z-index: 1; }
+
+/* ── Títulos ──────────────────────────────────────────────────────────────── */
+header h1, header .text-lg, .text-2xl, .text-xl { letter-spacing: -.01em; }
+
+/* Ligações e selecções de texto */
+::selection { background: rgba(178, 0, 9, .16); }
+
+/* Barra de rolagem fina, como no portal */
+* { scrollbar-width: thin; scrollbar-color: var(--surface-gray-5) transparent; }

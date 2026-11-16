@@ -1,0 +1,5 @@
+{#- O modelo do Helpdesk, inteiro, com a folha do tema antes do </head> (ver
+    orbit/www/crm.py). «</body>» fica neste comentário para o Frappe não o
+    embrulhar no modelo base do site. -#}
+{%- set pagina -%}{% include "helpdesk/www/helpdesk/index.html" %}{%- endset -%}
+{{ pagina | replace("</head>", '<link rel="stylesheet" href="/assets/orbit/css/orbit-apps.css?v=1"></head>', 1) }}
