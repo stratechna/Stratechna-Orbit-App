@@ -2,4 +2,4 @@
     O Frappe só deixa uma página www sem o modelo base do site se encontrar
     «</body>» no código: fica aqui neste comentário. -#}
 {%- set pagina -%}{% include "crm/www/crm.html" %}{%- endset -%}
-{{ pagina | replace("</head>", '<link rel="stylesheet" href="/assets/orbit/css/orbit-apps.css?v=1"></head>', 1) }}
+{{ pagina | replace("</head>", '<link rel="stylesheet" href="/assets/orbit/css/orbit-apps.css?v=2"></head>', 1) }}

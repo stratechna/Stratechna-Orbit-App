@@ -159,6 +159,16 @@ input[type="checkbox"]:checked {
 	box-shadow: inset 2px 0 0 var(--orbit-accao-sidebar, #ea5c55) !important;
 }
 .bg-surface-sidebar svg { color: inherit; }
+/* Os cartões dentro da barra (avisos do Helpdesk, por ex.) trazem fundo branco
+   próprio; com o texto já claro ficavam ilegíveis. Passam a vidro sobre ardósia. */
+.bg-surface-sidebar .bg-surface-white:not(.h-7),
+.bg-surface-sidebar .bg-surface-base:not(.h-7),
+.bg-surface-sidebar .bg-surface-cards:not(.h-7),
+.bg-surface-sidebar .bg-surface-elevation-1:not(.h-7) {
+	background-color: rgba(255, 255, 255, .06) !important;
+	border-color: rgba(255, 255, 255, .10) !important;
+	box-shadow: none !important;
+}
 /* O símbolo da app no topo da barra é um quadrado ardósia — sobre ardósia
    desaparecia. Um aro claro devolve-lhe o contorno. */
 .bg-surface-sidebar img:first-of-type,
