@@ -58,6 +58,8 @@ _MARKETING = ["orbit.marketing.consentimento.garantir", "orbit.marketing.menu.ga
 # um tenant novo tem de nascer com eles.
 _MARCACAO = ["orbit.marcacao.garantir"]
 _CAIXAS = ["orbit.caixas.garantir"]
+# O botão «Notas» nas fichas de organização e de contacto do CRM (notas_crm.py).
+_NOTAS = ["orbit.notas_crm.garantir"]
 # 17-10-2026: perfis «Orbit · …», equipa Triagem do Desk e o departamento da pessoa (orbit/organizacao.py)
 _ORGANIZACAO = ["orbit.organizacao.garantir"]
 # 17-10-2026: campos de correspondência com o Zoho (zoho_id, crm_account_id…) e a conversão de leads sem negócio
@@ -76,8 +78,8 @@ _FATURACAO = ["orbit.faturacao.instalar.garantir"]   # DP8, 05-11-2026
 _BOOKING = ["orbit.booking.garantir"]   # O1/I1, 06-11-2026: negócio do CRM ligado à marcação do Booking
 # 10-11-2026: propostas comerciais por cima do Orçamento (orbit/propostas; docs/PLANO-PROPOSTAS-ORBIT.md)
 _PROPOSTAS = ["orbit.propostas.instalar.garantir", "orbit.marcas_artigos.garantir"]
-after_migrate = _FATURACAO + _BOOKING + _PROPOSTAS + _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA + _LINGUA + _EMAILS_CRM
-after_install = _POR_DE_PE + _MARKETING + _MARCACAO + _ORGANIZACAO + ["orbit.remetentes.garantir"] + _LINGUA
+after_migrate = _FATURACAO + _BOOKING + _PROPOSTAS + _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA + _LINGUA + _EMAILS_CRM + _NOTAS
+after_install = _POR_DE_PE + _MARKETING + _MARCACAO + _ORGANIZACAO + ["orbit.remetentes.garantir"] + _LINGUA + _NOTAS
 
 # Email marketing: a saída das campanhas corre ao minuto (o ritmo por hora
 # reparte-se em sessenta lotes), as contagens de aberturas e cliques de hora a
