@@ -60,7 +60,9 @@ _MARCACAO = ["orbit.marcacao.garantir"]
 _CAIXAS = ["orbit.caixas.garantir"]
 # O botão «Actividade» nas fichas de organização e de contacto do CRM (actividade_crm.py, 19-11-2026);
 # substitui o antigo botão «Notas» (notas_crm.py), cujos scripts o garantir() apaga.
-_NOTAS = ["orbit.actividade_crm.garantir"]
+_NOTAS = ["orbit.actividade_crm.garantir", "orbit.chamadas_crm.garantir"]
+# 19-11-2026: «Ligar» e «Como correu a chamada?» (chamadas_crm.py + public/js/orbit-chamadas.js, carregado
+# pela página www/crm.html; docs/PLANO-CHAMADAS-CRM.md, fase C1)
 # 17-10-2026: perfis «Orbit · …», equipa Triagem do Desk e o departamento da pessoa (orbit/organizacao.py)
 _ORGANIZACAO = ["orbit.organizacao.garantir"]
 # 17-10-2026: campos de correspondência com o Zoho (zoho_id, crm_account_id…) e a conversão de leads sem negócio

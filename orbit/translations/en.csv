@@ -429,3 +429,28 @@ pelo menos um segmento,at least one segment
 {0} — não subscrito. Clique para subscrever.,{0} — not subscribed. Click to subscribe.
 Última corrida,Last run
 Propostas,Proposals
+Ligar,Call
+Ligar para,Call
+Telemóvel,Mobile
+Como correu a chamada?,How did the call go?
+Atendida,Answered
+Não atendeu,No answer
+Ocupado,Busy
+Número errado,Wrong number
+Duração (min:seg),Duration (min:sec)
+Nota,Note
+O que ficou combinado?,What was agreed?
+Próxima tarefa,Next task
+O quê,What
+Até,Due
+Não cheguei a ligar,I didn't call
+Agora não,Not now
+Gravar,Save
+Chamada registada.,Call logged.
+Não foi possível registar a chamada.,The call could not be logged.
+Não foi possível apagar. Tente outra vez.,Could not delete. Please try again.
+Não foi possível gravar. Verifique a ligação e tente outra vez.,Could not save. Check your connection and try again.
+Tem 1 chamada por comentar.,You have 1 call to comment on.
+Tem {0} chamadas por comentar.,You have {0} calls to comment on.
+Comentar,Comment
+Fechar,Close

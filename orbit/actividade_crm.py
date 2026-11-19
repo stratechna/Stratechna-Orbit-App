@@ -365,19 +365,40 @@ async function _oaBotao($dialog, call, doctype, name) {
 }
 """
 
+from orbit.chamadas_crm import _COMUM as _LIGAR  # noqa: E402 — o botão «Ligar», partilhado
+
 SCRIPTS = {
-    "Orbit · Actividade da organização": ("CRM Organization", _COMUM + r"""
+    "Orbit · Actividade da organização": ("CRM Organization", _COMUM + _LIGAR + r"""
 class CRMOrganization {}
 
 async function setupForm({ doc, $dialog, call }) {
-  return { actions: [await _oaBotao($dialog, call, 'CRM Organization', doc.name)] }
+  const acts = [await _oaBotao($dialog, call, 'CRM Organization', doc.name)]
+  // «Ligar» (chamadas_crm.py): os telefones dos contactos da organização
+  let contactos = []
+  try {
+    contactos = await call('frappe.client.get_list', {
+      doctype: 'Contact', fields: ['full_name', 'mobile_no', 'phone'], limit_page_length: 50,
+      filters: [['Dynamic Link', 'link_doctype', '=', 'CRM Organization'], ['Dynamic Link', 'link_name', '=', doc.name]],
+    }) || []
+  } catch (e) {}
+  const tel = []
+  for (const c of contactos) tel.push([c.mobile_no, c.full_name], [c.phone, c.full_name])
+  const b = _ocBotao($dialog, 'CRM Organization', doc.name, doc.organization_name || doc.name, tel)
+  if (b) acts.unshift(b)
+  return { actions: acts }
 }
 """),
-    "Orbit · Actividade do contacto": ("Contact", _COMUM + r"""
+    "Orbit · Actividade do contacto": ("Contact", _COMUM + _LIGAR + r"""
 class Contact {}
 
 async function setupForm({ doc, $dialog, call }) {
-  return { actions: [await _oaBotao($dialog, call, 'Contact', doc.name)] }
+  const acts = [await _oaBotao($dialog, call, 'Contact', doc.name)]
+  // «Ligar» (chamadas_crm.py)
+  const tel = [[doc.mobile_no, __('Telemóvel')], [doc.phone, __('Telefone')]]
+  for (const p of (doc.phone_nos || [])) tel.push([p.phone, ''])
+  const b = _ocBotao($dialog, 'Contact', doc.name, doc.full_name || doc.name, tel)
+  if (b) acts.unshift(b)
+  return { actions: acts }
 }
 """),
 }
