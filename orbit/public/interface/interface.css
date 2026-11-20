@@ -250,3 +250,30 @@ a.icone-btn{color:var(--ink-2);text-decoration:none}a.icone-btn.ativo{background
   .caixa3.com-conv{grid-template-rows:1fr}
   .voltar-conv{display:inline-block;width:100%;font-size:13px}
 }
+
+/* ── Calendário (A1) ── */
+.cal{padding:18px 22px}
+.cal-topo{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.cal-topo h1{margin-right:auto}
+.cal-nav{display:flex;align-items:center;gap:6px}.cal-nav b{margin-left:8px;text-transform:capitalize}
+.aviso-cal{padding:16px;margin-bottom:14px}.aviso-cal p{margin:6px 0 10px}
+.cal-grelha{display:grid;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.cal-cab{padding:8px;text-align:center;border-left:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--ink-2);text-transform:capitalize;font-size:13px}
+.cal-cab b{font-size:16px;margin-left:4px;color:var(--ink)}
+.cal-cab.hoje b{background:var(--acao);color:#fff;border-radius:50%;padding:2px 7px}
+.cal-canto{border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:flex-end;padding-right:6px}
+.cal-todo{border-left:1px solid var(--line);border-bottom:1px solid var(--line);min-height:28px;padding:3px;display:flex;flex-direction:column;gap:2px}
+.cal-horas div{font-size:11px;color:var(--ink-3);text-align:right;padding-right:6px;transform:translateY(-7px)}
+.cal-col{position:relative;border-left:1px solid var(--line)}
+.cal-linha{position:absolute;left:0;right:0;border-top:1px solid var(--line-2)}
+.cal-agora{position:absolute;left:0;right:0;border-top:2px solid var(--acao);z-index:3}
+.cal-ev{position:absolute;background:var(--azul-bg);border-left:3px solid var(--azul);border-radius:5px;padding:3px 6px;font-size:12px;overflow:hidden;cursor:pointer;z-index:2;color:var(--ink)}
+.cal-ev b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-ev span{color:var(--ink-2);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-ev.todo{position:static;color:#fff;border:0;padding:2px 6px}
+.form-cal{display:flex;flex-direction:column;gap:12px}
+.form-cal label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
+.form-cal input,.form-cal select,.form-cal textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:7px 9px}
+.form-cal .linha3{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:10px}
+.form-cal .chk-l{flex-direction:row;align-items:center;gap:8px}
+@media (max-width:760px){.cal{padding:12px}}

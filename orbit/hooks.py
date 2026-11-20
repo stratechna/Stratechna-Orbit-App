@@ -28,6 +28,8 @@ web_include_js = "/assets/orbit/js/entrada.js?v=10"
 on_logout = "orbit.entrada_unica.ao_sair"
 # Entrou pelo formulário do Orbit: também fica com sessão no portal (ponte, 18-10-2026)
 on_session_creation = "orbit.entrada_unica.sessao_criada"
+# 20-11-2026: a palavra-passe com que se entra (é a da caixa) serve o calendário da interface /orbit
+on_login = "orbit.interface.calendario.ao_entrar"
 # 03-11-2026: quem ainda não tem a palavra-passe da caixa no Orbit entra com ela (entrada_unica.antes_de_entrar)
 before_login = "orbit.entrada_unica.antes_de_entrar"
 

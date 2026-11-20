@@ -259,7 +259,8 @@ const Ficha = {
     const sub = (dt, r) => dt === "CRM Deal" ? [r.estado, r.deal_value ? eur(r.deal_value) : "", r.expected_closure_date ? "fecha a " + data(r.expected_closure_date, false) : ""].filter(Boolean).join(" · ")
       : dt === "Contact" ? [r.designation, r.email_id].filter(Boolean).join(" · ") : dt === "CRM Organization" ? [r.website, r.territory].filter(Boolean).join(" · ") : [r.estado, r.email].filter(Boolean).join(" · ");
     const ic = (t) => IC_EVENTO[t] || IC_EVENTO.nota;
-    return { f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
+    const marcarEmail = () => { window.__ref_email = (f.value && f.value.email_principal) || ""; };
+    return { marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
       grupos, mudarFase, NOMES, tit, sub, link, data, eur, ic, cor, ESTADO_COR };
   },
   template: `
@@ -274,6 +275,7 @@ const Ficha = {
           <a v-if="f.email_principal" :href="'mailto:'+f.email_principal" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)"><span style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface-2)"><Icone n="mail"/></span>Email</a>
           <a v-if="f.telefone" :href="'tel:'+f.telefone" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)"><span style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface-2)"><Icone n="tel"/></span>Ligar</a>
           <button @click="modo='tarefa'"><span><Icone n="tarefa"/></span>Tarefa</button>
+          <a :href="'#/calendario/nova/'+encodeURIComponent(doctype)+'/'+encodeURIComponent(name)" @click="marcarEmail" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)"><span style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface-2)"><Icone n="cal"/></span>Reunião</a>
         </div>
       </div>
       <div v-if="f.estados.length" style="margin-top:14px">
@@ -480,6 +482,133 @@ const Caixa = {
   </div>`,
 };
 
+
+// ── Calendário (A1): a agenda da pessoa no Orbit Mail (SOGo) + reuniões do Orbit, por semana ────────────
+async function apiCal(metodo, args = {}, post = false) {
+  const url = `/api/method/orbit.interface.calendario.${metodo}`;
+  const op = { headers: { "X-Frappe-CSRF-Token": window.csrf_token, Accept: "application/json" } };
+  let r;
+  if (post) { op.method = "POST"; op.headers["Content-Type"] = "application/json"; op.body = JSON.stringify(args); r = await fetch(url, op); }
+  else r = await fetch(url + "?" + new URLSearchParams(args), op);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(String(m).replace(/<[^>]+>/g, "")); throw new Error(m); }
+  return j.message;
+}
+const pad = (n) => String(n).padStart(2, "0");
+const isoDia = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const segunda = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); const w = (x.getDay() + 6) % 7; x.setDate(x.getDate() - w); return x; };
+const HORA0 = 7, HORA1 = 21, ALT = 48;
+const Calendario = {
+  components: { Icone },
+  props: ["nova", "refDt", "refDn"],
+  setup(props) {
+    const semana = ref(segunda(new Date())); const d = ref(null); const pwd = ref(""); const sel = ref(null);
+    const form = ref(null); const aGravar = ref(false); const estreito = ref(window.innerWidth < 900); const diaMovel = ref(new Date());
+    window.addEventListener("resize", () => (estreito.value = window.innerWidth < 900));
+    const dias = computed(() => {
+      if (estreito.value) { const x = new Date(diaMovel.value); x.setHours(0, 0, 0, 0); return [x]; }
+      return [...Array(7)].map((_, i) => { const x = new Date(semana.value); x.setDate(x.getDate() + i); return x; });
+    });
+    const carregar = async () => {
+      const ini = dias.value[0]; const fim = new Date(dias.value[dias.value.length - 1]); fim.setDate(fim.getDate() + 1);
+      d.value = await apiCal("eventos", { inicio: isoDia(ini) + " 00:00:00", fim: isoDia(fim) + " 00:00:00" });
+    };
+    watch([semana, diaMovel, estreito], carregar);
+    onMounted(async () => { await carregar(); if (props.nova) abrirNova(); });
+    const mover = (n) => { if (estreito.value) { const x = new Date(diaMovel.value); x.setDate(x.getDate() + n); diaMovel.value = x; } else { const x = new Date(semana.value); x.setDate(x.getDate() + 7 * n); semana.value = x; } };
+    const hoje = () => { semana.value = segunda(new Date()); diaMovel.value = new Date(); };
+    const titulo = computed(() => {
+      const a = dias.value[0], b = dias.value[dias.value.length - 1];
+      const f = (x, ano) => x.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: ano ? "numeric" : undefined });
+      return dias.value.length === 1 ? a.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" }) : `${f(a)} – ${f(b, true)}`;
+    });
+    const doDia = (dia) => (d.value?.eventos || []).filter((e) => !e.dia_todo && e.inicio.slice(0, 10) === isoDia(dia));
+    const diaTodo = (dia) => (d.value?.eventos || []).filter((e) => e.dia_todo ? (e.inicio <= isoDia(dia) && e.fim > isoDia(dia)) : (e.inicio.slice(0, 10) < isoDia(dia) && e.fim.slice(0, 10) > isoDia(dia)));
+    const minutos = (iso) => { const t = iso.slice(11, 16).split(":"); return +t[0] * 60 + +t[1]; };
+    const disposicao = (dia) => {
+      const evs = doDia(dia).map((e) => ({ e, a: minutos(e.inicio), b: Math.max(minutos(e.fim.slice(0, 10) > e.inicio.slice(0, 10) ? e.inicio.slice(0, 11) + "23:59" : e.fim), minutos(e.inicio) + 20) }))
+        .sort((x, y) => x.a - y.a || y.b - x.b);
+      const cols = []; evs.forEach((x) => { let c = 0; while (cols[c] && cols[c] > x.a) c++; cols[c] = x.b; x.col = c; });
+      evs.forEach((x) => { x.n = evs.filter((y) => y.a < x.b && y.b > x.a).reduce((m, y) => Math.max(m, y.col + 1), 1); });
+      return evs.map((x) => ({ ...x.e, top: Math.max((x.a - HORA0 * 60) / 60 * ALT, 0), alt: Math.max((x.b - x.a) / 60 * ALT - 2, 18), esq: (x.col / x.n) * 100, larg: 100 / x.n }));
+    };
+    const agoraTop = computed(() => { const n = new Date(); return ((n.getHours() * 60 + n.getMinutes()) - HORA0 * 60) / 60 * ALT; });
+    const ehHoje = (dia) => isoDia(dia) === isoDia(new Date());
+    const ligar = async () => { await apiCal("ligar", { pwd: pwd.value }, true); pwd.value = ""; toast("Calendário ligado"); carregar(); };
+    const hm = (iso) => iso.length > 10 ? iso.slice(11, 16) : "";
+    const abrirNova = (dia = null, hora = null) => {
+      const base = dia ? new Date(dia) : new Date(); const h = hora ?? Math.min(Math.max(new Date().getHours() + 1, 9), 18);
+      form.value = { titulo: "", dia: isoDia(base), ini: `${pad(h)}:00`, fim: `${pad(h + 1)}:00`, convidados: props.refDn ? (window.__ref_email || "") : "", meet: true,
+        calendario: (d.value?.calendarios || []).find((c) => c.pessoal)?.href || "", descricao: "", local: "" };
+    };
+    const gravar = async () => {
+      const f = form.value; if (!f.titulo.trim()) { toast("Falta o título"); return; }
+      aGravar.value = true;
+      try {
+        const r = await apiCal("criar", { titulo: f.titulo, inicio: `${f.dia} ${f.ini}:00`, fim: `${f.dia} ${f.fim}:00`, calendario: f.calendario,
+          convidados: f.convidados, meet: f.meet ? 1 : 0, descricao: f.descricao, local: f.local, ref_doctype: props.refDt || null, ref_name: props.refDn || null }, true);
+        toast(f.convidados.trim() ? "Reunião marcada — o convite segue pelo Orbit Mail" : "Reunião marcada");
+        form.value = null; if (props.nova) location.hash = "#/calendario"; carregar();
+      } finally { aGravar.value = false; }
+    };
+    const apagar = async (e) => { if (!confirm("Apagar esta reunião? Os convidados são avisados.")) return; await apiCal("apagar", { href: e.href }, true); sel.value = null; toast("Reunião apagada"); carregar(); };
+    const horas = [...Array(HORA1 - HORA0)].map((_, i) => HORA0 + i);
+    return { semana, d, pwd, sel, form, aGravar, dias, mover, hoje, titulo, disposicao, diaTodo, agoraTop, ehHoje, ligar, hm, abrirNova, gravar, apagar, horas, ALT, link, data, estreito };
+  },
+  template: `
+  <div class="cal">
+    <div class="cal-topo">
+      <h1>Calendário</h1>
+      <div class="cal-nav"><button class="btn sm" @click="mover(-1)">‹</button><button class="btn sm" @click="hoje">Hoje</button><button class="btn sm" @click="mover(1)">›</button><b>{{ titulo }}</b></div>
+      <button class="btn prim" @click="abrirNova()" :disabled="d && !d.ligado">+ Nova reunião</button>
+    </div>
+    <div v-if="d && !d.ligado" class="cartao aviso-cal">
+      <b>Ligar o calendário do Orbit Mail</b>
+      <p class="sub">Para ver e marcar reuniões na sua agenda, confirme uma vez a palavra-passe da sua caixa de correio ({{ d.utilizador }}). Fica guardada cifrada no seu Orbit e só serve o seu calendário. Quem entra no Orbit com a palavra-passe da caixa fica ligado sozinho.</p>
+      <form @submit.prevent="ligar" style="display:flex;gap:8px;flex-wrap:wrap"><input type="password" v-model="pwd" autocomplete="current-password" placeholder="Palavra-passe da caixa" class="filtro" style="border-style:solid;min-width:240px"><button class="btn prim" :disabled="!pwd">Ligar</button></form>
+      <p class="sub" style="font-size:12px;margin-bottom:0">Entretanto vê aqui as reuniões do Orbit (CRM e Booking).</p>
+    </div>
+    <div v-if="!d" class="carregar">A carregar…</div>
+    <div v-else class="cal-grelha" :style="{gridTemplateColumns:'52px repeat('+dias.length+',1fr)'}">
+      <div class="cal-canto"></div>
+      <div v-for="dia in dias" :key="dia" class="cal-cab" :class="{hoje:ehHoje(dia)}">{{ dia.toLocaleDateString('pt-PT',{weekday:'short'}) }} <b>{{ dia.getDate() }}</b></div>
+      <div class="cal-canto sub" style="font-size:11px">dia todo</div>
+      <div v-for="dia in dias" :key="'t'+dia" class="cal-todo"><div v-for="e in diaTodo(dia)" :key="e.id" class="cal-ev todo" :style="{background:e.cor}" @click="sel=e">{{ e.titulo }}</div></div>
+      <div class="cal-horas"><div v-for="h in horas" :key="h" :style="{height:ALT+'px'}">{{ h }}:00</div></div>
+      <div v-for="dia in dias" :key="'c'+dia" class="cal-col" :style="{height:(horas.length*ALT)+'px'}" @dblclick="(ev)=>abrirNova(dia, Math.floor(ev.offsetY/ALT)+7)">
+        <div v-for="h in horas" :key="h" class="cal-linha" :style="{top:((h-7)*ALT)+'px'}"></div>
+        <div v-if="ehHoje(dia) && agoraTop>0" class="cal-agora" :style="{top:agoraTop+'px'}"></div>
+        <div v-for="e in disposicao(dia)" :key="e.id" class="cal-ev" :style="{top:e.top+'px',height:e.alt+'px',left:'calc('+e.esq+'% + 2px)',width:'calc('+e.larg+'% - 4px)',borderLeftColor:e.cor}" @click="sel=e">
+          <b>{{ e.titulo }}</b><span>{{ hm(e.inicio) }}–{{ hm(e.fim) }}<template v-if="e.local"> · {{ e.local }}</template></span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-fundo" v-if="sel" @click.self="sel=null">
+      <div class="modal" style="max-width:520px"><header><div><b>{{ sel.titulo }}</b><div class="sub">{{ sel.dia_todo ? data(sel.inicio,false) : data(sel.inicio) + ' – ' + hm(sel.fim) }} · {{ sel.calendario }}</div></div><button class="btn sm" @click="sel=null">Fechar</button></header>
+        <div class="corpo-email">
+          <p v-if="sel.local"><b>Local:</b> <a v-if="sel.local.startsWith('http')" :href="sel.local" target="_blank">{{ sel.local }}</a><span v-else>{{ sel.local }}</span></p>
+          <p v-if="sel.convidados && sel.convidados.length"><b>Convidados:</b> {{ sel.convidados.join(', ') }}</p>
+          <p v-if="sel.descricao" style="white-space:pre-wrap">{{ sel.descricao }}</p>
+          <p v-if="sel.ref"><a :href="link(sel.ref[0], sel.ref[1])">Abrir o registo no CRM</a></p>
+          <div style="display:flex;gap:8px;margin-top:12px"><a v-if="sel.local && sel.local.includes('meet')" class="btn prim sm" :href="sel.local" target="_blank">Entrar na reunião</a><button v-if="sel.origem==='agenda' && sel.href" class="btn sm" @click="apagar(sel)">Apagar</button></div>
+        </div></div>
+    </div>
+    <div class="modal-fundo" v-if="form" @click.self="form=null">
+      <div class="modal" style="max-width:560px"><header><b>Nova reunião</b><button class="btn sm" @click="form=null">Fechar</button></header>
+        <form class="corpo-email form-cal" @submit.prevent="gravar">
+          <label>Título<input v-model="form.titulo" required placeholder="Ex.: Apresentação da proposta"></label>
+          <div class="linha3"><label>Dia<input type="date" v-model="form.dia"></label><label>Início<input type="time" v-model="form.ini" step="900"></label><label>Fim<input type="time" v-model="form.fim" step="900"></label></div>
+          <label>Convidados (emails, separados por vírgulas)<input v-model="form.convidados" placeholder="cliente@empresa.pt"></label>
+          <label class="chk-l"><input type="checkbox" v-model="form.meet"> Reunião no Stratechna Meet (a ligação vai no convite)</label>
+          <label v-if="!form.meet">Local<input v-model="form.local"></label>
+          <label>Calendário<select v-model="form.calendario"><option v-for="c in (d?.calendarios||[]).filter(c=>c.escreve)" :key="c.href" :value="c.href">{{ c.nome }}</option></select></label>
+          <label>Notas para os convidados<textarea v-model="form.descricao" rows="3"></textarea></label>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="sub" style="font-size:12px">Fica na sua agenda do Orbit Mail<template v-if="refDn"> e na cronologia do cliente</template>.</span><button class="btn prim" :disabled="aGravar">{{ aGravar ? 'A marcar…' : 'Marcar reunião' }}</button></div>
+        </form></div>
+    </div>
+  </div>`,
+};
+
 // ── Definições (uma só roda dentada) ─────────────────────────────────────────────────────────────────
 const Definicoes = {
   setup() { const d = ref(null); onMounted(async () => (d.value = await api("definicoes"))); return { d }; },
@@ -508,7 +637,7 @@ const AppEmbutida = {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, Calendario },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -533,8 +662,9 @@ const App = {
       r.dataset.theme = escuro ? "light" : "dark"; try { localStorage.setItem("orbit.tema", r.dataset.theme); } catch (e) {}
     };
     const NAV = [["inicio", "casa", "Início"], ["sec", "CRM"], ["contactos", "pessoa", "Contactos"], ["empresas", "empresa", "Empresas"], ["leads", "lead", "Leads"],
-      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"]];
-    return { ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS };
+      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"], ["sec", "Trabalho"], ["calendario", "cal", "Calendário"]];
+    const rotaCal = computed(() => partes.value.join("/"));
+    return { ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal };
   },
   template: `
   <div class="app" v-if="ctx">
@@ -569,12 +699,13 @@ const App = {
         <Funil v-else-if="ecra==='funil'"/>
         <Caixa v-else-if="ecra==='caixa'" :abrir-id="partes[1]"/>
         <Definicoes v-else-if="ecra==='definicoes'"/>
+        <Calendario v-else-if="ecra==='calendario'" :nova="partes[1]==='nova'" :ref-dt="partes[2]" :ref-dn="partes[3]" :key="rotaCal"/>
         <AppEmbutida v-else-if="ecra==='app'" :nome="partes[1]" :key="partes[1]"/>
         <div v-else class="vazio">Página desconhecida. <a href="#/inicio">Início</a></div>
       </main>
     </div>
     <nav class="menu-movel" aria-label="Navegação">
-      <a v-for="m in [['inicio','Início'],['contactos','Contactos'],['negocios','Negócios'],['funil','Funil'],['caixa','Caixa']]" :key="m[0]" :href="'#/'+m[0]" style="text-decoration:none"><button :class="{ativo: ecra===m[0]}" tabindex="-1">{{ m[1] }}</button></a>
+      <a v-for="m in [['inicio','Início'],['contactos','Contactos'],['negocios','Negócios'],['caixa','Caixa'],['calendario','Agenda']]" :key="m[0]" :href="'#/'+m[0]" style="text-decoration:none"><button :class="{ativo: ecra===m[0]}" tabindex="-1">{{ m[1] }}</button></a>
     </nav>
     <div class="toast" v-if="estado.toast">{{ estado.toast }}</div>
   </div>

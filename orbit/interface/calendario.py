@@ -1,0 +1,301 @@
+"""Calendário dentro da interface /orbit (A1 do plano da interface única, 20-11-2026).
+
+A agenda de cada pessoa continua no Orbit Mail (SOGo) — é lá que o iPhone, o Android e os convites a vêem.
+Aqui lê-se e escreve-se nela por CalDAV **com as credenciais da própria pessoa** (a palavra-passe do Orbit é a da
+caixa: regra da palavra-passe universal). Nunca uma conta de superutilizador do SOGo: um tenant comprometido daria
+as agendas de todos os clientes.
+
+* A palavra-passe guarda-se cifrada pelo Frappe (`set_encrypted_password`, como as das contas de email), no tenant
+  da pessoa, ao entrar no Orbit (`ao_entrar`, gancho on_login) ou pelo «Ligar o calendário» do ecrã (`ligar`).
+* Se o SOGo a recusar (mudou de palavra-passe), apaga-se e o ecrã volta a pedir.
+* Também aparecem os Event do Frappe (reuniões do Booking, do CRM), sem repetir os que nasceram aqui.
+"""
+from __future__ import annotations
+
+import re
+import uuid
+from datetime import date, datetime, timedelta
+from xml.etree import ElementTree as ET
+
+import frappe
+import requests
+from frappe.utils import cint, get_datetime, getdate, now_datetime
+
+CAMPO = "orbit_caldav"
+NS = {"d": "DAV:", "c": "urn:ietf:params:xml:ns:caldav", "a": "http://apple.com/ns/ical/", "cs": "http://calendarserver.org/ns/"}
+TZ = "Europe/Lisbon"
+
+
+def _guarda():
+    from orbit.interface.api import _guarda as g
+    g()
+
+
+def _base(user: str) -> str:
+    from orbit import marca
+    return f"https://{marca._mail_do_tenant()}/SOGo/dav/{user}/Calendar/"
+
+
+def _senha(user: str):
+    from frappe.utils.password import get_decrypted_password
+    return get_decrypted_password("User", user, CAMPO, raise_exception=False)
+
+
+def _gravar(user: str, pwd: str):
+    from frappe.utils.password import set_encrypted_password
+    set_encrypted_password("User", user, pwd, CAMPO)
+
+
+def _esquecer(user: str):
+    from frappe.utils.password import remove_encrypted_password
+    remove_encrypted_password("User", user, CAMPO)
+
+
+def _pedido(metodo: str, url: str, user: str, pwd: str, corpo: str = None, cab: dict = None, timeout=20):
+    h = {"Content-Type": "application/xml; charset=utf-8"}
+    h.update(cab or {})
+    return requests.request(metodo, url, data=(corpo.encode() if corpo else None), headers=h, auth=(user, pwd),
+                            timeout=timeout)
+
+
+def ao_entrar(login_manager=None):
+    """on_login: guarda a palavra-passe com que a pessoa entrou (é a da caixa) para o calendário da interface."""
+    try:
+        from orbit.interface.api import ligada
+        if not ligada():
+            return
+        user = getattr(login_manager, "user", None) or frappe.session.user
+        pwd = frappe.form_dict.get("pwd")
+        if not pwd or not user or user in ("Administrator", "Guest") or "@" not in user or len(pwd) > 128:
+            return
+        _gravar(user, pwd)
+    except Exception:  # noqa: BLE001 — nunca impedir a entrada por causa do calendário
+        frappe.log_error(title="orbit.interface.calendario.ao_entrar")
+
+
+@frappe.whitelist(methods=["POST"])
+def ligar(pwd: str):
+    """«Ligar o calendário»: confirma a palavra-passe da caixa no SOGo e guarda-a."""
+    _guarda()
+    user = frappe.session.user
+    chave = f"orbit:calendario:tentativas:{user}"
+    n = cint(frappe.cache.get_value(chave))
+    if n >= 5:
+        frappe.throw("Demasiadas tentativas. Espere 10 minutos.")
+    frappe.cache.set_value(chave, n + 1, expires_in_sec=600)
+    r = _pedido("PROPFIND", _base(user), user, pwd or "", '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:displayname/></d:prop></d:propfind>',
+                {"Depth": "0"})
+    if r.status_code in (401, 403):
+        frappe.throw("O Orbit Mail não aceitou essa palavra-passe da caixa.")
+    if r.status_code != 207:
+        frappe.throw(f"O calendário não respondeu ({r.status_code}).")
+    _gravar(user, pwd)
+    frappe.cache.delete_value(chave)
+    return {"ok": True}
+
+
+def _credenciais():
+    user = frappe.session.user
+    pwd = _senha(user)
+    return user, pwd
+
+
+def _calendarios(user, pwd):
+    corpo = ('<?xml version="1.0"?><d:propfind xmlns:d="DAV:" xmlns:a="http://apple.com/ns/ical/" '
+             'xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop><d:displayname/><d:resourcetype/><a:calendar-color/>'
+             '<d:current-user-privilege-set/></d:prop></d:propfind>')
+    r = _pedido("PROPFIND", _base(user), user, pwd, corpo, {"Depth": "1"})
+    if r.status_code in (401, 403):
+        return None
+    r.raise_for_status()
+    raiz = ET.fromstring(r.content)
+    out = []
+    for resp in raiz.findall("d:response", NS):
+        href = resp.findtext("d:href", namespaces=NS) or ""
+        prop = resp.find("d:propstat/d:prop", NS)
+        if prop is None or prop.find("d:resourcetype/c:calendar", NS) is None:
+            continue
+        nome = prop.findtext("d:displayname", namespaces=NS) or href.rstrip("/").rsplit("/", 1)[-1]
+        cor = (prop.findtext("a:calendar-color", namespaces=NS) or "").strip()[:7] or "#46607e"
+        escreve = any(p.tag.endswith("write") or p.tag.endswith("all") for p in prop.findall("d:current-user-privilege-set/d:privilege/*", NS))
+        out.append({"href": href, "nome": nome, "cor": cor, "escreve": escreve,
+                    "pessoal": href.rstrip("/").endswith("/personal")})
+    out.sort(key=lambda c: (not c["pessoal"], c["nome"].lower()))
+    return out
+
+
+def _abs(href: str) -> str:
+    from orbit import marca
+    return href if href.startswith("http") else f"https://{marca._mail_do_tenant()}{href}"
+
+
+def _ics_eventos(texto: str, inicio: datetime, fim: datetime):
+    import icalendar
+    import recurring_ical_events
+    cal = icalendar.Calendar.from_ical(texto)
+    for ev in recurring_ical_events.of(cal).between(inicio, fim):
+        ini = ev.get("DTSTART").dt if ev.get("DTSTART") else None
+        fi = ev.get("DTEND").dt if ev.get("DTEND") else None
+        if ini is None:
+            continue
+        dia_todo = isinstance(ini, date) and not isinstance(ini, datetime)
+        if fi is None:
+            fi = ini + (timedelta(days=1) if dia_todo else timedelta(hours=1))
+        yield {"uid": str(ev.get("UID") or ""), "titulo": str(ev.get("SUMMARY") or "(sem título)"),
+               "inicio": _iso(ini), "fim": _iso(fi), "dia_todo": dia_todo,
+               "local": str(ev.get("LOCATION") or ""), "descricao": str(ev.get("DESCRIPTION") or "")[:500],
+               "convidados": [str(a).replace("mailto:", "").replace("MAILTO:", "") for a in (ev.get("ATTENDEE") if isinstance(ev.get("ATTENDEE"), list) else ([ev.get("ATTENDEE")] if ev.get("ATTENDEE") else []))][:20]}
+
+
+def _iso(x):
+    if isinstance(x, datetime):
+        if x.tzinfo:
+            from zoneinfo import ZoneInfo
+            x = x.astimezone(ZoneInfo(TZ)).replace(tzinfo=None)
+        return x.strftime("%Y-%m-%dT%H:%M:%S")
+    return x.strftime("%Y-%m-%d")
+
+
+@frappe.whitelist()
+def eventos(inicio: str, fim: str):
+    _guarda()
+    from zoneinfo import ZoneInfo
+    ini = get_datetime(inicio).replace(tzinfo=ZoneInfo(TZ))
+    fi = get_datetime(fim).replace(tzinfo=ZoneInfo(TZ))
+    user, pwd = _credenciais()
+    out, cals, ligado = [], [], False
+    if pwd:
+        try:
+            cals = _calendarios(user, pwd)
+        except Exception:  # noqa: BLE001
+            frappe.log_error(title="orbit.interface.calendario: PROPFIND")
+            cals = []
+        if cals is None:          # a palavra-passe mudou: pedir de novo
+            _esquecer(user)
+            frappe.db.commit()
+            cals = []
+        else:
+            ligado = True
+    faixa = (f'<c:time-range start="{ini.astimezone(ZoneInfo("UTC")).strftime("%Y%m%dT%H%M%SZ")}" '
+             f'end="{fi.astimezone(ZoneInfo("UTC")).strftime("%Y%m%dT%H%M%SZ")}"/>')
+    corpo = ('<?xml version="1.0"?><c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">'
+             '<d:prop><d:getetag/><c:calendar-data/></d:prop><c:filter><c:comp-filter name="VCALENDAR">'
+             f'<c:comp-filter name="VEVENT">{faixa}</c:comp-filter></c:comp-filter></c:filter></c:calendar-query>')
+    vistos = set()
+    for c in cals:
+        try:
+            r = _pedido("REPORT", _abs(c["href"]), user, pwd, corpo, {"Depth": "1"}, timeout=30)
+            if r.status_code != 207:
+                continue
+            for resp in ET.fromstring(r.content).findall("d:response", NS):
+                href = resp.findtext("d:href", namespaces=NS) or ""
+                dados = resp.findtext("d:propstat/d:prop/c:calendar-data", namespaces=NS)
+                if not dados:
+                    continue
+                for ev in _ics_eventos(dados, ini, fi):
+                    vistos.add(ev["uid"])
+                    out.append({**ev, "id": f'{href}#{ev["inicio"]}', "href": href, "calendario": c["nome"],
+                                "cor": c["cor"], "origem": "agenda"})
+        except Exception:  # noqa: BLE001
+            frappe.log_error(title=f"orbit.interface.calendario: REPORT {c['nome']}")
+    # Event do Frappe (Booking, CRM) — sem os que nasceram aqui (já estão na agenda)
+    a, b = ini.replace(tzinfo=None), fi.replace(tzinfo=None)
+    vistos_ev = {}
+    campos = ["name", "subject", "starts_on", "ends_on", "all_day", "location", "reference_doctype", "reference_docname",
+              "custom_referencia_marcacao"]
+    for f in ({"starts_on": ["between", [a, b]]}, {"starts_on": ["<", a], "ends_on": [">=", a]}):
+        for e in frappe.get_list("Event", filters=f, fields=campos, limit=300):
+            vistos_ev[e.name] = e
+    for e in vistos_ev.values():
+        ref = e.custom_referencia_marcacao or ""
+        if ref.startswith("caldav:") and ref[7:] in vistos:
+            continue
+        s_ini = get_datetime(e.starts_on)
+        s_fim = get_datetime(e.ends_on) if e.ends_on else s_ini + timedelta(hours=1)
+        out.append({"id": f"event:{e.name}", "titulo": e.subject, "inicio": _iso(s_ini), "fim": _iso(s_fim),
+                    "dia_todo": bool(e.all_day), "local": e.location or "", "calendario": "Orbit (CRM e Booking)",
+                    "cor": "#b45309", "origem": "orbit",
+                    "ref": [e.reference_doctype, e.reference_docname] if e.reference_docname else None})
+    out.sort(key=lambda x: x["inicio"])
+    return {"ligado": ligado, "calendarios": cals, "eventos": out, "utilizador": user}
+
+
+@frappe.whitelist(methods=["POST"])
+def criar(titulo: str, inicio: str, fim: str, calendario: str = None, convidados: str = "", meet: int = 0,
+          descricao: str = "", local: str = "", ref_doctype: str = None, ref_name: str = None):
+    """Nova reunião na agenda da pessoa (SOGo): os convidados recebem o convite pelo Orbit Mail. Com `meet`, a sala
+    do Meet do tenant vai no local e na descrição. Com um registo do CRM, fica também na cronologia dele."""
+    _guarda()
+    import icalendar
+    from zoneinfo import ZoneInfo
+    user, pwd = _credenciais()
+    if not pwd:
+        frappe.throw("Ligue primeiro o calendário.")
+    titulo = (titulo or "").strip()[:200]
+    if not titulo:
+        frappe.throw("Falta o título.")
+    ini, fi = get_datetime(inicio), get_datetime(fim)
+    if fi <= ini:
+        frappe.throw("O fim tem de ser depois do início.")
+    cals = _calendarios(user, pwd) or []
+    alvo = next((c for c in cals if c["href"] == calendario and c["escreve"]), None) or next((c for c in cals if c["pessoal"]), None)
+    if not alvo:
+        frappe.throw("Não encontrei um calendário onde possa escrever.")
+    emails = [e for e in re.findall(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+", convidados or "") if e.lower() != user.lower()][:30]
+    uid = str(uuid.uuid4()).upper()
+    sala = ""
+    if cint(meet):
+        from orbit import meet as m
+        sala = f"{m._meet_base()}/{m._inquilino()}/{re.sub(r'[^a-z0-9]+', '-', titulo.lower()).strip('-')[:40]}-{uid[:6].lower()}"
+    ev = icalendar.Event()
+    ev.add("uid", uid)
+    ev.add("summary", titulo)
+    tz = ZoneInfo(TZ)
+    ev.add("dtstart", ini.replace(tzinfo=tz))
+    ev.add("dtend", fi.replace(tzinfo=tz))
+    ev.add("dtstamp", datetime.now(tz=ZoneInfo("UTC")))
+    if local or sala:
+        ev.add("location", local or sala)
+    texto = (descricao or "").strip()
+    if sala:
+        texto = (texto + "\n\n" if texto else "") + f"Reunião no Stratechna Meet: {sala}"
+    if texto:
+        ev.add("description", texto)
+    nome = frappe.db.get_value("User", user, "full_name") or user
+    org = icalendar.vCalAddress(f"mailto:{user}")
+    org.params["cn"] = icalendar.vText(nome)
+    ev.add("organizer", org)
+    for e in emails:
+        a = icalendar.vCalAddress(f"mailto:{e}")
+        a.params.update({"role": icalendar.vText("REQ-PARTICIPANT"), "partstat": icalendar.vText("NEEDS-ACTION"),
+                         "rsvp": icalendar.vText("TRUE")})
+        ev.add("attendee", a, encode=0)
+    cal = icalendar.Calendar()
+    cal.add("prodid", "-//Stratechna//Orbit//PT")
+    cal.add("version", "2.0")
+    cal.add_component(ev)
+    url = _abs(alvo["href"]).rstrip("/") + f"/{uid}.ics"
+    r = _pedido("PUT", url, user, pwd, cal.to_ical().decode(), {"Content-Type": "text/calendar; charset=utf-8",
+                                                               "If-None-Match": "*"})
+    if r.status_code not in (200, 201, 204):
+        frappe.throw(f"A agenda recusou a reunião ({r.status_code}).")
+    if ref_doctype and ref_name:
+        frappe.get_doc(ref_doctype, ref_name).check_permission("read")
+        frappe.get_doc({"doctype": "Event", "subject": titulo, "starts_on": ini, "ends_on": fi, "event_type": "Private",
+                        "event_category": "Meeting", "location": local or sala, "description": texto,
+                        "reference_doctype": ref_doctype, "reference_docname": ref_name,
+                        "custom_referencia_marcacao": f"caldav:{uid}"}).insert()
+    return {"ok": True, "uid": uid, "meet": sala, "calendario": alvo["nome"]}
+
+
+@frappe.whitelist(methods=["POST"])
+def apagar(href: str):
+    """Apaga um evento da agenda da pessoa (só os do calendário dela; o SOGo avisa os convidados)."""
+    _guarda()
+    user, pwd = _credenciais()
+    if not pwd or not href.startswith(f"/SOGo/dav/{user}/Calendar/"):
+        frappe.throw("Sem permissão.", frappe.PermissionError)
+    r = _pedido("DELETE", _abs(href), user, pwd)
+    if r.status_code not in (200, 204, 404):
+        frappe.throw(f"A agenda não apagou ({r.status_code}).")
+    return {"ok": True}
