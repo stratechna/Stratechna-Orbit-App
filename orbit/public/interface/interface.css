@@ -215,3 +215,5 @@ td a:hover{text-decoration:underline}
 .lista-conv .conv .meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .fio .vazio{margin:auto}
 .nota-maqueta{display:none}
+
+@media (max-width:760px){.main{padding-bottom:0}.menu-movel{position:fixed;left:0;right:0;bottom:0;z-index:30}.menu-movel button{width:100%}.ecra{padding-bottom:48px}}

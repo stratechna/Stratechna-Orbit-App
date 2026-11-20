@@ -465,6 +465,9 @@ const App = {
         <div v-else class="vazio">Página desconhecida. <a href="#/inicio">Início</a></div>
       </main>
     </div>
+    <nav class="menu-movel" aria-label="Navegação">
+      <a v-for="m in [['inicio','Início'],['contactos','Contactos'],['negocios','Negócios'],['funil','Funil'],['caixa','Caixa']]" :key="m[0]" :href="'#/'+m[0]" style="text-decoration:none"><button :class="{ativo: ecra===m[0]}" tabindex="-1">{{ m[1] }}</button></a>
+    </nav>
     <div class="toast" v-if="estado.toast">{{ estado.toast }}</div>
   </div>
   <div v-else class="arranque">Stratechna Orbit</div>`,

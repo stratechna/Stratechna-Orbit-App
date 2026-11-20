@@ -468,7 +468,7 @@ def cronologia(doctype: str, name: str, tipo: str = ""):
         for tk in frappe.get_list("HD Ticket", filters={"raised_by": ["in", list(emails)]},
                                   fields=["name", "subject", "status", "creation", "description", "status_category"], limit=50):
             itens.append({"tipo": "ticket", "id": tk.name, "data": tk.creation, "titulo": f"Ticket #{tk.name} · {tk.subject}",
-                          "estado": tk.status, "resolvido": tk.status_category == "Resolved", "texto": _texto(tk.description, 300)})
+                          "estado": _rotulo_estado(tk.status), "resolvido": tk.status_category == "Resolved", "texto": _texto(tk.description, 300)})
     itens.sort(key=lambda i: str(i.get("data") or ""), reverse=True)
     proximos = sorted([i for i in itens if i.get("proximo")], key=lambda i: str(i.get("data") or ""))
     passado = [i for i in itens if not i.get("proximo")]
@@ -589,7 +589,7 @@ def caixa(grupo: str = "todos"):
                                  fields=["name", "subject", "raised_by", "status", "modified", "_assign"],
                                  order_by="modified desc", limit=50):
             out.append({"tipo": "ticket", "grupo": "equipa", "id": t.name, "titulo": t.subject, "quem": t.raised_by,
-                        "data": t.modified, "estado": t.status, "url": f"/helpdesk/tickets/{t.name}",
+                        "data": t.modified, "estado": _rotulo_estado(t.status), "url": f"/helpdesk/tickets/{t.name}",
                         "atribuido": bool(t._assign and t._assign != "[]")})
     filtros = {"communication_medium": "Email", "communication_type": "Communication",
                "communication_date": [">", add_days(now_datetime(), -30)],
