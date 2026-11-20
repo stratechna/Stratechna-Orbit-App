@@ -1171,18 +1171,11 @@ def _perfil(email: str):
 
 
 def _alvo_crm(email: str):
-    """Onde um email deste endereço fica no CRM: negócio em curso › lead › contacto (None = não está no CRM).
-    O mesmo alvo do «Associar este email», do seguimento e das caixas ligadas ao CRM (orbit/emails_crm.py)."""
-    p = _perfil(email)
-    if p.get("negocios"):
-        return ("CRM Deal", p["negocios"][0]["id"])
-    if p.get("lead"):
-        return ("CRM Lead", p["lead"]["id"])
-    if p.get("contacto"):
-        cn = frappe.get_all("Contact Email", filters={"email_id": (email or "").strip().lower(), "parenttype": "Contact"},
-                            pluck="parent", limit=1)
-        return ("Contact", cn[0]) if cn else None
-    return None
+    """Onde um email deste endereço fica no CRM (None = não está no CRM). Desde 20-11-2026 é o registo principal de
+    orbit.emails_crm._alvos — negócio em curso › lead › negócio mais recente › contacto, com os negócios ligados
+    pelo contacto e não só pela organização —, o mesmo para o «Associar», o seguimento e as caixas ligadas."""
+    from orbit.emails_crm import _alvos
+    return _alvos(email)[0]
 
 
 _SEGUIMENTO = {"aberto": "Email aberto", "clique": "Ligação clicada", "resposta": "Email respondido"}

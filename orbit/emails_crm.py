@@ -172,12 +172,20 @@ def desligar_caixa(email: str):
     return {"ok": True}
 
 
+# 20-11-2026: domínios de correio público — numa caixa @gmail.com, um cliente @gmail.com NÃO é «interno»
+# (antes deitava-se fora tudo o que vinha de Gmail para a stratechna@gmail.com).
+_PUBLICOS = {"gmail.com", "googlemail.com", "hotmail.com", "hotmail.pt", "outlook.com", "outlook.pt", "live.com",
+             "live.com.pt", "msn.com", "yahoo.com", "yahoo.com.br", "yahoo.es", "icloud.com", "me.com", "mac.com",
+             "sapo.pt", "netcabo.pt", "clix.pt", "zoho.com", "zohomail.eu", "proton.me", "protonmail.com", "aol.com",
+             "gmx.com", "gmx.net", "gmx.de", "mail.com", "yandex.com"}
+
+
 def _excluido(endereco: str, excl: list, propria: str) -> bool:
     e = (endereco or "").strip().lower()
     if not e or e == propria:
         return True
     dom = e.rsplit("@", 1)[-1]
-    if dom == propria.rsplit("@", 1)[-1]:
+    if dom == propria.rsplit("@", 1)[-1] and dom not in _PUBLICOS:
         return True   # internos do mesmo domínio nunca contam como «cliente»
     return any(x == e or x.lstrip("@") == dom or (x.startswith("*.") and dom.endswith(x[1:])) for x in excl)
 
@@ -186,9 +194,79 @@ def _enderecos(texto: str) -> list:
     return [x.lower() for x in re.findall(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+", texto or "")]
 
 
+def _alvos(email: str):
+    """Todos os registos do CRM de um endereço (20-11-2026, como o HubSpot: o email aparece em todos).
+    Devolve (principal, ligacoes): principal = negócio em curso › lead por converter › negócio mais recente (também
+    ganho/perdido) › contacto; ligacoes = [(doctype, nome), …] com contactos, leads, negócios e organizações.
+    Antes de 20-11 só se procuravam negócios pela organização e só em curso: um negócio sem organização (as compras
+    das lojas) ou já ganho nunca recebia os emails, que iam para o Contacto — onde o CRM não os mostra."""
+    from orbit.portal import ESTADOS_FECHADOS
+    e = (email or "").strip().lower()
+    if not e:
+        return None, []
+    contactos = frappe.get_all("Contact Email", filters={"email_id": e, "parenttype": "Contact"}, pluck="parent")
+    leads = frappe.get_all("CRM Lead", filters={"email": e}, fields=["name", "converted"], order_by="modified desc")
+    nomes_neg = set(frappe.get_all("CRM Deal", filters={"email": e}, pluck="name"))
+    if contactos:
+        nomes_neg |= set(frappe.get_all("CRM Contacts", filters={"parenttype": "CRM Deal", "contact": ["in", contactos]},
+                                        pluck="parent"))
+    orgs = set()
+    for c in contactos:
+        for org in frappe.get_all("Dynamic Link", filters={"parenttype": "Contact", "parent": c,
+                                                             "link_doctype": "CRM Organization"}, pluck="link_name"):
+            orgs.add(org)
+    negocios = frappe.get_all("CRM Deal", filters={"name": ["in", list(nomes_neg)]},
+                              fields=["name", "status", "organization"], order_by="modified desc") if nomes_neg else []
+    orgs |= {n.organization for n in negocios if n.organization}
+    if orgs:   # negócios em curso da organização (o caso de antes): também contam
+        for n in frappe.get_all("CRM Deal", filters={"organization": ["in", list(orgs)], "status": ["not in", ESTADOS_FECHADOS]},
+                                fields=["name", "status", "organization"], order_by="modified desc", limit=10):
+            if n.name not in nomes_neg:
+                negocios.append(n)
+                nomes_neg.add(n.name)
+    abertos = [n for n in negocios if n.status not in ESTADOS_FECHADOS]
+    lead_aberto = next((l for l in leads if not l.converted), None)
+    if abertos:
+        principal = ("CRM Deal", abertos[0].name)
+    elif lead_aberto:
+        principal = ("CRM Lead", lead_aberto.name)
+    elif negocios:
+        principal = ("CRM Deal", negocios[0].name)
+    elif leads:
+        principal = ("CRM Lead", leads[0].name)
+    elif contactos:
+        principal = ("Contact", contactos[0])
+    else:
+        return None, []
+    ligacoes = [("CRM Deal", n.name) for n in negocios] + [("CRM Lead", l.name) for l in leads] \
+        + [("Contact", c) for c in contactos] + [("CRM Organization", o) for o in sorted(orgs)]
+    return principal, [x for x in dict.fromkeys(ligacoes) if x != principal]
+
+
+def _ligar(nome: str, ligacoes: list) -> None:
+    """Timeline Links (Communication Link) — o mecanismo do Frappe que põe o email no separador «E-mails» de cada
+    registo (frappe.desk.form.load.get_communication_data junta-os). Sem gravar o documento (os ganchos não voltam)."""
+    ja = set(frappe.get_all("Communication Link", filters={"parent": nome, "parenttype": "Communication"},
+                            fields=["link_doctype", "link_name"], as_list=True))
+    idx = len(ja)
+    data = frappe.db.get_value("Communication", nome, "communication_date")
+    for dt, dn in ligacoes:
+        if (dt, dn) in ja:
+            continue
+        idx += 1
+        frappe.get_doc({"doctype": "Communication Link", "parent": nome, "parenttype": "Communication",
+                        "parentfield": "timeline_links", "idx": idx, "link_doctype": dt, "link_name": dn,
+                        "link_title": dn, "communication_date": data}).db_insert()
+
+
+def _outros(doc, propria: str) -> list:
+    remetente = (_enderecos(doc.sender) or [""])[0]
+    return [remetente] if remetente != propria else _enderecos(f"{doc.recipients or ''},{doc.cc or ''}")
+
+
 def filtrar(doc, method=None):
     """Gancho after_insert de Communication: só nos emails lidos por uma conta «Orbit CRM · …»."""
-    if doc.communication_medium != "Email" or not doc.email_account or doc.reference_doctype:
+    if doc.communication_medium != "Email" or not doc.email_account:
         return
     nivel, dono, excl, propria = frappe.db.get_value(
         "Email Account", doc.email_account, ["orbit_registo_crm", "orbit_dono", "orbit_exclusoes", "email_id"]) \
@@ -197,23 +275,151 @@ def filtrar(doc, method=None):
         return
     propria = (propria or "").lower()
     lista = [x for x in (excl or "").splitlines() if x.strip()]
-    remetente = (_enderecos(doc.sender) or [""])[0]
-    outros = [remetente] if remetente != propria else _enderecos(f"{doc.recipients or ''},{doc.cc or ''}")
-    from orbit.portal import _alvo_crm
-    alvo = None
-    for e in outros:
+    principal, ligacoes = None, []
+    for e in _outros(doc, propria):
         if _excluido(e, lista, propria):
             continue
-        alvo = _alvo_crm(e)
-        if alvo:
-            break
-    if not alvo:
-        frappe.delete_doc("Communication", doc.name, ignore_permissions=True, force=True)
+        p, l = _alvos(e)
+        if p and not principal:
+            principal = p
+        ligacoes += l + ([p] if p else [])
+    if not principal:
+        if not doc.reference_doctype:
+            # 20-11-2026: apagar só depois de o Frappe acabar (o receive() faz reload() a seguir ao insert e falhava
+            # com «Comunicação … não foi encontrado» — ~70 erros por dia desde 06-11).
+            frappe.enqueue("orbit.emails_crm._apagar", queue="short", enqueue_after_commit=True, nome=doc.name)
         return
-    valores = {"reference_doctype": alvo[0], "reference_name": alvo[1]}
+    valores = {}
+    if not doc.reference_doctype:
+        valores = {"reference_doctype": principal[0], "reference_name": principal[1]}
     if nivel == "so_eu" and dono:
         valores["orbit_privado_de"] = dono
-    frappe.db.set_value("Communication", doc.name, valores, update_modified=False)
+    if valores:
+        frappe.db.set_value("Communication", doc.name, valores, update_modified=False)
+    atual = (doc.reference_doctype, doc.reference_name) if doc.reference_doctype else principal
+    _ligar(doc.name, [x for x in dict.fromkeys(ligacoes) if x != atual])
+
+
+def _apagar(nome: str):
+    if frappe.db.exists("Communication", nome) and not frappe.db.get_value("Communication", nome, "reference_doctype"):
+        frappe.delete_doc("Communication", nome, ignore_permissions=True, force=True)
+        frappe.db.commit()
+
+
+# ── Recuperar o passado (20-11-2026) ────────────────────────────────────────────────────────────────────
+# Uma caixa ligada só guarda o que chega com a pessoa JÁ no CRM; o resto apaga-se. Quando o contacto, a lead ou o
+# negócio nasce depois (as compras das lojas, um contacto criado à mão), procura-se nas caixas ligadas o que se
+# trocou com esse endereço e entra pelo caminho normal do Frappe (InboundMail → Communication → `filtrar`).
+_DIAS = 365
+_MAX_POR_PASTA = 300
+
+
+def _imap_da_conta(acc):
+    if acc.email_server:
+        servidor, porta, ssl = acc.email_server, int(acc.incoming_port or 993), bool(acc.use_ssl)
+    else:
+        d = frappe.get_doc("Email Domain", acc.domain)
+        servidor, porta, ssl = d.email_server, int(d.incoming_port or 993), bool(d.use_ssl)
+    m = imaplib.IMAP4_SSL(servidor, porta, timeout=60) if ssl else imaplib.IMAP4(servidor, porta, timeout=60)
+    m.login(acc.login_id or acc.email_id, acc.get_password("password"))
+    return m
+
+
+def recuperar(email: str, dias: int = _DIAS, simular: int = 0) -> dict:
+    """Traz das caixas ligadas ao CRM os emails trocados com `email` nos últimos `dias` (sem repetir: o Frappe
+    reconhece o Message-ID). `simular=1` só conta."""
+    from email.utils import formatdate
+    from frappe.email.receive import InboundMail, SentEmailInInboxError
+    e = (email or "").strip().lower()
+    if "@" not in e or not re.fullmatch(r"[\w.+'-]+@[\w-]+(\.[\w-]+)+", e):
+        return {"ok": False, "erro": "endereço inválido"}
+    if not _alvos(e)[0]:
+        return {"ok": True, "contas": {}, "nota": "sem registo no CRM"}
+    desde = frappe.utils.add_days(frappe.utils.nowdate(), -int(dias))
+    desde_imap = frappe.utils.getdate(desde).strftime("%d-%b-%Y")
+    res = {}
+    for nome in frappe.get_all("Email Account", filters={"enable_incoming": 1,
+                                                         "orbit_registo_crm": ["in", list(NIVEIS)]}, pluck="name"):
+        acc = frappe.get_doc("Email Account", nome)
+        propria = (acc.email_id or "").lower()
+        if _excluido(e, [x for x in (acc.orbit_exclusoes or "").splitlines() if x.strip()], propria):
+            continue
+        conta = {"encontrados": 0, "novos": 0, "erros": 0}
+        try:
+            m = _imap_da_conta(acc)
+        except Exception as ex:  # noqa: BLE001
+            res[nome] = {"erro": str(ex)[:150]}
+            continue
+        try:
+            for pasta in acc.imap_folder:
+                if m.select(f'"{pasta.folder_name}"', readonly=True)[0] != "OK":
+                    continue
+                _, r = m.uid("SEARCH", None, f'SINCE {desde_imap} OR OR FROM "{e}" TO "{e}" CC "{e}"')
+                uids = (r[0] or b"").split()[-_MAX_POR_PASTA:]
+                conta["encontrados"] += len(uids)
+                if simular:
+                    continue
+                for uid in uids:
+                    try:
+                        _, dados = m.uid("FETCH", uid, "(RFC822)")
+                        bruto = next((p[1] for p in dados if isinstance(p, tuple)), None)
+                        if not bruto:
+                            continue
+                        mail = InboundMail(bruto, acc, uid=None, seen_status=1, append_to=pasta.append_to)
+                        if mail.message_id and frappe.db.exists("Communication", {"message_id": mail.message_id}):
+                            c = frappe.db.get_value("Communication", {"message_id": mail.message_id}, "name")
+                            filtrar(frappe.get_doc("Communication", c))   # já existia: só acerta as ligações
+                        else:
+                            mail.process()
+                            conta["novos"] += 1
+                        frappe.db.commit()
+                    except SentEmailInInboxError:
+                        frappe.db.rollback()
+                    except Exception:  # noqa: BLE001
+                        frappe.db.rollback()
+                        conta["erros"] += 1
+                        frappe.log_error(title=f"Orbit CRM: recuperar {e} em {nome}")
+        finally:
+            try:
+                m.logout()
+            except Exception:
+                pass
+        res[nome] = conta
+    return {"ok": True, "contas": res}
+
+
+def _pedir_recuperacao(emails) -> None:
+    for e in {(x or "").strip().lower() for x in emails if x and "@" in x}:
+        chave = f"orbit:emails_crm:recuperado:{e}"
+        if frappe.cache.get_value(chave):
+            continue
+        frappe.cache.set_value(chave, 1, expires_in_sec=7 * 86400)
+        frappe.enqueue("orbit.emails_crm.recuperar", queue="long", timeout=1800, enqueue_after_commit=True,
+                       job_id=f"orbit-recuperar-{e}", deduplicate=True, email=e)
+
+
+def ao_gravar_registo(doc, method=None):
+    """Gancho de Contact, CRM Lead e CRM Deal: um endereço novo no CRM → ir buscar o que já se trocou com ele."""
+    if not frappe.db.exists("Email Account", {"enable_incoming": 1, "orbit_registo_crm": ["in", list(NIVEIS)]}):
+        return
+    if doc.doctype == "Contact":
+        emails = [r.email_id for r in (doc.get("email_ids") or [])]
+    elif doc.doctype == "CRM Deal":
+        emails = [doc.get("email")] + [r.get("email") for r in (doc.get("contacts") or [])]
+    else:
+        emails = [doc.get("email")]
+    _pedir_recuperacao(emails)
+
+
+@frappe.whitelist()
+def recuperar_agora(email: str, dias: int = _DIAS):
+    """Botão «Procurar emails antigos» (interface nova) — quem pode ler o registo pode pedir."""
+    p, _ = _alvos(email)
+    if not p or not frappe.has_permission(p[0], "read", p[1]):
+        frappe.throw("Sem permissão", frappe.PermissionError)
+    frappe.cache.delete_value(f"orbit:emails_crm:recuperado:{(email or '').strip().lower()}")
+    _pedir_recuperacao([email])
+    return {"ok": True}
 
 
 # ── «Só para mim»: esconder dos outros ─────────────────────────────────────────────────────────────────

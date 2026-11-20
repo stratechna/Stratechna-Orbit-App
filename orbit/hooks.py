@@ -113,6 +113,10 @@ doc_events = {
     # 17-10-2026: cada bilhete nasce na equipa da sua marca (formulário, destinatário) ou em Triagem
     "HD Ticket": {"before_insert": "orbit.organizacao.ticket_equipa"},
     "Communication": {"after_insert": ["orbit.organizacao.ticket_por_destinatario", "orbit.emails_crm.filtrar"]},
+    # 20-11-2026: um endereço novo no CRM vai buscar às caixas ligadas o que já se trocou com ele (emails_crm.py)
+    "Contact": {"after_insert": "orbit.emails_crm.ao_gravar_registo", "on_update": "orbit.emails_crm.ao_gravar_registo"},
+    "CRM Lead": {"after_insert": "orbit.emails_crm.ao_gravar_registo"},
+    "CRM Deal": {"after_insert": "orbit.emails_crm.ao_gravar_registo", "on_update": "orbit.emails_crm.ao_gravar_registo"},
     # 17-10-2026 (corte do Zoho): o tempo registado no Orbit vai para o livro de horas do portal
     "Timesheet": {"on_submit": "orbit.portal.tempo_submetido", "on_cancel": "orbit.portal.tempo_cancelado"},
     # 17-10-2026: a conta de saída por omissão é o remetente dos avisos — chama-se «Stratechna Orbit»
