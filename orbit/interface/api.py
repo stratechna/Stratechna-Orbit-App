@@ -1,0 +1,618 @@
+"""A interface única do Orbit (20-11-2026; docs/PLANO-ORBIT-INTERFACE-UNICA.md na área de trabalho).
+
+Tudo passa por aqui e só por documentos do Frappe CRM, do Helpdesk e do Frappe — nenhum ficheiro dessas apps é
+alterado e nenhum código delas é copiado (CRM/Helpdesk são AGPL; isto fala com eles só pela API). As leituras usam
+`frappe.get_list` (permissões da pessoa e o «só para mim» de orbit.emails_crm) e as escritas `doc.save()` sem
+`ignore_permissions`. Se uma actualização do CRM mudar um campo, o erro aparece aqui e não nos dados.
+
+Ligada por tenant: `orbit_interface_nova: 1` no site_config (só a Stratechna para já, decisão do Vítor a 20-11).
+"""
+from __future__ import annotations
+
+import re
+
+import frappe
+from frappe import _
+from frappe.utils import add_days, cint, flt, get_first_day, get_last_day, getdate, now_datetime, nowdate, strip_html
+
+FECHADOS = ("Won", "Lost")
+
+
+def ligada() -> bool:
+    return bool(cint(frappe.conf.get("orbit_interface_nova")))
+
+
+def _guarda():
+    if frappe.session.user == "Guest":
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
+    if not ligada():
+        frappe.throw("A interface nova não está ligada neste Orbit.", frappe.PermissionError)
+
+
+def _texto(html, n=280):
+    t = re.sub(r"\s+", " ", strip_html(html or "")).strip()
+    return t[:n] + ("…" if len(t) > n else "")
+
+
+def _iniciais(nome):
+    p = [x for x in re.split(r"\s+", (nome or "").strip()) if x]
+    return ((p[0][0] if p else "?") + (p[-1][0] if len(p) > 1 else "")).upper()
+
+
+def _nome_user(u, _cache={}):
+    if not u:
+        return ""
+    if u not in _cache:
+        _cache[u] = frappe.db.get_value("User", u, "full_name") or u
+    return _cache[u]
+
+
+_PT = {"Qualification": "Qualificação", "Demo/Making": "Demonstração", "Proposal/Quotation": "Proposta",
+       "Negotiation": "Negociação", "Ready to Close": "Pronto a fechar", "Won": "Ganho", "Lost": "Perdido",
+       "New": "Nova", "Contacted": "Contactada", "Nurture": "Em acompanhamento", "Qualified": "Qualificada",
+       "Unqualified": "Não qualificada", "Junk": "Descartada", "Open": "Aberto", "Replied": "Respondido",
+       "Paused": "Em pausa", "Resolved": "Resolvido", "Closed": "Fechado"}
+
+
+def _rotulo_estado(s):
+    if not s:
+        return ""
+    t = _(s)
+    if t == s and (frappe.local.lang or "pt").startswith("pt"):
+        return _PT.get(s, s)
+    return t
+
+
+# ── Contexto e pesquisa ─────────────────────────────────────────────────────────────────────────────────
+@frappe.whitelist()
+def contexto():
+    _guarda()
+    u = frappe.session.user
+    nome = _nome_user(u)
+    abertos = frappe.get_list("HD Ticket", filters={"status_category": ["!=", "Resolved"]}, pluck="name", limit=500) \
+        if frappe.db.exists("DocType", "HD Ticket") else []
+    return {
+        "utilizador": u, "nome": nome, "iniciais": _iniciais(nome),
+        "tenant": frappe.db.get_single_value("Website Settings", "app_name") or frappe.local.site,
+        "contadores": {"tickets": len(abertos)},
+        "apps": _apps(),
+        "classico": {"crm": "/crm", "desk": "/helpdesk"},
+    }
+
+
+def _apps():
+    """As mesmas apps e endereços da grelha do Orbit (orbit/marca.py ATALHOS), sem repetir a regra dos endereços."""
+    from orbit import marca
+    try:
+        valores = {"mail": marca._mail_do_tenant(), "docs": marca._docs_do_tenant(), "chat": marca._chat_do_tenant(),
+                   "dominio": marca._dominio_do_tenant()}
+    except Exception:  # noqa: BLE001
+        return []
+    icones = {"Mail": "mail", "Meet": "video", "Chat": "chat", "Docs": "livro", "Sign": "nota", "Booking": "cal",
+              "Marketing": "negocio", "Propostas": "nota"}
+    out = []
+    for a in sorted(marca.ATALHOS, key=lambda x: x["ordem"]):
+        if a.get("precisa") and not frappe.db.exists("DocType", a["precisa"]):
+            continue
+        try:
+            url = a["url"].format(**valores)
+        except (KeyError, IndexError):
+            continue
+        out.append({"nome": a["nome"], "url": url, "icone": icones.get(a["nome"], "grelha")})
+    out.append({"nome": "Secretária", "url": "/app", "icone": "grelha"})
+    return out
+
+
+@frappe.whitelist()
+def pesquisa(q: str):
+    _guarda()
+    q = (q or "").strip()
+    if len(q) < 2:
+        return []
+    like = f"%{q}%"
+    out = []
+
+    def junta(dt, campos, ou, titulo, sub, tipo):
+        if not frappe.has_permission(dt, "read"):
+            return
+        for r in frappe.get_list(dt, fields=["name"] + campos, or_filters=[[c, "like", like] for c in ou], limit=5):
+            out.append({"doctype": dt, "name": r.name, "titulo": titulo(r) or r.name, "sub": sub(r), "tipo": tipo})
+
+    junta("Contact", ["full_name", "email_id", "company_name"], ["full_name", "email_id", "company_name", "mobile_no"],
+          lambda r: r.full_name, lambda r: r.email_id or r.company_name or "", "Contacto")
+    junta("CRM Organization", ["organization_name", "website"], ["organization_name", "website", "nipc"],
+          lambda r: r.organization_name, lambda r: r.website or "", "Empresa")
+    junta("CRM Deal", ["titulo", "organization", "lead_name", "status"], ["name", "titulo", "organization", "lead_name", "email"],
+          lambda r: r.titulo or r.lead_name or r.organization, lambda r: f"{r.organization or ''} · {_rotulo_estado(r.status)}", "Negócio")
+    junta("CRM Lead", ["lead_name", "email", "organization"], ["lead_name", "email", "organization"],
+          lambda r: r.lead_name, lambda r: r.email or r.organization or "", "Lead")
+    if frappe.db.exists("DocType", "HD Ticket"):
+        junta("HD Ticket", ["subject", "raised_by"], ["subject", "raised_by", "name"],
+              lambda r: f"#{r.name} {r.subject}", lambda r: r.raised_by or "", "Ticket")
+    return out
+
+
+# ── Início ──────────────────────────────────────────────────────────────────────────────────────────────
+@frappe.whitelist()
+def inicio():
+    _guarda()
+    u = frappe.session.user
+    hoje = getdate(nowdate())
+    tarefas = frappe.get_list("CRM Task", filters={"assigned_to": u, "status": ["not in", ["Done", "Canceled"]]},
+                              fields=["name", "title", "status", "priority", "due_date", "reference_doctype", "reference_docname"],
+                              order_by="due_date asc", limit=12)
+    for t in tarefas:
+        t.atrasada = bool(t.due_date and getdate(t.due_date) < hoje)
+        t.hoje = bool(t.due_date and getdate(t.due_date) == hoje)
+        t.titulo_ref = _titulo(t.reference_doctype, t.reference_docname) if t.reference_docname else ""
+    eventos = frappe.get_list("Event", filters={"starts_on": ["between", [f"{hoje} 00:00:00", f"{add_days(hoje, 1)} 23:59:59"]]},
+                              fields=["name", "subject", "starts_on", "ends_on", "location", "reference_doctype",
+                                      "reference_docname", "google_meet_link"], order_by="starts_on asc", limit=10)
+    abertos = frappe.get_list("CRM Deal", filters={"status": ["not in", FECHADOS]}, fields=["name", "deal_value", "modified",
+                              "titulo", "organization", "status", "lead_name"], limit=1000)
+    ganhos = frappe.get_list("CRM Deal", filters={"status": "Won", "closed_date": ["between", [get_first_day(hoje), get_last_day(hoje)]]},
+                             fields=["deal_value"], limit=1000)
+    limite = add_days(now_datetime(), -14)
+    parados = sorted([d for d in abertos if d.modified < limite], key=lambda d: d.modified)[:6]
+    tickets = frappe.get_list("HD Ticket", filters={"status_category": ["!=", "Resolved"]}, fields=["name", "subject", "raised_by",
+                              "modified", "status"], order_by="modified desc", limit=6) if frappe.db.exists("DocType", "HD Ticket") else []
+    return {
+        "tarefas": tarefas, "eventos": eventos, "tickets": tickets,
+        "parados": [{"name": d.name, "titulo": d.titulo or d.lead_name or d.organization or d.name, "org": d.organization,
+                     "estado": _rotulo_estado(d.status), "valor": flt(d.deal_value),
+                     "dias": (now_datetime() - d.modified).days} for d in parados],
+        "kpis": {"abertos": len(abertos), "abertos_valor": sum(flt(d.deal_value) for d in abertos),
+                 "ganhos_valor": sum(flt(d.deal_value) for d in ganhos), "ganhos": len(ganhos),
+                 "tarefas_atrasadas": sum(1 for t in tarefas if t.atrasada), "tickets": len(tickets)},
+    }
+
+
+# ── Listas ──────────────────────────────────────────────────────────────────────────────────────────────
+_LISTAS = {
+    "contactos": {"dt": "Contact", "campos": ["full_name", "email_id", "mobile_no", "company_name", "modified", "owner", "image"],
+                  "pesquisa": ["full_name", "email_id", "company_name", "mobile_no"], "dono": "owner"},
+    "empresas": {"dt": "CRM Organization", "campos": ["organization_name", "website", "industry", "territory", "telefone",
+                                                       "estado_conta", "modified", "organization_logo"],
+                 "pesquisa": ["organization_name", "website", "nipc"], "dono": "owner"},
+    "negocios": {"dt": "CRM Deal", "campos": ["titulo", "organization", "lead_name", "status", "deal_value", "currency",
+                                               "expected_closure_date", "deal_owner", "modified", "email"],
+                 "pesquisa": ["titulo", "organization", "lead_name", "email", "name"], "dono": "deal_owner"},
+    "leads": {"dt": "CRM Lead", "campos": ["lead_name", "email", "mobile_no", "organization", "status", "source",
+                                            "lead_owner", "modified"],
+              "pesquisa": ["lead_name", "email", "organization"], "dono": "lead_owner",
+              "base": {"converted": 0}},
+}
+
+
+@frappe.whitelist()
+def lista(objeto: str, vista: str = "todos", q: str = "", pagina: int = 0, ordem: str = "modified desc", estado: str = ""):
+    _guarda()
+    cfg = _LISTAS.get(objeto)
+    if not cfg:
+        frappe.throw("Lista desconhecida")
+    filtros = dict(cfg.get("base") or {})
+    if vista == "meus":
+        filtros[cfg["dono"]] = frappe.session.user
+    elif vista == "parados":
+        filtros["modified"] = ["<", add_days(now_datetime(), -30)]
+    elif vista == "abertos" and objeto == "negocios":
+        filtros["status"] = ["not in", FECHADOS]
+    if estado and objeto in ("negocios", "leads"):
+        filtros["status"] = estado
+    campo_ordem, sentido = (ordem.split() + ["desc"])[:2]
+    if campo_ordem not in cfg["campos"] + ["creation", "modified"] or sentido not in ("asc", "desc"):
+        campo_ordem, sentido = "modified", "desc"
+    q = (q or "").strip()
+    or_filtros = [[c, "like", f"%{q}%"] for c in cfg["pesquisa"]] if q else None
+    pg = max(cint(pagina), 0)
+    linhas = frappe.get_list(cfg["dt"], filters=filtros, or_filters=or_filtros, fields=["name"] + cfg["campos"],
+                             order_by=f"{campo_ordem} {sentido}", limit_start=pg * 50, limit_page_length=51)
+    total = len(frappe.get_list(cfg["dt"], filters=filtros, or_filters=or_filtros, pluck="name", limit=5000))
+    for r in linhas:
+        for k in ("deal_owner", "lead_owner", "owner"):
+            if r.get(k):
+                r[k + "_nome"] = _nome_user(r[k])
+        if r.get("status"):
+            r.estado = _rotulo_estado(r.status)
+    if objeto == "contactos":
+        _ultima_actividade(linhas)
+    return {"linhas": linhas[:50], "mais": len(linhas) > 50, "total": total, "doctype": cfg["dt"]}
+
+
+def _ultima_actividade(contactos):
+    emails = [c.email_id for c in contactos if c.email_id]
+    if not emails:
+        return
+    ult = {}
+    for r in frappe.db.sql("""select c.email_id, max(m.communication_date) d from `tabContact Email` c
+            join tabCommunication m on (m.sender like concat('%%', c.email_id, '%%') or m.recipients like concat('%%', c.email_id, '%%'))
+            where c.email_id in %(e)s and m.communication_medium='Email' group by c.email_id""", {"e": tuple(emails)}, as_dict=1):
+        ult[r.email_id] = r.d
+    for c in contactos:
+        c.ultimo_email = ult.get(c.email_id)
+
+
+# ── Ficha ───────────────────────────────────────────────────────────────────────────────────────────────
+_PROPS = {
+    "Contact": [("email_id", "Email", "Data", 0), ("mobile_no", "Telemóvel", "Data", 0), ("phone", "Telefone", "Data", 0),
+                ("designation", "Cargo", "Data", 1), ("company_name", "Empresa (texto)", "Data", 1),
+                ("nif", "NIF", "Data", 1), ("origem", "Origem", "Link", 1), ("mkt_estado", "Marketing por email", "Select", 0),
+                ("mkt_idioma", "Língua", "Select", 1), ("creation", "Criado", "Datetime", 0)],
+    "CRM Deal": [("status", "Fase", "Link", 1), ("deal_value", "Valor", "Currency", 1), ("probability", "Probabilidade", "Percent", 1),
+                 ("expected_closure_date", "Data prevista de fecho", "Date", 1), ("deal_owner", "Responsável", "Link", 1),
+                 ("next_step", "Próximo passo", "Data", 1), ("source", "Origem", "Link", 1), ("marca", "Marca", "Link", 1),
+                 ("orbit_referencia_loja", "Encomenda na loja", "Data", 0), ("closed_date", "Data de fecho", "Date", 0),
+                 ("creation", "Criado", "Datetime", 0)],
+    "CRM Lead": [("status", "Estado", "Link", 1), ("email", "Email", "Data", 1), ("mobile_no", "Telemóvel", "Data", 1),
+                 ("organization", "Empresa", "Data", 1), ("job_title", "Cargo", "Data", 1), ("source", "Origem", "Link", 1),
+                 ("lead_owner", "Responsável", "Link", 1), ("mkt_estado", "Marketing por email", "Select", 0),
+                 ("creation", "Criado", "Datetime", 0)],
+    "CRM Organization": [("website", "Site", "Data", 1), ("telefone", "Telefone", "Data", 1), ("email_geral", "Email geral", "Data", 1),
+                         ("nipc", "NIPC", "Data", 1), ("industry", "Setor", "Link", 1), ("territory", "Território", "Link", 1),
+                         ("no_of_employees", "Pessoas", "Select", 1), ("tipo_conta", "Tipo de conta", "Select", 1),
+                         ("estado_conta", "Estado da conta", "Select", 1), ("creation", "Criado", "Datetime", 0)],
+}
+
+
+def _titulo(dt, dn):
+    if not dt or not dn:
+        return ""
+    campo = {"Contact": "full_name", "CRM Organization": "organization_name", "CRM Deal": "titulo", "CRM Lead": "lead_name",
+             "HD Ticket": "subject"}.get(dt)
+    v = frappe.db.get_value(dt, dn, campo) if campo else None
+    if dt == "CRM Deal" and not v:
+        v = frappe.db.get_value(dt, dn, "lead_name") or frappe.db.get_value(dt, dn, "organization")
+    return v or dn
+
+
+def _relacionados(dt, dn):
+    """Os registos ligados a este (como as associações do HubSpot): contactos, empresas, negócios, leads e emails."""
+    rel = {"Contact": set(), "CRM Organization": set(), "CRM Deal": set(), "CRM Lead": set()}
+    rel[dt].add(dn)
+    if dt == "Contact":
+        rel["CRM Deal"] |= set(frappe.get_all("CRM Contacts", filters={"parenttype": "CRM Deal", "contact": dn}, pluck="parent"))
+        rel["CRM Organization"] |= set(frappe.get_all("Dynamic Link", filters={"parenttype": "Contact", "parent": dn,
+                                                                                "link_doctype": "CRM Organization"}, pluck="link_name"))
+    elif dt == "CRM Deal":
+        d = frappe.db.get_value("CRM Deal", dn, ["organization", "lead", "contact"], as_dict=1) or {}
+        if d.get("organization"):
+            rel["CRM Organization"].add(d["organization"])
+        if d.get("lead"):
+            rel["CRM Lead"].add(d["lead"])
+        rel["Contact"] |= set(frappe.get_all("CRM Contacts", filters={"parenttype": "CRM Deal", "parent": dn}, pluck="contact"))
+        if d.get("contact"):
+            rel["Contact"].add(d["contact"])
+    elif dt == "CRM Organization":
+        rel["CRM Deal"] |= set(frappe.get_all("CRM Deal", filters={"organization": dn}, pluck="name"))
+        rel["Contact"] |= set(frappe.get_all("Dynamic Link", filters={"parenttype": "Contact", "link_doctype": "CRM Organization",
+                                                                       "link_name": dn}, pluck="parent"))
+    elif dt == "CRM Lead":
+        rel["CRM Deal"] |= set(frappe.get_all("CRM Deal", filters={"lead": dn}, pluck="name"))
+    if dt in ("Contact", "CRM Organization"):
+        for n in list(rel["CRM Deal"]):
+            l = frappe.db.get_value("CRM Deal", n, "lead")
+            if l:
+                rel["CRM Lead"].add(l)
+    emails = set()
+    for c in rel["Contact"]:
+        emails |= set(frappe.get_all("Contact Email", filters={"parent": c, "parenttype": "Contact"}, pluck="email_id"))
+    for l in rel["CRM Lead"]:
+        e = frappe.db.get_value("CRM Lead", l, "email")
+        if e:
+            emails.add(e)
+    if dt == "CRM Deal":
+        e = frappe.db.get_value("CRM Deal", dn, "email")
+        if e:
+            emails.add(e)
+    return rel, {e.lower() for e in emails if e}
+
+
+@frappe.whitelist()
+def ficha(doctype: str, name: str):
+    _guarda()
+    if doctype not in _PROPS:
+        frappe.throw("Tipo de registo desconhecido")
+    doc = frappe.get_doc(doctype, name)
+    doc.check_permission("read")
+    pode_editar = frappe.has_permission(doctype, "write", doc)
+    meta = frappe.get_meta(doctype)
+    props = []
+    for campo, rotulo, tipo, editavel in _PROPS[doctype]:
+        if not meta.has_field(campo) and campo != "creation":
+            continue
+        v = doc.get(campo)
+        f = meta.get_field(campo)
+        opcoes = None
+        if tipo == "Select" and f:
+            opcoes = [o for o in (f.options or "").split("\n")]
+        elif tipo == "Link" and f and f.options in ("CRM Deal Status", "CRM Lead Status", "CRM Lead Source", "CRM Industry",
+                                                    "CRM Territory", "Brand"):
+            opcoes = [""] + frappe.get_all(f.options, pluck="name", order_by="position asc" if f.options in
+                                           ("CRM Deal Status", "CRM Lead Status") else "name asc", limit=200)
+        elif tipo == "Link" and f and f.options == "User":
+            opcoes = [""] + frappe.get_all("User", filters={"enabled": 1, "user_type": "System User", "name": ["not in", ["Administrator", "Guest"]]},
+                                           pluck="name", limit=200)
+        mostra = v
+        if tipo == "Link" and f and f.options == "User":
+            mostra = _nome_user(v)
+        elif tipo in ("Link", "Select") and campo in ("status",):
+            mostra = _rotulo_estado(v)
+        props.append({"campo": campo, "rotulo": rotulo, "tipo": tipo, "valor": v, "mostra": mostra,
+                      "editavel": bool(editavel and pode_editar), "opcoes": opcoes,
+                      "rotulos": {o: (_nome_user(o) if tipo == "Link" and f and f.options == "User" else _rotulo_estado(o)) for o in (opcoes or [])}})
+    rel, emails = _relacionados(doctype, name)
+    assoc = {}
+    for dt, nomes in rel.items():
+        nomes = [n for n in nomes if not (dt == doctype and n == name)]
+        if not nomes:
+            assoc[dt] = []
+            continue
+        if dt == "CRM Deal":
+            campos = ["name", "titulo", "status", "deal_value", "expected_closure_date", "organization", "lead_name", "probability"]
+        elif dt == "Contact":
+            campos = ["name", "full_name", "email_id", "designation"]
+        elif dt == "CRM Organization":
+            campos = ["name", "organization_name", "website", "territory"]
+        else:
+            campos = ["name", "lead_name", "status", "email"]
+        linhas = frappe.get_list(dt, filters={"name": ["in", nomes]}, fields=campos, limit=50)
+        for r in linhas:
+            if r.get("status"):
+                r.estado = _rotulo_estado(r.status)
+        assoc[dt] = linhas
+    tickets = []
+    if emails and frappe.db.exists("DocType", "HD Ticket"):
+        tickets = frappe.get_list("HD Ticket", filters={"raised_by": ["in", list(emails)]},
+                                  fields=["name", "subject", "status", "modified"], order_by="modified desc", limit=10)
+    titulo = _titulo(doctype, name)
+    sub = ""
+    if doctype == "Contact":
+        org = (assoc.get("CRM Organization") or [{}])[0].get("organization_name") if assoc.get("CRM Organization") else doc.company_name
+        sub = " · ".join(x for x in [doc.designation, org] if x)
+    elif doctype == "CRM Deal":
+        sub = " · ".join(x for x in [doc.organization or doc.lead_name, _rotulo_estado(doc.status),
+                                    f"{flt(doc.deal_value):,.2f} €".replace(",", " ") if doc.deal_value else ""] if x)
+    elif doctype == "CRM Organization":
+        sub = " · ".join(x for x in [doc.website, doc.territory] if x)
+    elif doctype == "CRM Lead":
+        sub = " · ".join(x for x in [doc.organization, _rotulo_estado(doc.status)] if x)
+    estados = frappe.get_all("CRM Deal Status", fields=["name", "type", "color"], order_by="position asc") if doctype == "CRM Deal" else []
+    for s in estados:
+        s.rotulo = _rotulo_estado(s.name)
+    return {"doctype": doctype, "name": name, "titulo": titulo, "sub": sub, "iniciais": _iniciais(titulo),
+            "imagem": doc.get("image") or doc.get("organization_logo"), "props": props, "assoc": assoc, "tickets": tickets,
+            "emails": sorted(emails), "pode_editar": pode_editar, "estados": estados,
+            "classico": _url_classico(doctype, name),
+            "email_principal": (doc.get("email_id") or doc.get("email") or (sorted(emails)[0] if emails else "")),
+            "telefone": doc.get("mobile_no") or doc.get("phone") or doc.get("telefone") or ""}
+
+
+def _url_classico(dt, dn):
+    return {"Contact": f"/crm/contacts/{dn}", "CRM Deal": f"/crm/deals/{dn}", "CRM Lead": f"/crm/leads/{dn}",
+            "CRM Organization": f"/crm/organizations/{dn}"}.get(dt, "/crm")
+
+
+_EDITAVEIS = {dt: {c for c, _r, _t, e in campos if e} for dt, campos in _PROPS.items()}
+
+
+@frappe.whitelist(methods=["POST"])
+def guardar(doctype: str, name: str, campo: str, valor=None):
+    _guarda()
+    if campo not in _EDITAVEIS.get(doctype, set()):
+        frappe.throw("Campo não editável")
+    doc = frappe.get_doc(doctype, name)
+    doc.set(campo, valor or None)
+    doc.save()
+    return {"ok": True}
+
+
+# ── Cronologia ──────────────────────────────────────────────────────────────────────────────────────────
+@frappe.whitelist()
+def cronologia(doctype: str, name: str, tipo: str = ""):
+    _guarda()
+    frappe.get_doc(doctype, name).check_permission("read")
+    rel, emails = _relacionados(doctype, name)
+    pares = [(dt, n) for dt, ns in rel.items() for n in ns]
+    itens = []
+    hoje = now_datetime()
+
+    # Emails: pela referência e pelas ligações (Communication Link) — o mesmo que o separador «E-mails» do Frappe
+    nomes = set()
+    for dt, n in pares:
+        nomes |= set(frappe.get_all("Communication", filters={"reference_doctype": dt, "reference_name": n,
+                                                              "communication_type": "Communication"}, pluck="name"))
+        nomes |= set(frappe.get_all("Communication Link", filters={"parenttype": "Communication", "link_doctype": dt,
+                                                                   "link_name": n}, pluck="parent"))
+    if nomes and tipo in ("", "emails"):
+        for c in frappe.get_list("Communication", filters={"name": ["in", list(nomes)], "communication_medium": "Email"},
+                                 fields=["name", "subject", "sender", "sender_full_name", "recipients", "communication_date",
+                                         "sent_or_received", "content", "email_account", "orbit_privado_de",
+                                         "reference_doctype", "reference_name", "read_by_recipient"], limit=300):
+            itens.append({"tipo": "email", "id": c.name, "data": c.communication_date,
+                          "titulo": c.subject or "(sem assunto)",
+                          "quem": c.sender_full_name or c.sender, "sentido": c.sent_or_received,
+                          "de": c.sender, "para": c.recipients, "conta": (c.email_account or "").replace("Orbit CRM · ", ""),
+                          "texto": _texto(c.content, 400), "privado": bool(c.orbit_privado_de),
+                          "lido": bool(c.read_by_recipient)})
+
+    def por_ref(dt_alvo, campos, ref_dt="reference_doctype", ref_dn="reference_docname"):
+        out = []
+        for dt, n in pares:
+            out += frappe.get_list(dt_alvo, filters={ref_dt: dt, ref_dn: n}, fields=campos, limit=200)
+        return out
+
+    if tipo in ("", "notas"):
+        for nt in por_ref("FCRM Note", ["name", "title", "content", "creation", "owner"]):
+            itens.append({"tipo": "nota", "id": nt.name, "data": nt.creation, "titulo": nt.title or "Nota",
+                          "quem": _nome_user(nt.owner), "texto": _texto(nt.content, 600)})
+    if tipo in ("", "tarefas"):
+        for t in por_ref("CRM Task", ["name", "title", "status", "due_date", "assigned_to", "creation", "description"]):
+            futura = t.status not in ("Done", "Canceled")
+            itens.append({"tipo": "tarefa", "id": t.name, "data": t.due_date or t.creation, "titulo": t.title,
+                          "quem": _nome_user(t.assigned_to), "estado": t.status, "texto": _texto(t.description, 300),
+                          "proximo": futura, "atrasada": bool(futura and t.due_date and t.due_date < hoje)})
+    if tipo in ("", "chamadas"):
+        for cl in por_ref("CRM Call Log", ["name", "type", "status", "duration", "start_time", "creation", "caller",
+                                           "receiver", "note", "telephony_medium"]):
+            nota = frappe.db.get_value("FCRM Note", cl.note, "content") if cl.note else ""
+            itens.append({"tipo": "chamada", "id": cl.name, "data": cl.start_time or cl.creation,
+                          "titulo": ("Chamada efetuada" if cl.type == "Outgoing" else "Chamada recebida"),
+                          "quem": _nome_user(cl.caller or cl.receiver), "duracao": cint(cl.duration),
+                          "texto": _texto(nota, 600), "estado": cl.status})
+    if tipo in ("", "reunioes"):
+        for ev in por_ref("Event", ["name", "subject", "starts_on", "ends_on", "location", "google_meet_link", "description"]):
+            itens.append({"tipo": "reuniao", "id": ev.name, "data": ev.starts_on, "titulo": ev.subject,
+                          "texto": _texto(ev.description, 300), "local": ev.location,
+                          "proximo": bool(ev.starts_on and ev.starts_on > hoje)})
+    if emails and tipo in ("", "tickets") and frappe.db.exists("DocType", "HD Ticket"):
+        for tk in frappe.get_list("HD Ticket", filters={"raised_by": ["in", list(emails)]},
+                                  fields=["name", "subject", "status", "creation", "description", "status_category"], limit=50):
+            itens.append({"tipo": "ticket", "id": tk.name, "data": tk.creation, "titulo": f"Ticket #{tk.name} · {tk.subject}",
+                          "estado": tk.status, "resolvido": tk.status_category == "Resolved", "texto": _texto(tk.description, 300)})
+    itens.sort(key=lambda i: str(i.get("data") or ""), reverse=True)
+    proximos = sorted([i for i in itens if i.get("proximo")], key=lambda i: str(i.get("data") or ""))
+    passado = [i for i in itens if not i.get("proximo")]
+    contagem = {}
+    for i in itens:
+        contagem[i["tipo"]] = contagem.get(i["tipo"], 0) + 1
+    return {"proximos": proximos, "passado": passado[:200], "contagem": contagem}
+
+
+@frappe.whitelist(methods=["POST"])
+def email_completo(nome: str):
+    _guarda()
+    c = frappe.get_doc("Communication", nome)
+    c.check_permission("read")
+    return {"assunto": c.subject, "de": c.sender, "para": c.recipients, "cc": c.cc, "data": c.communication_date,
+            "html": frappe.utils.sanitize_html(c.content or "")}
+
+
+# ── Criar a partir da ficha ─────────────────────────────────────────────────────────────────────────────
+@frappe.whitelist(methods=["POST"])
+def nota(doctype: str, name: str, conteudo: str):
+    _guarda()
+    frappe.get_doc(doctype, name).check_permission("read")
+    n = frappe.get_doc({"doctype": "FCRM Note", "title": _texto(conteudo, 60), "content": frappe.utils.escape_html(conteudo).replace("\n", "<br>"),
+                        "reference_doctype": doctype, "reference_docname": name}).insert()
+    return {"ok": True, "id": n.name}
+
+
+@frappe.whitelist(methods=["POST"])
+def tarefa(doctype: str, name: str, titulo: str, data: str = None, responsavel: str = None):
+    _guarda()
+    frappe.get_doc(doctype, name).check_permission("read")
+    t = frappe.get_doc({"doctype": "CRM Task", "title": titulo, "status": "Todo", "priority": "Medium",
+                        "due_date": data or None, "assigned_to": responsavel or frappe.session.user,
+                        "reference_doctype": doctype, "reference_docname": name}).insert()
+    return {"ok": True, "id": t.name}
+
+
+@frappe.whitelist(methods=["POST"])
+def tarefa_feita(nome: str):
+    _guarda()
+    t = frappe.get_doc("CRM Task", nome)
+    t.status = "Done" if t.status != "Done" else "Todo"
+    t.save()
+    return {"ok": True, "estado": t.status}
+
+
+@frappe.whitelist(methods=["POST"])
+def procurar_emails(doctype: str, name: str):
+    """«Procurar emails antigos»: pede às caixas ligadas o que se trocou com os endereços deste registo."""
+    _guarda()
+    frappe.get_doc(doctype, name).check_permission("read")
+    from orbit.emails_crm import recuperar_agora
+    _rel, emails = _relacionados(doctype, name)
+    for e in emails:
+        recuperar_agora(e)
+    return {"ok": True, "emails": sorted(emails)}
+
+
+# ── Funil ───────────────────────────────────────────────────────────────────────────────────────────────
+@frappe.whitelist()
+def funil(responsavel: str = ""):
+    _guarda()
+    estados = frappe.get_all("CRM Deal Status", fields=["name", "type", "color", "position"], order_by="position asc")
+    filtros = {"status": ["not in", ["Lost"]]}
+    if responsavel == "eu":
+        filtros["deal_owner"] = frappe.session.user
+    negocios = frappe.get_list("CRM Deal", filters=filtros, fields=["name", "titulo", "organization", "lead_name", "status",
+                               "deal_value", "deal_owner", "expected_closure_date", "modified", "closed_date"],
+                               order_by="modified desc", limit=1000)
+    limite = getdate(add_days(nowdate(), -30))
+    proximas = {}
+    for t in frappe.get_list("CRM Task", filters={"reference_doctype": "CRM Deal", "status": ["not in", ["Done", "Canceled"]]},
+                             fields=["reference_docname", "title", "due_date"], order_by="due_date asc", limit=2000):
+        proximas.setdefault(t.reference_docname, t)
+    agora = now_datetime()
+    colunas = []
+    for s in estados:
+        cartoes = []
+        for d in negocios:
+            if d.status != s.name:
+                continue
+            if s.type == "Won" and d.closed_date and getdate(d.closed_date) < limite:
+                continue
+            t = proximas.get(d.name)
+            cartoes.append({"name": d.name, "titulo": d.titulo or d.lead_name or d.organization or d.name,
+                            "org": d.organization or d.lead_name or "", "valor": flt(d.deal_value),
+                            "dono": _iniciais(_nome_user(d.deal_owner)), "dono_nome": _nome_user(d.deal_owner),
+                            "prox": (t.title if t else ""), "prox_data": (t.due_date if t else None),
+                            "atraso": bool(t and t.due_date and t.due_date < agora),
+                            "parado": (agora - d.modified).days if not t else 0})
+        colunas.append({"estado": s.name, "rotulo": _rotulo_estado(s.name), "tipo": s.type, "cor": s.color,
+                        "total": sum(c["valor"] for c in cartoes), "cartoes": cartoes})
+    return {"colunas": colunas}
+
+
+@frappe.whitelist(methods=["POST"])
+def mover(negocio: str, estado: str):
+    _guarda()
+    if not frappe.db.exists("CRM Deal Status", estado):
+        frappe.throw("Fase desconhecida")
+    d = frappe.get_doc("CRM Deal", negocio)
+    d.status = estado
+    d.save()
+    return {"ok": True}
+
+
+# ── Caixa de entrada (como a do HubSpot: conversas, não a caixa de correio inteira) ───────────────────────
+# «Equipa» = caixas partilhadas ligadas ao CRM e tickets do Desk; «Privado» = as conversas da minha caixa pessoal
+# com contactos do CRM («só para mim», orbit_privado_de = eu). O resto do correio fica no Orbit Mail (SOGo).
+@frappe.whitelist()
+def caixa(grupo: str = "todos"):
+    _guarda()
+    u = frappe.session.user
+    out = []
+    if grupo in ("todos", "equipa") and frappe.db.exists("DocType", "HD Ticket"):
+        for t in frappe.get_list("HD Ticket", filters={"status_category": ["!=", "Resolved"]},
+                                 fields=["name", "subject", "raised_by", "status", "modified", "_assign"],
+                                 order_by="modified desc", limit=50):
+            out.append({"tipo": "ticket", "grupo": "equipa", "id": t.name, "titulo": t.subject, "quem": t.raised_by,
+                        "data": t.modified, "estado": t.status, "url": f"/helpdesk/tickets/{t.name}",
+                        "atribuido": bool(t._assign and t._assign != "[]")})
+    filtros = {"communication_medium": "Email", "communication_type": "Communication",
+               "communication_date": [">", add_days(now_datetime(), -30)],
+               "reference_doctype": ["in", ["Contact", "CRM Deal", "CRM Lead", "CRM Organization"]]}
+    if grupo == "privado":
+        filtros["orbit_privado_de"] = u
+    elif grupo == "equipa":
+        filtros["orbit_privado_de"] = ["in", ["", None]]
+    conversas = {}
+    for e in frappe.get_list("Communication", filters=filtros,
+                             fields=["name", "subject", "sender", "sender_full_name", "recipients", "communication_date",
+                                     "sent_or_received", "reference_doctype", "reference_name", "email_account", "content",
+                                     "orbit_privado_de"], order_by="communication_date desc", limit=400):
+        chave = (e.reference_doctype, e.reference_name, re.sub(r"^(re|fw|fwd|enc|res)\s*:\s*", "", (e.subject or "").strip(), flags=re.I).lower())
+        if chave in conversas:
+            conversas[chave]["n"] += 1
+            continue
+        conversas[chave] = {"tipo": "email", "grupo": "privado" if e.orbit_privado_de else "equipa", "id": e.name,
+                            "titulo": e.subject or "(sem assunto)", "quem": e.sender_full_name or e.sender, "data": e.communication_date,
+                            "por_responder": e.sent_or_received == "Received", "n": 1,
+                            "conta": (e.email_account or "").replace("Orbit CRM · ", ""),
+                            "ref": [e.reference_doctype, e.reference_name], "ref_titulo": _titulo(e.reference_doctype, e.reference_name),
+                            "texto": _texto(e.content, 160)}
+    out += list(conversas.values())
+    out.sort(key=lambda i: str(i["data"] or ""), reverse=True)
+    return out
