@@ -17,6 +17,7 @@ on:
       - "apps.json"
       - "Containerfile.marca"
       - ".github/workflows/imagem.yml"
+      - "ferramentas/**"
   workflow_dispatch:
 
 env:
@@ -31,6 +32,9 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verificar a interface /orbit (carrega sem erros)
+        run: node ferramentas/verificar-interface.mjs orbit/public/interface/app.js
 
       - name: Libertar espaço no disco
         # A imagem final passa dos 6 GB e a construção precisa de bem mais.

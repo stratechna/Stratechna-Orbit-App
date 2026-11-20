@@ -103,394 +103,6 @@ const EmailCorpo = {
     <button v-if="partes[1]" class="citacao-btn" @click="verAnterior=!verAnterior">{{ verAnterior ? 'Esconder a mensagem anterior' : '··· Mostrar a mensagem anterior' }}</button></div>`,
 };
 
-// ── Ecrãs ────────────────────────────────────────────────────────────────────────────────────────────
-const Inicio = {
-  components: { Icone },
-  props: ["ctx"],
-  setup(props) {
-    const d = ref(null);
-    const carregar = async () => (d.value = await api("inicio"));
-    onMounted(carregar);
-    const feita = async (t) => { await api("tarefa_feita", { nome: t.name }, true); carregar(); };
-    const hora = (x) => new Date(String(x).replace(" ", "T")).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
-    const hoje = new Date().toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
-    const saud = new Date().getHours() < 13 ? "Bom dia" : new Date().getHours() < 20 ? "Boa tarde" : "Boa noite";
-    return { d, feita, hora, hoje, saud, eur, data, link };
-  },
-  template: `
-  <div class="pad" v-if="d">
-    <div class="ola"><div><h1>{{ saud }}, {{ (ctx.nome||'').split(' ')[0] }}</h1>
-      <div class="sub">{{ hoje }} · {{ d.tarefas.length }} tarefas por fazer, {{ d.eventos.length }} reuniões hoje e amanhã</div></div></div>
-    <div class="kpis">
-      <div class="cartao kpi"><span class="sub">Negócios abertos</span><b>{{ d.kpis.abertos }} · {{ eur(d.kpis.abertos_valor) }}</b></div>
-      <div class="cartao kpi"><span class="sub">Ganhos este mês</span><b>{{ eur(d.kpis.ganhos_valor) }}</b><span class="var">{{ d.kpis.ganhos }} negócios</span></div>
-      <div class="cartao kpi"><span class="sub">Tickets em aberto</span><b>{{ ctx.contadores.tickets }}</b></div>
-      <div class="cartao kpi"><span class="sub">Tarefas atrasadas</span><b>{{ d.kpis.tarefas_atrasadas }}</b></div>
-    </div>
-    <div class="grelha2">
-      <div class="cartao"><header><h2>As minhas tarefas</h2></header>
-        <div v-if="!d.tarefas.length" class="vazio">Sem tarefas por fazer.</div>
-        <div class="linha" v-for="t in d.tarefas" :key="t.name">
-          <span class="chk" @click="feita(t)" title="Marcar como feita" style="cursor:pointer"></span>
-          <div class="cresce">{{ t.title }}<small><a v-if="t.reference_docname" :href="link(t.reference_doctype,t.reference_docname)">{{ t.titulo_ref }}</a></small></div>
-          <span class="etq ambar" v-if="t.atrasada">Atrasada</span><span class="etq" v-else-if="t.hoje">Hoje</span>
-          <span class="sub" v-else-if="t.due_date">{{ data(t.due_date,false) }}</span>
-        </div>
-      </div>
-      <div class="cartao"><header><h2>Agenda</h2></header>
-        <div v-if="!d.eventos.length" class="vazio">Nada marcado para hoje e amanhã.</div>
-        <div class="linha" v-for="e in d.eventos" :key="e.name"><span class="hora">{{ hora(e.starts_on) }}</span>
-          <div class="cresce">{{ e.subject }}<small>{{ data(e.starts_on,false) }}<span v-if="e.location"> · {{ e.location }}</span></small></div></div>
-        <header style="border-top:1px solid var(--line)"><h2>Negócios parados</h2><span class="sub">sem atividade há 14+ dias</span></header>
-        <div v-if="!d.parados.length" class="vazio">Nenhum.</div>
-        <a class="linha" v-for="n in d.parados" :key="n.name" :href="link('CRM Deal',n.name)" style="text-decoration:none;color:inherit">
-          <div class="cresce">{{ n.titulo }}<small>{{ n.estado }} · {{ n.dias }} dias</small></div><b>{{ eur(n.valor) }}</b></a>
-      </div>
-    </div>
-  </div>
-  <div v-else class="carregar">A carregar…</div>`,
-};
-
-const COLUNAS = {
-  contactos: [["full_name", "Nome"], ["company_name", "Empresa"], ["email_id", "Email"], ["mobile_no", "Telemóvel"], ["owner_nome", "Criado por"], ["ultimo_email", "Último email"]],
-  empresas: [["organization_name", "Empresa"], ["website", "Site"], ["telefone", "Telefone"], ["industry", "Setor"], ["territory", "Território"], ["estado_conta", "Estado"]],
-  negocios: [["titulo", "Negócio"], ["organization", "Empresa"], ["estado", "Fase"], ["deal_value", "Valor"], ["expected_closure_date", "Fecho previsto"], ["deal_owner_nome", "Responsável"]],
-  leads: [["lead_name", "Nome"], ["organization", "Empresa"], ["email", "Email"], ["estado", "Estado"], ["source", "Origem"], ["lead_owner_nome", "Responsável"]],
-};
-const TITULOS = { contactos: "Contactos", empresas: "Empresas", negocios: "Negócios", leads: "Leads" };
-const VISTAS = { contactos: [["todos", "Todos"], ["meus", "Os meus"], ["parados", "Sem atividade há 30 dias"]],
-  empresas: [["todos", "Todas"], ["meus", "As minhas"], ["parados", "Sem atividade há 30 dias"]],
-  negocios: [["abertos", "Em curso"], ["todos", "Todos"], ["meus", "Os meus"], ["parados", "Parados há 30 dias"]],
-  leads: [["todos", "Por converter"], ["meus", "As minhas"], ["parados", "Sem atividade há 30 dias"]] };
-const DT_LISTA = { contactos: "Contact", empresas: "CRM Organization", negocios: "CRM Deal", leads: "CRM Lead" };
-
-const Lista = {
-  props: ["objeto"],
-  setup(props) {
-    const chaveVista = () => `orbit.vista.${props.objeto}`;
-    let guardada = null; try { guardada = localStorage.getItem(chaveVista()); } catch (e) {}
-    const vista = ref(guardada || VISTAS[props.objeto][0][0]);
-    const q = ref(""); const linhas = ref([]); const total = ref(0); const mais = ref(false); const pagina = ref(0); const ordem = ref("modified desc"); const a = ref(false);
-    let tq;
-    const carregar = async (junta = false) => {
-      a.value = true;
-      const r = await api("lista", { objeto: props.objeto, vista: vista.value, q: q.value, pagina: pagina.value, ordem: ordem.value });
-      linhas.value = junta ? linhas.value.concat(r.linhas) : r.linhas; total.value = r.total; mais.value = r.mais; a.value = false;
-    };
-    watch(vista, (v) => { try { localStorage.setItem(chaveVista(), v); } catch (e) {} pagina.value = 0; carregar(); });
-    watch(q, () => { clearTimeout(tq); tq = setTimeout(() => { pagina.value = 0; carregar(); }, 300); });
-    watch(() => props.objeto, () => { vista.value = VISTAS[props.objeto][0][0]; q.value = ""; pagina.value = 0; carregar(); });
-    onMounted(() => carregar());
-    const ordenar = (c) => { ordem.value = ordem.value === `${c} desc` ? `${c} asc` : `${c} desc`; pagina.value = 0; carregar(); };
-    const valor = (l, c) => c === "deal_value" ? eur(l[c]) : (c === "ultimo_email" || c === "expected_closure_date") ? data(l[c], false) : l[c];
-    const abrir = (l) => (location.hash = link(DT_LISTA[props.objeto], l.name));
-    return { vista, q, linhas, total, mais, pagina, carregar, ordenar, valor, abrir, a, VISTAS, COLUNAS, TITULOS, cor, ini, ordem };
-  },
-  template: `
-  <div>
-    <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-      <div><h1>{{ TITULOS[objeto] }}</h1><div class="sub">{{ total }} registos</div></div>
-      <div style="display:flex;gap:8px"><a class="btn" :href="'/crm/' + ({contactos:'contacts',empresas:'organizations',negocios:'deals',leads:'leads'})[objeto]">Abrir no CRM clássico</a></div>
-    </div>
-    <div class="vistas"><button v-for="v in VISTAS[objeto]" :key="v[0]" :class="{ativo: vista===v[0]}" @click="vista=v[0]">{{ v[1] }}</button></div>
-    <div class="filtros"><input class="filtro" style="border-style:solid;min-width:240px" v-model="q" :placeholder="'Procurar em ' + TITULOS[objeto].toLowerCase() + '…'"></div>
-    <div class="tabela-wrap"><table>
-      <thead><tr><th v-for="c in COLUNAS[objeto]" :key="c[0]" @click="ordenar(c[0])" style="cursor:pointer">{{ c[1] }}<span v-if="ordem.startsWith(c[0]+' ')">{{ ordem.endsWith('asc') ? ' ↑' : ' ↓' }}</span></th></tr></thead>
-      <tbody>
-        <tr v-for="l in linhas" :key="l.name" @click="abrir(l)">
-          <td v-for="(c,i) in COLUNAS[objeto]" :key="c[0]">
-            <div v-if="i===0" class="pessoa"><span class="av" :style="{background:cor(l.name)}">{{ ini(l[c[0]]||l.name) }}</span><a :href="'#'" @click.prevent>{{ l[c[0]] || l.name }}</a></div>
-            <span v-else-if="c[0]==='estado'" class="etq">{{ l.estado }}</span>
-            <span v-else>{{ valor(l,c[0]) }}</span>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-    <div v-if="!a && !linhas.length" class="vazio">Nada encontrado.</div>
-    <div class="mais-linhas" v-if="mais"><button class="btn sm" @click="pagina++; carregar(true)">Mostrar mais</button></div>
-    </div>
-  </div>`,
-};
-
-const Ficha = {
-  components: { Icone, EmailCorpo, VerDocumento },
-  props: ["doctype", "name"],
-  setup(props) {
-    const f = ref(null); const cron = ref(null); const filtro = ref(""); const ed = ref(""); const valorEd = ref("");
-    const notaTxt = ref(""); const tarefaTxt = ref(""); const tarefaData = ref(""); const modo = ref("nota"); const email = ref(null);
-    const docs = ref(null); const verDoc = ref(null);
-    const carregar = async () => {
-      f.value = await api("ficha", { doctype: props.doctype, name: props.name });
-      carregarCron();
-      apiD("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (docs.value = r)).catch(() => (docs.value = { erro: "falhou" }));
-    };
-    const carregarCron = async () => (cron.value = await api("cronologia", { doctype: props.doctype, name: props.name, tipo: filtro.value }));
-    watch(() => [props.doctype, props.name], () => { f.value = null; cron.value = null; carregar(); });
-    watch(filtro, carregarCron);
-    onMounted(carregar);
-    const editar = (p) => { if (!p.editavel) return; ed.value = p.campo; valorEd.value = p.valor || ""; nextTick(() => document.querySelector(".prop .ed-campo")?.focus()); };
-    const gravar = async (p) => {
-      if (valorEd.value === (p.valor || "")) { ed.value = ""; return; }
-      await api("guardar", { doctype: props.doctype, name: props.name, campo: p.campo, valor: valorEd.value }, true);
-      ed.value = ""; toast("Gravado"); carregar();
-    };
-    const enviarNota = async () => {
-      if (!notaTxt.value.trim()) return;
-      await api("nota", { doctype: props.doctype, name: props.name, conteudo: notaTxt.value }, true);
-      notaTxt.value = ""; toast("Nota gravada"); carregarCron();
-    };
-    const enviarTarefa = async () => {
-      if (!tarefaTxt.value.trim()) return;
-      await api("tarefa", { doctype: props.doctype, name: props.name, titulo: tarefaTxt.value, data: tarefaData.value || null }, true);
-      tarefaTxt.value = ""; tarefaData.value = ""; toast("Tarefa criada"); carregarCron();
-    };
-    const procurar = async () => {
-      const r = await api("procurar_emails", { doctype: props.doctype, name: props.name }, true);
-      toast(r.emails.length ? "A procurar nas caixas ligadas… atualize daqui a um minuto." : "Este registo não tem email.");
-    };
-    const abrirEmail = async (i) => { if (i.tipo !== "email") return; email.value = await api("email_completo", { nome: i.id }, true); };
-    const grupos = computed(() => {
-      if (!cron.value) return [];
-      const g = []; let atual = null;
-      for (const i of cron.value.passado) { const m = mes(i.data); if (!atual || atual.mes !== m) { atual = { mes: m, itens: [] }; g.push(atual); } atual.itens.push(i); }
-      return g;
-    });
-    const mudarFase = async (s) => { await api("guardar", { doctype: "CRM Deal", name: props.name, campo: "status", valor: s }, true); toast("Fase alterada"); carregar(); };
-    const NOMES = { "CRM Deal": "Negócios", "Contact": "Contactos", "CRM Organization": "Empresa", "CRM Lead": "Leads" };
-    const tit = (dt, r) => dt === "CRM Deal" ? (r.titulo || r.lead_name || r.organization || r.name) : dt === "Contact" ? (r.full_name || r.name) : dt === "CRM Organization" ? (r.organization_name || r.name) : (r.lead_name || r.name);
-    const sub = (dt, r) => dt === "CRM Deal" ? [r.estado, r.deal_value ? eur(r.deal_value) : "", r.expected_closure_date ? "fecha a " + data(r.expected_closure_date, false) : ""].filter(Boolean).join(" · ")
-      : dt === "Contact" ? [r.designation, r.email_id].filter(Boolean).join(" · ") : dt === "CRM Organization" ? [r.website, r.territory].filter(Boolean).join(" · ") : [r.estado, r.email].filter(Boolean).join(" · ");
-    const ic = (t) => IC_EVENTO[t] || IC_EVENTO.nota;
-    const marcarEmail = () => { window.__ref_email = (f.value && f.value.email_principal) || ""; };
-    return { docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
-      grupos, mudarFase, NOMES, tit, sub, link, data, eur, ic, cor, ESTADO_COR };
-  },
-  template: `
-  <div class="ficha" v-if="f">
-    <aside class="col-esq">
-      <div style="font-size:13px;display:flex;justify-content:space-between"><a href="javascript:history.back()">← Voltar</a><a :href="f.classico">Abrir no CRM clássico</a></div>
-      <div class="cabeca">
-        <div class="av" :style="{background:cor(f.titulo)}">{{ f.iniciais }}</div>
-        <h1>{{ f.titulo }}</h1><div class="sub">{{ f.sub }}</div>
-        <div class="acoes-rap">
-          <button @click="modo='nota'"><span><Icone n="nota"/></span>Nota</button>
-          <a v-if="f.email_principal" :href="'mailto:'+f.email_principal" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)"><span style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface-2)"><Icone n="mail"/></span>Email</a>
-          <a v-if="f.telefone" :href="'tel:'+f.telefone" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)"><span style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface-2)"><Icone n="tel"/></span>Ligar</a>
-          <button @click="modo='tarefa'"><span><Icone n="tarefa"/></span>Tarefa</button>
-          <a :href="'#/calendario/nova/'+encodeURIComponent(doctype)+'/'+encodeURIComponent(name)" @click="marcarEmail" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)"><span style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface-2)"><Icone n="cal"/></span>Reunião</a>
-        </div>
-      </div>
-      <div v-if="f.estados.length" style="margin-top:14px">
-        <label class="sub" style="font-size:12px">Fase do negócio</label>
-        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
-          <button v-for="s in f.estados" :key="s.name" class="btn sm" :class="{prim: f.props.find(p=>p.campo==='status')?.valor===s.name}" @click="mudarFase(s.name)" :disabled="!f.pode_editar">{{ s.rotulo }}</button>
-        </div>
-      </div>
-      <div class="bloco-tit">Sobre este registo</div>
-      <div class="prop" v-for="p in f.props" :key="p.campo">
-        <label>{{ p.rotulo }}</label>
-        <template v-if="ed===p.campo">
-          <select v-if="p.opcoes" class="ed-campo" v-model="valorEd" @change="gravar(p)" @blur="ed=''"><option v-for="o in p.opcoes" :value="o">{{ p.rotulos[o] || o || '—' }}</option></select>
-          <input v-else class="ed-campo" v-model="valorEd" :type="p.tipo==='Date'?'date':(p.tipo==='Currency'||p.tipo==='Percent')?'number':'text'" @keyup.enter="gravar(p)" @keyup.esc="ed=''" @blur="gravar(p)">
-        </template>
-        <div v-else :class="{ed:p.editavel}" @click="editar(p)">
-          <span v-if="p.tipo==='Currency'">{{ p.valor ? eur(p.valor) : '—' }}</span>
-          <span v-else-if="p.tipo==='Datetime'||p.tipo==='Date'">{{ p.valor ? data(p.valor, p.tipo==='Datetime') : '—' }}</span>
-          <span v-else-if="p.tipo==='Percent'">{{ p.valor!=null ? p.valor+' %' : '—' }}</span>
-          <span v-else>{{ (p.rotulos && p.rotulos[p.valor]) || p.mostra || p.valor || '—' }}</span>
-        </div>
-      </div>
-    </aside>
-
-    <div class="col-meio">
-      <div class="separ">
-        <button :class="{ativo:filtro===''}" @click="filtro=''">Atividade</button>
-        <button :class="{ativo:filtro==='emails'}" @click="filtro='emails'">Emails <span class="sub">{{ cron?.contagem?.email || '' }}</span></button>
-        <button :class="{ativo:filtro==='notas'}" @click="filtro='notas'">Notas</button>
-        <button :class="{ativo:filtro==='chamadas'}" @click="filtro='chamadas'">Chamadas</button>
-        <button :class="{ativo:filtro==='tarefas'}" @click="filtro='tarefas'">Tarefas</button>
-        <button :class="{ativo:filtro==='reunioes'}" @click="filtro='reunioes'">Reuniões</button>
-        <button :class="{ativo:filtro==='tickets'}" @click="filtro='tickets'">Tickets</button>
-      </div>
-      <div class="cartao compor" v-if="modo==='nota'"><textarea v-model="notaTxt" rows="1" :placeholder="'Escrever uma nota sobre ' + f.titulo + '…'" @keydown.meta.enter="enviarNota" @keydown.ctrl.enter="enviarNota"></textarea><button class="btn sm prim" @click="enviarNota" :disabled="!notaTxt.trim()">Gravar nota</button></div>
-      <div class="cartao compor" v-else><input v-model="tarefaTxt" placeholder="Nova tarefa…" @keyup.enter="enviarTarefa"><input type="date" v-model="tarefaData" style="flex:none;width:150px"><button class="btn sm prim" @click="enviarTarefa" :disabled="!tarefaTxt.trim()">Criar tarefa</button></div>
-      <div v-if="!cron" class="carregar">A carregar…</div>
-      <template v-else>
-        <template v-if="cron.proximos.length"><div class="mes">Próximo</div>
-          <div class="evento" v-for="i in cron.proximos" :key="i.tipo+i.id"><div class="ic" :style="{background:ic(i.tipo)[1],color:ic(i.tipo)[2]}"><Icone :n="ic(i.tipo)[0]"/></div>
-            <div class="cartao corpo"><header><b>{{ i.titulo }}</b><span :class="i.atrasada?'etq ambar':'sub'">{{ i.atrasada ? 'Atrasada · ' : '' }}{{ data(i.data) }}</span></header><p v-if="i.texto">{{ i.texto }}</p><p v-if="i.quem" class="sub">{{ i.quem }}</p></div></div>
-        </template>
-        <div v-if="!grupos.length && !cron.proximos.length" class="vazio">Ainda não há atividade.<br><button class="btn sm" style="margin-top:10px" @click="procurar">Procurar emails antigos nas caixas ligadas</button></div>
-        <template v-for="g in grupos" :key="g.mes"><div class="mes">{{ g.mes }}</div>
-          <div class="evento" v-for="i in g.itens" :key="i.tipo+i.id"><div class="ic" :style="{background:ic(i.tipo)[1],color:ic(i.tipo)[2]}"><Icone :n="ic(i.tipo)[0]"/></div>
-            <div class="cartao corpo" :class="{abre:i.tipo==='email'}" @click="abrirEmail(i)">
-              <header><b><template v-if="i.tipo==='email'">{{ i.sentido==='Sent' ? 'Email enviado: ' : 'Email recebido: ' }}</template>{{ i.titulo }}</b>
-                <span class="sub">{{ data(i.data) }}<template v-if="i.duracao"> · {{ Math.round(i.duracao/60) }} min</template></span></header>
-              <p v-if="i.tipo==='email'" class="sub" style="margin-top:2px">{{ i.sentido==='Sent' ? 'Para ' + (i.para||'') : 'De ' + (i.quem||'') }}<template v-if="i.conta"> · {{ i.conta }}</template> <span v-if="i.privado" class="priv">· só para si</span></p>
-              <p v-if="i.texto">{{ i.texto }}</p>
-              <p v-if="i.tipo!=='email' && i.quem" class="sub">{{ i.quem }}</p>
-              <span v-if="i.tipo==='ticket'" class="etq" :class="i.resolvido?'verde':'ambar'">{{ i.estado }}</span>
-            </div></div>
-        </template>
-        <div v-if="grupos.length" style="text-align:center;margin:16px 0"><button class="btn sm" @click="procurar">Procurar emails antigos nas caixas ligadas</button></div>
-      </template>
-    </div>
-
-    <aside class="col-dir">
-      <template v-for="(lista, dt) in f.assoc" :key="dt">
-        <template v-if="lista.length || dt!=='CRM Lead'">
-          <div class="bloco-tit">{{ NOMES[dt] }} <span class="sub" style="font-weight:400">{{ lista.length }}</span></div>
-          <div v-if="!lista.length" class="sub" style="font-size:13px">—</div>
-          <a v-for="r in lista" :key="r.name" class="assoc" :href="link(dt,r.name)" style="display:block;text-decoration:none;color:inherit">
-            <b>{{ tit(dt,r) }}</b><small>{{ sub(dt,r) }}</small>
-            <div class="barra" v-if="dt==='CRM Deal' && r.probability"><i :style="{width:r.probability+'%'}"></i></div>
-          </a>
-        </template>
-      </template>
-      <div class="bloco-tit">Documentos <span class="sub" style="font-weight:400" v-if="docs && !docs.erro">{{ docs.docs.length }}</span></div>
-      <div v-if="!docs" class="sub" style="font-size:13px">A procurar…</div>
-      <div v-else-if="docs.erro" class="sub" style="font-size:13px"><a href="#/documentos">Ligar a sua conta</a> para ver os documentos.</div>
-      <div v-else-if="!docs.docs.length" class="sub" style="font-size:13px">—</div>
-      <div v-for="x in (docs && docs.docs) || []" :key="x.id" class="assoc" style="cursor:pointer" @click="verDoc=x"><b>{{ x.titulo }}</b><small>{{ [x.tipo, x.criado].filter(Boolean).join(' · ') }}</small></div>
-      <VerDocumento v-if="verDoc" :doc="verDoc" @fechar="verDoc=null"/>
-      <div class="bloco-tit">Tickets <span class="sub" style="font-weight:400">{{ f.tickets.length }}</span></div>
-      <div v-if="!f.tickets.length" class="sub" style="font-size:13px">—</div>
-      <a v-for="t in f.tickets" :key="t.name" class="assoc" :href="'/helpdesk/tickets/'+t.name" style="display:block;text-decoration:none;color:inherit"><b>#{{ t.name }} {{ t.subject }}</b><small>{{ t.status }} · {{ data(t.modified,false) }}</small></a>
-    </aside>
-
-    <div class="modal-fundo" v-if="email" @click.self="email=null">
-      <div class="modal"><header><div><b>{{ email.assunto }}</b><div class="sub">De {{ email.de }} · para {{ email.para }}<span v-if="email.cc"> · cc {{ email.cc }}</span> · {{ data(email.data) }}</div></div><div style="display:flex;gap:6px"><a class="btn sm prim" :href="'#/caixa/'+encodeURIComponent(email.id)">Responder</a><button class="btn sm" @click="email=null">Fechar</button></div></header>
-        <div class="corpo-email"><EmailCorpo :html="email.html"/></div></div>
-    </div>
-  </div>
-  <div v-else class="carregar">A carregar…</div>`,
-};
-
-const Funil = {
-  setup() {
-    const d = ref(null); const resp = ref(""); const arrastar = ref(null); const alvo = ref("");
-    const carregar = async () => (d.value = await api("funil", { responsavel: resp.value }));
-    watch(resp, carregar); onMounted(carregar);
-    const largar = async (col) => {
-      const n = arrastar.value; alvo.value = ""; arrastar.value = null;
-      if (!n || n.estado === col.estado) return;
-      await api("mover", { negocio: n.name, estado: col.estado }, true); toast(`Passou a «${col.rotulo}»`); carregar();
-    };
-    const total = computed(() => d.value ? d.value.colunas.filter((c) => c.tipo !== "Won").reduce((a, c) => a + c.total, 0) : 0);
-    const n = computed(() => d.value ? d.value.colunas.filter((c) => c.tipo !== "Won").reduce((a, c) => a + c.cartoes.length, 0) : 0);
-    return { d, resp, arrastar, alvo, largar, total, n, eur, link, data, FAIXA };
-  },
-  template: `
-  <div>
-    <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-      <div><h1>Funil de negócios</h1><div class="sub">{{ n }} em curso · {{ eur(total) }} · ganhos dos últimos 30 dias</div></div>
-      <div style="display:flex;gap:8px"><select class="btn" v-model="resp"><option value="">Todos os responsáveis</option><option value="eu">Só os meus</option></select><a class="btn" href="#/negocios">Lista</a></div>
-    </div>
-    <div v-if="!d" class="carregar">A carregar…</div>
-    <div class="funil" v-else :style="{gridTemplateColumns:'repeat('+d.colunas.length+',minmax(230px,1fr))'}">
-      <div class="coluna" v-for="c in d.colunas" :key="c.estado" :class="{alvo: alvo===c.estado}"
-           @dragover.prevent="alvo=c.estado" @dragleave="alvo=''" @drop.prevent="largar(c)">
-        <header><b>{{ c.rotulo }} <span class="sub" style="font-weight:500">{{ c.cartoes.length }}</span></b><small>{{ eur(c.total) }}</small><div class="faixa" :style="{background:FAIXA[c.cor]||'#94a3b8'}"></div></header>
-        <a class="cartao negocio" v-for="x in c.cartoes" :key="x.name" :href="link('CRM Deal',x.name)" draggable="true" @dragstart="arrastar={...x, estado:c.estado}" style="display:block;text-decoration:none;color:inherit">
-          <h3>{{ x.titulo }}</h3><div class="sub">{{ x.org }}</div>
-          <div class="val">{{ eur(x.valor) }}<span class="av" style="width:22px;height:22px;font-size:10px;background:#5b6f7a" :title="x.dono_nome">{{ x.dono }}</span></div>
-          <div class="prox" :class="{atraso:x.atraso}" v-if="x.prox">◷ {{ x.prox }}<template v-if="x.prox_data"> · {{ data(x.prox_data,false) }}</template></div>
-          <div class="prox" v-else-if="c.tipo!=='Won'">Sem próxima tarefa<template v-if="x.parado>7"> · {{ x.parado }} dias parado</template></div>
-        </a>
-      </div>
-    </div>
-  </div>`,
-};
-
-const Caixa = {
-  components: { EmailCorpo, Icone },
-  props: ["abrirId"],
-  setup(props) {
-    let c0 = { grupo: "equipa", conta: "" }; try { c0 = JSON.parse(localStorage.getItem("orbit.caixa.canal")) || c0; } catch (e) {}
-    const canal = ref(c0); const canais = ref(null); const itens = ref(null); const conv = ref(null);
-    const resposta = ref(""); const para = ref(""); const cc = ref(""); const aEnviar = ref(false); const verCc = ref(false);
-    const carregar = async () => { itens.value = null; itens.value = await api("caixa", { grupo: canal.value.grupo, conta: canal.value.conta }); };
-    const escolher = (grupo, conta = "") => { canal.value = { grupo, conta }; try { localStorage.setItem("orbit.caixa.canal", JSON.stringify(canal.value)); } catch (e) {} carregar(); };
-    const abrirConversa = async (id) => {
-      conv.value = null; resposta.value = ""; cc.value = ""; verCc.value = false;
-      conv.value = await api("conversa", { nome: id });
-      para.value = conv.value.para || "";
-      nextTick(() => { const m = document.querySelector(".msgs"); if (m) m.scrollTop = m.scrollHeight; });
-    };
-    const abrir = (i) => { if (i.tipo === "ticket") { window.open(i.url, "_blank"); return; } location.hash = "#/caixa/" + encodeURIComponent(i.id); };
-    watch(() => props.abrirId, (id) => { if (id) abrirConversa(id); });
-    onMounted(async () => { canais.value = await api("canais"); carregar(); if (props.abrirId) abrirConversa(props.abrirId); });
-    const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const enviar = async () => {
-      if (!resposta.value.trim() || aEnviar.value) return;
-      aEnviar.value = true;
-      try {
-        const html = resposta.value.trim().split(/\n{2,}/).map((p) => "<p>" + esc(p).replace(/\n/g, "<br>") + "</p>").join("");
-        await api("responder", { nome: conv.value.responder_a, html, para: para.value, cc: cc.value }, true);
-        toast("Resposta enviada de " + conv.value.de);
-        resposta.value = ""; await abrirConversa(conv.value.responder_a); carregar();
-      } finally { aEnviar.value = false; }
-    };
-    const ativo = (g, c = "") => canal.value.grupo === g && (canal.value.conta || "") === c;
-    const nomeCanal = computed(() => {
-      const c = canal.value; if (c.grupo === "tickets") return "Tickets do Desk";
-      if (c.conta) return c.conta.replace("Orbit CRM · ", "");
-      return c.grupo === "privado" ? "As minhas conversas" : "Todas as caixas de equipa";
-    });
-    return { canal, canais, itens, conv, abrir, data, cor, ini, link, resposta, para, cc, verCc, enviar, aEnviar, escolher, ativo, nomeCanal };
-  },
-  template: `
-  <div class="caixa caixa3" :class="{'com-conv': !!abrirId}">
-    <aside class="canais">
-      <h6><span class="ponto-eq"></span>Equipa</h6>
-      <button :class="{ativo:ativo('equipa')}" @click="escolher('equipa')">Todas as caixas de equipa</button>
-      <button v-for="c in canais?.equipa||[]" :key="c.conta" :class="{ativo:ativo('equipa',c.conta)}" @click="escolher('equipa',c.conta)"><span class="txt">{{ c.email }}</span><span class="n" v-if="c.n">{{ c.n }}</span></button>
-      <button :class="{ativo:ativo('tickets','tickets')}" @click="escolher('tickets','tickets')"><span class="txt">Tickets do Desk</span><span class="n" v-if="canais?.tickets">{{ canais.tickets }}</span></button>
-      <h6><span class="ponto-pr"></span>Privado <small>só você vê</small></h6>
-      <button :class="{ativo:ativo('privado')}" @click="escolher('privado')">As minhas conversas</button>
-      <button v-for="c in canais?.privado||[]" :key="c.conta" :class="{ativo:ativo('privado',c.conta)}" @click="escolher('privado',c.conta)"><span class="txt">{{ c.email }}</span><span class="n" v-if="c.n">{{ c.n }}</span></button>
-      <p class="sub" v-if="canais && !canais.privado.length" style="font-size:12px;padding:0 10px">A sua caixa pessoal ainda não está ligada ao CRM («só para mim»): liga-se no portal, em Stratechna Orbit.</p>
-    </aside>
-    <div class="lista-conv">
-      <header><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2 style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ nomeCanal }}</h2><span class="sub" v-if="itens">{{ itens.length }}</span></div>
-        <div class="sub" style="font-size:12px;margin-top:4px">{{ canal.grupo==='privado' ? 'Conversas da sua caixa com clientes do CRM — só você as vê.' : canal.grupo==='tickets' ? 'Pedidos de suporte em aberto.' : 'Conversas partilhadas — toda a equipa as vê.' }}</div></header>
-      <div v-if="!itens" class="carregar">A carregar…</div>
-      <div v-else-if="!itens.length" class="vazio">Nada por aqui.</div>
-      <div v-for="i in itens || []" :key="i.tipo+i.id" class="conv" :class="{ativo: abrirId===i.id, nova: i.por_responder}" @click="abrir(i)">
-        <span class="av" style="width:30px;height:30px;font-size:11px" :style="{background:cor(i.quem)}">{{ ini(i.quem) }}</span>
-        <div style="min-width:0"><div class="linha1"><b>{{ i.quem }}</b><time>{{ data(i.data,false) }}</time></div><p>{{ i.titulo }}</p>
-          <div class="meta"><span class="etq" :class="i.tipo==='ticket'?'ambar':i.grupo==='privado'?'roxo':'azul'">{{ i.tipo==='ticket' ? 'Ticket · ' + i.estado : i.grupo==='privado' ? 'Privado' : 'Equipa' }}</span>
-            <span class="sub" style="font-size:12px" v-if="i.ref_titulo">{{ i.ref_titulo }}</span><span class="sub" style="font-size:12px" v-if="i.n>1">· {{ i.n }}</span></div></div>
-      </div>
-    </div>
-    <div class="fio">
-      <template v-if="conv">
-        <header><a class="voltar-conv" href="#/caixa">← Conversas</a><div style="min-width:0"><h2>{{ conv.assunto }}</h2><div class="sub">{{ conv.mensagens.length }} mensagens<template v-if="conv.de"> · caixa {{ conv.de }}</template></div></div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap"><a v-if="conv.ref[0]" class="btn sm" :href="link(conv.ref[0], conv.ref[1])">Abrir {{ conv.ref_titulo }}</a></div></header>
-        <div class="msgs">
-          <div class="cartao msg" v-for="m in conv.mensagens" :key="m.id" :class="{nossa:m.enviado}">
-            <header><b>{{ m.de }}</b><span>{{ data(m.data) }}</span></header>
-            <div class="sub" style="font-size:12px;margin-bottom:8px">Para {{ m.para }}<template v-if="m.cc"> · cc {{ m.cc }}</template></div>
-            <EmailCorpo :html="m.html"/>
-          </div>
-        </div>
-        <div class="cartao resposta" v-if="conv.pode_responder">
-          <div class="tabs" style="flex-wrap:wrap;align-items:center"><span class="sub">De {{ conv.de }} · Para</span>
-            <input v-model="para" style="flex:1;min-width:180px;border:0;background:none;font:inherit;color:var(--ink);outline:none">
-            <button class="sub" style="all:unset;cursor:pointer;font-size:12px" v-if="!verCc" @click="verCc=true">Cc</button></div>
-          <div class="tabs" v-if="verCc"><span class="sub">Cc</span><input v-model="cc" style="flex:1;border:0;background:none;font:inherit;color:var(--ink);outline:none"></div>
-          <textarea v-model="resposta" rows="5" placeholder="Escrever a resposta…" @keydown.meta.enter="enviar" @keydown.ctrl.enter="enviar"></textarea>
-          <footer><span class="sub">Fica nos Enviados de {{ conv.de }} e na cronologia do cliente · ⌘↵ envia</span><button class="btn prim sm" @click="enviar" :disabled="!resposta.trim() || aEnviar">{{ aEnviar ? 'A enviar…' : 'Enviar' }}</button></footer>
-        </div>
-        <div v-else class="vazio" style="margin:0 20px 20px">Esta conversa é da caixa pessoal de outra pessoa: só ela pode responder.</div>
-      </template>
-      <div v-else-if="abrirId" class="carregar">A carregar…</div>
-      <div v-else class="vazio">Escolha uma conversa.</div>
-    </div>
-  </div>`,
-};
-
-
 // ── Calendário (A1): a agenda da pessoa no Orbit Mail (SOGo) + reuniões do Orbit, por semana ────────────
 async function apiCal(metodo, args = {}, post = false) {
   const url = `/api/method/orbit.interface.calendario.${metodo}`;
@@ -852,6 +464,474 @@ const Documentos = {
   </div>`,
 };
 
+
+// ── Assinaturas (A4): pedidos do Sign (DocuSeal) do tenant ────────────────────────────────────────────
+async function apiS(metodo, args = {}, post = false) {
+  const url = `/api/method/orbit.interface.assinaturas.${metodo}`;
+  const op = { headers: { "X-Frappe-CSRF-Token": window.csrf_token, Accept: "application/json" } };
+  let r;
+  if (post) { op.method = "POST"; op.headers["Content-Type"] = "application/json"; op.body = JSON.stringify(args); r = await fetch(url, op); }
+  else r = await fetch(url + "?" + new URLSearchParams(args), op);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(String(m).replace(/<[^>]+>/g, "")); throw new Error(m); }
+  return j.message;
+}
+const COR_EST = { completed: "verde", declined: "ambar", expired: "", pending: "azul", sent: "azul", opened: "roxo", awaiting: "azul" };
+const EnviarAssinatura = {
+  props: ["doctype", "name", "emailInicial", "nomeInicial"], emits: ["fechar", "enviado"],
+  setup(props, { emit }) {
+    const ms = ref(null); const modelo = ref(""); const pessoas = ref([]); const msg = ref(""); const aEnviar = ref(false);
+    onMounted(async () => { ms.value = await apiS("modelos"); });
+    watch(modelo, (id) => {
+      const m = (ms.value || []).find((x) => String(x.id) === String(id)); if (!m) return;
+      const papeis = m.papeis.length ? m.papeis : ["Primeira parte"];
+      pessoas.value = papeis.map((p, i) => ({ papel: p, email: i === papeis.length - 1 ? (props.emailInicial || "") : "", nome: i === papeis.length - 1 ? (props.nomeInicial || "") : "" }));
+    });
+    const enviar = async () => {
+      aEnviar.value = true;
+      try { await apiS("enviar", { modelo: modelo.value, pessoas: JSON.stringify(pessoas.value), mensagem: msg.value, doctype: props.doctype || null, name: props.name || null }, true);
+        toast("Enviado — o Sign manda o pedido por email"); emit("enviado"); emit("fechar"); } finally { aEnviar.value = false; }
+    };
+    return { ms, modelo, pessoas, msg, aEnviar, enviar };
+  },
+  template: `<div class="modal-fundo" @click.self="$emit('fechar')"><div class="modal" style="max-width:560px"><header><b>Enviar para assinar</b><button class="btn sm" @click="$emit('fechar')">Fechar</button></header>
+    <form class="corpo-email form-cal" @submit.prevent="enviar">
+      <label>Modelo do Sign<select v-model="modelo" required><option value="" disabled>{{ ms ? 'Escolha um modelo' : 'A carregar…' }}</option><option v-for="m in ms||[]" :key="m.id" :value="m.id">{{ m.nome }}</option></select></label>
+      <p class="sub" v-if="ms && !ms.length" style="margin:0">Ainda não há modelos. Crie-os no Sign (carregar o PDF e marcar onde se assina).</p>
+      <div v-for="(p,i) in pessoas" :key="i" class="linha3" style="grid-template-columns:1fr 1.4fr 1fr"><label>{{ p.papel }}<input v-model="p.nome" placeholder="Nome"></label><label>Email<input v-model="p.email" type="email" required></label><span></span></div>
+      <label>Mensagem (opcional)<textarea v-model="msg" rows="3" placeholder="Junto envio o documento para assinatura."></textarea></label>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="sub" style="font-size:12px">O pedido segue do Sign por email<template v-if="name">; fica uma nota na cronologia</template>.</span><button class="btn prim" :disabled="!modelo || aEnviar">{{ aEnviar ? 'A enviar…' : 'Enviar' }}</button></div>
+    </form></div></div>`,
+};
+const Assinaturas = {
+  components: { EnviarAssinatura },
+  setup() {
+    const est = ref(""); const q = ref(""); const d = ref(null); const novo = ref(false); const ligado = ref(true); let tq;
+    const carregar = async () => { d.value = null; const r = await apiS("lista", { q: q.value, estado_f: est.value }); ligado.value = r.ligado; d.value = r.itens; };
+    watch(est, carregar); watch(q, () => { clearTimeout(tq); tq = setTimeout(carregar, 350); }); onMounted(carregar);
+    return { est, q, d, novo, ligado, carregar, COR_EST, data };
+  },
+  template: `
+  <div>
+    <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div><h1>Assinaturas</h1><div class="sub">Pedidos de assinatura do Stratechna Sign</div></div>
+      <button class="btn prim" @click="novo=true" :disabled="!ligado">Enviar para assinar</button>
+    </div>
+    <div class="vistas"><button v-for="e in [['','Todos'],['pending','À espera'],['completed','Assinados'],['declined','Recusados'],['expired','Expirados']]" :key="e[0]" :class="{ativo:est===e[0]}" @click="est=e[0]">{{ e[1] }}</button></div>
+    <div class="filtros"><input class="filtro" style="border-style:solid;min-width:240px" v-model="q" placeholder="Procurar por email ou nome…"></div>
+    <div v-if="!ligado" class="vazio">Este Orbit ainda não está ligado ao Sign.</div>
+    <div v-else-if="!d" class="carregar">A carregar…</div>
+    <div v-else-if="!d.length" class="vazio">Nenhum pedido.</div>
+    <div v-else class="tabela-wrap"><table>
+      <thead><tr><th>Documento</th><th>Quem assina</th><th>Estado</th><th>Enviado</th><th></th></tr></thead>
+      <tbody><tr v-for="x in d" :key="x.id" style="cursor:default">
+        <td><b>{{ x.modelo }}</b></td>
+        <td><div v-for="p in x.pessoas" :key="p.email" style="white-space:nowrap"><span class="etq" :class="COR_EST[p.estado_c]" style="font-size:11px">{{ p.estado }}</span> {{ p.nome || p.email }} <span class="sub">({{ p.papel }})</span></div></td>
+        <td><span class="etq" :class="COR_EST[x.estado_c]">{{ x.estado }}</span></td>
+        <td class="sub">{{ data(x.criado) }}</td>
+        <td><a v-if="x.estado_c==='completed'" class="btn sm" :href="'/api/method/orbit.interface.assinaturas.documento?id='+x.id" target="_blank">Documento assinado</a></td>
+      </tr></tbody></table></div>
+    <EnviarAssinatura v-if="novo" @fechar="novo=false" @enviado="carregar"/>
+  </div>`,
+};
+
+
+// ── Ecrãs ────────────────────────────────────────────────────────────────────────────────────────────
+const Inicio = {
+  components: { Icone },
+  props: ["ctx"],
+  setup(props) {
+    const d = ref(null);
+    const carregar = async () => (d.value = await api("inicio"));
+    onMounted(carregar);
+    const feita = async (t) => { await api("tarefa_feita", { nome: t.name }, true); carregar(); };
+    const hora = (x) => new Date(String(x).replace(" ", "T")).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+    const hoje = new Date().toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
+    const saud = new Date().getHours() < 13 ? "Bom dia" : new Date().getHours() < 20 ? "Boa tarde" : "Boa noite";
+    return { d, feita, hora, hoje, saud, eur, data, link };
+  },
+  template: `
+  <div class="pad" v-if="d">
+    <div class="ola"><div><h1>{{ saud }}, {{ (ctx.nome||'').split(' ')[0] }}</h1>
+      <div class="sub">{{ hoje }} · {{ d.tarefas.length }} tarefas por fazer, {{ d.eventos.length }} reuniões hoje e amanhã</div></div></div>
+    <div class="kpis">
+      <div class="cartao kpi"><span class="sub">Negócios abertos</span><b>{{ d.kpis.abertos }} · {{ eur(d.kpis.abertos_valor) }}</b></div>
+      <div class="cartao kpi"><span class="sub">Ganhos este mês</span><b>{{ eur(d.kpis.ganhos_valor) }}</b><span class="var">{{ d.kpis.ganhos }} negócios</span></div>
+      <div class="cartao kpi"><span class="sub">Tickets em aberto</span><b>{{ ctx.contadores.tickets }}</b></div>
+      <div class="cartao kpi"><span class="sub">Tarefas atrasadas</span><b>{{ d.kpis.tarefas_atrasadas }}</b></div>
+    </div>
+    <div class="grelha2">
+      <div class="cartao"><header><h2>As minhas tarefas</h2></header>
+        <div v-if="!d.tarefas.length" class="vazio">Sem tarefas por fazer.</div>
+        <div class="linha" v-for="t in d.tarefas" :key="t.name">
+          <span class="chk" @click="feita(t)" title="Marcar como feita" style="cursor:pointer"></span>
+          <div class="cresce">{{ t.title }}<small><a v-if="t.reference_docname" :href="link(t.reference_doctype,t.reference_docname)">{{ t.titulo_ref }}</a></small></div>
+          <span class="etq ambar" v-if="t.atrasada">Atrasada</span><span class="etq" v-else-if="t.hoje">Hoje</span>
+          <span class="sub" v-else-if="t.due_date">{{ data(t.due_date,false) }}</span>
+        </div>
+      </div>
+      <div class="cartao"><header><h2>Agenda</h2></header>
+        <div v-if="!d.eventos.length" class="vazio">Nada marcado para hoje e amanhã.</div>
+        <div class="linha" v-for="e in d.eventos" :key="e.name"><span class="hora">{{ hora(e.starts_on) }}</span>
+          <div class="cresce">{{ e.subject }}<small>{{ data(e.starts_on,false) }}<span v-if="e.location"> · {{ e.location }}</span></small></div></div>
+        <header style="border-top:1px solid var(--line)"><h2>Negócios parados</h2><span class="sub">sem atividade há 14+ dias</span></header>
+        <div v-if="!d.parados.length" class="vazio">Nenhum.</div>
+        <a class="linha" v-for="n in d.parados" :key="n.name" :href="link('CRM Deal',n.name)" style="text-decoration:none;color:inherit">
+          <div class="cresce">{{ n.titulo }}<small>{{ n.estado }} · {{ n.dias }} dias</small></div><b>{{ eur(n.valor) }}</b></a>
+      </div>
+    </div>
+  </div>
+  <div v-else class="carregar">A carregar…</div>`,
+};
+
+const COLUNAS = {
+  contactos: [["full_name", "Nome"], ["company_name", "Empresa"], ["email_id", "Email"], ["mobile_no", "Telemóvel"], ["owner_nome", "Criado por"], ["ultimo_email", "Último email"]],
+  empresas: [["organization_name", "Empresa"], ["website", "Site"], ["telefone", "Telefone"], ["industry", "Setor"], ["territory", "Território"], ["estado_conta", "Estado"]],
+  negocios: [["titulo", "Negócio"], ["organization", "Empresa"], ["estado", "Fase"], ["deal_value", "Valor"], ["expected_closure_date", "Fecho previsto"], ["deal_owner_nome", "Responsável"]],
+  leads: [["lead_name", "Nome"], ["organization", "Empresa"], ["email", "Email"], ["estado", "Estado"], ["source", "Origem"], ["lead_owner_nome", "Responsável"]],
+};
+const TITULOS = { contactos: "Contactos", empresas: "Empresas", negocios: "Negócios", leads: "Leads" };
+const VISTAS = { contactos: [["todos", "Todos"], ["meus", "Os meus"], ["parados", "Sem atividade há 30 dias"]],
+  empresas: [["todos", "Todas"], ["meus", "As minhas"], ["parados", "Sem atividade há 30 dias"]],
+  negocios: [["abertos", "Em curso"], ["todos", "Todos"], ["meus", "Os meus"], ["parados", "Parados há 30 dias"]],
+  leads: [["todos", "Por converter"], ["meus", "As minhas"], ["parados", "Sem atividade há 30 dias"]] };
+const DT_LISTA = { contactos: "Contact", empresas: "CRM Organization", negocios: "CRM Deal", leads: "CRM Lead" };
+
+const Lista = {
+  props: ["objeto"],
+  setup(props) {
+    const chaveVista = () => `orbit.vista.${props.objeto}`;
+    let guardada = null; try { guardada = localStorage.getItem(chaveVista()); } catch (e) {}
+    const vista = ref(guardada || VISTAS[props.objeto][0][0]);
+    const q = ref(""); const linhas = ref([]); const total = ref(0); const mais = ref(false); const pagina = ref(0); const ordem = ref("modified desc"); const a = ref(false);
+    let tq;
+    const carregar = async (junta = false) => {
+      a.value = true;
+      const r = await api("lista", { objeto: props.objeto, vista: vista.value, q: q.value, pagina: pagina.value, ordem: ordem.value });
+      linhas.value = junta ? linhas.value.concat(r.linhas) : r.linhas; total.value = r.total; mais.value = r.mais; a.value = false;
+    };
+    watch(vista, (v) => { try { localStorage.setItem(chaveVista(), v); } catch (e) {} pagina.value = 0; carregar(); });
+    watch(q, () => { clearTimeout(tq); tq = setTimeout(() => { pagina.value = 0; carregar(); }, 300); });
+    watch(() => props.objeto, () => { vista.value = VISTAS[props.objeto][0][0]; q.value = ""; pagina.value = 0; carregar(); });
+    onMounted(() => carregar());
+    const ordenar = (c) => { ordem.value = ordem.value === `${c} desc` ? `${c} asc` : `${c} desc`; pagina.value = 0; carregar(); };
+    const valor = (l, c) => c === "deal_value" ? eur(l[c]) : (c === "ultimo_email" || c === "expected_closure_date") ? data(l[c], false) : l[c];
+    const abrir = (l) => (location.hash = link(DT_LISTA[props.objeto], l.name));
+    return { vista, q, linhas, total, mais, pagina, carregar, ordenar, valor, abrir, a, VISTAS, COLUNAS, TITULOS, cor, ini, ordem };
+  },
+  template: `
+  <div>
+    <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div><h1>{{ TITULOS[objeto] }}</h1><div class="sub">{{ total }} registos</div></div>
+      <div style="display:flex;gap:8px"><a class="btn" :href="'/crm/' + ({contactos:'contacts',empresas:'organizations',negocios:'deals',leads:'leads'})[objeto]">Abrir no CRM clássico</a></div>
+    </div>
+    <div class="vistas"><button v-for="v in VISTAS[objeto]" :key="v[0]" :class="{ativo: vista===v[0]}" @click="vista=v[0]">{{ v[1] }}</button></div>
+    <div class="filtros"><input class="filtro" style="border-style:solid;min-width:240px" v-model="q" :placeholder="'Procurar em ' + TITULOS[objeto].toLowerCase() + '…'"></div>
+    <div class="tabela-wrap"><table>
+      <thead><tr><th v-for="c in COLUNAS[objeto]" :key="c[0]" @click="ordenar(c[0])" style="cursor:pointer">{{ c[1] }}<span v-if="ordem.startsWith(c[0]+' ')">{{ ordem.endsWith('asc') ? ' ↑' : ' ↓' }}</span></th></tr></thead>
+      <tbody>
+        <tr v-for="l in linhas" :key="l.name" @click="abrir(l)">
+          <td v-for="(c,i) in COLUNAS[objeto]" :key="c[0]">
+            <div v-if="i===0" class="pessoa"><span class="av" :style="{background:cor(l.name)}">{{ ini(l[c[0]]||l.name) }}</span><a :href="'#'" @click.prevent>{{ l[c[0]] || l.name }}</a></div>
+            <span v-else-if="c[0]==='estado'" class="etq">{{ l.estado }}</span>
+            <span v-else>{{ valor(l,c[0]) }}</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div v-if="!a && !linhas.length" class="vazio">Nada encontrado.</div>
+    <div class="mais-linhas" v-if="mais"><button class="btn sm" @click="pagina++; carregar(true)">Mostrar mais</button></div>
+    </div>
+  </div>`,
+};
+
+const Ficha = {
+  components: { Icone, EmailCorpo, VerDocumento, EnviarAssinatura },
+  props: ["doctype", "name"],
+  setup(props) {
+    const f = ref(null); const cron = ref(null); const filtro = ref(""); const ed = ref(""); const valorEd = ref("");
+    const notaTxt = ref(""); const tarefaTxt = ref(""); const tarefaData = ref(""); const modo = ref("nota"); const email = ref(null);
+    const docs = ref(null); const verDoc = ref(null);
+    const carregar = async () => {
+      f.value = await api("ficha", { doctype: props.doctype, name: props.name });
+      carregarCron();
+      apiD("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (docs.value = r)).catch(() => (docs.value = { erro: "falhou" }));
+      carregarAssin();
+    };
+    const assin = ref(null); const assinar = ref(false);
+    const carregarAssin = () => apiS("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (assin.value = r)).catch(() => (assin.value = { itens: [] }));
+    const carregarCron = async () => (cron.value = await api("cronologia", { doctype: props.doctype, name: props.name, tipo: filtro.value }));
+    watch(() => [props.doctype, props.name], () => { f.value = null; cron.value = null; carregar(); });
+    watch(filtro, carregarCron);
+    onMounted(carregar);
+    const editar = (p) => { if (!p.editavel) return; ed.value = p.campo; valorEd.value = p.valor || ""; nextTick(() => document.querySelector(".prop .ed-campo")?.focus()); };
+    const gravar = async (p) => {
+      if (valorEd.value === (p.valor || "")) { ed.value = ""; return; }
+      await api("guardar", { doctype: props.doctype, name: props.name, campo: p.campo, valor: valorEd.value }, true);
+      ed.value = ""; toast("Gravado"); carregar();
+    };
+    const enviarNota = async () => {
+      if (!notaTxt.value.trim()) return;
+      await api("nota", { doctype: props.doctype, name: props.name, conteudo: notaTxt.value }, true);
+      notaTxt.value = ""; toast("Nota gravada"); carregarCron();
+    };
+    const enviarTarefa = async () => {
+      if (!tarefaTxt.value.trim()) return;
+      await api("tarefa", { doctype: props.doctype, name: props.name, titulo: tarefaTxt.value, data: tarefaData.value || null }, true);
+      tarefaTxt.value = ""; tarefaData.value = ""; toast("Tarefa criada"); carregarCron();
+    };
+    const procurar = async () => {
+      const r = await api("procurar_emails", { doctype: props.doctype, name: props.name }, true);
+      toast(r.emails.length ? "A procurar nas caixas ligadas… atualize daqui a um minuto." : "Este registo não tem email.");
+    };
+    const abrirEmail = async (i) => { if (i.tipo !== "email") return; email.value = await api("email_completo", { nome: i.id }, true); };
+    const grupos = computed(() => {
+      if (!cron.value) return [];
+      const g = []; let atual = null;
+      for (const i of cron.value.passado) { const m = mes(i.data); if (!atual || atual.mes !== m) { atual = { mes: m, itens: [] }; g.push(atual); } atual.itens.push(i); }
+      return g;
+    });
+    const mudarFase = async (s) => { await api("guardar", { doctype: "CRM Deal", name: props.name, campo: "status", valor: s }, true); toast("Fase alterada"); carregar(); };
+    const NOMES = { "CRM Deal": "Negócios", "Contact": "Contactos", "CRM Organization": "Empresa", "CRM Lead": "Leads" };
+    const tit = (dt, r) => dt === "CRM Deal" ? (r.titulo || r.lead_name || r.organization || r.name) : dt === "Contact" ? (r.full_name || r.name) : dt === "CRM Organization" ? (r.organization_name || r.name) : (r.lead_name || r.name);
+    const sub = (dt, r) => dt === "CRM Deal" ? [r.estado, r.deal_value ? eur(r.deal_value) : "", r.expected_closure_date ? "fecha a " + data(r.expected_closure_date, false) : ""].filter(Boolean).join(" · ")
+      : dt === "Contact" ? [r.designation, r.email_id].filter(Boolean).join(" · ") : dt === "CRM Organization" ? [r.website, r.territory].filter(Boolean).join(" · ") : [r.estado, r.email].filter(Boolean).join(" · ");
+    const ic = (t) => IC_EVENTO[t] || IC_EVENTO.nota;
+    const marcarEmail = () => { window.__ref_email = (f.value && f.value.email_principal) || ""; };
+    return { assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
+      grupos, mudarFase, NOMES, tit, sub, link, data, eur, ic, cor, ESTADO_COR };
+  },
+  template: `
+  <div class="ficha" v-if="f">
+    <aside class="col-esq">
+      <div style="font-size:13px;display:flex;justify-content:space-between"><a href="javascript:history.back()">← Voltar</a><a :href="f.classico">Abrir no CRM clássico</a></div>
+      <div class="cabeca">
+        <div class="av" :style="{background:cor(f.titulo)}">{{ f.iniciais }}</div>
+        <h1>{{ f.titulo }}</h1><div class="sub">{{ f.sub }}</div>
+        <div class="acoes-rap">
+          <button @click="modo='nota'"><span><Icone n="nota"/></span>Nota</button>
+          <a v-if="f.email_principal" :href="'mailto:'+f.email_principal" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)"><span style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface-2)"><Icone n="mail"/></span>Email</a>
+          <a v-if="f.telefone" :href="'tel:'+f.telefone" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)"><span style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface-2)"><Icone n="tel"/></span>Ligar</a>
+          <button @click="modo='tarefa'"><span><Icone n="tarefa"/></span>Tarefa</button>
+          <a :href="'#/calendario/nova/'+encodeURIComponent(doctype)+'/'+encodeURIComponent(name)" @click="marcarEmail" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)"><span style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface-2)"><Icone n="cal"/></span>Reunião</a>
+        </div>
+      </div>
+      <div v-if="f.estados.length" style="margin-top:14px">
+        <label class="sub" style="font-size:12px">Fase do negócio</label>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
+          <button v-for="s in f.estados" :key="s.name" class="btn sm" :class="{prim: f.props.find(p=>p.campo==='status')?.valor===s.name}" @click="mudarFase(s.name)" :disabled="!f.pode_editar">{{ s.rotulo }}</button>
+        </div>
+      </div>
+      <div class="bloco-tit">Sobre este registo</div>
+      <div class="prop" v-for="p in f.props" :key="p.campo">
+        <label>{{ p.rotulo }}</label>
+        <template v-if="ed===p.campo">
+          <select v-if="p.opcoes" class="ed-campo" v-model="valorEd" @change="gravar(p)" @blur="ed=''"><option v-for="o in p.opcoes" :value="o">{{ p.rotulos[o] || o || '—' }}</option></select>
+          <input v-else class="ed-campo" v-model="valorEd" :type="p.tipo==='Date'?'date':(p.tipo==='Currency'||p.tipo==='Percent')?'number':'text'" @keyup.enter="gravar(p)" @keyup.esc="ed=''" @blur="gravar(p)">
+        </template>
+        <div v-else :class="{ed:p.editavel}" @click="editar(p)">
+          <span v-if="p.tipo==='Currency'">{{ p.valor ? eur(p.valor) : '—' }}</span>
+          <span v-else-if="p.tipo==='Datetime'||p.tipo==='Date'">{{ p.valor ? data(p.valor, p.tipo==='Datetime') : '—' }}</span>
+          <span v-else-if="p.tipo==='Percent'">{{ p.valor!=null ? p.valor+' %' : '—' }}</span>
+          <span v-else>{{ (p.rotulos && p.rotulos[p.valor]) || p.mostra || p.valor || '—' }}</span>
+        </div>
+      </div>
+    </aside>
+
+    <div class="col-meio">
+      <div class="separ">
+        <button :class="{ativo:filtro===''}" @click="filtro=''">Atividade</button>
+        <button :class="{ativo:filtro==='emails'}" @click="filtro='emails'">Emails <span class="sub">{{ cron?.contagem?.email || '' }}</span></button>
+        <button :class="{ativo:filtro==='notas'}" @click="filtro='notas'">Notas</button>
+        <button :class="{ativo:filtro==='chamadas'}" @click="filtro='chamadas'">Chamadas</button>
+        <button :class="{ativo:filtro==='tarefas'}" @click="filtro='tarefas'">Tarefas</button>
+        <button :class="{ativo:filtro==='reunioes'}" @click="filtro='reunioes'">Reuniões</button>
+        <button :class="{ativo:filtro==='tickets'}" @click="filtro='tickets'">Tickets</button>
+      </div>
+      <div class="cartao compor" v-if="modo==='nota'"><textarea v-model="notaTxt" rows="1" :placeholder="'Escrever uma nota sobre ' + f.titulo + '…'" @keydown.meta.enter="enviarNota" @keydown.ctrl.enter="enviarNota"></textarea><button class="btn sm prim" @click="enviarNota" :disabled="!notaTxt.trim()">Gravar nota</button></div>
+      <div class="cartao compor" v-else><input v-model="tarefaTxt" placeholder="Nova tarefa…" @keyup.enter="enviarTarefa"><input type="date" v-model="tarefaData" style="flex:none;width:150px"><button class="btn sm prim" @click="enviarTarefa" :disabled="!tarefaTxt.trim()">Criar tarefa</button></div>
+      <div v-if="!cron" class="carregar">A carregar…</div>
+      <template v-else>
+        <template v-if="cron.proximos.length"><div class="mes">Próximo</div>
+          <div class="evento" v-for="i in cron.proximos" :key="i.tipo+i.id"><div class="ic" :style="{background:ic(i.tipo)[1],color:ic(i.tipo)[2]}"><Icone :n="ic(i.tipo)[0]"/></div>
+            <div class="cartao corpo"><header><b>{{ i.titulo }}</b><span :class="i.atrasada?'etq ambar':'sub'">{{ i.atrasada ? 'Atrasada · ' : '' }}{{ data(i.data) }}</span></header><p v-if="i.texto">{{ i.texto }}</p><p v-if="i.quem" class="sub">{{ i.quem }}</p></div></div>
+        </template>
+        <div v-if="!grupos.length && !cron.proximos.length" class="vazio">Ainda não há atividade.<br><button class="btn sm" style="margin-top:10px" @click="procurar">Procurar emails antigos nas caixas ligadas</button></div>
+        <template v-for="g in grupos" :key="g.mes"><div class="mes">{{ g.mes }}</div>
+          <div class="evento" v-for="i in g.itens" :key="i.tipo+i.id"><div class="ic" :style="{background:ic(i.tipo)[1],color:ic(i.tipo)[2]}"><Icone :n="ic(i.tipo)[0]"/></div>
+            <div class="cartao corpo" :class="{abre:i.tipo==='email'}" @click="abrirEmail(i)">
+              <header><b><template v-if="i.tipo==='email'">{{ i.sentido==='Sent' ? 'Email enviado: ' : 'Email recebido: ' }}</template>{{ i.titulo }}</b>
+                <span class="sub">{{ data(i.data) }}<template v-if="i.duracao"> · {{ Math.round(i.duracao/60) }} min</template></span></header>
+              <p v-if="i.tipo==='email'" class="sub" style="margin-top:2px">{{ i.sentido==='Sent' ? 'Para ' + (i.para||'') : 'De ' + (i.quem||'') }}<template v-if="i.conta"> · {{ i.conta }}</template> <span v-if="i.privado" class="priv">· só para si</span></p>
+              <p v-if="i.texto">{{ i.texto }}</p>
+              <p v-if="i.tipo!=='email' && i.quem" class="sub">{{ i.quem }}</p>
+              <span v-if="i.tipo==='ticket'" class="etq" :class="i.resolvido?'verde':'ambar'">{{ i.estado }}</span>
+            </div></div>
+        </template>
+        <div v-if="grupos.length" style="text-align:center;margin:16px 0"><button class="btn sm" @click="procurar">Procurar emails antigos nas caixas ligadas</button></div>
+      </template>
+    </div>
+
+    <aside class="col-dir">
+      <template v-for="(lista, dt) in f.assoc" :key="dt">
+        <template v-if="lista.length || dt!=='CRM Lead'">
+          <div class="bloco-tit">{{ NOMES[dt] }} <span class="sub" style="font-weight:400">{{ lista.length }}</span></div>
+          <div v-if="!lista.length" class="sub" style="font-size:13px">—</div>
+          <a v-for="r in lista" :key="r.name" class="assoc" :href="link(dt,r.name)" style="display:block;text-decoration:none;color:inherit">
+            <b>{{ tit(dt,r) }}</b><small>{{ sub(dt,r) }}</small>
+            <div class="barra" v-if="dt==='CRM Deal' && r.probability"><i :style="{width:r.probability+'%'}"></i></div>
+          </a>
+        </template>
+      </template>
+      <div class="bloco-tit">Documentos <span class="sub" style="font-weight:400" v-if="docs && !docs.erro">{{ docs.docs.length }}</span></div>
+      <div v-if="!docs" class="sub" style="font-size:13px">A procurar…</div>
+      <div v-else-if="docs.erro" class="sub" style="font-size:13px"><a href="#/documentos">Ligar a sua conta</a> para ver os documentos.</div>
+      <div v-else-if="!docs.docs.length" class="sub" style="font-size:13px">—</div>
+      <div v-for="x in (docs && docs.docs) || []" :key="x.id" class="assoc" style="cursor:pointer" @click="verDoc=x"><b>{{ x.titulo }}</b><small>{{ [x.tipo, x.criado].filter(Boolean).join(' · ') }}</small></div>
+      <VerDocumento v-if="verDoc" :doc="verDoc" @fechar="verDoc=null"/>
+      <div class="bloco-tit">Assinaturas <span class="sub" style="font-weight:400;cursor:pointer" @click="assinar=true">+ Enviar</span></div>
+      <div v-if="!assin" class="sub" style="font-size:13px">A procurar…</div>
+      <div v-else-if="!assin.itens.length" class="sub" style="font-size:13px">—</div>
+      <div v-for="x in (assin && assin.itens) || []" :key="x.id" class="assoc"><b>{{ x.modelo }}</b><small><span class="etq" :class="COR_EST[x.estado_c]" style="font-size:11px">{{ x.estado }}</span> · {{ data(x.criado,false) }}<a v-if="x.estado_c==='completed'" :href="'/api/method/orbit.interface.assinaturas.documento?id='+x.id" target="_blank"> · documento</a></small></div>
+      <EnviarAssinatura v-if="assinar" :doctype="doctype" :name="name" :email-inicial="f.email_principal" :nome-inicial="doctype==='Contact'?f.titulo:''" @fechar="assinar=false" @enviado="carregarAssin(); carregarCron()"/>
+      <div class="bloco-tit">Tickets <span class="sub" style="font-weight:400">{{ f.tickets.length }}</span></div>
+      <div v-if="!f.tickets.length" class="sub" style="font-size:13px">—</div>
+      <a v-for="t in f.tickets" :key="t.name" class="assoc" :href="'/helpdesk/tickets/'+t.name" style="display:block;text-decoration:none;color:inherit"><b>#{{ t.name }} {{ t.subject }}</b><small>{{ t.status }} · {{ data(t.modified,false) }}</small></a>
+    </aside>
+
+    <div class="modal-fundo" v-if="email" @click.self="email=null">
+      <div class="modal"><header><div><b>{{ email.assunto }}</b><div class="sub">De {{ email.de }} · para {{ email.para }}<span v-if="email.cc"> · cc {{ email.cc }}</span> · {{ data(email.data) }}</div></div><div style="display:flex;gap:6px"><a class="btn sm prim" :href="'#/caixa/'+encodeURIComponent(email.id)">Responder</a><button class="btn sm" @click="email=null">Fechar</button></div></header>
+        <div class="corpo-email"><EmailCorpo :html="email.html"/></div></div>
+    </div>
+  </div>
+  <div v-else class="carregar">A carregar…</div>`,
+};
+
+const Funil = {
+  setup() {
+    const d = ref(null); const resp = ref(""); const arrastar = ref(null); const alvo = ref("");
+    const carregar = async () => (d.value = await api("funil", { responsavel: resp.value }));
+    watch(resp, carregar); onMounted(carregar);
+    const largar = async (col) => {
+      const n = arrastar.value; alvo.value = ""; arrastar.value = null;
+      if (!n || n.estado === col.estado) return;
+      await api("mover", { negocio: n.name, estado: col.estado }, true); toast(`Passou a «${col.rotulo}»`); carregar();
+    };
+    const total = computed(() => d.value ? d.value.colunas.filter((c) => c.tipo !== "Won").reduce((a, c) => a + c.total, 0) : 0);
+    const n = computed(() => d.value ? d.value.colunas.filter((c) => c.tipo !== "Won").reduce((a, c) => a + c.cartoes.length, 0) : 0);
+    return { d, resp, arrastar, alvo, largar, total, n, eur, link, data, FAIXA };
+  },
+  template: `
+  <div>
+    <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div><h1>Funil de negócios</h1><div class="sub">{{ n }} em curso · {{ eur(total) }} · ganhos dos últimos 30 dias</div></div>
+      <div style="display:flex;gap:8px"><select class="btn" v-model="resp"><option value="">Todos os responsáveis</option><option value="eu">Só os meus</option></select><a class="btn" href="#/negocios">Lista</a></div>
+    </div>
+    <div v-if="!d" class="carregar">A carregar…</div>
+    <div class="funil" v-else :style="{gridTemplateColumns:'repeat('+d.colunas.length+',minmax(230px,1fr))'}">
+      <div class="coluna" v-for="c in d.colunas" :key="c.estado" :class="{alvo: alvo===c.estado}"
+           @dragover.prevent="alvo=c.estado" @dragleave="alvo=''" @drop.prevent="largar(c)">
+        <header><b>{{ c.rotulo }} <span class="sub" style="font-weight:500">{{ c.cartoes.length }}</span></b><small>{{ eur(c.total) }}</small><div class="faixa" :style="{background:FAIXA[c.cor]||'#94a3b8'}"></div></header>
+        <a class="cartao negocio" v-for="x in c.cartoes" :key="x.name" :href="link('CRM Deal',x.name)" draggable="true" @dragstart="arrastar={...x, estado:c.estado}" style="display:block;text-decoration:none;color:inherit">
+          <h3>{{ x.titulo }}</h3><div class="sub">{{ x.org }}</div>
+          <div class="val">{{ eur(x.valor) }}<span class="av" style="width:22px;height:22px;font-size:10px;background:#5b6f7a" :title="x.dono_nome">{{ x.dono }}</span></div>
+          <div class="prox" :class="{atraso:x.atraso}" v-if="x.prox">◷ {{ x.prox }}<template v-if="x.prox_data"> · {{ data(x.prox_data,false) }}</template></div>
+          <div class="prox" v-else-if="c.tipo!=='Won'">Sem próxima tarefa<template v-if="x.parado>7"> · {{ x.parado }} dias parado</template></div>
+        </a>
+      </div>
+    </div>
+  </div>`,
+};
+
+const Caixa = {
+  components: { EmailCorpo, Icone },
+  props: ["abrirId"],
+  setup(props) {
+    let c0 = { grupo: "equipa", conta: "" }; try { c0 = JSON.parse(localStorage.getItem("orbit.caixa.canal")) || c0; } catch (e) {}
+    const canal = ref(c0); const canais = ref(null); const itens = ref(null); const conv = ref(null);
+    const resposta = ref(""); const para = ref(""); const cc = ref(""); const aEnviar = ref(false); const verCc = ref(false);
+    const carregar = async () => { itens.value = null; itens.value = await api("caixa", { grupo: canal.value.grupo, conta: canal.value.conta }); };
+    const escolher = (grupo, conta = "") => { canal.value = { grupo, conta }; try { localStorage.setItem("orbit.caixa.canal", JSON.stringify(canal.value)); } catch (e) {} carregar(); };
+    const abrirConversa = async (id) => {
+      conv.value = null; resposta.value = ""; cc.value = ""; verCc.value = false;
+      conv.value = await api("conversa", { nome: id });
+      para.value = conv.value.para || "";
+      nextTick(() => { const m = document.querySelector(".msgs"); if (m) m.scrollTop = m.scrollHeight; });
+    };
+    const abrir = (i) => { if (i.tipo === "ticket") { window.open(i.url, "_blank"); return; } location.hash = "#/caixa/" + encodeURIComponent(i.id); };
+    watch(() => props.abrirId, (id) => { if (id) abrirConversa(id); });
+    onMounted(async () => { canais.value = await api("canais"); carregar(); if (props.abrirId) abrirConversa(props.abrirId); });
+    const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const enviar = async () => {
+      if (!resposta.value.trim() || aEnviar.value) return;
+      aEnviar.value = true;
+      try {
+        const html = resposta.value.trim().split(/\n{2,}/).map((p) => "<p>" + esc(p).replace(/\n/g, "<br>") + "</p>").join("");
+        await api("responder", { nome: conv.value.responder_a, html, para: para.value, cc: cc.value }, true);
+        toast("Resposta enviada de " + conv.value.de);
+        resposta.value = ""; await abrirConversa(conv.value.responder_a); carregar();
+      } finally { aEnviar.value = false; }
+    };
+    const ativo = (g, c = "") => canal.value.grupo === g && (canal.value.conta || "") === c;
+    const nomeCanal = computed(() => {
+      const c = canal.value; if (c.grupo === "tickets") return "Tickets do Desk";
+      if (c.conta) return c.conta.replace("Orbit CRM · ", "");
+      return c.grupo === "privado" ? "As minhas conversas" : "Todas as caixas de equipa";
+    });
+    return { canal, canais, itens, conv, abrir, data, cor, ini, link, resposta, para, cc, verCc, enviar, aEnviar, escolher, ativo, nomeCanal };
+  },
+  template: `
+  <div class="caixa caixa3" :class="{'com-conv': !!abrirId}">
+    <aside class="canais">
+      <h6><span class="ponto-eq"></span>Equipa</h6>
+      <button :class="{ativo:ativo('equipa')}" @click="escolher('equipa')">Todas as caixas de equipa</button>
+      <button v-for="c in canais?.equipa||[]" :key="c.conta" :class="{ativo:ativo('equipa',c.conta)}" @click="escolher('equipa',c.conta)"><span class="txt">{{ c.email }}</span><span class="n" v-if="c.n">{{ c.n }}</span></button>
+      <button :class="{ativo:ativo('tickets','tickets')}" @click="escolher('tickets','tickets')"><span class="txt">Tickets do Desk</span><span class="n" v-if="canais?.tickets">{{ canais.tickets }}</span></button>
+      <h6><span class="ponto-pr"></span>Privado <small>só você vê</small></h6>
+      <button :class="{ativo:ativo('privado')}" @click="escolher('privado')">As minhas conversas</button>
+      <button v-for="c in canais?.privado||[]" :key="c.conta" :class="{ativo:ativo('privado',c.conta)}" @click="escolher('privado',c.conta)"><span class="txt">{{ c.email }}</span><span class="n" v-if="c.n">{{ c.n }}</span></button>
+      <p class="sub" v-if="canais && !canais.privado.length" style="font-size:12px;padding:0 10px">A sua caixa pessoal ainda não está ligada ao CRM («só para mim»): liga-se no portal, em Stratechna Orbit.</p>
+    </aside>
+    <div class="lista-conv">
+      <header><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2 style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ nomeCanal }}</h2><span class="sub" v-if="itens">{{ itens.length }}</span></div>
+        <div class="sub" style="font-size:12px;margin-top:4px">{{ canal.grupo==='privado' ? 'Conversas da sua caixa com clientes do CRM — só você as vê.' : canal.grupo==='tickets' ? 'Pedidos de suporte em aberto.' : 'Conversas partilhadas — toda a equipa as vê.' }}</div></header>
+      <div v-if="!itens" class="carregar">A carregar…</div>
+      <div v-else-if="!itens.length" class="vazio">Nada por aqui.</div>
+      <div v-for="i in itens || []" :key="i.tipo+i.id" class="conv" :class="{ativo: abrirId===i.id, nova: i.por_responder}" @click="abrir(i)">
+        <span class="av" style="width:30px;height:30px;font-size:11px" :style="{background:cor(i.quem)}">{{ ini(i.quem) }}</span>
+        <div style="min-width:0"><div class="linha1"><b>{{ i.quem }}</b><time>{{ data(i.data,false) }}</time></div><p>{{ i.titulo }}</p>
+          <div class="meta"><span class="etq" :class="i.tipo==='ticket'?'ambar':i.grupo==='privado'?'roxo':'azul'">{{ i.tipo==='ticket' ? 'Ticket · ' + i.estado : i.grupo==='privado' ? 'Privado' : 'Equipa' }}</span>
+            <span class="sub" style="font-size:12px" v-if="i.ref_titulo">{{ i.ref_titulo }}</span><span class="sub" style="font-size:12px" v-if="i.n>1">· {{ i.n }}</span></div></div>
+      </div>
+    </div>
+    <div class="fio">
+      <template v-if="conv">
+        <header><a class="voltar-conv" href="#/caixa">← Conversas</a><div style="min-width:0"><h2>{{ conv.assunto }}</h2><div class="sub">{{ conv.mensagens.length }} mensagens<template v-if="conv.de"> · caixa {{ conv.de }}</template></div></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><a v-if="conv.ref[0]" class="btn sm" :href="link(conv.ref[0], conv.ref[1])">Abrir {{ conv.ref_titulo }}</a></div></header>
+        <div class="msgs">
+          <div class="cartao msg" v-for="m in conv.mensagens" :key="m.id" :class="{nossa:m.enviado}">
+            <header><b>{{ m.de }}</b><span>{{ data(m.data) }}</span></header>
+            <div class="sub" style="font-size:12px;margin-bottom:8px">Para {{ m.para }}<template v-if="m.cc"> · cc {{ m.cc }}</template></div>
+            <EmailCorpo :html="m.html"/>
+          </div>
+        </div>
+        <div class="cartao resposta" v-if="conv.pode_responder">
+          <div class="tabs" style="flex-wrap:wrap;align-items:center"><span class="sub">De {{ conv.de }} · Para</span>
+            <input v-model="para" style="flex:1;min-width:180px;border:0;background:none;font:inherit;color:var(--ink);outline:none">
+            <button class="sub" style="all:unset;cursor:pointer;font-size:12px" v-if="!verCc" @click="verCc=true">Cc</button></div>
+          <div class="tabs" v-if="verCc"><span class="sub">Cc</span><input v-model="cc" style="flex:1;border:0;background:none;font:inherit;color:var(--ink);outline:none"></div>
+          <textarea v-model="resposta" rows="5" placeholder="Escrever a resposta…" @keydown.meta.enter="enviar" @keydown.ctrl.enter="enviar"></textarea>
+          <footer><span class="sub">Fica nos Enviados de {{ conv.de }} e na cronologia do cliente · ⌘↵ envia</span><button class="btn prim sm" @click="enviar" :disabled="!resposta.trim() || aEnviar">{{ aEnviar ? 'A enviar…' : 'Enviar' }}</button></footer>
+        </div>
+        <div v-else class="vazio" style="margin:0 20px 20px">Esta conversa é da caixa pessoal de outra pessoa: só ela pode responder.</div>
+      </template>
+      <div v-else-if="abrirId" class="carregar">A carregar…</div>
+      <div v-else class="vazio">Escolha uma conversa.</div>
+    </div>
+  </div>`,
+};
+
+
 // ── Definições (uma só roda dentada) ─────────────────────────────────────────────────────────────────
 const Definicoes = {
   setup() { const d = ref(null); onMounted(async () => (d.value = await api("definicoes"))); return { d }; },
@@ -880,7 +960,7 @@ const AppEmbutida = {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, Calendario, Tarefas, Projetos, Projeto, Documentos },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, Calendario, Tarefas, Projetos, Projeto, Documentos, Assinaturas },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -905,7 +985,7 @@ const App = {
       r.dataset.theme = escuro ? "light" : "dark"; try { localStorage.setItem("orbit.tema", r.dataset.theme); } catch (e) {}
     };
     const NAV = [["inicio", "casa", "Início"], ["sec", "CRM"], ["contactos", "pessoa", "Contactos"], ["empresas", "empresa", "Empresas"], ["leads", "lead", "Leads"],
-      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"], ["sec", "Trabalho"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"], ["projetos", "grelha", "Projetos"], ["documentos", "livro", "Documentos"]];
+      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"], ["sec", "Trabalho"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"], ["projetos", "grelha", "Projetos"], ["documentos", "livro", "Documentos"], ["assinaturas", "nota", "Assinaturas"]];
     const rotaCal = computed(() => partes.value.join("/"));
     return { ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal };
   },
@@ -944,6 +1024,7 @@ const App = {
         <Definicoes v-else-if="ecra==='definicoes'"/>
         <Tarefas v-else-if="ecra==='tarefas'"/>
         <Documentos v-else-if="ecra==='documentos'"/>
+        <Assinaturas v-else-if="ecra==='assinaturas'"/>
         <Projetos v-else-if="ecra==='projetos'"/>
         <Projeto v-else-if="ecra==='projeto'" :nome="partes[1]" :key="partes[1]"/>
         <Calendario v-else-if="ecra==='calendario'" :nova="partes[1]==='nova'" :ref-dt="partes[2]" :ref-dn="partes[3]" :key="rotaCal"/>
