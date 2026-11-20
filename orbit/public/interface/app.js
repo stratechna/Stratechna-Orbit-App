@@ -872,6 +872,53 @@ const Importar = {
     </div></div></div>`,
 };
 
+
+// ── Compositor com modelos (H9) e email novo a partir da ficha ─────────────────────────────────────────
+const Compositor = {
+  props: ["modelValue", "doctype", "name", "para", "linhas"], emits: ["update:modelValue", "assunto", "enviar"],
+  setup(props, { emit }) {
+    const modelos = ref(null); const area = ref(null);
+    const abrir = async () => { if (!modelos.value) modelos.value = await api("modelos_email"); };
+    const inserir = async (ev) => {
+      const m = ev.target.value; ev.target.value = ""; if (!m) return;
+      const r = await api("aplicar_modelo", { modelo: m, doctype: props.doctype || "", name: props.name || "", para: props.para || "" });
+      const el = area.value; const v = props.modelValue || ""; const pos = el ? el.selectionStart : v.length;
+      emit("update:modelValue", v.slice(0, pos) + r.texto + v.slice(pos)); if (r.assunto) emit("assunto", r.assunto);
+    };
+    return { modelos, area, abrir, inserir };
+  },
+  template: `<div class="compositor">
+    <div class="compositor-barra"><select class="btn sm" @focus="abrir" @mousedown="abrir" @change="inserir"><option value="">Modelos ▾</option><option v-for="m in modelos||[]" :key="m.name" :value="m.name">{{ m.name }}</option></select>
+      <span class="sub" style="font-size:12px">os campos ({{ '{' }}{{ '{' }} nome {{ '}' }}{{ '}' }}, empresa…) preenchem-se sozinhos</span></div>
+    <textarea ref="area" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" :rows="linhas || 6" placeholder="Escrever…" @keydown.meta.enter="$emit('enviar')" @keydown.ctrl.enter="$emit('enviar')"></textarea>
+  </div>`,
+};
+const NovoEmail = {
+  components: { Compositor }, props: ["doctype", "name", "para"], emits: ["fechar", "enviado"],
+  setup(props, { emit }) {
+    const caixas = ref(null); const f = ref({ conta: "", para: props.para || "", cc: "", assunto: "", texto: "" }); const aEnviar = ref(false);
+    onMounted(async () => { caixas.value = await api("minhas_caixas"); f.value.conta = (caixas.value[0] || {}).conta || ""; });
+    const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const enviar = async () => {
+      if (!f.value.conta || !f.value.para || !f.value.assunto || !f.value.texto.trim()) { toast("Falta a caixa, o destinatário, o assunto ou o texto"); return; }
+      aEnviar.value = true;
+      try { const html = f.value.texto.trim().split(/\n{2,}/).map((p) => "<p>" + esc(p).replace(/\n/g, "<br>") + "</p>").join("");
+        await api("enviar_email", { doctype: props.doctype, name: props.name, conta: f.value.conta, para: f.value.para, cc: f.value.cc, assunto: f.value.assunto, html }, true);
+        toast("Email enviado"); emit("enviado"); emit("fechar"); } finally { aEnviar.value = false; }
+    };
+    return { caixas, f, aEnviar, enviar };
+  },
+  template: `<div class="modal-fundo" @click.self="$emit('fechar')"><div class="modal" style="max-width:680px"><header><b>Novo email</b><button class="btn sm" @click="$emit('fechar')">Fechar</button></header>
+    <div class="corpo-email form-cal">
+      <div v-if="caixas && !caixas.length" class="aviso" style="margin:0">Ainda não há caixas ligadas ao CRM de onde possa escrever (ligam-se no portal, em Stratechna Orbit).</div>
+      <label>De<select v-model="f.conta"><option v-for="c in caixas||[]" :key="c.conta" :value="c.conta">{{ c.email }}{{ c.privada ? ' (a sua caixa)' : ' (equipa)' }}</option></select></label>
+      <div class="linha3" style="grid-template-columns:1fr 1fr"><label>Para<input v-model="f.para"></label><label>Cc<input v-model="f.cc"></label></div>
+      <label>Assunto<input v-model="f.assunto"></label>
+      <Compositor v-model="f.texto" :doctype="doctype" :name="name" :para="f.para" :linhas="9" @assunto="(a)=>{ if(!f.assunto) f.assunto=a }" @enviar="enviar"/>
+      <div style="display:flex;justify-content:space-between;align-items:center"><span class="sub" style="font-size:12px">Fica nos Enviados da caixa e na cronologia · sabe-se quando é aberto</span><button class="btn prim" @click="enviar" :disabled="aEnviar">{{ aEnviar ? 'A enviar…' : 'Enviar' }}</button></div>
+    </div></div></div>`,
+};
+
 // ── Ecrãs ────────────────────────────────────────────────────────────────────────────────────────────
 const Inicio = {
   components: { Icone },
@@ -1072,7 +1119,7 @@ const Lista = {
 };
 
 const Ficha = {
-  components: { Icone, EmailCorpo, VerDocumento, EnviarAssinatura },
+  components: { Icone, EmailCorpo, VerDocumento, EnviarAssinatura, NovoEmail },
   props: ["doctype", "name"],
   setup(props) {
     const f = ref(null); const cron = ref(null); const filtro = ref(""); const ed = ref(""); const valorEd = ref("");
@@ -1146,7 +1193,8 @@ const Ficha = {
       : dt === "Contact" ? [r.designation, r.email_id].filter(Boolean).join(" · ") : dt === "CRM Organization" ? [r.website, r.territory].filter(Boolean).join(" · ") : [r.estado, r.email].filter(Boolean).join(" · ");
     const ic = (t) => IC_EVENTO[t] || IC_EVENTO.nota;
     const marcarEmail = () => { window.__ref_email = (f.value && f.value.email_principal) || ""; };
-    return { conv, convForm, aConverter, abrirConversao, converter, pode, assocAberta, assocQ, assocRes, abrirAssoc, procurarAssoc, ligarAssoc, tirarAssoc, vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
+    const novoEmail = ref(false);
+    return { novoEmail, conv, convForm, aConverter, abrirConversao, converter, pode, assocAberta, assocQ, assocRes, abrirAssoc, procurarAssoc, ligarAssoc, tirarAssoc, vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
       grupos, mudarFase, NOMES, tit, sub, link, data, eur, ic, cor, ESTADO_COR };
   },
   template: `
@@ -1158,7 +1206,7 @@ const Ficha = {
         <h1>{{ f.titulo }}</h1><div class="sub">{{ f.sub }}</div>
         <div class="acoes-rap">
           <button @click="modo='nota'"><span><Icone n="nota"/></span>Nota</button>
-          <a v-if="f.email_principal" :href="'mailto:'+f.email_principal" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)"><span style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface-2)"><Icone n="mail"/></span>Email</a>
+          <button @click="novoEmail=true"><span><Icone n="mail"/></span>Email</button>
           <a v-if="f.telefone" :href="'tel:'+f.telefone" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)"><span style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface-2)"><Icone n="tel"/></span>Ligar</a>
           <button @click="modo='tarefa'"><span><Icone n="tarefa"/></span>Tarefa</button>
           <a :href="'#/calendario/nova/'+encodeURIComponent(doctype)+'/'+encodeURIComponent(name)" @click="marcarEmail" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)"><span style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface-2)"><Icone n="cal"/></span>Reunião</a>
@@ -1214,7 +1262,7 @@ const Ficha = {
             <div class="cartao corpo" :class="{abre:i.tipo==='email'}" @click="abrirEmail(i)">
               <header><b><template v-if="i.tipo==='email'">{{ i.sentido==='Sent' ? 'Email enviado: ' : 'Email recebido: ' }}</template>{{ i.titulo }}</b>
                 <span class="sub">{{ data(i.data) }}<template v-if="i.duracao"> · {{ Math.round(i.duracao/60) }} min</template></span></header>
-              <p v-if="i.tipo==='email'" class="sub" style="margin-top:2px">{{ i.sentido==='Sent' ? 'Para ' + (i.para||'') : 'De ' + (i.quem||'') }}<template v-if="i.conta"> · {{ i.conta }}</template> <span v-if="i.privado" class="priv">· só para si</span></p>
+              <p v-if="i.tipo==='email'" class="sub" style="margin-top:2px">{{ i.sentido==='Sent' ? 'Para ' + (i.para||'') : 'De ' + (i.quem||'') }}<template v-if="i.conta"> · {{ i.conta }}</template> <span v-if="i.privado" class="priv">· só para si</span> <span v-if="i.sentido==='Sent' && i.lido" class="etq verde" style="font-size:11px">Aberto</span></p>
               <p v-if="i.texto">{{ i.texto }}</p>
               <p v-if="i.tipo!=='email' && i.quem" class="sub">{{ i.quem }}</p>
               <span v-if="i.tipo==='ticket'" class="etq" :class="i.resolvido?'verde':'ambar'">{{ i.estado }}</span>
@@ -1264,6 +1312,7 @@ const Ficha = {
       <a v-for="t in f.tickets" :key="t.name" class="assoc" :href="'/helpdesk/tickets/'+t.name" style="display:block;text-decoration:none;color:inherit"><b>#{{ t.name }} {{ t.subject }}</b><small>{{ t.status }} · {{ data(t.modified,false) }}</small></a>
     </aside>
 
+    <NovoEmail v-if="novoEmail" :doctype="doctype" :name="name" :para="f.email_principal" @fechar="novoEmail=false" @enviado="carregarCron()"/>
     <div class="modal-fundo" v-if="convForm" @click.self="convForm=null">
       <div class="modal" style="max-width:520px"><header><b>Converter «{{ f.titulo }}» em negócio</b><button class="btn sm" @click="convForm=null">Fechar</button></header>
         <form class="corpo-email form-cal" @submit.prevent="converter">
@@ -1321,7 +1370,7 @@ const Funil = {
 };
 
 const Caixa = {
-  components: { EmailCorpo, Icone },
+  components: { EmailCorpo, Icone, Compositor },
   props: ["abrirId"],
   setup(props) {
     let c0 = { grupo: "equipa", conta: "" }; try { c0 = JSON.parse(localStorage.getItem("orbit.caixa.canal")) || c0; } catch (e) {}
@@ -1397,7 +1446,7 @@ const Caixa = {
             <input v-model="para" style="flex:1;min-width:180px;border:0;background:none;font:inherit;color:var(--ink);outline:none">
             <button class="sub" style="all:unset;cursor:pointer;font-size:12px" v-if="!verCc" @click="verCc=true">Cc</button></div>
           <div class="tabs" v-if="verCc"><span class="sub">Cc</span><input v-model="cc" style="flex:1;border:0;background:none;font:inherit;color:var(--ink);outline:none"></div>
-          <textarea v-model="resposta" rows="5" placeholder="Escrever a resposta…" @keydown.meta.enter="enviar" @keydown.ctrl.enter="enviar"></textarea>
+          <Compositor v-model="resposta" :doctype="conv.ref[0]" :name="conv.ref[1]" :para="para" :linhas="5" @enviar="enviar"/>
           <footer><span class="sub">Fica nos Enviados de {{ conv.de }} e na cronologia do cliente · ⌘↵ envia</span><button class="btn prim sm" @click="enviar" :disabled="!resposta.trim() || aEnviar">{{ aEnviar ? 'A enviar…' : 'Enviar' }}</button></footer>
         </div>
         <div v-else class="vazio" style="margin:0 20px 20px">Esta conversa é da caixa pessoal de outra pessoa: só ela pode responder.</div>

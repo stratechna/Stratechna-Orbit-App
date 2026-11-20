@@ -588,6 +588,9 @@ def preparar_saida(nome_conta: str):
     if acc.orbit_registo_crm not in NIVEIS:
         frappe.throw("Esta caixa não está ligada ao CRM.")
     if acc.enable_outgoing and acc.smtp_server:
+        if not acc.track_email_status:   # H9: saber se o email foi aberto (pixel do próprio Frappe)
+            frappe.db.set_value("Email Account", acc.name, "track_email_status", 1, update_modified=False)
+            acc.track_email_status = 1
         return acc
     if acc.email_server and not acc.domain:
         smtp = _SMTP_FORA.get((acc.email_server or "").lower())
@@ -601,7 +604,7 @@ def preparar_saida(nome_conta: str):
     acc.update({"enable_outgoing": 1, "default_outgoing": 0, "smtp_server": servidor, "smtp_port": str(porta),
                 "use_tls": tls, "use_ssl_for_outgoing": ssl, "append_emails_to_sent_folder": 1,
                 "always_use_account_email_id_as_sender": 1, "send_unsubscribe_message": 0,
-                "track_email_status": 0, "add_signature": 1 if acc.get("signature") else 0})
+                "track_email_status": 1, "add_signature": 1 if acc.get("signature") else 0})
     if acc.meta.has_field("login_id_is_different") and not acc.get("login_id"):
         acc.login_id_is_different = 0
     acc.save(ignore_permissions=True)

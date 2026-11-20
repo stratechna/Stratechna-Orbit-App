@@ -347,3 +347,9 @@ a.icone-btn{color:var(--ink-2);text-decoration:none}a.icone-btn.ativo{background
 .chk-col{display:flex;gap:8px;align-items:center;font-size:13px;padding:2px 0;cursor:pointer}
 .x-vista{margin-left:4px;opacity:.5;font-size:12px}.x-vista:hover{opacity:1;color:var(--acao)}
 .tabela-wrap td{cursor:pointer}
+
+/* ── Compositor (H9) ── */
+.compositor{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.compositor-barra{display:flex;gap:10px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--line);background:var(--surface-2);flex-wrap:wrap}
+.compositor textarea{border:0;background:none;padding:10px 12px;font:inherit;color:var(--ink);resize:vertical;outline:none;min-height:90px}
+.resposta .compositor{border:0;border-radius:0}

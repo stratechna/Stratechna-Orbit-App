@@ -939,3 +939,94 @@ def converter(lead: str, valor: float = None, fase: str = None, contacto: str = 
     if isinstance(nome, dict):
         nome = nome.get("name") or nome.get("deal")
     return {"ok": True, "negocio": nome}
+
+
+# ── Compositor: modelos de email e email novo a partir da ficha (H9, 20-11-2026) ───────────────────────
+@frappe.whitelist()
+def modelos_email():
+    _guarda()
+    # todos (os modelos de origem do Frappe vêm «desligados» e o campo só serve às notificações automáticas)
+    return frappe.get_list("Email Template", fields=["name", "subject"], order_by="name asc", limit=200)
+
+
+def _contexto_modelo(doctype=None, name=None, para=None):
+    eu = frappe.db.get_value("User", frappe.session.user, ["full_name", "first_name"], as_dict=True) or {}
+    ctx = {"eu": eu.get("full_name") or frappe.session.user, "meu_nome": eu.get("full_name"), "data": frappe.utils.formatdate(frappe.utils.nowdate()),
+           "nome": "", "nome_completo": "", "empresa": "", "negocio": "", "email": para or ""}
+    doc = None
+    if doctype and name and frappe.db.exists(doctype, name):
+        doc = frappe.get_doc(doctype, name)
+        doc.check_permission("read")
+        if doctype == "Contact":
+            ctx.update(nome=doc.first_name or "", nome_completo=doc.full_name or "", empresa=doc.company_name or "")
+        elif doctype == "CRM Lead":
+            ctx.update(nome=doc.first_name or "", nome_completo=doc.lead_name or "", empresa=doc.organization or "")
+        elif doctype == "CRM Deal":
+            ctx.update(negocio=doc.get("titulo") or doc.name, empresa=doc.organization or "",
+                       nome=doc.first_name or "", nome_completo=" ".join(x for x in [doc.first_name, doc.last_name] if x))
+            c = next((x.contact for x in doc.get("contacts") or [] if x.is_primary), None) or (doc.contacts[0].contact if doc.get("contacts") else None)
+            if c:
+                cd = frappe.db.get_value("Contact", c, ["first_name", "full_name"], as_dict=True) or {}
+                ctx.update(nome=cd.get("first_name") or ctx["nome"], nome_completo=cd.get("full_name") or ctx["nome_completo"])
+        elif doctype == "CRM Organization":
+            ctx.update(empresa=doc.organization_name or "")
+    ctx["doc"] = doc.as_dict() if doc else {}
+    return ctx
+
+
+@frappe.whitelist()
+def aplicar_modelo(modelo: str, doctype: str = None, name: str = None, para: str = None):
+    _guarda()
+    t = frappe.get_doc("Email Template", modelo)
+    t.check_permission("read")
+    ctx = _contexto_modelo(doctype, name, para)
+    corpo = t.response_html if t.get("use_html") and t.get("response_html") else (t.response or "")
+    try:
+        corpo = frappe.render_template(corpo, ctx)
+        assunto = frappe.render_template(t.subject or "", ctx)
+    except Exception:  # noqa: BLE001 — um modelo com variáveis erradas insere-se como está
+        assunto = t.subject or ""
+    import html as _h
+    texto = re.sub(r"<br\s*/?>", "\n", corpo, flags=re.I)
+    texto = re.sub(r"</p\s*>|</div\s*>|</li\s*>", "\n\n", texto, flags=re.I)
+    texto = _h.unescape(strip_html(texto))
+    texto = re.sub(r"\n{3,}", "\n\n", texto).strip()
+    return {"assunto": assunto, "texto": texto}
+
+
+@frappe.whitelist()
+def minhas_caixas():
+    """As caixas de onde a pessoa pode escrever: as partilhadas ligadas ao CRM e a dela («só para mim»)."""
+    _guarda()
+    u = frappe.session.user
+    out = []
+    for a in frappe.get_all("Email Account", filters={"enable_incoming": 1, "orbit_registo_crm": ["in", ["equipa", "so_eu"]]},
+                            fields=["name", "email_id", "orbit_registo_crm", "orbit_dono"], order_by="email_id asc"):
+        if a.orbit_registo_crm == "so_eu" and a.orbit_dono != u:
+            continue
+        out.append({"conta": a.name, "email": a.email_id, "privada": a.orbit_registo_crm == "so_eu"})
+    out.sort(key=lambda x: (not x["privada"], x["email"]))
+    return out
+
+
+@frappe.whitelist(methods=["POST"])
+def enviar_email(doctype: str, name: str, conta: str, para: str, assunto: str, html: str, cc: str = None):
+    """Email novo a partir da ficha, da caixa escolhida; fica nos Enviados dela e na cronologia do registo."""
+    _guarda()
+    from frappe.core.doctype.communication.email import make
+    from orbit.emails_crm import filtrar, pode_responder, preparar_saida
+    frappe.get_doc(doctype, name).check_permission("read")
+    if not pode_responder(conta):
+        frappe.throw("Não pode escrever a partir desta caixa.", frappe.PermissionError)
+    if not strip_html(html or "").strip() or not (assunto or "").strip():
+        frappe.throw("Falta o assunto ou o texto.")
+    acc = preparar_saida(conta)
+    r = make(doctype=doctype, name=name, content=html, subject=assunto.strip()[:200], sender=acc.email_id,
+             sender_full_name=frappe.db.get_value("User", frappe.session.user, "full_name"), recipients=para, cc=cc or None,
+             send_email=True, communication_medium="Email", now=True)
+    nome = (r or {}).get("name")
+    if nome:
+        if not frappe.db.get_value("Communication", nome, "email_account"):
+            frappe.db.set_value("Communication", nome, "email_account", acc.name, update_modified=False)
+        filtrar(frappe.get_doc("Communication", nome))
+    return {"ok": True, "id": nome}
