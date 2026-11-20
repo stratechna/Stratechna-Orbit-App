@@ -779,6 +779,57 @@ const Chat = {
   </div>`,
 };
 
+
+// ── Duplicados (H6): encontrar e fundir contactos e empresas ─────────────────────────────────────────
+async function apiDup(metodo, args = {}, post = false) {
+  const url = `/api/method/orbit.interface.duplicados.${metodo}`;
+  const op = { headers: { "X-Frappe-CSRF-Token": window.csrf_token, Accept: "application/json" } };
+  let r;
+  if (post) { op.method = "POST"; op.headers["Content-Type"] = "application/json"; op.body = JSON.stringify(args); r = await fetch(url, op); }
+  else r = await fetch(url + "?" + new URLSearchParams(args), op);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(String(m).replace(/<[^>]+>/g, "")); throw new Error(m); }
+  return j.message;
+}
+const Duplicados = {
+  props: ["tipo"],
+  setup(props) {
+    const g = ref(null); const escolha = ref({}); const aFundir = ref(null);
+    const carregar = async () => {
+      g.value = await apiDup("grupos", { tipo: props.tipo });
+      const e = {}; g.value.forEach((x, i) => { const p = [...x.registos].sort((a, b) => (b.negocios + b.emails) - (a.negocios + a.emails))[0];
+        e[i] = { principal: p.name, juntar: x.registos.filter((r) => r.name !== p.name).map((r) => r.name) }; }); escolha.value = e;
+    };
+    onMounted(carregar);
+    const fundir = async (i) => {
+      const e = escolha.value[i]; const outros = e.juntar.filter((n) => n !== e.principal);
+      if (!outros.length) { toast("Marque o que se funde no principal"); return; }
+      if (!confirm(`Fundir ${outros.length} registo(s) no principal? Os negócios, emails, notas e tarefas passam para ele e os duplicados são apagados. Não se desfaz.`)) return;
+      aFundir.value = i;
+      try { const r = await apiDup("fundir", { tipo: props.tipo, principal: e.principal, outros: JSON.stringify(outros) }, true); toast(`${r.fundidos} fundido(s)`); carregar(); } finally { aFundir.value = null; }
+    };
+    const dt = props.tipo === "contactos" ? "Contact" : "CRM Organization";
+    return { g, escolha, fundir, aFundir, link, dt };
+  },
+  template: `
+  <div class="pad">
+    <div class="ola"><div><div style="font-size:13px"><a :href="'#/'+tipo">← {{ tipo==='contactos' ? 'Contactos' : 'Empresas' }}</a></div>
+      <h1>Duplicados — {{ tipo==='contactos' ? 'contactos' : 'empresas' }}</h1>
+      <div class="sub">Escolha o registo principal (●) e marque os que se fundem nele (☑). Os negócios, emails, notas e tarefas passam para o principal.</div></div></div>
+    <div v-if="!g" class="carregar">A procurar…</div>
+    <div v-else-if="!g.length" class="vazio">Sem duplicados.</div>
+    <div v-for="(x,i) in g||[]" :key="i" class="cartao" style="margin-bottom:12px">
+      <header><h2 style="font-weight:500">{{ x.motivo }}</h2><button class="btn sm prim" @click="fundir(i)" :disabled="aFundir===i">{{ aFundir===i ? 'A fundir…' : 'Fundir' }}</button></header>
+      <div class="linha" v-for="r in x.registos" :key="r.name">
+        <input type="radio" :name="'p'+i" :value="r.name" v-model="escolha[i].principal" title="Registo principal">
+        <input type="checkbox" :value="r.name" v-model="escolha[i].juntar" :disabled="escolha[i].principal===r.name" title="Fundir no principal">
+        <div class="cresce"><a :href="link(dt,r.name)" target="_blank">{{ r.titulo }}</a><small>{{ r.sub }} · {{ r.negocios }} negócios · {{ r.emails }} emails</small></div>
+        <span class="etq verde" v-if="escolha[i].principal===r.name">Principal</span>
+      </div>
+    </div>
+  </div>`,
+};
+
 // ── Ecrãs ────────────────────────────────────────────────────────────────────────────────────────────
 const Inicio = {
   components: { Icone },
@@ -866,7 +917,7 @@ const Lista = {
   <div>
     <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <div><h1>{{ TITULOS[objeto] }}</h1><div class="sub">{{ total }} registos</div></div>
-      <div style="display:flex;gap:8px"><a class="btn" :href="'/crm/' + ({contactos:'contacts',empresas:'organizations',negocios:'deals',leads:'leads'})[objeto]">Abrir no CRM clássico</a></div>
+      <div style="display:flex;gap:8px"><a v-if="objeto==='contactos'||objeto==='empresas'" class="btn" :href="'#/duplicados/'+objeto">Duplicados</a><a class="btn" :href="'/crm/' + ({contactos:'contacts',empresas:'organizations',negocios:'deals',leads:'leads'})[objeto]">Abrir no CRM clássico</a></div>
     </div>
     <div class="vistas"><button v-for="v in VISTAS[objeto]" :key="v[0]" :class="{ativo: vista===v[0]}" @click="vista=v[0]">{{ v[1] }}</button></div>
     <div class="filtros"><input class="filtro" style="border-style:solid;min-width:240px" v-model="q" :placeholder="'Procurar em ' + TITULOS[objeto].toLowerCase() + '…'"></div>
@@ -1340,7 +1391,7 @@ const AppEmbutida = {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, Calendario, DefLista, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, Calendario, DefLista, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -1410,6 +1461,7 @@ const App = {
         <Assinaturas v-else-if="ecra==='assinaturas'"/>
         <Tempo v-else-if="ecra==='tempo'"/>
         <Chat v-else-if="ecra==='chat'"/>
+        <Duplicados v-else-if="ecra==='duplicados'" :tipo="partes[1]" :key="partes[1]"/>
         <Projetos v-else-if="ecra==='projetos'"/>
         <Projeto v-else-if="ecra==='projeto'" :nome="partes[1]" :key="partes[1]"/>
         <Calendario v-else-if="ecra==='calendario'" :nova="partes[1]==='nova'" :ref-dt="partes[2]" :ref-dn="partes[3]" :key="rotaCal"/>
