@@ -638,8 +638,34 @@ async function apiC(metodo, args = {}, post = false) {
   if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(String(m).replace(/<[^>]+>/g, "")); throw new Error(m); }
   return j.message;
 }
+// Nomes de emoji do Zulip mais usados → caráter (o resto fica como :nome:)
+const EMOJIS = { smile: "😄", grinning: "😀", smiley: "😃", laughing: "😆", joy: "😂", rolling_on_the_floor_laughing: "🤣", rofl: "🤣",
+  wink: "😉", blush: "😊", innocent: "😇", heart_eyes: "😍", star_struck: "🤩", kissing_heart: "😘", yum: "😋", stuck_out_tongue: "😛",
+  thinking: "🤔", neutral: "😐", expressionless: "😑", rolling_eyes: "🙄", smirk: "😏", relieved: "😌", sleeping: "😴", mask: "😷",
+  sunglasses: "😎", nerd: "🤓", confused: "😕", slight_frown: "🙁", frown: "☹️", sad: "😢", cry: "😢", sob: "😭", scream: "😱",
+  angry: "😠", rage: "😡", exploding_head: "🤯", flushed: "😳", hugging: "🤗", shush: "🤫", zipper_mouth: "🤐", slight_smile: "🙂",
+  upside_down: "🙃", sweat_smile: "😅", grimacing: "😬", partying_face: "🥳", wave: "👋", hello: "👋", raised_hand: "✋",
+  ok: "👌", ok_hand: "👌", "+1": "👍", thumbs_up: "👍", like: "👍", "-1": "👎", thumbs_down: "👎", clap: "👏", raised_hands: "🙌",
+  pray: "🙏", handshake: "🤝", muscle: "💪", point_right: "👉", point_left: "👈", point_up: "☝️", point_down: "👇", fist: "✊",
+  v: "✌️", crossed_fingers: "🤞", writing: "✍️", eyes: "👀", brain: "🧠", heart: "❤️", red_heart: "❤️", orange_heart: "🧡",
+  yellow_heart: "💛", green_heart: "💚", blue_heart: "💙", purple_heart: "💜", black_heart: "🖤", broken_heart: "💔",
+  fire: "🔥", sparkles: "✨", star: "⭐", glowing_star: "🌟", tada: "🎉", party_popper: "🎉", confetti: "🎊", gift: "🎁",
+  balloon: "🎈", trophy: "🏆", medal: "🏅", 100: "💯", check: "✅", check_mark: "✔️", white_check_mark: "✅", heavy_check_mark: "✔️",
+  x: "❌", cross_mark: "❌", warning: "⚠️", exclamation: "❗", question: "❓", info: "ℹ️", stop_sign: "🛑", no_entry: "⛔",
+  rocket: "🚀", light_bulb: "💡", bulb: "💡", idea: "💡", zap: "⚡", boom: "💥", hourglass: "⌛", stopwatch: "⏱️", clock: "🕐",
+  calendar: "📅", date: "📅", email: "📧", envelope: "✉️", inbox: "📥", outbox: "📤", phone: "📞", telephone: "☎️",
+  mobile_phone: "📱", computer: "💻", keyboard: "⌨️", printer: "🖨️", camera: "📷", video_camera: "📹", link: "🔗",
+  lock: "🔒", unlock: "🔓", key: "🔑", pencil: "✏️", memo: "📝", clipboard: "📋", paperclip: "📎", pushpin: "📌",
+  bookmark: "🔖", book: "📖", books: "📚", newspaper: "📰", chart: "📈", chart_increasing: "📈", chart_decreasing: "📉",
+  bar_chart: "📊", money: "💰", euro: "💶", credit_card: "💳", package: "📦", truck: "🚚", house: "🏠", office: "🏢",
+  coffee: "☕", tea: "🍵", beer: "🍺", wine: "🍷", cake: "🎂", pizza: "🍕", sun: "☀️", sunny: "☀️", cloud: "☁️",
+  rain: "🌧️", umbrella: "☂️", snowflake: "❄️", rainbow: "🌈", earth_africa: "🌍", globe: "🌐", plant: "🌱", tree: "🌳",
+  octopus: "🐙", dog: "🐶", cat: "🐱", robot: "🤖", ghost: "👻", bell: "🔔", speech_bubble: "💬", thought: "💭",
+  search: "🔍", gear: "⚙️", wrench: "🔧", hammer: "🔨", tools: "🛠️", shield: "🛡️", recycle: "♻️", soon: "🔜", new: "🆕",
+  arrow_right: "➡️", arrow_left: "⬅️", arrow_up: "⬆️", arrow_down: "⬇️", repeat: "🔁", plus: "➕", minus: "➖", heavy_plus_sign: "➕" };
 function textoChat(t) {
-  const esc = String(t || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const esc = String(t || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/:([a-z0-9_+\-]+):/g, (m, n) => EMOJIS[n] || m);
   return esc.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>")
     .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/\n/g, "<br>");
 }
