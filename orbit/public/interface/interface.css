@@ -298,3 +298,15 @@ a.icone-btn{color:var(--ink-2);text-decoration:none}a.icone-btn.ativo{background
 .doc-modal{max-width:1000px}.doc-ver{height:72vh;background:var(--surface-2)}.doc-ver iframe{width:100%;height:100%;border:0}
 .doc-meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:10px 20px}
 @media (max-width:900px){.docs{grid-template-columns:1fr;padding:0 16px 16px}.docs .canais{display:flex;overflow-x:auto;gap:4px}.docs .canais h6{display:none}.docs .canais button{width:auto;flex:none;white-space:nowrap}.grelha-docs{padding:0}}
+
+/* ── Tempo (A5) ── */
+.form-tempo{padding:14px 16px;margin-bottom:16px;display:flex;flex-direction:column;gap:10px}
+.form-tempo .linha-t{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.form-tempo label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--ink-3)}
+.form-tempo input,.form-tempo select{font:inherit;font-size:14px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:6px 8px}
+.form-tempo .chk-l{flex-direction:row;align-items:center;gap:6px;font-size:13px;color:var(--ink-2);padding-bottom:7px}
+.semana-t{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin-bottom:14px}
+.dia-t{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.dia-t span{font-size:12px;color:var(--ink-3);text-transform:capitalize}.dia-t b{font-size:16px}
+.dia-t.hoje{border-color:var(--acao)}.dia-t.total{background:var(--surface-2)}
+@media (max-width:760px){.semana-t{grid-template-columns:repeat(4,1fr)}}

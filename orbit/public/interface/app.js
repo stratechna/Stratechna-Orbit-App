@@ -536,6 +536,88 @@ const Assinaturas = {
 };
 
 
+
+// ── Tempo (A5): registo de horas (Timesheet do ERPNext → livro de horas do cliente no portal) ───────────
+async function apiTm(metodo, args = {}, post = false) {
+  const url = `/api/method/orbit.interface.tempo.${metodo}`;
+  const op = { headers: { "X-Frappe-CSRF-Token": window.csrf_token, Accept: "application/json" } };
+  let r;
+  if (post) { op.method = "POST"; op.headers["Content-Type"] = "application/json"; op.body = JSON.stringify(args); r = await fetch(url, op); }
+  else r = await fetch(url + "?" + new URLSearchParams(args), op);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(String(m).replace(/<[^>]+>/g, "")); throw new Error(m); }
+  return j.message;
+}
+function lerHoras(t) {
+  t = String(t || "").trim().replace(",", ".");
+  if (/^\d+:\d{1,2}$/.test(t)) { const [h, m] = t.split(":"); return +h + +m / 60; }
+  if (/^\d+(\.\d+)?h?$/.test(t)) return parseFloat(t);
+  const m = t.match(/^(\d+)\s*h\s*(\d+)\s*m?$/); if (m) return +m[1] + +m[2] / 60;
+  const mm = t.match(/^(\d+)\s*m(in)?$/); if (mm) return +mm[1] / 60;
+  return NaN;
+}
+const fmtH = (h) => { const t = Math.round((h || 0) * 60); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`; };
+const Tempo = {
+  setup() {
+    const semanaIni = ref(isoDia(segunda(new Date()))); const d = ref(null); const op = ref(null); const tarefasP = ref([]);
+    const f = ref({ data: isoDia(new Date()), horas: "", descricao: "", cliente: window.__tempo_cliente || "", projeto: "", tarefa: "", atividade: "", faturavel: true });
+    window.__tempo_cliente = "";
+    const aGravar = ref(false);
+    const carregar = async () => (d.value = await apiTm("semana", { inicio: semanaIni.value }));
+    watch(semanaIni, carregar);
+    onMounted(async () => { carregar(); op.value = await apiTm("opcoes"); });
+    watch(() => f.value.projeto, async (p) => { f.value.tarefa = ""; tarefasP.value = p ? await apiTm("tarefas_do_projeto", { projeto: p }) : [];
+      const pr = (op.value?.projetos || []).find((x) => x.name === p); if (pr && pr.customer && !f.value.cliente) f.value.cliente = pr.customer; });
+    const projetosDoCliente = computed(() => (op.value?.projetos || []).filter((p) => !f.value.cliente || !p.customer || p.customer === f.value.cliente));
+    const mover = (n) => { const x = new Date(semanaIni.value); x.setDate(x.getDate() + 7 * n); semanaIni.value = isoDia(x); };
+    const dias = computed(() => [...Array(7)].map((_, i) => { const x = new Date(semanaIni.value); x.setDate(x.getDate() + i); return isoDia(x); }));
+    const registar = async () => {
+      const h = lerHoras(f.value.horas); if (!(h > 0)) { toast("Horas como 1:30, 1,5 ou 45m"); return; }
+      aGravar.value = true;
+      try {
+        await apiTm("registar", { data: f.value.data, horas: h, descricao: f.value.descricao, cliente: f.value.cliente || null, projeto: f.value.projeto || null,
+          tarefa: f.value.tarefa || null, atividade: f.value.atividade || null, faturavel: f.value.faturavel ? 1 : 0 }, true);
+        toast(`${fmtH(h)} registadas`); f.value.horas = ""; f.value.descricao = ""; semanaIni.value = isoDia(segunda(new Date(f.value.data))); carregar();
+      } finally { aGravar.value = false; }
+    };
+    const anular = async (l) => { if (!confirm("Anular este registo? Sai também do livro de horas do cliente.")) return; await apiTm("anular", { timesheet: l.ts }, true); toast("Anulado"); carregar(); };
+    const nomeCliente = (c) => (op.value?.clientes || []).find((x) => x.name === c)?.customer_name || c;
+    const isoDiaHoje = () => isoDia(new Date());
+    return { d, op, f, tarefasP, projetosDoCliente, mover, dias, registar, anular, aGravar, fmtH, nomeCliente, data, semanaIni, isoDiaHoje };
+  },
+  template: `
+  <div class="pad">
+    <div class="ola"><div><h1>Tempo</h1><div class="sub">O que regista aqui entra no livro de horas do cliente, no portal.</div></div>
+      <div class="cal-nav"><button class="btn sm" @click="mover(-1)">‹</button><button class="btn sm" @click="semanaIni=isoDiaHoje()">Esta semana</button><button class="btn sm" @click="mover(1)">›</button></div></div>
+    <form class="cartao form-tempo" @submit.prevent="registar">
+      <div class="linha-t">
+        <label>Dia<input type="date" v-model="f.data"></label>
+        <label>Horas<input v-model="f.horas" placeholder="1:30" style="width:90px"></label>
+        <label style="flex:1;min-width:200px">Cliente<input v-model="f.cliente" list="orbit-clientes" placeholder="Procurar cliente…"><datalist id="orbit-clientes"><option v-for="c in op?.clientes||[]" :key="c.name" :value="c.name">{{ c.customer_name }}</option></datalist></label>
+        <label style="min-width:200px">Projeto<select v-model="f.projeto"><option value="">—</option><option v-for="p in projetosDoCliente" :key="p.name" :value="p.name">{{ p.project_name }}</option></select></label>
+        <label v-if="tarefasP.length" style="min-width:180px">Tarefa<select v-model="f.tarefa"><option value="">—</option><option v-for="t in tarefasP" :key="t.name" :value="t.name">{{ t.subject }}</option></select></label>
+        <label>Atividade<select v-model="f.atividade"><option value="">—</option><option v-for="a in op?.atividades||[]" :key="a" :value="a">{{ a }}</option></select></label>
+      </div>
+      <div class="linha-t"><label style="flex:1">O que foi feito<input v-model="f.descricao" required placeholder="Ex.: Correção do formulário de contacto e testes"></label>
+        <label class="chk-l"><input type="checkbox" v-model="f.faturavel"> Faturável</label>
+        <button class="btn prim" :disabled="aGravar">{{ aGravar ? 'A registar…' : 'Registar' }}</button></div>
+    </form>
+    <div v-if="!d" class="carregar">A carregar…</div>
+    <template v-else>
+      <div class="semana-t"><div v-for="x in dias" :key="x" class="dia-t" :class="{hoje: x===isoDiaHoje()}"><span>{{ new Date(x).toLocaleDateString('pt-PT',{weekday:'short',day:'numeric'}) }}</span><b>{{ fmtH(d.dias[x]||0) }}</b></div>
+        <div class="dia-t total"><span>Semana</span><b>{{ fmtH(d.total) }}</b></div></div>
+      <div v-if="!d.linhas.length" class="vazio">Sem registos nesta semana.</div>
+      <div class="cartao" v-else>
+        <div class="linha" v-for="l in d.linhas" :key="l.name">
+          <span class="hora" style="width:56px">{{ fmtH(l.hours) }}</span>
+          <div class="cresce">{{ l.description || '—' }}<small>{{ data(l.dia,false) }} · {{ [nomeCliente(l.customer), l.projeto_nome, l.tarefa_nome, l.ticket_nome].filter(Boolean).join(' · ') }}<template v-if="l.activity_type"> · {{ l.activity_type }}</template><template v-if="!l.is_billable"> · não faturável</template></small></div>
+          <button class="btn sm" @click="anular(l)">Anular</button>
+        </div>
+      </div>
+    </template>
+  </div>`,
+};
+
 // ── Ecrãs ────────────────────────────────────────────────────────────────────────────────────────────
 const Inicio = {
   components: { Icone },
@@ -657,7 +739,10 @@ const Ficha = {
       carregarCron();
       apiD("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (docs.value = r)).catch(() => (docs.value = { erro: "falhou" }));
       carregarAssin();
+      apiTm("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (tempo.value = r)).catch(() => {});
     };
+    const tempo = ref(null);
+    const registarTempo = () => { window.__tempo_cliente = (tempo.value && tempo.value.cliente) || ""; };
     const assin = ref(null); const assinar = ref(false);
     const carregarAssin = () => apiS("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (assin.value = r)).catch(() => (assin.value = { itens: [] }));
     const carregarCron = async () => (cron.value = await api("cronologia", { doctype: props.doctype, name: props.name, tipo: filtro.value }));
@@ -698,7 +783,7 @@ const Ficha = {
       : dt === "Contact" ? [r.designation, r.email_id].filter(Boolean).join(" · ") : dt === "CRM Organization" ? [r.website, r.territory].filter(Boolean).join(" · ") : [r.estado, r.email].filter(Boolean).join(" · ");
     const ic = (t) => IC_EVENTO[t] || IC_EVENTO.nota;
     const marcarEmail = () => { window.__ref_email = (f.value && f.value.email_principal) || ""; };
-    return { assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
+    return { tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
       grupos, mudarFase, NOMES, tit, sub, link, data, eur, ic, cor, ESTADO_COR };
   },
   template: `
@@ -789,6 +874,11 @@ const Ficha = {
       <div v-else-if="!docs.docs.length" class="sub" style="font-size:13px">—</div>
       <div v-for="x in (docs && docs.docs) || []" :key="x.id" class="assoc" style="cursor:pointer" @click="verDoc=x"><b>{{ x.titulo }}</b><small>{{ [x.tipo, x.criado].filter(Boolean).join(' · ') }}</small></div>
       <VerDocumento v-if="verDoc" :doc="verDoc" @fechar="verDoc=null"/>
+      <template v-if="tempo && tempo.cliente">
+        <div class="bloco-tit">Tempo <a class="sub" style="font-weight:400" href="#/tempo" @click="registarTempo">+ Registar</a></div>
+        <div class="assoc"><b>{{ fmtH(tempo.mes) }} este mês</b><small>{{ fmtH(tempo.tres_meses) }} nos últimos 3 meses</small></div>
+        <div v-for="(u,i) in tempo.ultimos" :key="i" class="sub" style="font-size:12px;margin:2px 0 6px">{{ fmtH(u.hours) }} · {{ data(u.from_time,false) }} — {{ (u.description||'').slice(0,60) }}</div>
+      </template>
       <div class="bloco-tit">Assinaturas <span class="sub" style="font-weight:400;cursor:pointer" @click="assinar=true">+ Enviar</span></div>
       <div v-if="!assin" class="sub" style="font-size:13px">A procurar…</div>
       <div v-else-if="!assin.itens.length" class="sub" style="font-size:13px">—</div>
@@ -960,7 +1050,7 @@ const AppEmbutida = {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, Calendario, Tarefas, Projetos, Projeto, Documentos, Assinaturas },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, Calendario, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -985,7 +1075,7 @@ const App = {
       r.dataset.theme = escuro ? "light" : "dark"; try { localStorage.setItem("orbit.tema", r.dataset.theme); } catch (e) {}
     };
     const NAV = [["inicio", "casa", "Início"], ["sec", "CRM"], ["contactos", "pessoa", "Contactos"], ["empresas", "empresa", "Empresas"], ["leads", "lead", "Leads"],
-      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"], ["sec", "Trabalho"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"], ["projetos", "grelha", "Projetos"], ["documentos", "livro", "Documentos"], ["assinaturas", "nota", "Assinaturas"]];
+      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"], ["sec", "Trabalho"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"], ["projetos", "grelha", "Projetos"], ["documentos", "livro", "Documentos"], ["assinaturas", "nota", "Assinaturas"], ["tempo", "relogio", "Tempo"]];
     const rotaCal = computed(() => partes.value.join("/"));
     return { ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal };
   },
@@ -1025,6 +1115,7 @@ const App = {
         <Tarefas v-else-if="ecra==='tarefas'"/>
         <Documentos v-else-if="ecra==='documentos'"/>
         <Assinaturas v-else-if="ecra==='assinaturas'"/>
+        <Tempo v-else-if="ecra==='tempo'"/>
         <Projetos v-else-if="ecra==='projetos'"/>
         <Projeto v-else-if="ecra==='projeto'" :nome="partes[1]" :key="partes[1]"/>
         <Calendario v-else-if="ecra==='calendario'" :nova="partes[1]==='nova'" :ref-dt="partes[2]" :ref-dn="partes[3]" :key="rotaCal"/>
