@@ -882,3 +882,49 @@ def desassociar(doctype: str, name: str, outro_doctype: str, outro_name: str):
     _guarda()
     _par(doctype, name, outro_doctype, outro_name, False)
     return {"ok": True}
+
+
+# ── Converter lead em negócio (H5, 20-11-2026) — pela função do próprio Frappe CRM ───────────────────────
+@frappe.whitelist()
+def sugestao_conversao(lead: str):
+    _guarda()
+    l = frappe.get_doc("CRM Lead", lead)
+    l.check_permission("read")
+    contactos = []
+    if l.email:
+        for c in frappe.get_all("Contact Email", filters={"email_id": l.email.lower(), "parenttype": "Contact"}, pluck="parent", limit=5):
+            contactos.append({"name": c, "titulo": _titulo("Contact", c)})
+    empresas = []
+    for f in ([["organization_name", "=", l.organization]] if l.organization else []) + \
+             ([["website", "like", f"%{l.website}%"]] if l.website else []):
+        for o in frappe.get_list("CRM Organization", filters=[f], pluck="name", limit=3):
+            if o not in [e["name"] for e in empresas]:
+                empresas.append({"name": o, "titulo": _titulo("CRM Organization", o)})
+    fases = [{"name": s.name, "rotulo": _rotulo_estado(s.name)} for s in
+             frappe.get_all("CRM Deal Status", filters={"type": ["not in", ["Won", "Lost"]]}, fields=["name"], order_by="position asc")]
+    return {"convertida": bool(l.converted), "nome": l.lead_name, "empresa_texto": l.organization or "",
+            "contactos": contactos, "empresas": empresas, "fases": fases,
+            "negocios": frappe.get_all("CRM Deal", filters={"lead": lead}, pluck="name")}
+
+
+@frappe.whitelist(methods=["POST"])
+def converter(lead: str, valor: float = None, fase: str = None, contacto: str = None, empresa: str = None, titulo: str = None):
+    """`contacto`/`empresa`: nome de um registo existente para reutilizar; vazio = o CRM cria a partir da lead."""
+    _guarda()
+    from crm.fcrm.doctype.crm_lead.crm_lead import convert_to_deal
+    l = frappe.get_doc("CRM Lead", lead)
+    l.check_permission("write")
+    deal = {}
+    if valor not in (None, ""):
+        deal["deal_value"] = float(valor)
+    if fase and frappe.db.exists("CRM Deal Status", fase):
+        deal["status"] = fase
+    if l.lead_owner:
+        deal["deal_owner"] = l.lead_owner
+    if titulo and frappe.get_meta("CRM Deal").has_field("titulo"):
+        deal["titulo"] = titulo.strip()[:140]
+    nome = convert_to_deal(lead=lead, deal=deal or None, existing_contact=contacto or None,
+                           existing_organization=empresa or None)
+    if isinstance(nome, dict):
+        nome = nome.get("name") or nome.get("deal")
+    return {"ok": True, "negocio": nome}

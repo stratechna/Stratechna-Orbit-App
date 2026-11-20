@@ -902,8 +902,16 @@ const Ficha = {
       carregarAssin();
       apiTm("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (tempo.value = r)).catch(() => {});
       apiV("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (vendas.value = r)).catch(() => {});
+      carregarConv();
     };
     const vendas = ref(null);
+    const conv = ref(null); const convForm = ref(null); const aConverter = ref(false);
+    const carregarConv = async () => { if (props.doctype === "CRM Lead") conv.value = await api("sugestao_conversao", { lead: props.name }); };
+    const abrirConversao = async () => { if (!conv.value) await carregarConv();
+      convForm.value = { titulo: f.value.titulo, valor: "", fase: (conv.value.fases[0] || {}).name || "", contacto: (conv.value.contactos[0] || {}).name || "", empresa: (conv.value.empresas[0] || {}).name || "" }; };
+    const converter = async () => { aConverter.value = true;
+      try { const r = await api("converter", { lead: props.name, valor: convForm.value.valor || null, fase: convForm.value.fase, contacto: convForm.value.contacto, empresa: convForm.value.empresa, titulo: convForm.value.titulo }, true);
+        toast("Lead convertida em negócio"); convForm.value = null; location.hash = link("CRM Deal", r.negocio); } finally { aConverter.value = false; } };
     const ASSOC = { "Contact": ["CRM Organization", "CRM Deal"], "CRM Organization": ["Contact", "CRM Deal"], "CRM Deal": ["Contact", "CRM Organization"] };
     const pode = (dt) => !!(f.value && f.value.pode_editar !== false && (ASSOC[props.doctype] || []).includes(dt));
     const assocAberta = ref(null); const assocQ = ref(""); const assocRes = ref([]); let tAssoc;
@@ -956,7 +964,7 @@ const Ficha = {
       : dt === "Contact" ? [r.designation, r.email_id].filter(Boolean).join(" · ") : dt === "CRM Organization" ? [r.website, r.territory].filter(Boolean).join(" · ") : [r.estado, r.email].filter(Boolean).join(" · ");
     const ic = (t) => IC_EVENTO[t] || IC_EVENTO.nota;
     const marcarEmail = () => { window.__ref_email = (f.value && f.value.email_principal) || ""; };
-    return { pode, assocAberta, assocQ, assocRes, abrirAssoc, procurarAssoc, ligarAssoc, tirarAssoc, vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
+    return { conv, convForm, aConverter, abrirConversao, converter, pode, assocAberta, assocQ, assocRes, abrirAssoc, procurarAssoc, ligarAssoc, tirarAssoc, vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
       grupos, mudarFase, NOMES, tit, sub, link, data, eur, ic, cor, ESTADO_COR };
   },
   template: `
@@ -973,6 +981,10 @@ const Ficha = {
           <button @click="modo='tarefa'"><span><Icone n="tarefa"/></span>Tarefa</button>
           <a :href="'#/calendario/nova/'+encodeURIComponent(doctype)+'/'+encodeURIComponent(name)" @click="marcarEmail" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)"><span style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface-2)"><Icone n="cal"/></span>Reunião</a>
         </div>
+      </div>
+      <div v-if="doctype==='CRM Lead'" style="margin-top:14px">
+        <button class="btn prim" style="width:100%" @click="abrirConversao">{{ conv && conv.negocios && conv.negocios.length ? 'Converter de novo' : 'Converter em negócio' }}</button>
+        <div v-if="conv && conv.negocios && conv.negocios.length" class="sub" style="font-size:12px;margin-top:6px">Já convertida: <a v-for="n in conv.negocios" :key="n" :href="link('CRM Deal',n)" style="margin-right:6px">{{ n }}</a></div>
       </div>
       <div v-if="f.estados.length" style="margin-top:14px">
         <label class="sub" style="font-size:12px">Fase do negócio</label>
@@ -1070,6 +1082,18 @@ const Ficha = {
       <a v-for="t in f.tickets" :key="t.name" class="assoc" :href="'/helpdesk/tickets/'+t.name" style="display:block;text-decoration:none;color:inherit"><b>#{{ t.name }} {{ t.subject }}</b><small>{{ t.status }} · {{ data(t.modified,false) }}</small></a>
     </aside>
 
+    <div class="modal-fundo" v-if="convForm" @click.self="convForm=null">
+      <div class="modal" style="max-width:520px"><header><b>Converter «{{ f.titulo }}» em negócio</b><button class="btn sm" @click="convForm=null">Fechar</button></header>
+        <form class="corpo-email form-cal" @submit.prevent="converter">
+          <label>Nome do negócio<input v-model="convForm.titulo" :placeholder="f.titulo"></label>
+          <div class="linha3" style="grid-template-columns:1fr 1fr"><label>Valor (€)<input type="number" step="0.01" v-model="convForm.valor"></label>
+            <label>Fase<select v-model="convForm.fase"><option v-for="x in conv.fases" :key="x.name" :value="x.name">{{ x.rotulo }}</option></select></label></div>
+          <label>Contacto<select v-model="convForm.contacto"><option value="">Criar um contacto novo a partir da lead</option><option v-for="c in conv.contactos" :key="c.name" :value="c.name">Usar o existente: {{ c.titulo }}</option></select></label>
+          <label>Empresa<select v-model="convForm.empresa"><option value="">{{ conv.empresa_texto ? 'Criar «' + conv.empresa_texto + '»' : 'Sem empresa' }}</option><option v-for="e in conv.empresas" :key="e.name" :value="e.name">Usar a existente: {{ e.titulo }}</option></select></label>
+          <p class="sub" style="font-size:12px;margin:0">A lead fica marcada como convertida; os emails, notas e tarefas dela aparecem no negócio.</p>
+          <div style="display:flex;justify-content:flex-end"><button class="btn prim" :disabled="aConverter">{{ aConverter ? 'A converter…' : 'Converter' }}</button></div>
+        </form></div>
+    </div>
     <div class="modal-fundo" v-if="email" @click.self="email=null">
       <div class="modal"><header><div><b>{{ email.assunto }}</b><div class="sub">De {{ email.de }} · para {{ email.para }}<span v-if="email.cc"> · cc {{ email.cc }}</span> · {{ data(email.data) }}</div></div><div style="display:flex;gap:6px"><a class="btn sm prim" :href="'#/caixa/'+encodeURIComponent(email.id)">Responder</a><button class="btn sm" @click="email=null">Fechar</button></div></header>
         <div class="corpo-email"><EmailCorpo :html="email.html"/></div></div>
