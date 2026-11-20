@@ -618,6 +618,14 @@ const Tempo = {
   </div>`,
 };
 
+
+// ── Propostas e faturas na ficha (A6): ERPNext do tenant e, na casa, o portal ─────────────────────────
+async function apiV(metodo, args = {}) {
+  const r = await fetch(`/api/method/orbit.interface.vendas.${metodo}?` + new URLSearchParams(args), { headers: { Accept: "application/json" } });
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error("vendas"); return j.message;
+}
+const COR_V = { "Paga": "verde", "Aprovada": "verde", "Encomendada": "verde", "Por pagar": "ambar", "Em atraso": "ambar", "Por emitir": "ambar", "Enviada": "azul", "Vista": "roxo", "Respondida": "roxo" };
+
 // ── Ecrãs ────────────────────────────────────────────────────────────────────────────────────────────
 const Inicio = {
   components: { Icone },
@@ -740,7 +748,9 @@ const Ficha = {
       apiD("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (docs.value = r)).catch(() => (docs.value = { erro: "falhou" }));
       carregarAssin();
       apiTm("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (tempo.value = r)).catch(() => {});
+      apiV("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (vendas.value = r)).catch(() => {});
     };
+    const vendas = ref(null);
     const tempo = ref(null);
     const registarTempo = () => { window.__tempo_cliente = (tempo.value && tempo.value.cliente) || ""; };
     const assin = ref(null); const assinar = ref(false);
@@ -783,7 +793,7 @@ const Ficha = {
       : dt === "Contact" ? [r.designation, r.email_id].filter(Boolean).join(" · ") : dt === "CRM Organization" ? [r.website, r.territory].filter(Boolean).join(" · ") : [r.estado, r.email].filter(Boolean).join(" · ");
     const ic = (t) => IC_EVENTO[t] || IC_EVENTO.nota;
     const marcarEmail = () => { window.__ref_email = (f.value && f.value.email_principal) || ""; };
-    return { tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
+    return { vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
       grupos, mudarFase, NOMES, tit, sub, link, data, eur, ic, cor, ESTADO_COR };
   },
   template: `
@@ -878,6 +888,14 @@ const Ficha = {
         <div class="bloco-tit">Tempo <a class="sub" style="font-weight:400" href="#/tempo" @click="registarTempo">+ Registar</a></div>
         <div class="assoc"><b>{{ fmtH(tempo.mes) }} este mês</b><small>{{ fmtH(tempo.tres_meses) }} nos últimos 3 meses</small></div>
         <div v-for="(u,i) in tempo.ultimos" :key="i" class="sub" style="font-size:12px;margin:2px 0 6px">{{ fmtH(u.hours) }} · {{ data(u.from_time,false) }} — {{ (u.description||'').slice(0,60) }}</div>
+      </template>
+      <template v-if="vendas && vendas.tem_cliente">
+        <div class="bloco-tit">Propostas <a v-if="vendas.nova_proposta" class="sub" style="font-weight:400" :href="vendas.nova_proposta" target="_blank">+ Nova</a></div>
+        <div v-if="!vendas.propostas.length" class="sub" style="font-size:13px">—</div>
+        <a v-for="x in vendas.propostas" :key="x.ref" class="assoc" :href="x.url" target="_blank" style="display:block;text-decoration:none;color:inherit"><b>{{ x.ref }}</b><small><span class="etq" :class="COR_V[x.estado]" style="font-size:11px">{{ x.estado }}</span> · {{ x.mensal ? eur(x.mensal)+'/mês' + (x.unico ? ' + '+eur(x.unico) : '') : eur(x.valor) }} · {{ data(x.data,false) }}</small></a>
+        <div class="bloco-tit">Faturas <span class="sub" style="font-weight:400" :style="vendas.em_divida>0?{color:'var(--acao)'}:{}">{{ vendas.em_divida>0 ? eur(vendas.em_divida)+' em dívida' : vendas.faturas.length }}</span></div>
+        <div v-if="!vendas.faturas.length" class="sub" style="font-size:13px">—</div>
+        <a v-for="x in vendas.faturas.slice(0,6)" :key="x.ref" class="assoc" :href="x.url" target="_blank" style="display:block;text-decoration:none;color:inherit"><b>{{ x.ref.startsWith('#') ? (x.periodo || 'Fatura') : x.ref }}</b><small><span class="etq" :class="COR_V[x.estado]" style="font-size:11px">{{ x.estado }}</span> · {{ eur(x.valor) }} · {{ data(x.data,false) }}</small></a>
       </template>
       <div class="bloco-tit">Assinaturas <span class="sub" style="font-weight:400;cursor:pointer" @click="assinar=true">+ Enviar</span></div>
       <div v-if="!assin" class="sub" style="font-size:13px">A procurar…</div>
