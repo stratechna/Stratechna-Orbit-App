@@ -283,6 +283,16 @@ def filtrar(doc, method=None):
         if p and not principal:
             principal = p
         ligacoes += l + ([p] if p else [])
+    if not principal and not doc.reference_doctype:
+        # 20-11-2026 (Vítor: «devem ser registados todos os emails e criados os respetivos leads; por defeito entram
+        # todos»): quem ainda não está no CRM ganha uma lead — salvo robôs e newsletters (ver _robo).
+        for e in _outros(doc, propria):
+            if _excluido(e, lista, propria) or _robo(e, doc):
+                continue
+            lead = _criar_lead(e, doc, dono if nivel == "so_eu" else None)
+            if lead:
+                principal = ("CRM Lead", lead)
+                break
     if not principal:
         if not doc.reference_doctype:
             # 20-11-2026: apagar só depois de o Frappe acabar (o receive() faz reload() a seguir ao insert e falhava
@@ -298,6 +308,83 @@ def filtrar(doc, method=None):
         frappe.db.set_value("Communication", doc.name, valores, update_modified=False)
     atual = (doc.reference_doctype, doc.reference_name) if doc.reference_doctype else principal
     _ligar(doc.name, [x for x in dict.fromkeys(ligacoes) if x != atual])
+
+
+_ROBOS = re.compile(r"^(no[-_.]?reply|do[-_.]?not[-_.]?reply|donotreply|mailer[-_.]?daemon|postmaster|bounces?|bounce[-+].*|"
+                    r"notifications?|notificacoes|notify|alerts?|newsletter|news|marketing|mailing|automated|system|"
+                    r"support[-_.]?noreply|billing[-_.]?noreply|calendar[-_.]?notification|dmarc.*|reports?)(@|$)", re.I)
+_ROBOS_DOM = ("amazonses.com", "sendgrid.net", "mailchimpapp.net", "mcsv.net", "bounces.google.com", "facebookmail.com",
+              "linkedin.com", "mail.instagram.com", "accounts.google.com", "noreply.github.com", "zoho.eu", "zoho.com")
+_ANULAR = re.compile(r"(unsubscribe|anular\s+(a\s+)?subscri|cancelar\s+(a\s+)?subscri|deixar\s+de\s+receber|darse\s+de\s+baja|"
+                     r"se\s+d[ée]sabonner|manage\s+(your\s+)?(email\s+)?preferences|gerir\s+prefer[êe]ncias)", re.I)
+
+
+def _robo(endereco: str, doc) -> bool:
+    """Remetentes automáticos e newsletters não criam leads (o email também não fica: não há a quem o ligar)."""
+    e = (endereco or "").lower()
+    if not e or _ROBOS.match(e):
+        return True
+    dom = e.rsplit("@", 1)[-1]
+    if any(dom == d or dom.endswith("." + d) for d in _ROBOS_DOM):
+        return True
+    if doc.sent_or_received == "Received" and _ANULAR.search(doc.content or ""):
+        return True
+    return False
+
+
+def _criar_lead(endereco: str, doc, dono: str = None):
+    e = endereco.strip().lower()
+    ja = frappe.db.get_value("CRM Lead", {"email": e})
+    if ja:
+        return ja
+    nome = ""
+    if doc.sent_or_received == "Received" and doc.sender_full_name and "@" not in doc.sender_full_name:
+        nome = doc.sender_full_name.strip()
+    if not nome:
+        local = e.split("@")[0]
+        nome = " ".join(p.capitalize() for p in re.split(r"[._\-]+", local) if p and not p.isdigit()) or local
+    partes = nome.split()
+    dom = e.rsplit("@", 1)[-1]
+    fonte = "Caixa de correio"
+    if not frappe.db.exists("CRM Lead Source", fonte):
+        frappe.get_doc({"doctype": "CRM Lead Source", "source_name": fonte}).insert(ignore_permissions=True)
+    try:
+        lead = frappe.get_doc({"doctype": "CRM Lead", "first_name": partes[0][:140], "last_name": " ".join(partes[1:])[:140] or None,
+                               "email": e, "source": fonte, "lead_owner": dono,
+                               "website": None if dom in _PUBLICOS else dom}).insert(ignore_permissions=True)
+        return lead.name
+    except frappe.DuplicateEntryError:
+        return frappe.db.get_value("CRM Lead", {"email": e})
+    except Exception:  # noqa: BLE001 — sem lead, o email segue o caminho de antes
+        frappe.log_error(title=f"Orbit CRM: lead a partir de {e}")
+        return None
+
+
+# ── Apagar uma lead apaga o que é dela (20-11-2026) ─────────────────────────────────────────────────────
+def lead_apagada(doc, method=None):
+    """on_trash de CRM Lead: emails, notas, tarefas, chamadas e reuniões da lead saem com ela — excepto o que também
+    está ligado a outro registo (um negócio que nasceu da lead, um contacto), que passa para esse registo."""
+    nome = doc.name
+    comms = set(frappe.get_all("Communication", filters={"reference_doctype": "CRM Lead", "reference_name": nome}, pluck="name"))
+    comms |= set(frappe.get_all("Communication Link", filters={"parenttype": "Communication", "link_doctype": "CRM Lead",
+                                                              "link_name": nome}, pluck="parent"))
+    for c in comms:
+        outros = frappe.get_all("Communication Link", filters={"parent": c, "parenttype": "Communication",
+                                                               "link_doctype": ["!=", "CRM Lead"]}, fields=["link_doctype", "link_name"])
+        frappe.db.delete("Communication Link", {"parent": c, "link_doctype": "CRM Lead", "link_name": nome})
+        if outros:
+            ref = frappe.db.get_value("Communication", c, ["reference_doctype", "reference_name"])
+            if ref and ref[0] == "CRM Lead" and ref[1] == nome:
+                frappe.db.set_value("Communication", c, {"reference_doctype": outros[0].link_doctype,
+                                                         "reference_name": outros[0].link_name}, update_modified=False)
+        else:
+            frappe.delete_doc("Communication", c, ignore_permissions=True, force=True)
+    for dt in ("FCRM Note", "CRM Task", "CRM Call Log"):
+        if frappe.db.exists("DocType", dt):
+            for n in frappe.get_all(dt, filters={"reference_doctype": "CRM Lead", "reference_docname": nome}, pluck="name"):
+                frappe.delete_doc(dt, n, ignore_permissions=True, force=True)
+    for n in frappe.get_all("Event", filters={"reference_doctype": "CRM Lead", "reference_docname": nome}, pluck="name"):
+        frappe.delete_doc("Event", n, ignore_permissions=True, force=True)
 
 
 def _apagar(nome: str):

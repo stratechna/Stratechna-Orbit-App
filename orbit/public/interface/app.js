@@ -129,12 +129,35 @@ const Calendario = {
       if (estreito.value) { const x = new Date(diaMovel.value); x.setHours(0, 0, 0, 0); return [x]; }
       return [...Array(7)].map((_, i) => { const x = new Date(semana.value); x.setDate(x.getDate() + i); return x; });
     });
+    const minutos = (iso) => { const t = iso.slice(11, 16).split(":"); return +t[0] * 60 + +t[1]; };
+    const equipa = ref([]); let sel0 = []; try { sel0 = JSON.parse(localStorage.getItem("orbit.cal.equipa") || "[]"); } catch (e) {}
+    const verEquipa = ref(sel0); const ocupado = ref({});
+    const carregarEquipa = async () => {
+      try { localStorage.setItem("orbit.cal.equipa", JSON.stringify(verEquipa.value)); } catch (e) {}
+      if (!verEquipa.value.length || !d.value?.ligado) { ocupado.value = {}; return; }
+      const ini = dias.value[0]; const fim = new Date(dias.value[dias.value.length - 1]); fim.setDate(fim.getDate() + 1);
+      const r = await apiCal("disponibilidade", { pessoas: verEquipa.value.join(","), inicio: isoDia(ini) + " 00:00:00", fim: isoDia(fim) + " 00:00:00" });
+      ocupado.value = r.ocupado || {};
+    };
+    watch(verEquipa, carregarEquipa, { deep: true });
     const carregar = async () => {
       const ini = dias.value[0]; const fim = new Date(dias.value[dias.value.length - 1]); fim.setDate(fim.getDate() + 1);
       d.value = await apiCal("eventos", { inicio: isoDia(ini) + " 00:00:00", fim: isoDia(fim) + " 00:00:00" });
+      carregarEquipa();
+    };
+    const corDe = (e) => (equipa.value.find((x) => x.email === e) || {}).cor || "#64748b";
+    const nomeDe = (e) => (equipa.value.find((x) => x.email === e) || {}).nome || e;
+    const ocupadoDia = (dia) => {
+      const out = []; const n = verEquipa.value.length || 1;
+      verEquipa.value.forEach((em, k) => (ocupado.value[em] || []).forEach((b) => {
+        if (b.inicio.slice(0, 10) !== isoDia(dia)) return;
+        const a = minutos(b.inicio), z = Math.max(minutos(b.fim.slice(0, 10) > b.inicio.slice(0, 10) ? b.inicio.slice(0, 11) + "23:59" : b.fim), a + 15);
+        out.push({ k: em + b.inicio, cor: corDe(em), nome: nomeDe(em), top: Math.max((a - HORA0 * 60) / 60 * ALT, 0), alt: Math.max((z - a) / 60 * ALT - 2, 10), esq: (k / n) * 100, larg: 100 / n });
+      }));
+      return out;
     };
     watch([semana, diaMovel, estreito], carregar);
-    onMounted(async () => { await carregar(); if (props.nova) abrirNova(); });
+    onMounted(async () => { await carregar(); equipa.value = await apiCal("equipa"); if (props.nova) abrirNova(); });
     const mover = (n) => { if (estreito.value) { const x = new Date(diaMovel.value); x.setDate(x.getDate() + n); diaMovel.value = x; } else { const x = new Date(semana.value); x.setDate(x.getDate() + 7 * n); semana.value = x; } };
     const hoje = () => { semana.value = segunda(new Date()); diaMovel.value = new Date(); };
     const titulo = computed(() => {
@@ -144,7 +167,7 @@ const Calendario = {
     });
     const doDia = (dia) => (d.value?.eventos || []).filter((e) => !e.dia_todo && e.inicio.slice(0, 10) === isoDia(dia));
     const diaTodo = (dia) => (d.value?.eventos || []).filter((e) => e.dia_todo ? (e.inicio <= isoDia(dia) && e.fim > isoDia(dia)) : (e.inicio.slice(0, 10) < isoDia(dia) && e.fim.slice(0, 10) > isoDia(dia)));
-    const minutos = (iso) => { const t = iso.slice(11, 16).split(":"); return +t[0] * 60 + +t[1]; };
+
     const disposicao = (dia) => {
       const evs = doDia(dia).map((e) => ({ e, a: minutos(e.inicio), b: Math.max(minutos(e.fim.slice(0, 10) > e.inicio.slice(0, 10) ? e.inicio.slice(0, 11) + "23:59" : e.fim), minutos(e.inicio) + 20) }))
         .sort((x, y) => x.a - y.a || y.b - x.b);
@@ -159,21 +182,31 @@ const Calendario = {
     const abrirNova = (dia = null, hora = null) => {
       const base = dia ? new Date(dia) : new Date(); const h = hora ?? Math.min(Math.max(new Date().getHours() + 1, 9), 18);
       form.value = { titulo: "", dia: isoDia(base), ini: `${pad(h)}:00`, fim: `${pad(h + 1)}:00`, convidados: props.refDn ? (window.__ref_email || "") : "", meet: true,
-        calendario: (d.value?.calendarios || []).find((c) => c.pessoal)?.href || "", descricao: "", local: "" };
+        calendario: (d.value?.calendarios || []).find((c) => c.pessoal)?.href || "", descricao: "", local: "", colegas: [...verEquipa.value] };
+    };
+    const procurar = ref(false);
+    const primeiroLivre = async () => {
+      const f = form.value; const [h1, m1] = f.ini.split(":").map(Number); const [h2, m2] = f.fim.split(":").map(Number);
+      const dur = Math.max((h2 * 60 + m2) - (h1 * 60 + m1), 15); procurar.value = true;
+      try {
+        const r = await apiCal("primeiro_livre", { pessoas: f.colegas.join(","), duracao: dur, desde: `${f.dia} ${new Date().toISOString().slice(0, 10) === f.dia ? new Date().toTimeString().slice(0, 5) : "00:00"}:00` });
+        if (!r.inicio) { toast("Sem horário livre comum nos próximos 10 dias"); return; }
+        f.dia = r.inicio.slice(0, 10); f.ini = r.inicio.slice(11, 16); f.fim = r.fim.slice(11, 16); toast("Horário livre para todos encontrado");
+      } finally { procurar.value = false; }
     };
     const gravar = async () => {
       const f = form.value; if (!f.titulo.trim()) { toast("Falta o título"); return; }
       aGravar.value = true;
       try {
         const r = await apiCal("criar", { titulo: f.titulo, inicio: `${f.dia} ${f.ini}:00`, fim: `${f.dia} ${f.fim}:00`, calendario: f.calendario,
-          convidados: f.convidados, meet: f.meet ? 1 : 0, descricao: f.descricao, local: f.local, ref_doctype: props.refDt || null, ref_name: props.refDn || null }, true);
+          convidados: [f.convidados, ...f.colegas].filter(Boolean).join(", "), meet: f.meet ? 1 : 0, descricao: f.descricao, local: f.local, ref_doctype: props.refDt || null, ref_name: props.refDn || null }, true);
         toast(f.convidados.trim() ? "Reunião marcada — o convite segue pelo Orbit Mail" : "Reunião marcada");
         form.value = null; if (props.nova) location.hash = "#/calendario"; carregar();
       } finally { aGravar.value = false; }
     };
     const apagar = async (e) => { if (!confirm("Apagar esta reunião? Os convidados são avisados.")) return; await apiCal("apagar", { href: e.href }, true); sel.value = null; toast("Reunião apagada"); carregar(); };
     const horas = [...Array(HORA1 - HORA0)].map((_, i) => HORA0 + i);
-    return { semana, d, pwd, sel, form, aGravar, dias, mover, hoje, titulo, disposicao, diaTodo, agoraTop, ehHoje, ligar, hm, abrirNova, gravar, apagar, horas, ALT, link, data, estreito };
+    return { equipa, verEquipa, ocupadoDia, procurar, primeiroLivre, semana, d, pwd, sel, form, aGravar, dias, mover, hoje, titulo, disposicao, diaTodo, agoraTop, ehHoje, ligar, hm, abrirNova, gravar, apagar, horas, ALT, link, data, estreito };
   },
   template: `
   <div class="cal">
@@ -182,6 +215,10 @@ const Calendario = {
       <div class="cal-nav"><button class="btn sm" @click="mover(-1)">‹</button><button class="btn sm" @click="hoje">Hoje</button><button class="btn sm" @click="mover(1)">›</button><b>{{ titulo }}</b></div>
       <button class="btn prim" @click="abrirNova()" :disabled="d && !d.ligado">+ Nova reunião</button>
     </div>
+    <div class="equipa-cal" v-if="d && d.ligado && equipa.length"><span class="sub">Ver também:</span>
+      <label v-for="p in equipa" :key="p.email" class="chip-eq" :style="{borderColor:p.cor, background: verEquipa.includes(p.email) ? p.cor : 'transparent', color: verEquipa.includes(p.email) ? '#fff' : 'var(--ink)'}">
+        <input type="checkbox" :value="p.email" v-model="verEquipa" style="display:none">{{ p.nome }}</label>
+      <span class="sub" style="font-size:12px" v-if="verEquipa.length">ocupado de cada colega, sem detalhes</span></div>
     <div v-if="d && !d.ligado" class="cartao aviso-cal">
       <b>Ligar o calendário do Orbit Mail</b>
       <p class="sub">Para ver e marcar reuniões na sua agenda, confirme uma vez a palavra-passe da sua caixa de correio ({{ d.utilizador }}). Fica guardada cifrada no seu Orbit e só serve o seu calendário. Quem entra no Orbit com a palavra-passe da caixa fica ligado sozinho.</p>
@@ -198,6 +235,7 @@ const Calendario = {
       <div v-for="dia in dias" :key="'c'+dia" class="cal-col" :style="{height:(horas.length*ALT)+'px'}" @dblclick="(ev)=>abrirNova(dia, Math.floor(ev.offsetY/ALT)+7)">
         <div v-for="h in horas" :key="h" class="cal-linha" :style="{top:((h-7)*ALT)+'px'}"></div>
         <div v-if="ehHoje(dia) && agoraTop>0" class="cal-agora" :style="{top:agoraTop+'px'}"></div>
+        <div v-for="o in ocupadoDia(dia)" :key="o.k" class="cal-ocupado" :title="'Ocupado — ' + o.nome" :style="{top:o.top+'px',height:o.alt+'px',left:'calc('+o.esq+'% + 1px)',width:'calc('+o.larg+'% - 2px)',background:o.cor}"><span>{{ o.nome.split(' ')[0] }}</span></div>
         <div v-for="e in disposicao(dia)" :key="e.id" class="cal-ev" :style="{top:e.top+'px',height:e.alt+'px',left:'calc('+e.esq+'% + 2px)',width:'calc('+e.larg+'% - 4px)',borderLeftColor:e.cor}" @click="sel=e">
           <b>{{ e.titulo }}</b><span>{{ hm(e.inicio) }}–{{ hm(e.fim) }}<template v-if="e.local"> · {{ e.local }}</template></span>
         </div>
@@ -218,7 +256,10 @@ const Calendario = {
         <form class="corpo-email form-cal" @submit.prevent="gravar">
           <label>Título<input v-model="form.titulo" required placeholder="Ex.: Apresentação da proposta"></label>
           <div class="linha3"><label>Dia<input type="date" v-model="form.dia"></label><label>Início<input type="time" v-model="form.ini" step="900"></label><label>Fim<input type="time" v-model="form.fim" step="900"></label></div>
-          <label>Convidados (emails, separados por vírgulas)<input v-model="form.convidados" placeholder="cliente@empresa.pt"></label>
+          <div v-if="equipa.length"><div class="sub" style="font-size:13px;margin-bottom:4px">Colegas</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap"><label v-for="p in equipa" :key="p.email" class="chip-eq" :style="{borderColor:p.cor, background: form.colegas.includes(p.email) ? p.cor : 'transparent', color: form.colegas.includes(p.email) ? '#fff' : 'var(--ink)'}"><input type="checkbox" :value="p.email" v-model="form.colegas" style="display:none">{{ p.nome }}</label></div></div>
+          <label>Convidados de fora (emails, separados por vírgulas)<input v-model="form.convidados" placeholder="cliente@empresa.pt"></label>
+          <button type="button" class="btn sm" @click="primeiroLivre" :disabled="procurar" style="align-self:flex-start">{{ procurar ? 'A procurar…' : '⌕ Primeiro horário livre para todos' }}</button>
           <label class="chk-l"><input type="checkbox" v-model="form.meet"> Reunião no Stratechna Meet (a ligação vai no convite)</label>
           <label v-if="!form.meet">Local<input v-model="form.local"></label>
           <label>Calendário<select v-model="form.calendario"><option v-for="c in (d?.calendarios||[]).filter(c=>c.escreve)" :key="c.href" :value="c.href">{{ c.nome }}</option></select></label>
@@ -787,8 +828,8 @@ const Inicio = {
 };
 
 const COLUNAS = {
-  contactos: [["full_name", "Nome"], ["company_name", "Empresa"], ["email_id", "Email"], ["mobile_no", "Telemóvel"], ["owner_nome", "Criado por"], ["ultimo_email", "Último email"]],
-  empresas: [["organization_name", "Empresa"], ["website", "Site"], ["telefone", "Telefone"], ["industry", "Setor"], ["territory", "Território"], ["estado_conta", "Estado"]],
+  contactos: [["full_name", "Nome"], ["company_name", "Empresa"], ["email_id", "Email"], ["mobile_no", "Telemóvel"], ["orbit_responsavel_nome", "Responsável"], ["ultimo_email", "Último email"]],
+  empresas: [["organization_name", "Empresa"], ["website", "Site"], ["telefone", "Telefone"], ["industry", "Setor"], ["orbit_responsavel_nome", "Responsável"], ["estado_conta", "Estado"]],
   negocios: [["titulo", "Negócio"], ["organization", "Empresa"], ["estado", "Fase"], ["deal_value", "Valor"], ["expected_closure_date", "Fecho previsto"], ["deal_owner_nome", "Responsável"]],
   leads: [["lead_name", "Nome"], ["organization", "Empresa"], ["email", "Email"], ["estado", "Estado"], ["source", "Origem"], ["lead_owner_nome", "Responsável"]],
 };
@@ -857,7 +898,6 @@ const Ficha = {
     const carregar = async () => {
       f.value = await api("ficha", { doctype: props.doctype, name: props.name });
       carregarCron();
-      apiD("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (docs.value = r)).catch(() => (docs.value = { erro: "falhou" }));
       carregarAssin();
       apiTm("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (tempo.value = r)).catch(() => {});
       apiV("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (vendas.value = r)).catch(() => {});
@@ -990,12 +1030,6 @@ const Ficha = {
           </a>
         </template>
       </template>
-      <div class="bloco-tit">Documentos <span class="sub" style="font-weight:400" v-if="docs && !docs.erro">{{ docs.docs.length }}</span></div>
-      <div v-if="!docs" class="sub" style="font-size:13px">A procurar…</div>
-      <div v-else-if="docs.erro" class="sub" style="font-size:13px"><a href="#/documentos">Ligar a sua conta</a> para ver os documentos.</div>
-      <div v-else-if="!docs.docs.length" class="sub" style="font-size:13px">—</div>
-      <div v-for="x in (docs && docs.docs) || []" :key="x.id" class="assoc" style="cursor:pointer" @click="verDoc=x"><b>{{ x.titulo }}</b><small>{{ [x.tipo, x.criado].filter(Boolean).join(' · ') }}</small></div>
-      <VerDocumento v-if="verDoc" :doc="verDoc" @fechar="verDoc=null"/>
       <template v-if="tempo && tempo.cliente">
         <div class="bloco-tit">Tempo <a class="sub" style="font-weight:400" href="#/tempo" @click="registarTempo">+ Registar</a></div>
         <div class="assoc"><b>{{ fmtH(tempo.mes) }} este mês</b><small>{{ fmtH(tempo.tres_meses) }} nos últimos 3 meses</small></div>
@@ -1290,7 +1324,7 @@ const App = {
       r.dataset.theme = escuro ? "light" : "dark"; try { localStorage.setItem("orbit.tema", r.dataset.theme); } catch (e) {}
     };
     const NAV = [["inicio", "casa", "Início"], ["sec", "CRM"], ["contactos", "pessoa", "Contactos"], ["empresas", "empresa", "Empresas"], ["leads", "lead", "Leads"],
-      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"], ["chat", "chat", "Chat"], ["sec", "Trabalho"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"], ["projetos", "grelha", "Projetos"], ["documentos", "livro", "Documentos"], ["assinaturas", "nota", "Assinaturas"], ["tempo", "relogio", "Tempo"]];
+      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"], ["chat", "chat", "Chat"], ["sec", "Trabalho"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"], ["projetos", "grelha", "Projetos"], ["assinaturas", "nota", "Assinaturas"], ["tempo", "relogio", "Tempo"]];
     const rotaCal = computed(() => partes.value.join("/"));
     return { ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal };
   },
@@ -1302,6 +1336,8 @@ const App = {
         <h6 v-if="n[0]==='sec'">{{ n[1] }}</h6>
         <a v-else :href="'#/'+n[0]" style="text-decoration:none"><button :class="{ativo: ecra===n[0] || (n[0]==='contactos'&&ecra==='contacto') || (n[0]==='negocios'&&ecra==='negocio') || (n[0]==='empresas'&&ecra==='empresa') || (n[0]==='leads'&&ecra==='lead') || (n[0]==='projetos'&&ecra==='projeto')}" tabindex="-1"><Icone :n="n[1]"/>{{ n[2] }}<span class="conta" v-if="n[0]==='caixa' && ctx.contadores.tickets">{{ ctx.contadores.tickets }}</span></button></a>
       </template>
+      <template v-for="g in ['Gestão','Recursos Humanos']" :key="g"><template v-if="(ctx.modulos||[]).some(m=>m.grupo===g)"><h6>{{ g }}</h6>
+      <a v-for="m in ctx.modulos.filter(m=>m.grupo===g)" :key="m.url" :href="m.url" target="_blank" style="text-decoration:none"><button tabindex="-1"><Icone n="grelha"/>{{ m.nome }}<span class="fora">↗</span></button></a></template></template>
       <h6>Apps</h6>
       <a v-for="a in ctx.apps" :key="a.nome" :href="EMBUTIDAS.includes(a.nome) ? '#/app/'+a.nome : a.url" :target="EMBUTIDAS.includes(a.nome) ? null : '_blank'" style="text-decoration:none"><button tabindex="-1" :class="{ativo: ecra==='app' && partes[1]===a.nome}"><Icone :n="a.icone"/>{{ a.nome }}<span class="fora" v-if="!EMBUTIDAS.includes(a.nome)">↗</span></button></a>
       <a href="/crm" style="text-decoration:none"><button tabindex="-1"><Icone n="antigo"/>CRM clássico</button></a>
@@ -1330,7 +1366,6 @@ const App = {
         <DefConsulta v-else-if="ecra==='definicoes' && ['caixas','utilizadores'].includes(partes[1])" :chave="partes[1]" :key="partes[1]"/>
         <DefLista v-else-if="ecra==='definicoes'" :chave="partes[1]" :key="partes[1]"/>
         <Tarefas v-else-if="ecra==='tarefas'"/>
-        <Documentos v-else-if="ecra==='documentos'"/>
         <Assinaturas v-else-if="ecra==='assinaturas'"/>
         <Tempo v-else-if="ecra==='tempo'"/>
         <Chat v-else-if="ecra==='chat'"/>

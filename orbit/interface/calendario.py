@@ -299,3 +299,103 @@ def apagar(href: str):
     if r.status_code not in (200, 204, 404):
         frappe.throw(f"A agenda não apagou ({r.status_code}).")
     return {"ok": True}
+
+
+# ── Equipa: disponibilidade (livre/ocupado) dos colegas, sem os detalhes (20-11-2026) ────────────────────
+# O SOGo dá o «freebusy» de qualquer pessoa do mesmo servidor a quem está autenticado — só blocos ocupados, nunca o
+# assunto. Usa-se a credencial da própria pessoa que pergunta (não há leitura das agendas dos outros).
+CORES_EQUIPA = ["#2563eb", "#16a34a", "#d97706", "#9333ea", "#0891b2", "#db2777", "#65a30d", "#ea580c"]
+
+
+@frappe.whitelist()
+def equipa():
+    _guarda()
+    eu = frappe.session.user
+    us = frappe.get_all("User", filters={"enabled": 1, "user_type": "System User", "name": ["not in", ["Administrator", "Guest", eu]]},
+                        fields=["name", "full_name"], order_by="full_name asc")
+    us = [u for u in us if "@" in u.name and not u.name.startswith(("portal@", "suporte@", "it@", "noreply@"))]
+    return [{"email": u.name, "nome": u.full_name or u.name, "cor": CORES_EQUIPA[i % len(CORES_EQUIPA)]} for i, u in enumerate(us)]
+
+
+def _ocupado(alvo: str, ini, fim, user, pwd):
+    from orbit import marca
+    r = requests.get(f"https://{marca._mail_do_tenant()}/SOGo/dav/{alvo}/freebusy.ifb",
+                     params={"sday": ini.strftime("%Y%m%d"), "eday": fim.strftime("%Y%m%d")}, auth=(user, pwd), timeout=20)
+    if r.status_code != 200:
+        return None
+    from zoneinfo import ZoneInfo
+    out = []
+    for linha in r.text.replace("\r\n ", "").splitlines():
+        if not linha.startswith("FREEBUSY"):
+            continue
+        tipo = "BUSY"
+        m = re.search(r"FBTYPE=([A-Z\-]+)", linha)
+        if m:
+            tipo = m.group(1)
+        if tipo == "FREE":
+            continue
+        for per in linha.split(":", 1)[1].split(","):
+            try:
+                a, b = per.split("/")
+                da = datetime.strptime(a, "%Y%m%dT%H%M%SZ").replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(TZ))
+                if b.startswith("P"):
+                    h = re.search(r"(\d+)H", b); mi = re.search(r"(\d+)M", b)
+                    db = da + timedelta(hours=int(h.group(1)) if h else 0, minutes=int(mi.group(1)) if mi else 0)
+                else:
+                    db = datetime.strptime(b, "%Y%m%dT%H%M%SZ").replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(TZ))
+                out.append({"inicio": _iso(da), "fim": _iso(db), "tentativo": tipo == "BUSY-TENTATIVE"})
+            except Exception:  # noqa: BLE001
+                continue
+    return out
+
+
+@frappe.whitelist()
+def disponibilidade(pessoas: str, inicio: str, fim: str):
+    """Blocos ocupados de cada colega (`pessoas` = emails separados por vírgulas) entre `inicio` e `fim`."""
+    _guarda()
+    user, pwd = _credenciais()
+    if not pwd:
+        return {"ligado": False}
+    ini, fi = get_datetime(inicio), get_datetime(fim)
+    lista = [e.strip().lower() for e in (pessoas or "").split(",") if "@" in e][:12]
+    validos = set(frappe.get_all("User", filters={"enabled": 1, "name": ["in", lista]}, pluck="name"))
+    out = {}
+    for e in lista:
+        if e in validos:
+            out[e] = _ocupado(e, ini, fi, user, pwd)
+    return {"ligado": True, "ocupado": out}
+
+
+@frappe.whitelist()
+def primeiro_livre(pessoas: str, duracao: int = 60, desde: str = None, dias: int = 10):
+    """O primeiro horário em que a pessoa e os colegas indicados estão todos livres, em dias úteis, 9h–13h e 14h–18h30
+    (o horário da casa), em passos de 15 min."""
+    _guarda()
+    user, pwd = _credenciais()
+    if not pwd:
+        frappe.throw("Ligue primeiro o calendário.")
+    dur = max(cint(duracao), 15)
+    ini = get_datetime(desde) if desde else now_datetime()
+    ini = ini.replace(second=0, microsecond=0)
+    ini += timedelta(minutes=(15 - ini.minute % 15) % 15)
+    fim = ini + timedelta(days=max(cint(dias), 1))
+    todos = [user] + [e.strip().lower() for e in (pessoas or "").split(",") if "@" in e and e.strip().lower() != user][:10]
+    blocos = []
+    for e in todos:
+        oc = _ocupado(e, ini, fim, user, pwd) or []
+        blocos += [(get_datetime(b["inicio"]), get_datetime(b["fim"])) for b in oc]
+    janelas = [((9, 0), (13, 0)), ((14, 0), (18, 30))]
+    t = ini
+    while t < fim:
+        if t.weekday() < 5:
+            for (h1, m1), (h2, m2) in janelas:
+                a = t.replace(hour=h1, minute=m1)
+                b = t.replace(hour=h2, minute=m2)
+                c = max(a, t)
+                while c + timedelta(minutes=dur) <= b:
+                    d = c + timedelta(minutes=dur)
+                    if not any(x < d and y > c for x, y in blocos):
+                        return {"inicio": _iso(c), "fim": _iso(d), "pessoas": todos}
+                    c += timedelta(minutes=15)
+        t = (t + timedelta(days=1)).replace(hour=0, minute=0)
+    return {"inicio": None}

@@ -324,3 +324,9 @@ a.icone-btn{color:var(--ink-2);text-decoration:none}a.icone-btn.ativo{background
 /* ── Definições em ecrãs próprios ── */
 .def-ed td{background:var(--surface-2)}
 .def-ed input:not([type=checkbox]),.def-ed select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px 6px;width:100%;min-width:90px}
+
+/* ── Calendário da equipa ── */
+.equipa-cal{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:-4px 0 12px}
+.chip-eq{border:1.5px solid;border-radius:14px;padding:2px 10px;font-size:12px;cursor:pointer;user-select:none}
+.cal-ocupado{position:absolute;opacity:.22;border-radius:4px;z-index:1;overflow:hidden;pointer-events:auto}
+.cal-ocupado span{font-size:10px;color:#000;opacity:.9;padding:1px 3px;display:block;white-space:nowrap}

@@ -30,7 +30,10 @@ def _guarda():
 
 
 def _texto(html, n=280):
-    t = re.sub(r"\s+", " ", strip_html(html or "")).strip()
+    import html as _h
+    # algumas descrições (tickets vindos do Zoho) têm o HTML escapado («&lt;div…»): desfazer antes e depois
+    t = strip_html(_h.unescape(strip_html(_h.unescape(html or ""))))
+    t = re.sub(r"\s+", " ", t).strip()
     return t[:n] + ("…" if len(t) > n else "")
 
 
@@ -77,7 +80,42 @@ def contexto():
         "contadores": {"tickets": len(abertos)},
         "apps": _apps(),
         "classico": {"crm": "/crm", "desk": "/helpdesk"},
+        "modulos": _modulos(),
     }
+
+
+# Módulos do ERP e do RH (Frappe 16: «Desktop Icon» do tipo Workspace Sidebar → /desk/<espaço>), com nome em português.
+_GESTAO = [("Accounting", "Contabilidade"), ("Invoicing", "Faturação"), ("Payments", "Pagamentos"), ("Banking", "Banca"),
+           ("Financial Reports", "Relatórios financeiros"), ("Selling", "Vendas"), ("Buying", "Compras"), ("Stock", "Inventário"),
+           ("Assets", "Ativos"), ("Projects", "Projetos (ERP)"), ("Quality", "Qualidade"), ("Manufacturing", "Produção"),
+           ("Subcontracting", "Subcontratação"), ("Subscription", "Subscrições")]
+_RH = [("Frappe HR", "Pessoas"), ("Recruitment", "Recrutamento"), ("Leaves", "Férias e ausências"),
+       ("Shift & Attendance", "Turnos e presenças"), ("Payroll", "Salários"), ("Expenses", "Despesas"),
+       ("Performance", "Desempenho"), ("Tenure", "Ciclo do colaborador"), ("Tax & Benefits", "Impostos e benefícios")]
+
+
+def _modulos():
+    """Os módulos do ERP e do RH a que a pessoa tem acesso (ícones da secretária visíveis e com os papéis dela)."""
+    if not frappe.db.exists("DocType", "Desktop Icon"):
+        return []
+    papeis = set(frappe.get_roles())
+    icones = {d.name: d for d in frappe.get_all("Desktop Icon", filters={"hidden": 0},
+                                                 fields=["name", "link_type", "link_to", "link"])}
+    restritos = {}
+    for r in frappe.get_all("Has Role", filters={"parenttype": "Desktop Icon"}, fields=["parent", "role"]):
+        restritos.setdefault(r.parent, set()).add(r.role)
+    out = []
+    for grupo, lista in (("Gestão", _GESTAO), ("Recursos Humanos", _RH)):
+        for nome, pt in lista:
+            d = icones.get(nome)
+            if not d or (restritos.get(nome) and not (restritos[nome] & papeis)):
+                continue
+            if d.link_type == "External" and d.link:
+                url = d.link
+            else:
+                url = "/desk/" + (d.link_to or nome).lower().replace(" & ", "-").replace(" ", "-")
+            out.append({"nome": pt, "url": url, "grupo": grupo})
+    return out
 
 
 def _apps():
@@ -169,11 +207,12 @@ def inicio():
 
 # ── Listas ──────────────────────────────────────────────────────────────────────────────────────────────
 _LISTAS = {
-    "contactos": {"dt": "Contact", "campos": ["full_name", "email_id", "mobile_no", "company_name", "modified", "owner", "image"],
-                  "pesquisa": ["full_name", "email_id", "company_name", "mobile_no"], "dono": "owner"},
+    "contactos": {"dt": "Contact", "campos": ["full_name", "email_id", "mobile_no", "company_name", "modified", "owner", "image",
+                                               "orbit_responsavel"],
+                  "pesquisa": ["full_name", "email_id", "company_name", "mobile_no"], "dono": "orbit_responsavel"},
     "empresas": {"dt": "CRM Organization", "campos": ["organization_name", "website", "industry", "territory", "telefone",
-                                                       "estado_conta", "modified", "organization_logo"],
-                 "pesquisa": ["organization_name", "website", "nipc"], "dono": "owner"},
+                                                       "estado_conta", "modified", "organization_logo", "orbit_responsavel"],
+                 "pesquisa": ["organization_name", "website", "nipc"], "dono": "orbit_responsavel"},
     "negocios": {"dt": "CRM Deal", "campos": ["titulo", "organization", "lead_name", "status", "deal_value", "currency",
                                                "expected_closure_date", "deal_owner", "modified", "email"],
                  "pesquisa": ["titulo", "organization", "lead_name", "email", "name"], "dono": "deal_owner"},
@@ -190,6 +229,10 @@ def lista(objeto: str, vista: str = "todos", q: str = "", pagina: int = 0, ordem
     cfg = _LISTAS.get(objeto)
     if not cfg:
         frappe.throw("Lista desconhecida")
+    meta = frappe.get_meta(cfg["dt"])
+    cfg = {**cfg, "campos": [c for c in cfg["campos"] if meta.has_field(c) or c in ("modified", "owner", "creation")]}
+    if not meta.has_field(cfg["dono"]) and cfg["dono"] not in ("owner",):
+        cfg["dono"] = "owner"
     filtros = dict(cfg.get("base") or {})
     if vista == "meus":
         filtros[cfg["dono"]] = frappe.session.user
@@ -209,7 +252,7 @@ def lista(objeto: str, vista: str = "todos", q: str = "", pagina: int = 0, ordem
                              order_by=f"{campo_ordem} {sentido}", limit_start=pg * 50, limit_page_length=51)
     total = len(frappe.get_list(cfg["dt"], filters=filtros, or_filters=or_filtros, pluck="name", limit=5000))
     for r in linhas:
-        for k in ("deal_owner", "lead_owner", "owner"):
+        for k in ("deal_owner", "lead_owner", "owner", "orbit_responsavel"):
             if r.get(k):
                 r[k + "_nome"] = _nome_user(r[k])
         if r.get("status"):
@@ -234,20 +277,20 @@ def _ultima_actividade(contactos):
 
 # ── Ficha ───────────────────────────────────────────────────────────────────────────────────────────────
 _PROPS = {
-    "Contact": [("email_id", "Email", "Data", 0), ("mobile_no", "Telemóvel", "Data", 0), ("phone", "Telefone", "Data", 0),
+    "Contact": [("orbit_responsavel", "Responsável", "Link", 1), ("email_id", "Email", "Data", 0), ("mobile_no", "Telemóvel", "Data", 0), ("phone", "Telefone", "Data", 0),
                 ("designation", "Cargo", "Data", 1), ("company_name", "Empresa (texto)", "Data", 1),
                 ("nif", "NIF", "Data", 1), ("origem", "Origem", "Link", 1), ("mkt_estado", "Marketing por email", "Select", 0),
                 ("mkt_idioma", "Língua", "Select", 1), ("creation", "Criado", "Datetime", 0)],
-    "CRM Deal": [("status", "Fase", "Link", 1), ("deal_value", "Valor", "Currency", 1), ("probability", "Probabilidade", "Percent", 1),
-                 ("expected_closure_date", "Data prevista de fecho", "Date", 1), ("deal_owner", "Responsável", "Link", 1),
+    "CRM Deal": [("deal_owner", "Responsável", "Link", 1), ("status", "Fase", "Link", 1), ("deal_value", "Valor", "Currency", 1), ("probability", "Probabilidade", "Percent", 1),
+                 ("expected_closure_date", "Data prevista de fecho", "Date", 1),
                  ("next_step", "Próximo passo", "Data", 1), ("source", "Origem", "Link", 1), ("marca", "Marca", "Link", 1),
                  ("orbit_referencia_loja", "Encomenda na loja", "Data", 0), ("closed_date", "Data de fecho", "Date", 0),
                  ("creation", "Criado", "Datetime", 0)],
-    "CRM Lead": [("status", "Estado", "Link", 1), ("email", "Email", "Data", 1), ("mobile_no", "Telemóvel", "Data", 1),
+    "CRM Lead": [("lead_owner", "Responsável", "Link", 1), ("status", "Estado", "Link", 1), ("email", "Email", "Data", 1), ("mobile_no", "Telemóvel", "Data", 1),
                  ("organization", "Empresa", "Data", 1), ("job_title", "Cargo", "Data", 1), ("source", "Origem", "Link", 1),
-                 ("lead_owner", "Responsável", "Link", 1), ("mkt_estado", "Marketing por email", "Select", 0),
+                 ("mkt_estado", "Marketing por email", "Select", 0),
                  ("creation", "Criado", "Datetime", 0)],
-    "CRM Organization": [("website", "Site", "Data", 1), ("telefone", "Telefone", "Data", 1), ("email_geral", "Email geral", "Data", 1),
+    "CRM Organization": [("orbit_responsavel", "Responsável", "Link", 1), ("website", "Site", "Data", 1), ("telefone", "Telefone", "Data", 1), ("email_geral", "Email geral", "Data", 1),
                          ("nipc", "NIPC", "Data", 1), ("industry", "Setor", "Link", 1), ("territory", "Território", "Link", 1),
                          ("no_of_employees", "Pessoas", "Select", 1), ("tipo_conta", "Tipo de conta", "Select", 1),
                          ("estado_conta", "Estado da conta", "Select", 1), ("creation", "Criado", "Datetime", 0)],
