@@ -454,3 +454,25 @@ Tem 1 chamada por comentar.,You have 1 call to comment on.
 Tem {0} chamadas por comentar.,You have {0} calls to comment on.
 Comentar,Comment
 Fechar,Close
+O corrector está ocupado. Tente daqui a um momento.,The spell checker is busy. Please try again in a moment.
+O corrector não está ligado neste Orbit.,The spell checker is not enabled in this Orbit.
+Não autorizado,Not authorised
+Rever texto,Check text
+Rever texto (ortografia e gramática),Check text (spelling and grammar)
+1 sugestão,1 suggestion
+{0} sugestões,{0} suggestions
+Nada a corrigir.,Nothing to correct.
+Não encontrei erros no que escreveu.,No mistakes found in what you wrote.
+(apagar),(delete)
+Ignorar,Ignore
+Juntar ao dicionário,Add to dictionary
+Ainda não há nada escrito para rever.,There is nothing written to check yet.
+A rever…,Checking…
+Não foi possível rever o texto.,The text could not be checked.
+Português,Portuguese
+Espanhol,Spanish
+Inglês,English
+Francês,French
+Alemão,German
+Italiano,Italian
+Neerlandês,Dutch

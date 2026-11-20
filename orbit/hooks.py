@@ -15,7 +15,8 @@ app_license = "agpl-3.0"
 # chegar a ver-se, por mais vezes que se recarregue.
 #
 # SUBIR ESTE NÚMERO sempre que se mexer no CSS ou no JS.
-app_include_js = "/assets/orbit/js/orbit.js?v=28"
+# 20-11-2026: «Rever texto» (orbit-corrector.js; corrector.py) — também carregado por www/crm.html e www/helpdesk
+app_include_js = ["/assets/orbit/js/orbit.js?v=28", "/assets/orbit/js/orbit-corrector.js?v=1"]
 app_include_css = "/assets/orbit/css/orbit.css?v=30"
 # As cores tambem nas paginas publicas — a entrada e a primeira coisa que
 # alguem ve, e e servida pelo lado do site e nao pela secretaria.
