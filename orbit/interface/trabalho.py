@@ -162,3 +162,114 @@ def projeto(nome: str):
             "inicio": str(p.expected_start_date) if p.expected_start_date else None, "horas": horas,
             "horas_orcamento": flt(p.get("horas_orcamento")), "notas": p.notes or "", "colunas": colunas,
             "pode_editar": frappe.has_permission("Task", "write"), "classico": f"/app/project/{p.name}"}
+
+
+# ── Fila de tarefas e lembretes (H10, 20-11-2026) ──────────────────────────────────────────────────────
+def _fim_do_dia():
+    from frappe.utils import add_to_date, get_datetime
+    return add_to_date(get_datetime(nowdate()), days=1)
+
+
+@frappe.whitelist()
+def fila():
+    """As minhas tarefas de hoje e atrasadas (CRM e projetos), pela ordem: atrasadas primeiro, depois prioridade."""
+    _guarda()
+    u = frappe.session.user
+    fim = _fim_do_dia()
+    pr = {"Urgent": 0, "High": 1, "Medium": 2, "Low": 3}
+    out = []
+    for t in frappe.get_list("CRM Task", filters={"assigned_to": u, "status": ["not in", FEITAS_CRM], "due_date": ["<", fim]},
+                             fields=["name", "due_date", "priority"], limit=200):
+        out.append({"tipo": "crm", "id": t.name, "d": str(t.due_date), "p": pr.get(t.priority, 2)})
+    for t in frappe.get_list("Task", filters={"_assign": ["like", f'%"{u}"%'], "status": ["not in", FEITAS_PROJ],
+                                              "exp_end_date": ["<", fim], "is_group": 0},
+                             fields=["name", "exp_end_date", "priority"], limit=200):
+        out.append({"tipo": "projeto", "id": t.name, "d": str(t.exp_end_date), "p": pr.get(t.priority, 2)})
+    out.sort(key=lambda x: (x["d"][:10], x["p"]))
+    return out
+
+
+@frappe.whitelist()
+def detalhe(tipo: str, nome: str):
+    """A tarefa e o resumo do registo a que pertence (para trabalhar sem sair da fila)."""
+    _guarda()
+    from orbit.interface.api import cronologia, ficha, _titulo
+    if tipo == "crm":
+        t = frappe.get_doc("CRM Task", nome)
+        t.check_permission("read")
+        out = {"tipo": tipo, "id": nome, "titulo": t.title, "descricao": t.description or "", "data": str(t.due_date or ""),
+               "prioridade": PRIOR.get(t.priority, t.priority), "ref": [t.reference_doctype, t.reference_docname] if t.reference_docname else None}
+    else:
+        t = frappe.get_doc("Task", nome)
+        t.check_permission("read")
+        out = {"tipo": tipo, "id": nome, "titulo": t.subject, "descricao": t.description or "", "data": str(t.exp_end_date or ""),
+               "prioridade": PRIOR.get(t.priority, t.priority), "projeto": t.project,
+               "projeto_nome": frappe.db.get_value("Project", t.project, "project_name") if t.project else "", "ref": None}
+    if out["ref"] and out["ref"][0] in ("Contact", "CRM Deal", "CRM Lead", "CRM Organization"):
+        try:
+            f = ficha(*out["ref"])
+            c = cronologia(*out["ref"])
+            out["registo"] = {"titulo": f["titulo"], "sub": f["sub"], "email": f["email_principal"], "telefone": f["telefone"],
+                              "recentes": (c["passado"] or [])[:5]}
+        except frappe.PermissionError:
+            out["registo"] = None
+    return out
+
+
+@frappe.whitelist(methods=["POST"])
+def adiar(tipo: str, nome: str, dias: int = 1):
+    _guarda()
+    from frappe.utils import add_days, get_datetime
+    if tipo == "crm":
+        d = frappe.get_doc("CRM Task", nome)
+        base = get_datetime(d.due_date) if d.due_date else get_datetime(nowdate() + " 09:00:00")
+        d.due_date = add_days(max(base, get_datetime(nowdate() + " 09:00:00")), cint(dias))
+    else:
+        d = frappe.get_doc("Task", nome)
+        base = get_datetime(d.exp_end_date) if d.exp_end_date else get_datetime(nowdate())
+        d.exp_end_date = add_days(max(base, get_datetime(nowdate())), cint(dias))
+        if d.status == "Overdue":
+            d.status = "Open"
+    d.save()
+    return {"ok": True}
+
+
+def lembretes():
+    """Cron de 15 em 15 min: aviso no sino a quem tem uma tarefa do CRM a chegar à hora marcada (uma vez por tarefa)."""
+    from frappe.utils import add_to_date, now_datetime
+    agora = now_datetime()
+    for t in frappe.get_all("CRM Task", filters={"status": ["not in", FEITAS_CRM], "assigned_to": ["is", "set"],
+                                                 "due_date": ["between", [add_to_date(agora, minutes=-15), add_to_date(agora, minutes=15)]]},
+                            fields=["name", "title", "assigned_to", "due_date", "reference_doctype", "reference_docname"]):
+        chave = f"orbit:lembrete:crm:{t.name}:{t.due_date}"
+        if frappe.cache.get_value(chave):
+            continue
+        frappe.cache.set_value(chave, 1, expires_in_sec=3 * 86400)
+        try:
+            frappe.get_doc({"doctype": "Notification Log", "for_user": t.assigned_to, "type": "Alert",
+                            "subject": f"Tarefa: {t.title}", "email_content": f"Para {frappe.utils.format_datetime(t.due_date, 'HH:mm')}",
+                            "document_type": t.reference_doctype or "CRM Task",
+                            "document_name": t.reference_docname or t.name}).insert(ignore_permissions=True)
+        except Exception:  # noqa: BLE001
+            frappe.log_error(title="orbit.interface.trabalho.lembretes")
+    frappe.db.commit()
+
+
+@frappe.whitelist()
+def notificacoes():
+    """O sino da interface: os avisos do Frappe da pessoa (tarefas, menções, atribuições)."""
+    _guarda()
+    ns = frappe.get_all("Notification Log", filters={"for_user": frappe.session.user}, fields=["name", "subject", "email_content",
+                        "document_type", "document_name", "read", "creation", "type"], order_by="creation desc", limit=30)
+    from frappe.utils import strip_html
+    for n in ns:
+        n.subject = strip_html(n.subject or "")
+        n.email_content = strip_html(n.email_content or "")[:200]
+    return {"por_ler": sum(1 for n in ns if not n.read), "itens": ns}
+
+
+@frappe.whitelist(methods=["POST"])
+def marcar_lidas():
+    _guarda()
+    frappe.db.set_value("Notification Log", {"for_user": frappe.session.user, "read": 0}, "read", 1, update_modified=False)
+    return {"ok": True}

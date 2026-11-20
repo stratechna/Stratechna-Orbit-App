@@ -64,6 +64,7 @@ const ICONES = {
   lupa: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>', lua: '<path d="M20 14A8 8 0 1110 4a6 6 0 0010 10z"/>',
   tel: '<path d="M5 4h4l2 5-3 2a11 11 0 005 5l2-3 5 2v4a2 2 0 01-2 2A17 17 0 013 6a2 2 0 012-2"/>', nota: '<path d="M4 4h16v12l-4 4H4z"/><path d="M16 20v-4h4M8 9h8M8 13h5"/>',
   roda: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/>',
+  sino: '<path d="M6 16V11a6 6 0 0112 0v5l2 2H4z"/><path d="M10 20a2 2 0 004 0"/>',
   sair: '<path d="M14 4h5v16h-5"/><path d="M10 8l-4 4 4 4M6 12h10"/>', antigo: '<path d="M4 12a8 8 0 108-8"/><path d="M4 4v5h5"/>',
 };
 const Icone = { props: ["n"], template: `<svg viewBox="0 0 24 24" v-html="html"></svg>`, computed: { html() { return ICONES[this.n] || ""; } } };
@@ -308,7 +309,7 @@ const Tarefas = {
   <div>
     <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <div><h1>Tarefas</h1><div class="sub">Do CRM e dos projetos, num só sítio<template v-if="itens"> · {{ itens.length }} por fazer</template></div></div>
-      <a class="btn" href="#/projetos">Projetos</a>
+      <div style="display:flex;gap:8px"><a class="btn prim" href="#/fila">▶ Começar as minhas tarefas</a><a class="btn" href="#/projetos">Projetos</a></div>
     </div>
     <div class="vistas"><button :class="{ativo:vista==='minhas'}" @click="vista='minhas'">As minhas</button><button :class="{ativo:vista==='equipa'}" @click="vista='equipa'">Equipa</button></div>
     <div class="filtros"><input class="filtro" style="border-style:solid;min-width:220px" v-model="q" placeholder="Procurar tarefas…"></div>
@@ -917,6 +918,75 @@ const NovoEmail = {
       <Compositor v-model="f.texto" :doctype="doctype" :name="name" :para="f.para" :linhas="9" @assunto="(a)=>{ if(!f.assunto) f.assunto=a }" @enviar="enviar"/>
       <div style="display:flex;justify-content:space-between;align-items:center"><span class="sub" style="font-size:12px">Fica nos Enviados da caixa e na cronologia · sabe-se quando é aberto</span><button class="btn prim" @click="enviar" :disabled="aEnviar">{{ aEnviar ? 'A enviar…' : 'Enviar' }}</button></div>
     </div></div></div>`,
+};
+
+
+// ── Fila de tarefas (H10): uma de cada vez, com o cliente ao lado ─────────────────────────────────────
+const Fila = {
+  components: { NovoEmail, Icone },
+  setup() {
+    const lista = ref(null); const i = ref(0); const d = ref(null); const nota = ref(""); const email = ref(false); const feitas = ref(0); const ocupado = ref(false);
+    const carregar = async () => { d.value = null; nota.value = ""; if (lista.value && i.value < lista.value.length) { const t = lista.value[i.value]; d.value = await apiT("detalhe", { tipo: t.tipo, nome: t.id }); } };
+    onMounted(async () => { lista.value = await apiT("fila"); carregar(); });
+    const seguinte = () => { i.value++; carregar(); };
+    const concluir = async () => { ocupado.value = true; try { await apiT("concluir", { tipo: d.value.tipo, nome: d.value.id }, true); feitas.value++; seguinte(); } finally { ocupado.value = false; } };
+    const adiar = async (dias) => { await apiT("adiar", { tipo: d.value.tipo, nome: d.value.id, dias }, true); toast(dias === 1 ? "Passou para amanhã" : "Passou para daqui a uma semana"); seguinte(); };
+    const gravarNota = async () => { if (!nota.value.trim() || !d.value.ref) return; await api("nota", { doctype: d.value.ref[0], name: d.value.ref[1], conteudo: nota.value }, true); nota.value = ""; toast("Nota gravada"); };
+    const ic = (t) => IC_EVENTO[t] || IC_EVENTO.nota;
+    return { lista, i, d, nota, email, feitas, ocupado, seguinte, concluir, adiar, gravarNota, link, data, ic };
+  },
+  template: `
+  <div class="pad">
+    <div class="ola"><div><div style="font-size:13px"><a href="#/tarefas">← Tarefas</a></div><h1>Fila de tarefas</h1>
+      <div class="sub" v-if="lista">{{ lista.length ? (Math.min(i+1, lista.length) + ' de ' + lista.length + ' · ' + feitas + ' concluídas') : 'Sem tarefas para hoje.' }}</div></div></div>
+    <div v-if="lista && lista.length" class="barra" style="margin:-8px 0 16px"><i :style="{width: (100*i/lista.length)+'%'}"></i></div>
+    <div v-if="!lista" class="carregar">A carregar…</div>
+    <div v-else-if="i >= lista.length" class="vazio" style="font-size:16px">🎉 Fila terminada — {{ feitas }} tarefas concluídas.<br><a href="#/tarefas">Voltar às tarefas</a></div>
+    <div v-else-if="!d" class="carregar">A carregar…</div>
+    <div v-else class="fila">
+      <div class="cartao" style="padding:18px">
+        <div class="sub" style="font-size:12px">{{ d.tipo==='crm' ? 'Tarefa do CRM' : 'Tarefa do projeto ' + (d.projeto_nome||'') }} · {{ d.data ? data(d.data) : 'sem data' }}<template v-if="d.prioridade"> · {{ d.prioridade }}</template></div>
+        <h2 style="font-size:20px;margin:6px 0 10px">{{ d.titulo }}</h2>
+        <div v-if="d.descricao" class="chat-txt sub" v-html="d.descricao"></div>
+        <div class="fila-acoes">
+          <button class="btn prim" @click="concluir" :disabled="ocupado">✓ Concluir e seguinte</button>
+          <button class="btn" @click="seguinte">Saltar</button>
+          <button class="btn" @click="adiar(1)">Amanhã</button>
+          <button class="btn" @click="adiar(7)">Daqui a uma semana</button>
+        </div>
+      </div>
+      <div class="cartao" style="padding:16px" v-if="d.registo">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><b style="font-size:16px">{{ d.registo.titulo }}</b><div class="sub">{{ d.registo.sub }}</div></div>
+          <a class="btn sm" :href="link(d.ref[0], d.ref[1])" target="_blank">Abrir ficha</a></div>
+        <div class="fila-acoes" style="margin:12px 0">
+          <a v-if="d.registo.telefone" class="btn sm" :href="'tel:'+d.registo.telefone">📞 {{ d.registo.telefone }}</a>
+          <button v-if="d.registo.email" class="btn sm" @click="email=true">✉ Email</button></div>
+        <div class="compor cartao" style="margin-bottom:12px"><textarea v-model="nota" rows="2" placeholder="Nota rápida sobre este cliente…"></textarea><button class="btn sm prim" @click="gravarNota" :disabled="!nota.trim()">Gravar</button></div>
+        <div class="mes" style="margin-top:4px">Últimas interações</div>
+        <div v-if="!d.registo.recentes.length" class="sub">—</div>
+        <div v-for="r in d.registo.recentes" :key="r.tipo+r.id" class="evento" style="margin-bottom:6px"><div class="ic" :style="{background:ic(r.tipo)[1],color:ic(r.tipo)[2]}"><Icone :n="ic(r.tipo)[0]"/></div>
+          <div><b style="font-size:13px">{{ r.titulo }}</b><div class="sub" style="font-size:12px">{{ data(r.data) }}</div></div></div>
+      </div>
+      <NovoEmail v-if="email" :doctype="d.ref[0]" :name="d.ref[1]" :para="d.registo.email" @fechar="email=false"/>
+    </div>
+  </div>`,
+};
+// ── Sino (avisos do Frappe: tarefas, menções, atribuições) ────────────────────────────────────────────
+const Sino = {
+  components: { Icone },
+  setup() {
+    const d = ref({ por_ler: 0, itens: [] }); const aberto = ref(false);
+    const carregar = async () => { try { d.value = await apiT("notificacoes"); } catch (e) {} };
+    onMounted(() => { carregar(); setInterval(() => { if (!document.hidden) carregar(); }, 60000); });
+    const abrir = async () => { aberto.value = !aberto.value; if (aberto.value && d.value.por_ler) { await apiT("marcar_lidas", {}, true); setTimeout(carregar, 1500); } };
+    const ir = (n) => { aberto.value = false; if (["Contact", "CRM Deal", "CRM Lead", "CRM Organization"].includes(n.document_type)) location.hash = link(n.document_type, n.document_name); else if (n.document_type === "CRM Task") location.hash = "#/tarefas"; };
+    return { d, aberto, abrir, ir, data };
+  },
+  template: `<span class="sino"><button class="icone-btn" @click="abrir" title="Avisos"><Icone n="sino"/><span v-if="d.por_ler" class="sino-n">{{ d.por_ler }}</span></button>
+    <div v-if="aberto" class="cartao sino-lista"><header style="padding:10px 14px"><b>Avisos</b></header>
+      <div v-if="!d.itens.length" class="vazio">Sem avisos.</div>
+      <div v-for="n in d.itens" :key="n.name" class="linha" style="cursor:pointer" :style="n.read?{}:{background:'var(--azul-bg)'}" @click="ir(n)"><div class="cresce">{{ n.subject }}<small>{{ n.email_content }} · {{ data(n.creation) }}</small></div></div>
+    </div></span>`,
 };
 
 // ── Ecrãs ────────────────────────────────────────────────────────────────────────────────────────────
@@ -1571,7 +1641,7 @@ const AppEmbutida = {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, Calendario, DefLista, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, Calendario, DefLista, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -1606,7 +1676,7 @@ const App = {
       <div class="marca"><div class="logo">O</div><div>Stratechna Orbit<small>{{ ctx.tenant }}</small></div></div>
       <template v-for="(n,i) in NAV" :key="i">
         <h6 v-if="n[0]==='sec'">{{ n[1] }}</h6>
-        <a v-else :href="'#/'+n[0]" style="text-decoration:none"><button :class="{ativo: ecra===n[0] || (n[0]==='contactos'&&ecra==='contacto') || (n[0]==='negocios'&&ecra==='negocio') || (n[0]==='empresas'&&ecra==='empresa') || (n[0]==='leads'&&ecra==='lead') || (n[0]==='projetos'&&ecra==='projeto')}" tabindex="-1"><Icone :n="n[1]"/>{{ n[2] }}<span class="conta" v-if="n[0]==='caixa' && ctx.contadores.tickets">{{ ctx.contadores.tickets }}</span></button></a>
+        <a v-else :href="'#/'+n[0]" style="text-decoration:none"><button :class="{ativo: ecra===n[0] || (n[0]==='contactos'&&ecra==='contacto') || (n[0]==='negocios'&&ecra==='negocio') || (n[0]==='empresas'&&ecra==='empresa') || (n[0]==='leads'&&ecra==='lead') || (n[0]==='projetos'&&ecra==='projeto') || (n[0]==='tarefas'&&ecra==='fila')}" tabindex="-1"><Icone :n="n[1]"/>{{ n[2] }}<span class="conta" v-if="n[0]==='caixa' && ctx.contadores.tickets">{{ ctx.contadores.tickets }}</span></button></a>
       </template>
       <template v-for="g in ['Gestão','Recursos Humanos']" :key="g"><template v-if="(ctx.modulos||[]).some(m=>m.grupo===g)"><h6>{{ g }}</h6>
       <a v-for="m in ctx.modulos.filter(m=>m.grupo===g)" :key="m.url" :href="m.url" target="_blank" style="text-decoration:none"><button tabindex="-1"><Icone n="grelha"/>{{ m.nome }}<span class="fora">↗</span></button></a></template></template>
@@ -1624,6 +1694,7 @@ const App = {
           </div>
         </div>
         <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+          <Sino/>
           <button class="icone-btn" @click="tema" title="Claro / escuro"><Icone n="lua"/></button>
           <a class="icone-btn" href="#/definicoes" title="Definições" :class="{ativo: ecra==='definicoes'}"><Icone n="roda"/></a>
         </div>
@@ -1642,6 +1713,7 @@ const App = {
         <Tempo v-else-if="ecra==='tempo'"/>
         <Chat v-else-if="ecra==='chat'"/>
         <Duplicados v-else-if="ecra==='duplicados'" :tipo="partes[1]" :key="partes[1]"/>
+        <Fila v-else-if="ecra==='fila'"/>
         <Projetos v-else-if="ecra==='projetos'"/>
         <Projeto v-else-if="ecra==='projeto'" :nome="partes[1]" :key="partes[1]"/>
         <Calendario v-else-if="ecra==='calendario'" :nova="partes[1]==='nova'" :ref-dt="partes[2]" :ref-dn="partes[3]" :key="rotaCal"/>

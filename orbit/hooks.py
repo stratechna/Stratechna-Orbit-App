@@ -96,7 +96,7 @@ scheduler_events = {
     "cron": {
         "* * * * *": ["orbit.marketing.envio.processar"],
         # 05-11-2026 (DP8): faturação certificada — repetir o que ficou por emitir e ler anulações do programa
-        "*/15 * * * *": ["orbit.faturacao.emissao.periodico"],
+        "*/15 * * * *": ["orbit.faturacao.emissao.periodico", "orbit.interface.trabalho.lembretes"],
     },
     "hourly": ["orbit.marketing.envio.contagens_do_dia", "orbit.marketing.automacoes.correr"],
 }
