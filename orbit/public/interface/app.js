@@ -1126,18 +1126,103 @@ const Caixa = {
 };
 
 
-// ── Definições (uma só roda dentada) ─────────────────────────────────────────────────────────────────
+// ── Definições (uma só roda dentada): listas editáveis dentro do Orbit + o resto na secretária ──────────
+async function apiDef(metodo, args = {}, post = false) {
+  const url = `/api/method/orbit.interface.definicoes.${metodo}`;
+  const op = { headers: { "X-Frappe-CSRF-Token": window.csrf_token, Accept: "application/json" } };
+  let r;
+  if (post) { op.method = "POST"; op.headers["Content-Type"] = "application/json"; op.body = JSON.stringify(args); r = await fetch(url, op); }
+  else r = await fetch(url + "?" + new URLSearchParams(args), op);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(String(m).replace(/<[^>]+>/g, "")); throw new Error(m); }
+  return j.message;
+}
 const Definicoes = {
-  setup() { const d = ref(null); onMounted(async () => (d.value = await api("definicoes"))); return { d }; },
+  setup() {
+    const d = ref(null); const nat = ref(null);
+    onMounted(async () => { [nat.value, d.value] = await Promise.all([apiDef("indice"), api("definicoes")]); });
+    const grupos = computed(() => { const g = {}; (nat.value || []).forEach((x) => (g[x.grupo] = g[x.grupo] || []).push(x)); return g; });
+    return { d, nat, grupos };
+  },
   template: `
   <div class="pad">
     <div class="ola"><div><h1>Definições</h1><div class="sub">Tudo o que se configura no Orbit, num só sítio.</div></div></div>
     <div v-if="!d" class="carregar">A carregar…</div>
-    <div class="grelha-def" v-else>
-      <div class="cartao" v-for="g in d" :key="g.grupo"><header><h2>{{ g.grupo }}</h2></header>
-        <a class="linha" v-for="i in g.itens" :key="i.url" :href="i.url" style="text-decoration:none;color:inherit"><div class="cresce">{{ i.rotulo }}</div><span class="sub">›</span></a>
+    <template v-else>
+      <div class="grelha-def" style="margin-bottom:22px">
+        <div class="cartao" v-for="(itens, g) in grupos" :key="g"><header><h2>{{ g }}</h2></header>
+          <a class="linha" v-for="i in itens" :key="i.chave" :href="'#/definicoes/'+i.chave" style="text-decoration:none;color:inherit"><div class="cresce">{{ i.titulo }}</div><span class="sub">{{ i.n }} ›</span></a>
+          <a v-if="g==='Correio'" class="linha" href="#/definicoes/caixas" style="text-decoration:none;color:inherit"><div class="cresce">Caixas ligadas ao Orbit</div><span class="sub">›</span></a>
+        </div>
+        <div class="cartao"><header><h2>Pessoas</h2></header>
+          <a class="linha" href="#/definicoes/utilizadores" style="text-decoration:none;color:inherit"><div class="cresce">Utilizadores do Orbit</div><span class="sub">›</span></a></div>
       </div>
-    </div>
+      <h2 style="margin:0 0 10px">Mais definições <span class="sub" style="font-weight:400">— abrem na secretária</span></h2>
+      <div class="grelha-def">
+        <div class="cartao" v-for="g in d" :key="g.grupo"><header><h2>{{ g.grupo }}</h2></header>
+          <a class="linha" v-for="i in g.itens" :key="i.url" :href="i.url" style="text-decoration:none;color:inherit"><div class="cresce">{{ i.rotulo }}</div><span class="sub">↗</span></a>
+        </div>
+      </div>
+    </template>
+  </div>`,
+};
+const DefLista = {
+  props: ["chave"],
+  setup(props) {
+    const d = ref(null); const ed = ref(null); const nova = ref(null); const arr = ref(null);
+    const carregar = async () => { d.value = await apiDef("lista", { chave: props.chave }); };
+    onMounted(carregar);
+    const editar = (l) => { ed.value = { nome: l.name, valores: Object.fromEntries(d.value.campos.map((c) => [c.campo, l[c.campo] ?? ""])) }; };
+    const gravar = async () => { await apiDef("gravar", { chave: props.chave, nome: ed.value.nome, valores: JSON.stringify(ed.value.valores) }, true); ed.value = null; toast("Gravado"); carregar(); };
+    const comecarNova = () => { nova.value = Object.fromEntries(d.value.campos.map((c) => [c.campo, c.tipo === "Check" ? 0 : (c.opcoes && c.opcoes.length && c.tipo === "Select" ? c.opcoes[0] : "")])); };
+    const criar = async () => { await apiDef("criar", { chave: props.chave, valores: JSON.stringify(nova.value) }, true); nova.value = null; toast("Criado"); carregar(); };
+    const apagar = async (l) => { if (!confirm(`Apagar «${l.name}»?`)) return; await apiDef("apagar", { chave: props.chave, nome: l.name }, true); toast("Apagado"); carregar(); };
+    const largar = async (alvo) => {
+      const de = arr.value; arr.value = null; if (!de || de === alvo) return;
+      const nomes = d.value.linhas.map((l) => l.name).filter((n) => n !== de); nomes.splice(nomes.indexOf(alvo), 0, de);
+      d.value.linhas.sort((a, b) => nomes.indexOf(a.name) - nomes.indexOf(b.name));
+      await apiDef("ordenar", { chave: props.chave, nomes: JSON.stringify(nomes) }, true); toast("Ordem gravada");
+    };
+    const mostra = (l, c) => c.tipo === "Check" ? (l[c.campo] ? "Sim" : "—") : c.campo === "__name" && d.value.rotulos[l.name] ? d.value.rotulos[l.name] : (c.campo === d.value.nome && d.value.rotulos[l.name]) ? d.value.rotulos[l.name] : (l[c.campo] ?? "—");
+    return { d, ed, nova, arr, editar, gravar, comecarNova, criar, apagar, largar, mostra };
+  },
+  template: `
+  <div class="pad" v-if="d">
+    <div class="ola"><div><div style="font-size:13px"><a href="#/definicoes">← Definições</a></div><h1>{{ d.titulo }}</h1><div class="sub">{{ d.linhas.length }} registos<template v-if="d.ordenavel"> · arraste para mudar a ordem</template></div></div>
+      <button class="btn prim" v-if="d.pode_criar && !nova" @click="comecarNova">+ Acrescentar</button></div>
+    <div class="tabela-wrap" style="margin:0"><table>
+      <thead><tr><th v-if="d.ordenavel" style="width:28px"></th><th v-for="c in d.campos" :key="c.campo">{{ c.rotulo }}</th><th style="width:150px"></th></tr></thead>
+      <tbody>
+        <tr v-if="nova" class="def-ed"><td v-if="d.ordenavel"></td>
+          <td v-for="c in d.campos" :key="c.campo"><select v-if="c.opcoes" v-model="nova[c.campo]"><option v-for="o in c.opcoes" :value="o">{{ o || '—' }}</option></select>
+            <input v-else-if="c.tipo==='Check'" type="checkbox" v-model="nova[c.campo]" :true-value="1" :false-value="0"><input v-else v-model="nova[c.campo]" :type="c.tipo==='Int'?'number':'text'"></td>
+          <td><button class="btn sm prim" @click="criar">Criar</button> <button class="btn sm" @click="nova=null">Cancelar</button></td></tr>
+        <tr v-for="l in d.linhas" :key="l.name" :draggable="d.ordenavel && !ed" @dragstart="arr=l.name" @dragover.prevent @drop.prevent="largar(l.name)" :class="{'def-ed': ed && ed.nome===l.name}">
+          <td v-if="d.ordenavel" class="sub" style="cursor:grab">⋮⋮</td>
+          <template v-if="ed && ed.nome===l.name"><td v-for="c in d.campos" :key="c.campo"><select v-if="c.opcoes" v-model="ed.valores[c.campo]"><option v-for="o in c.opcoes" :value="o">{{ o || '—' }}</option></select>
+            <input v-else-if="c.tipo==='Check'" type="checkbox" v-model="ed.valores[c.campo]" :true-value="1" :false-value="0"><input v-else v-model="ed.valores[c.campo]" :type="c.tipo==='Int'?'number':'text'" :disabled="d.nome_fixo && c.campo===d.nome" :title="d.nome_fixo && c.campo===d.nome ? 'Nome interno fixo (usado pelo Orbit)' : ''"></td>
+            <td><button class="btn sm prim" @click="gravar">Gravar</button> <button class="btn sm" @click="ed=null">Cancelar</button></td></template>
+          <template v-else><td v-for="c in d.campos" :key="c.campo" style="white-space:normal;max-width:360px">{{ mostra(l,c) }}</td>
+            <td style="text-align:right"><button class="btn sm" v-if="d.pode_editar" @click="editar(l)">Editar</button> <button class="btn sm" v-if="d.pode_apagar" @click="apagar(l)">Apagar</button></td></template>
+        </tr>
+      </tbody></table></div>
+  </div>
+  <div v-else class="carregar">A carregar…</div>`,
+};
+const DefConsulta = {
+  props: ["chave"],
+  setup(props) { const d = ref(null); onMounted(async () => (d.value = await apiDef(props.chave === "caixas" ? "caixas" : "utilizadores"))); return { d, data }; },
+  template: `
+  <div class="pad">
+    <div class="ola"><div><div style="font-size:13px"><a href="#/definicoes">← Definições</a></div><h1>{{ chave==='caixas' ? 'Caixas ligadas ao Orbit' : 'Utilizadores do Orbit' }}</h1>
+      <div class="sub">{{ chave==='caixas' ? 'Ligar ou desligar caixas faz-se no portal, em Stratechna Orbit.' : 'Dar e tirar acessos faz-se no portal (utilizadores contratados).' }}</div></div></div>
+    <div v-if="!d" class="carregar">A carregar…</div>
+    <div v-else class="tabela-wrap" style="margin:0"><table>
+      <template v-if="chave==='caixas'"><thead><tr><th>Caixa</th><th>Uso</th><th>Entrada</th><th>Envio</th><th>Mensagens no Orbit</th></tr></thead>
+        <tbody><tr v-for="c in d" :key="c.email"><td><b>{{ c.email }}</b></td><td>{{ c.uso }}</td><td>{{ c.entrada ? 'Ligada' : '—' }}</td><td>{{ c.envio ? 'Ligado' : '—' }}</td><td>{{ c.mensagens }}</td></tr></tbody></template>
+      <template v-else><thead><tr><th>Nome</th><th>Email</th><th>Perfil</th><th>Estado</th><th>Última entrada</th></tr></thead>
+        <tbody><tr v-for="u in d" :key="u.name"><td><b>{{ u.full_name }}</b></td><td>{{ u.name }}</td><td>{{ u.perfil }}</td><td><span class="etq" :class="u.enabled?'verde':''">{{ u.enabled ? 'Ativo' : 'Desativado' }}</span></td><td class="sub">{{ u.last_login ? data(u.last_login) : '—' }}</td></tr></tbody></template>
+    </table></div>
   </div>`,
 };
 
@@ -1154,7 +1239,7 @@ const AppEmbutida = {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, Calendario, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, Calendario, DefLista, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -1215,7 +1300,9 @@ const App = {
         <Ficha v-else-if="ROTAS_DT[ecra]" :doctype="ROTAS_DT[ecra]" :name="partes[1]" :key="ecra+partes[1]"/>
         <Funil v-else-if="ecra==='funil'"/>
         <Caixa v-else-if="ecra==='caixa'" :abrir-id="partes[1]"/>
-        <Definicoes v-else-if="ecra==='definicoes'"/>
+        <Definicoes v-else-if="ecra==='definicoes' && !partes[1]"/>
+        <DefConsulta v-else-if="ecra==='definicoes' && ['caixas','utilizadores'].includes(partes[1])" :chave="partes[1]" :key="partes[1]"/>
+        <DefLista v-else-if="ecra==='definicoes'" :chave="partes[1]" :key="partes[1]"/>
         <Tarefas v-else-if="ecra==='tarefas'"/>
         <Documentos v-else-if="ecra==='documentos'"/>
         <Assinaturas v-else-if="ecra==='assinaturas'"/>

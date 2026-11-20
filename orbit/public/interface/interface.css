@@ -320,3 +320,7 @@ a.icone-btn{color:var(--ink-2);text-decoration:none}a.icone-btn.ativo{background
 .chat-txt{line-height:1.5;margin-top:2px;overflow-wrap:anywhere}
 .chat-txt code{background:var(--surface-2);padding:0 4px;border-radius:4px}
 @media (max-width:900px){.chat{grid-template-columns:1fr}.chat .canais{display:flex;overflow-x:auto}.chat .canais h6,.chat .canais select{display:none}.chat .canais button{width:auto;flex:none;white-space:nowrap}}
+
+/* ── Definições em ecrãs próprios ── */
+.def-ed td{background:var(--surface-2)}
+.def-ed input:not([type=checkbox]),.def-ed select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px 6px;width:100%;min-width:90px}
