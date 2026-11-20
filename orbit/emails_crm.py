@@ -319,17 +319,49 @@ _ROBOS = re.compile(r"^(no[-_.]?reply|do[-_.]?not[-_.]?reply|donotreply|mailer[-
 _ROBOS_DOM = ("amazonses.com", "sendgrid.net", "mailchimpapp.net", "mcsv.net", "bounces.google.com", "facebookmail.com",
               "linkedin.com", "mail.instagram.com", "accounts.google.com", "noreply.github.com", "zoho.eu", "zoho.com")
 _ANULAR = re.compile(r"(unsubscribe|anular\s+(a\s+)?subscri|cancelar\s+(a\s+)?subscri|deixar\s+de\s+receber|darse\s+de\s+baja|"
-                     r"se\s+d[ée]sabonner|manage\s+(your\s+)?(email\s+)?preferences|gerir\s+prefer[êe]ncias)", re.I)
+                     r"se\s+d[ée]sabonner|manage\s+(your\s+)?(email\s+)?(preferences|subscription)|gerir\s+prefer[êe]ncias|"
+                     r"view\s+(it\s+|this\s+email\s+)?in\s+(your\s+)?browser|ver\s+(este\s+e-?mail\s+)?no\s+(seu\s+)?navegador)", re.I)
+# (20-11) frases de rodapé como «este email foi enviado para…» ou «não responda» também aparecem nos emails de empresas
+# reais (avisos legais) — não servem para distinguir newsletters.
+# remetentes de fornecedores de software/serviços que só mandam avisos e marketing
+_ROBOS_LOCAL = re.compile(r"^(support|suporte|help|hello|hi|team|equipa|news|noticias|updates?|info-?mail|mail|mailer|"
+                          r"marcomms|communications?|comunicacao|promo(tions?|cao)?|offers?|ofertas|campaigns?|billing|invoices?|"
+                          r"receipts?|accounts?|security|seguranca|feedback|survey|inquerito)@", re.I)
+_SOFTWARE = ("zohobooks.com", "zoho.com", "zoho.eu", "anthropic.com", "openai.com", "google.com", "microsoft.com", "apple.com",
+             "hubspot.com", "mailchimp.com", "stripe.com", "paypal.com", "atlassian.com", "slack.com", "notion.so", "canva.com",
+             "github.com", "gitlab.com", "hetzner.com", "cloudflare.com", "godaddy.com", "openprovider.com", "wordpress.com",
+             "wix.com", "shopify.com", "meta.com", "facebook.com", "linkedin.com", "x.com", "twitter.com", "tiktok.com")
+
+
+def _dominios_casa() -> set:
+    """Domínios da casa neste tenant: os de correio configurados e os dos utilizadores — nunca são clientes."""
+    chave = "orbit:emails_crm:dominios_casa"
+    d = frappe.cache.get_value(chave)
+    if d is None:
+        d = {x.lower() for x in frappe.get_all("Email Domain", pluck="domain_name") if x}
+        d |= {u.split("@")[-1].lower() for u in frappe.get_all("User", filters={"user_type": "System User", "enabled": 1}, pluck="name")
+              if "@" in u}
+        d -= _PUBLICOS
+        frappe.cache.set_value(chave, list(d), expires_in_sec=3600)
+    return set(d)
+
+
+_NOREPLY = re.compile(r"(^|[-_.+])(no[-_.]?reply|do[-_.]?not[-_.]?reply|donotreply|mailer[-_.]?daemon|bounces?)([-_.+]|@)", re.I)
 
 
 def _robo(endereco: str, doc) -> bool:
     """Remetentes automáticos e newsletters não criam leads (o email também não fica: não há a quem o ligar)."""
     e = (endereco or "").lower()
-    if not e or _ROBOS.match(e):
+    if not e or _ROBOS.match(e) or _NOREPLY.search(e.split("@")[0] + "@"):
         return True
     dom = e.rsplit("@", 1)[-1]
     if any(dom == d or dom.endswith("." + d) for d in _ROBOS_DOM):
         return True
+    if dom in _dominios_casa():
+        return True
+    if _ROBOS_LOCAL.match(e) and any(dom == d or dom.endswith("." + d) for d in _SOFTWARE):
+        return True
+
     if doc.sent_or_received == "Received" and _ANULAR.search(doc.content or ""):
         return True
     return False
