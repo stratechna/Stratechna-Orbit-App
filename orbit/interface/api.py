@@ -9,6 +9,7 @@ Ligada por tenant: `orbit_interface_nova: 1` no site_config (só a Stratechna pa
 """
 from __future__ import annotations
 
+import json
 import re
 
 import frappe
@@ -225,8 +226,10 @@ _LISTAS = {
 
 
 @frappe.whitelist()
-def lista(objeto: str, vista: str = "todos", q: str = "", pagina: int = 0, ordem: str = "modified desc", estado: str = ""):
+def lista(objeto: str, vista: str = "todos", q: str = "", pagina: int = 0, ordem: str = "modified desc", estado: str = "",
+          filtros: str = "", colunas: str = ""):
     _guarda()
+    filtros_json = filtros
     cfg = _LISTAS.get(objeto)
     if not cfg:
         frappe.throw("Lista desconhecida")
@@ -244,15 +247,23 @@ def lista(objeto: str, vista: str = "todos", q: str = "", pagina: int = 0, ordem
         filtros["status"] = ["not in", FECHADOS]
     if estado and objeto in ("negocios", "leads"):
         filtros["status"] = estado
+    # H7: filtros à escolha e colunas da vista (lista branca em orbit/interface/vistas.py)
+    from orbit.interface import vistas as _v
+    extra = _v.traduzir(objeto, filtros_json) if filtros_json else []
+    if colunas:
+        disp = {c for c, _r in _v.COLUNAS.get(objeto, [])}
+        pedidas = [c for c in json.loads(colunas) if c in disp and (meta.has_field(c) or c == "creation")]
+        cfg = {**cfg, "campos": list(dict.fromkeys(cfg["campos"] + pedidas))}
     campo_ordem, sentido = (ordem.split() + ["desc"])[:2]
     if campo_ordem not in cfg["campos"] + ["creation", "modified"] or sentido not in ("asc", "desc"):
         campo_ordem, sentido = "modified", "desc"
     q = (q or "").strip()
     or_filtros = [[c, "like", f"%{q}%"] for c in cfg["pesquisa"]] if q else None
     pg = max(cint(pagina), 0)
-    linhas = frappe.get_list(cfg["dt"], filters=filtros, or_filters=or_filtros, fields=["name"] + cfg["campos"],
+    filtros_lista = [[k, *(v if isinstance(v, list) else ["=", v])] for k, v in filtros.items()] + extra
+    linhas = frappe.get_list(cfg["dt"], filters=filtros_lista, or_filters=or_filtros, fields=["name"] + cfg["campos"],
                              order_by=f"{campo_ordem} {sentido}", limit_start=pg * 50, limit_page_length=51)
-    total = len(frappe.get_list(cfg["dt"], filters=filtros, or_filters=or_filtros, pluck="name", limit=5000))
+    total = len(frappe.get_list(cfg["dt"], filters=filtros_lista, or_filters=or_filtros, pluck="name", limit=5000))
     for r in linhas:
         for k in ("deal_owner", "lead_owner", "owner", "orbit_responsavel"):
             if r.get(k):

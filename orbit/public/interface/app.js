@@ -891,45 +891,131 @@ const VISTAS = { contactos: [["todos", "Todos"], ["meus", "Os meus"], ["parados"
   leads: [["todos", "Por converter"], ["meus", "As minhas"], ["parados", "Sem atividade há 30 dias"]] };
 const DT_LISTA = { contactos: "Contact", empresas: "CRM Organization", negocios: "CRM Deal", leads: "CRM Lead" };
 
+async function apiVis(metodo, args = {}, post = false) {
+  const url = `/api/method/orbit.interface.vistas.${metodo}`;
+  const op = { headers: { "X-Frappe-CSRF-Token": window.csrf_token, Accept: "application/json" } };
+  let r;
+  if (post) { op.method = "POST"; op.headers["Content-Type"] = "application/json"; op.body = JSON.stringify(args); r = await fetch(url, op); }
+  else r = await fetch(url + "?" + new URLSearchParams(args), op);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(String(m).replace(/<[^>]+>/g, "")); throw new Error(m); }
+  return j.message;
+}
+const OPS_TIPO = { user: [["igual", "é"], ["diferente", "não é"], ["vazio", "está vazio"], ["preenchido", "está preenchido"]],
+  select: [["igual", "é"], ["diferente", "não é"], ["vazio", "está vazio"], ["preenchido", "está preenchido"]],
+  link: [["igual", "é"], ["diferente", "não é"], ["vazio", "está vazio"], ["preenchido", "está preenchido"]],
+  texto: [["contem", "contém"], ["igual", "é"], ["vazio", "está vazio"], ["preenchido", "está preenchido"]],
+  numero: [["maior", "maior que"], ["menor", "menor que"], ["igual", "é"]],
+  data: [["depois", "depois de"], ["antes", "antes de"], ["vazio", "está vazio"]] };
+const CAMPOS_USER = ["orbit_responsavel", "deal_owner", "lead_owner"];
+const CAMPOS_DATA = ["orbit_ultima_atividade", "creation", "expected_closure_date", "ultimo_email"];
 const Lista = {
   props: ["objeto"],
   setup(props) {
-    const chaveVista = () => `orbit.vista.${props.objeto}`;
-    let guardada = null; try { guardada = localStorage.getItem(chaveVista()); } catch (e) {}
-    const vista = ref(guardada || VISTAS[props.objeto][0][0]);
-    const q = ref(""); const linhas = ref([]); const total = ref(0); const mais = ref(false); const pagina = ref(0); const ordem = ref("modified desc"); const a = ref(false);
+    const vista = ref(VISTAS[props.objeto][0][0]); const q = ref(""); const linhas = ref([]); const total = ref(0); const mais = ref(false);
+    const pagina = ref(0); const ordem = ref("modified desc"); const a = ref(false);
+    const meta = ref(null); const salvas = ref([]); const salvaAtiva = ref(null);
+    const filtros = ref([]); const colunas = ref(COLUNAS[props.objeto].map((c) => ({ campo: c[0] === "estado" ? "status" : c[0].replace(/_nome$/, ""), rotulo: c[1] })));
+    const novoF = ref(null); const verCols = ref(false); const sel = ref([]); const massa = ref({ acao: "", valor: "" });
     let tq;
     const carregar = async (junta = false) => {
       a.value = true;
-      const r = await api("lista", { objeto: props.objeto, vista: vista.value, q: q.value, pagina: pagina.value, ordem: ordem.value });
+      const r = await api("lista", { objeto: props.objeto, vista: vista.value, q: q.value, pagina: pagina.value, ordem: ordem.value,
+        filtros: JSON.stringify(filtros.value), colunas: JSON.stringify(colunas.value.map((c) => c.campo)) });
       linhas.value = junta ? linhas.value.concat(r.linhas) : r.linhas; total.value = r.total; mais.value = r.mais; a.value = false;
+      if (!junta) sel.value = [];
     };
-    watch(vista, (v) => { try { localStorage.setItem(chaveVista(), v); } catch (e) {} pagina.value = 0; carregar(); });
-    watch(q, () => { clearTimeout(tq); tq = setTimeout(() => { pagina.value = 0; carregar(); }, 300); });
-    watch(() => props.objeto, () => { vista.value = VISTAS[props.objeto][0][0]; q.value = ""; pagina.value = 0; carregar(); });
-    onMounted(() => carregar());
-    const ordenar = (c) => { ordem.value = ordem.value === `${c} desc` ? `${c} asc` : `${c} desc`; pagina.value = 0; carregar(); };
-    const valor = (l, c) => c === "deal_value" ? eur(l[c]) : (c === "ultimo_email" || c === "expected_closure_date" || c === "orbit_ultima_atividade") ? data(l[c], false) : l[c];
+    const recarregar = () => { pagina.value = 0; carregar(); };
+    const carregarSalvas = async () => (salvas.value = await apiVis("vistas", { objeto: props.objeto }));
+    onMounted(async () => { meta.value = await apiVis("metadados", { objeto: props.objeto }); carregarSalvas(); carregar(); });
+    watch(q, () => { clearTimeout(tq); tq = setTimeout(recarregar, 300); });
+    const escolherFixa = (v) => { salvaAtiva.value = null; vista.value = v; filtros.value = []; recarregar(); };
+    const escolherSalva = (v) => { salvaAtiva.value = v.nome + (v.partilhada ? "*" : ""); const c = v.config || {}; vista.value = c.base || "todos";
+      filtros.value = c.filtros || []; if (c.colunas && c.colunas.length) colunas.value = c.colunas.map((x) => ({ campo: x, rotulo: (meta.value?.colunas.find((m) => m.campo === x) || {}).rotulo || x }));
+      if (c.ordem) ordem.value = c.ordem; recarregar(); };
+    const apagarSalva = async (v) => { if (!confirm(`Apagar a vista «${v.nome}»?`)) return; await apiVis("apagar_vista", { objeto: props.objeto, nome: v.nome, partilhada: v.partilhada ? 1 : 0 }, true); carregarSalvas(); };
+    const guardar = async () => {
+      const nome = prompt("Nome da vista:"); if (!nome) return;
+      const partilhar = meta.value?.pode_partilhar && confirm("Partilhar esta vista com a equipa? (OK = partilhar, Cancelar = só para mim)");
+      await apiVis("guardar_vista", { objeto: props.objeto, nome, partilhada: partilhar ? 1 : 0,
+        config: JSON.stringify({ filtros: filtros.value, colunas: colunas.value.map((c) => c.campo), ordem: ordem.value, base: vista.value }) }, true);
+      toast("Vista guardada"); await carregarSalvas(); salvaAtiva.value = nome + (partilhar ? "*" : "");
+    };
+    const campoMeta = (c) => (meta.value?.filtraveis || []).find((x) => x.campo === c) || {};
+    const rotuloFiltro = (f) => { const m = campoMeta(f[0]); const op = (OPS_TIPO[m.tipo] || []).find((o) => o[0] === f[1]); const val = (m.opcoes || []).find((o) => o.v === f[2]);
+      return `${m.rotulo || f[0]} ${op ? op[1] : f[1]}${["vazio", "preenchido"].includes(f[1]) ? "" : " " + (val ? val.r : (f[2] || ""))}`; };
+    const juntarFiltro = () => { const f = novoF.value; if (!f.campo || !f.op) return; filtros.value = [...filtros.value, [f.campo, f.op, f.valor || ""]]; novoF.value = null; recarregar(); };
+    const tirarFiltro = (i) => { filtros.value = filtros.value.filter((_, k) => k !== i); recarregar(); };
+    const alternarCol = (c) => { const i = colunas.value.findIndex((x) => x.campo === c.campo);
+      if (i >= 0) { if (colunas.value.length > 1) colunas.value.splice(i, 1); } else colunas.value.push({ campo: c.campo, rotulo: c.rotulo }); recarregar(); };
+    const ordenar = (c) => { ordem.value = ordem.value === `${c} desc` ? `${c} asc` : `${c} desc`; recarregar(); };
+    const valor = (l, c) => CAMPOS_USER.includes(c) ? (l[c + "_nome"] || l[c] || "") : c === "status" ? (l.estado || l.status) : c === "deal_value" ? eur(l[c]) : CAMPOS_DATA.includes(c) ? data(l[c], false) : (l[c] ?? "");
     const abrir = (l) => (location.hash = link(DT_LISTA[props.objeto], l.name));
-    return { vista, q, linhas, total, mais, pagina, carregar, ordenar, valor, abrir, a, VISTAS, COLUNAS, TITULOS, cor, ini, ordem };
+    const todos = computed({ get: () => linhas.value.length && sel.value.length === linhas.value.length, set: (v) => (sel.value = v ? linhas.value.map((l) => l.name) : []) });
+    const opsMassa = computed(() => { const o = [["responsavel", "Atribuir responsável"]]; if (["negocios", "leads"].includes(props.objeto)) o.push(["estado", props.objeto === "negocios" ? "Mudar a fase" : "Mudar o estado"]);
+      if (["contactos", "empresas"].includes(props.objeto)) o.push(["ciclo", "Mudar a fase do ciclo de vida"]); if (meta.value?.pode_apagar) o.push(["apagar", "Apagar"]); return o; });
+    const opcoesMassa = computed(() => { const m = massa.value.acao; const campo = m === "responsavel" ? (props.objeto === "negocios" ? "deal_owner" : props.objeto === "leads" ? "lead_owner" : "orbit_responsavel") : m === "estado" ? "status" : m === "ciclo" ? "orbit_ciclo" : null;
+      return campo ? (campoMeta(campo).opcoes || []) : []; });
+    const aplicarMassa = async () => {
+      const m = massa.value; if (!m.acao) return;
+      if (m.acao === "apagar" && !confirm(`Apagar ${sel.value.length} registo(s)? Não se desfaz.`)) return;
+      const r = await apiVis("em_massa", { objeto: props.objeto, nomes: JSON.stringify(sel.value), acao: m.acao, valor: m.valor }, true);
+      toast(`${r.feitos} atualizado(s)` + (r.falhas.length ? ` · ${r.falhas.length} falharam` : "")); if (r.falhas.length) console.warn(r.falhas);
+      massa.value = { acao: "", valor: "" }; carregar();
+    };
+    const exportar = (soSel) => { const p = new URLSearchParams({ objeto: props.objeto, vista: vista.value, q: q.value, filtros: JSON.stringify(filtros.value),
+      colunas: JSON.stringify(colunas.value.map((c) => c.campo)), nomes: soSel ? JSON.stringify(sel.value) : "" });
+      window.location.href = "/api/method/orbit.interface.vistas.exportar?" + p.toString(); };
+    return { vista, q, linhas, total, mais, pagina, carregar, ordenar, valor, abrir, a, VISTAS, TITULOS, cor, ini, ordem, meta, salvas, salvaAtiva,
+      filtros, colunas, novoF, verCols, sel, massa, escolherFixa, escolherSalva, apagarSalva, guardar, campoMeta, rotuloFiltro, juntarFiltro, tirarFiltro,
+      alternarCol, todos, opsMassa, opcoesMassa, aplicarMassa, exportar, OPS_TIPO };
   },
   template: `
   <div>
     <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <div><h1>{{ TITULOS[objeto] }}</h1><div class="sub">{{ total }} registos</div></div>
-      <div style="display:flex;gap:8px"><a v-if="objeto==='contactos'||objeto==='empresas'" class="btn" :href="'#/duplicados/'+objeto">Duplicados</a><a class="btn" :href="'/crm/' + ({contactos:'contacts',empresas:'organizations',negocios:'deals',leads:'leads'})[objeto]">Abrir no CRM clássico</a></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" @click="exportar(false)">Exportar</button><a v-if="objeto==='contactos'||objeto==='empresas'" class="btn" :href="'#/duplicados/'+objeto">Duplicados</a><a class="btn" :href="'/crm/' + ({contactos:'contacts',empresas:'organizations',negocios:'deals',leads:'leads'})[objeto]">CRM clássico</a></div>
     </div>
-    <div class="vistas"><button v-for="v in VISTAS[objeto]" :key="v[0]" :class="{ativo: vista===v[0]}" @click="vista=v[0]">{{ v[1] }}</button></div>
-    <div class="filtros"><input class="filtro" style="border-style:solid;min-width:240px" v-model="q" :placeholder="'Procurar em ' + TITULOS[objeto].toLowerCase() + '…'"></div>
-    <div class="tabela-wrap"><table>
-      <thead><tr><th v-for="c in COLUNAS[objeto]" :key="c[0]" @click="ordenar(c[0])" style="cursor:pointer">{{ c[1] }}<span v-if="ordem.startsWith(c[0]+' ')">{{ ordem.endsWith('asc') ? ' ↑' : ' ↓' }}</span></th></tr></thead>
+    <div class="vistas">
+      <button v-for="v in VISTAS[objeto]" :key="v[0]" :class="{ativo: !salvaAtiva && vista===v[0]}" @click="escolherFixa(v[0])">{{ v[1] }}</button>
+      <button v-for="v in salvas" :key="v.nome+v.partilhada" :class="{ativo: salvaAtiva===v.nome+(v.partilhada?'*':'')}" @click="escolherSalva(v)">{{ v.partilhada ? '👥 ' : '' }}{{ v.nome }} <span class="x-vista" @click.stop="apagarSalva(v)" title="Apagar a vista">×</span></button>
+      <button class="mais" @click="guardar">+ Guardar vista</button>
+    </div>
+    <div class="filtros">
+      <input class="filtro" style="border-style:solid;min-width:220px" v-model="q" :placeholder="'Procurar em ' + TITULOS[objeto].toLowerCase() + '…'">
+      <span v-for="(f,i) in filtros" :key="i" class="filtro on">{{ rotuloFiltro(f) }} <span style="cursor:pointer" @click="tirarFiltro(i)">✕</span></span>
+      <span class="filtro-novo"><button class="filtro" @click="novoF = novoF ? null : {campo:'',op:'',valor:''}">+ Filtro</button>
+        <div v-if="novoF" class="cartao pop-filtro">
+          <select v-model="novoF.campo" @change="novoF.op=(OPS_TIPO[campoMeta(novoF.campo).tipo]||[[''] ])[0][0]; novoF.valor=''"><option value="" disabled>Campo…</option><option v-for="c in meta?.filtraveis||[]" :key="c.campo" :value="c.campo">{{ c.rotulo }}</option></select>
+          <select v-if="novoF.campo" v-model="novoF.op"><option v-for="o in OPS_TIPO[campoMeta(novoF.campo).tipo]||[]" :key="o[0]" :value="o[0]">{{ o[1] }}</option></select>
+          <template v-if="novoF.campo && !['vazio','preenchido'].includes(novoF.op)">
+            <select v-if="campoMeta(novoF.campo).opcoes" v-model="novoF.valor"><option v-for="o in campoMeta(novoF.campo).opcoes" :key="o.v" :value="o.v">{{ o.r }}</option></select>
+            <input v-else v-model="novoF.valor" :type="campoMeta(novoF.campo).tipo==='data'?'date':campoMeta(novoF.campo).tipo==='numero'?'number':'text'">
+          </template>
+          <button class="btn sm prim" @click="juntarFiltro" :disabled="!novoF.campo">Aplicar</button>
+        </div></span>
+      <span class="filtro-novo" style="margin-left:auto"><button class="filtro" @click="verCols=!verCols">Colunas ▾</button>
+        <div v-if="verCols" class="cartao pop-filtro" style="right:0;left:auto;min-width:220px">
+          <label v-for="c in meta?.colunas||[]" :key="c.campo" class="chk-col"><input type="checkbox" :checked="colunas.some(x=>x.campo===c.campo)" @change="alternarCol(c)"> {{ c.rotulo }}</label>
+        </div></span>
+    </div>
+    <div v-if="sel.length" class="selec" style="margin:0 24px;border-radius:10px 10px 0 0;flex-wrap:wrap">
+      {{ sel.length }} selecionado(s) ·
+      <select class="btn sm" v-model="massa.acao" @change="massa.valor=''"><option value="">Ação…</option><option v-for="o in opsMassa" :key="o[0]" :value="o[0]">{{ o[1] }}</option></select>
+      <select v-if="opcoesMassa.length" class="btn sm" v-model="massa.valor"><option value="">— nenhum —</option><option v-for="o in opcoesMassa" :key="o.v" :value="o.v">{{ o.r }}</option></select>
+      <button class="btn sm prim" @click="aplicarMassa" :disabled="!massa.acao">Aplicar</button>
+      <button class="btn sm" @click="exportar(true)">Exportar seleção</button>
+    </div>
+    <div class="tabela-wrap" :style="sel.length?{borderTopLeftRadius:0,borderTopRightRadius:0}:{}"><table>
+      <thead><tr><th style="width:34px"><input type="checkbox" v-model="todos"></th><th v-for="c in colunas" :key="c.campo" @click="ordenar(c.campo)" style="cursor:pointer">{{ c.rotulo }}<span v-if="ordem.startsWith(c.campo+' ')">{{ ordem.endsWith('asc') ? ' ↑' : ' ↓' }}</span></th></tr></thead>
       <tbody>
-        <tr v-for="l in linhas" :key="l.name" @click="abrir(l)">
-          <td v-for="(c,i) in COLUNAS[objeto]" :key="c[0]">
-            <div v-if="i===0" class="pessoa"><span class="av" :style="{background:cor(l.name)}">{{ ini(l[c[0]]||l.name) }}</span><a :href="'#'" @click.prevent>{{ l[c[0]] || l.name }}</a></div>
-            <span v-else-if="c[0]==='estado'" class="etq">{{ l.estado }}</span>
-            <span v-else-if="c[0]==='orbit_ciclo' && l.orbit_ciclo" class="etq" :class="{Cliente:'verde',Oportunidade:'roxo',Promotor:'verde','Lead qualificada (vendas)':'azul','Lead qualificada (marketing)':'azul'}[l.orbit_ciclo]">{{ l.orbit_ciclo }}</span>
-            <span v-else>{{ valor(l,c[0]) }}</span>
+        <tr v-for="l in linhas" :key="l.name">
+          <td @click.stop><input type="checkbox" :value="l.name" v-model="sel"></td>
+          <td v-for="(c,i) in colunas" :key="c.campo" @click="abrir(l)">
+            <div v-if="i===0" class="pessoa"><span class="av" :style="{background:cor(l.name)}">{{ ini(valor(l,c.campo)||l.name) }}</span><a href="#" @click.prevent>{{ valor(l,c.campo) || l.name }}</a></div>
+            <span v-else-if="c.campo==='status'" class="etq">{{ valor(l,c.campo) }}</span>
+            <span v-else-if="c.campo==='orbit_ciclo' && l.orbit_ciclo" class="etq" :class="{Cliente:'verde',Oportunidade:'roxo',Promotor:'verde','Lead qualificada (vendas)':'azul','Lead qualificada (marketing)':'azul'}[l.orbit_ciclo]">{{ l.orbit_ciclo }}</span>
+            <span v-else>{{ valor(l,c.campo) }}</span>
           </td>
         </tr>
       </tbody>

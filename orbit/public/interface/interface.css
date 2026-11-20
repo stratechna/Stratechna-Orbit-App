@@ -339,3 +339,11 @@ a.icone-btn{color:var(--ink-2);text-decoration:none}a.icone-btn.ativo{background
 .assoc-procura input{width:100%;font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
 .assoc-op{padding:6px 8px;border-radius:6px;cursor:pointer}.assoc-op:hover{background:var(--surface-2)}
 .assoc-op small{display:block;color:var(--ink-3)}
+
+/* ── Vistas, filtros e ações em massa (H7) ── */
+.filtro-novo{position:relative;display:inline-block}
+.pop-filtro{position:absolute;top:34px;left:0;z-index:30;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:260px}
+.pop-filtro select,.pop-filtro input{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:5px 7px}
+.chk-col{display:flex;gap:8px;align-items:center;font-size:13px;padding:2px 0;cursor:pointer}
+.x-vista{margin-left:4px;opacity:.5;font-size:12px}.x-vista:hover{opacity:1;color:var(--acao)}
+.tabela-wrap td{cursor:pointer}
