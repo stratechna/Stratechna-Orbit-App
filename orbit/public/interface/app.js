@@ -903,6 +903,16 @@ const Ficha = {
       apiV("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (vendas.value = r)).catch(() => {});
     };
     const vendas = ref(null);
+    const ASSOC = { "Contact": ["CRM Organization", "CRM Deal"], "CRM Organization": ["Contact", "CRM Deal"], "CRM Deal": ["Contact", "CRM Organization"] };
+    const pode = (dt) => !!(f.value && f.value.pode_editar !== false && (ASSOC[props.doctype] || []).includes(dt));
+    const assocAberta = ref(null); const assocQ = ref(""); const assocRes = ref([]); let tAssoc;
+    const abrirAssoc = (dt) => { assocAberta.value = assocAberta.value === dt ? null : dt; assocQ.value = ""; assocRes.value = [];
+      nextTick(() => document.querySelector(".assoc-procura input")?.focus()); };
+    const procurarAssoc = () => { clearTimeout(tAssoc); tAssoc = setTimeout(async () => { assocRes.value = await api("candidatos", { tipo: assocAberta.value, q: assocQ.value }); }, 250); };
+    const ligarAssoc = async (dt, c) => { await api("associar", { doctype: props.doctype, name: props.name, outro_doctype: dt, outro_name: c.name }, true);
+      assocAberta.value = null; toast("Associado"); carregar(); };
+    const tirarAssoc = async (dt, r) => { if (!confirm("Tirar esta associação? Nenhum registo é apagado.")) return;
+      await api("desassociar", { doctype: props.doctype, name: props.name, outro_doctype: dt, outro_name: r.name }, true); toast("Associação retirada"); carregar(); };
     const tempo = ref(null);
     const registarTempo = () => { window.__tempo_cliente = (tempo.value && tempo.value.cliente) || ""; };
     const assin = ref(null); const assinar = ref(false);
@@ -945,7 +955,7 @@ const Ficha = {
       : dt === "Contact" ? [r.designation, r.email_id].filter(Boolean).join(" · ") : dt === "CRM Organization" ? [r.website, r.territory].filter(Boolean).join(" · ") : [r.estado, r.email].filter(Boolean).join(" · ");
     const ic = (t) => IC_EVENTO[t] || IC_EVENTO.nota;
     const marcarEmail = () => { window.__ref_email = (f.value && f.value.email_principal) || ""; };
-    return { vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
+    return { pode, assocAberta, assocQ, assocRes, abrirAssoc, procurarAssoc, ligarAssoc, tirarAssoc, vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
       grupos, mudarFase, NOMES, tit, sub, link, data, eur, ic, cor, ESTADO_COR };
   },
   template: `
@@ -1022,12 +1032,18 @@ const Ficha = {
     <aside class="col-dir">
       <template v-for="(lista, dt) in f.assoc" :key="dt">
         <template v-if="lista.length || dt!=='CRM Lead'">
-          <div class="bloco-tit">{{ NOMES[dt] }} <span class="sub" style="font-weight:400">{{ lista.length }}</span></div>
+          <div class="bloco-tit">{{ NOMES[dt] }} <span class="sub" style="font-weight:400"><template v-if="pode(dt)"><a href="#" @click.prevent="abrirAssoc(dt)">+ Adicionar</a> · </template>{{ lista.length }}</span></div>
+          <div v-if="assocAberta===dt" class="assoc-procura">
+            <input v-model="assocQ" :placeholder="'Procurar ' + NOMES[dt].toLowerCase() + '…'" @input="procurarAssoc" @keydown.esc="assocAberta=null" ref="assocInput">
+            <div v-for="c in assocRes" :key="c.name" class="assoc-op" @click="ligarAssoc(dt,c)"><b>{{ c.titulo }}</b><small>{{ c.sub }}</small></div>
+            <div v-if="assocQ.length>=2 && !assocRes.length" class="sub" style="font-size:12px;padding:6px">Nada encontrado.</div>
+          </div>
           <div v-if="!lista.length" class="sub" style="font-size:13px">—</div>
-          <a v-for="r in lista" :key="r.name" class="assoc" :href="link(dt,r.name)" style="display:block;text-decoration:none;color:inherit">
-            <b>{{ tit(dt,r) }}</b><small>{{ sub(dt,r) }}</small>
-            <div class="barra" v-if="dt==='CRM Deal' && r.probability"><i :style="{width:r.probability+'%'}"></i></div>
-          </a>
+          <div v-for="r in lista" :key="r.name" class="assoc assoc-linha">
+            <a :href="link(dt,r.name)" style="text-decoration:none;color:inherit;min-width:0;flex:1"><b>{{ tit(dt,r) }}</b><small>{{ sub(dt,r) }}</small>
+              <div class="barra" v-if="dt==='CRM Deal' && r.probability"><i :style="{width:r.probability+'%'}"></i></div></a>
+            <button v-if="pode(dt)" class="tirar" title="Tirar a associação" @click="tirarAssoc(dt,r)">×</button>
+          </div>
         </template>
       </template>
       <template v-if="tempo && tempo.cliente">

@@ -330,3 +330,12 @@ a.icone-btn{color:var(--ink-2);text-decoration:none}a.icone-btn.ativo{background
 .chip-eq{border:1.5px solid;border-radius:14px;padding:2px 10px;font-size:12px;cursor:pointer;user-select:none}
 .cal-ocupado{position:absolute;opacity:.22;border-radius:4px;z-index:1;overflow:hidden;pointer-events:auto}
 .cal-ocupado span{font-size:10px;color:#000;opacity:.9;padding:1px 3px;display:block;white-space:nowrap}
+
+/* ── Associações editáveis (H3) ── */
+.assoc-linha{display:flex;align-items:flex-start;gap:6px}
+.assoc-linha .tirar{all:unset;cursor:pointer;color:var(--ink-3);font-size:16px;line-height:1;padding:0 4px;border-radius:4px}
+.assoc-linha .tirar:hover{color:var(--acao);background:var(--surface-2)}
+.assoc-procura{border:1px solid var(--line);border-radius:9px;padding:6px;margin-bottom:8px;background:var(--surface)}
+.assoc-procura input{width:100%;font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.assoc-op{padding:6px 8px;border-radius:6px;cursor:pointer}.assoc-op:hover{background:var(--surface-2)}
+.assoc-op small{display:block;color:var(--ink-3)}

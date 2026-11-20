@@ -316,6 +316,9 @@ def _relacionados(dt, dn):
         rel["CRM Deal"] |= set(frappe.get_all("CRM Contacts", filters={"parenttype": "CRM Deal", "contact": dn}, pluck="parent"))
         rel["CRM Organization"] |= set(frappe.get_all("Dynamic Link", filters={"parenttype": "Contact", "parent": dn,
                                                                                 "link_doctype": "CRM Organization"}, pluck="link_name"))
+        emp = frappe.db.get_value("Contact", dn, "company_name")
+        if emp and frappe.db.exists("CRM Organization", emp):
+            rel["CRM Organization"].add(emp)
     elif dt == "CRM Deal":
         d = frappe.db.get_value("CRM Deal", dn, ["organization", "lead", "contact"], as_dict=1) or {}
         if d.get("organization"):
@@ -329,6 +332,7 @@ def _relacionados(dt, dn):
         rel["CRM Deal"] |= set(frappe.get_all("CRM Deal", filters={"organization": dn}, pluck="name"))
         rel["Contact"] |= set(frappe.get_all("Dynamic Link", filters={"parenttype": "Contact", "link_doctype": "CRM Organization",
                                                                        "link_name": dn}, pluck="parent"))
+        rel["Contact"] |= set(frappe.get_all("Contact", filters={"company_name": dn}, pluck="name"))
     elif dt == "CRM Lead":
         rel["CRM Deal"] |= set(frappe.get_all("CRM Deal", filters={"lead": dn}, pluck="name"))
     if dt in ("Contact", "CRM Organization"):
@@ -808,3 +812,67 @@ def definicoes():
         if ok:
             out.append({"grupo": grupo, "itens": ok})
     return out
+
+
+# ── Associações editáveis (H3, 20-11-2026) — os mesmos campos que o Frappe CRM usa ────────────────────
+# Contacto↔Empresa: Contact.company_name (é assim que o CRM lista os contactos de uma organização)
+# Contacto↔Negócio: tabela CRM Contacts do negócio · Negócio↔Empresa: CRM Deal.organization
+ASSOCIAVEIS = {"Contact": ["CRM Organization", "CRM Deal"], "CRM Organization": ["Contact", "CRM Deal"],
+               "CRM Deal": ["Contact", "CRM Organization"]}
+
+
+@frappe.whitelist()
+def candidatos(tipo: str, q: str = ""):
+    _guarda()
+    if tipo not in ("Contact", "CRM Organization", "CRM Deal"):
+        frappe.throw("Tipo desconhecido")
+    return [r for r in pesquisa(q) if r["doctype"] == tipo][:8] if len((q or "").strip()) >= 2 else []
+
+
+def _par(a_dt, a_dn, b_dt, b_dn, ligar: bool):
+    if b_dt not in ASSOCIAVEIS.get(a_dt, []):
+        frappe.throw("Associação não suportada")
+    par = {a_dt: a_dn, b_dt: b_dn}
+    if "Contact" in par and "CRM Organization" in par:
+        c = frappe.get_doc("Contact", par["Contact"])
+        if ligar:
+            c.company_name = par["CRM Organization"]
+        elif c.company_name == par["CRM Organization"]:
+            c.company_name = None
+        c.save()
+        if not ligar:
+            frappe.db.delete("Dynamic Link", {"parenttype": "Contact", "parent": c.name, "link_doctype": "CRM Organization",
+                                              "link_name": par["CRM Organization"]})
+    elif "Contact" in par and "CRM Deal" in par:
+        d = frappe.get_doc("CRM Deal", par["CRM Deal"])
+        linhas = [x for x in d.get("contacts", []) if x.contact == par["Contact"]]
+        if ligar and not linhas:
+            d.append("contacts", {"contact": par["Contact"], "is_primary": 0 if d.get("contacts") else 1})
+        elif not ligar:
+            for x in linhas:
+                d.remove(x)
+            if d.get("contacts") and not any(x.is_primary for x in d.contacts):
+                d.contacts[0].is_primary = 1
+        d.save()
+    else:   # Negócio ↔ Empresa
+        d = frappe.get_doc("CRM Deal", par["CRM Deal"])
+        if ligar:
+            d.organization = par["CRM Organization"]
+        elif d.organization == par["CRM Organization"]:
+            d.organization = None
+        d.save()
+
+
+@frappe.whitelist(methods=["POST"])
+def associar(doctype: str, name: str, outro_doctype: str, outro_name: str):
+    _guarda()
+    frappe.get_doc(outro_doctype, outro_name).check_permission("read")
+    _par(doctype, name, outro_doctype, outro_name, True)
+    return {"ok": True}
+
+
+@frappe.whitelist(methods=["POST"])
+def desassociar(doctype: str, name: str, outro_doctype: str, outro_name: str):
+    _guarda()
+    _par(doctype, name, outro_doctype, outro_name, False)
+    return {"ok": True}

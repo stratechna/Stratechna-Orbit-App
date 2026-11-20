@@ -212,6 +212,9 @@ def _alvos(email: str):
                                         pluck="parent"))
     orgs = set()
     for c in contactos:
+        emp = frappe.db.get_value("Contact", c, "company_name")
+        if emp and frappe.db.exists("CRM Organization", emp):
+            orgs.add(emp)
         for org in frappe.get_all("Dynamic Link", filters={"parenttype": "Contact", "parent": c,
                                                              "link_doctype": "CRM Organization"}, pluck="link_name"):
             orgs.add(org)
