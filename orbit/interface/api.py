@@ -484,7 +484,7 @@ def email_completo(nome: str):
     c = frappe.get_doc("Communication", nome)
     c.check_permission("read")
     return {"id": c.name, "assunto": c.subject, "de": c.sender, "para": c.recipients, "cc": c.cc, "data": c.communication_date,
-            "html": frappe.utils.sanitize_html(c.content or "")}
+            "html": c.content or ""}
 
 
 # ── Criar a partir da ficha ─────────────────────────────────────────────────────────────────────────────
@@ -580,11 +580,13 @@ def mover(negocio: str, estado: str):
 # «Equipa» = caixas partilhadas ligadas ao CRM e tickets do Desk; «Privado» = as conversas da minha caixa pessoal
 # com contactos do CRM («só para mim», orbit_privado_de = eu). O resto do correio fica no Orbit Mail (SOGo).
 @frappe.whitelist()
-def caixa(grupo: str = "todos"):
+def caixa(grupo: str = "todos", conta: str = ""):
     _guarda()
     u = frappe.session.user
     out = []
-    if grupo in ("todos", "equipa") and frappe.db.exists("DocType", "HD Ticket"):
+    if conta == "tickets":
+        grupo = "tickets"
+    if grupo in ("todos", "equipa", "tickets") and not (conta and conta != "tickets") and frappe.db.exists("DocType", "HD Ticket"):
         for t in frappe.get_list("HD Ticket", filters={"status_category": ["!=", "Resolved"]},
                                  fields=["name", "subject", "raised_by", "status", "modified", "_assign"],
                                  order_by="modified desc", limit=50):
@@ -594,6 +596,11 @@ def caixa(grupo: str = "todos"):
     filtros = {"communication_medium": "Email", "communication_type": "Communication",
                "communication_date": [">", add_days(now_datetime(), -30)],
                "reference_doctype": ["in", ["Contact", "CRM Deal", "CRM Lead", "CRM Organization"]]}
+    if grupo == "tickets":
+        out.sort(key=lambda i: str(i["data"] or ""), reverse=True)
+        return out
+    if conta:
+        filtros["email_account"] = conta
     if grupo == "privado":
         filtros["orbit_privado_de"] = u
     elif grupo == "equipa":
@@ -653,7 +660,7 @@ def conversa(nome: str):
             "pode_responder": bool(conta and pode_responder(conta)), "para": para, "responder_a": ultima.name,
             "mensagens": [{"id": m.name, "de": m.sender_full_name or m.sender, "email_de": m.sender, "para": m.recipients,
                            "cc": m.cc, "data": m.communication_date, "enviado": m.sent_or_received == "Sent",
-                           "html": frappe.utils.sanitize_html(m.content or "")} for m in msgs]}
+                           "html": m.content or ""} for m in msgs]}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -690,3 +697,71 @@ def responder(nome: str, html: str, para: str = None, cc: str = None):
         from orbit.emails_crm import filtrar
         filtrar(frappe.get_doc("Communication", nome_novo))
     return {"ok": True, "id": nome_novo}
+
+
+# ── Canais da caixa de entrada (como o HubSpot: caixas de equipa e a minha caixa, bem separadas) ────────
+@frappe.whitelist()
+def canais():
+    _guarda()
+    u = frappe.session.user
+    desde = add_days(now_datetime(), -30)
+    contas = frappe.get_all("Email Account", filters={"enable_incoming": 1, "orbit_registo_crm": ["in", ["equipa", "so_eu"]]},
+                            fields=["name", "email_id", "orbit_registo_crm", "orbit_dono"], order_by="email_id asc")
+    def por_responder(nome, privado):
+        f = {"email_account": nome, "communication_medium": "Email", "sent_or_received": "Received",
+             "communication_date": [">", desde]}
+        return len(frappe.get_list("Communication", filters=f, pluck="name", limit=500))
+    equipa = [{"conta": c.name, "email": c.email_id, "n": por_responder(c.name, False)} for c in contas if c.orbit_registo_crm == "equipa"]
+    minhas = [{"conta": c.name, "email": c.email_id, "n": por_responder(c.name, True)} for c in contas
+              if c.orbit_registo_crm == "so_eu" and c.orbit_dono == u]
+    tickets = len(frappe.get_list("HD Ticket", filters={"status_category": ["!=", "Resolved"]}, pluck="name", limit=1000)) \
+        if frappe.db.exists("DocType", "HD Ticket") else 0
+    return {"equipa": equipa, "privado": minhas, "tickets": tickets}
+
+
+# ── Definições: tudo o que é configuração numa só roda dentada (como o HubSpot) ─────────────────────────
+_DEFINICOES = [
+    ("Conta e utilizadores", [("Utilizadores", "/app/user", "User"), ("Papéis e permissões", "/app/role", "Role"),
+                              ("Perfis de módulos", "/app/module-profile", "Module Profile"),
+                              ("Definições do sistema", "/app/system-settings", "System Settings")]),
+    ("Correio", [("Caixas de email", "/app/email-account", "Email Account"), ("Domínios de email", "/app/email-domain", "Email Domain"),
+                 ("Modelos de email", "/app/email-template", "Email Template"), ("Notificações", "/app/notification", "Notification")]),
+    ("CRM", [("Fases dos negócios", "/app/crm-deal-status", "CRM Deal Status"), ("Estados das leads", "/app/crm-lead-status", "CRM Lead Status"),
+             ("Origens", "/app/crm-lead-source", "CRM Lead Source"), ("Motivos de perda", "/app/crm-lost-reason", "CRM Lost Reason"),
+             ("Setores", "/app/crm-industry", "CRM Industry"), ("Territórios", "/app/crm-territory", "CRM Territory"),
+             ("Acordos de nível de serviço (CRM)", "/app/crm-service-level-agreement", "CRM Service Level Agreement"),
+             ("Campos e formulários do CRM", "/app/crm-fields-layout", "CRM Fields Layout")]),
+    ("Atendimento (Desk)", [("Equipas", "/app/hd-team", "HD Team"), ("Tipos de ticket", "/app/hd-ticket-type", "HD Ticket Type"),
+                            ("Prioridades", "/app/hd-ticket-priority", "HD Ticket Priority"),
+                            ("Acordos de nível de serviço", "/app/hd-service-level-agreement", "HD Service Level Agreement"),
+                            ("Respostas-modelo", "/app/hd-canned-response", "HD Canned Response"),
+                            ("Definições do Desk", "/app/hd-settings", "HD Settings")]),
+    ("Marcas e empresa", [("Marcas", "/app/brand", "Brand"), ("Empresas (ERP)", "/app/company", "Company"),
+                          ("Cabeçalhos de documentos", "/app/letter-head", "Letter Head"),
+                          ("Modelos de impressão", "/app/print-format", "Print Format")]),
+    ("Vendas e faturação", [("Artigos", "/app/item", "Item"), ("Listas de preços", "/app/price-list", "Price List"),
+                            ("Impostos de venda", "/app/sales-taxes-and-charges-template", "Sales Taxes and Charges Template"),
+                            ("Termos e condições", "/app/terms-and-conditions", "Terms and Conditions"),
+                            ("Ligação à faturação certificada", "/app/ligacao-faturacao", "Ligacao Faturacao")]),
+    ("Pessoas e tempo", [("Funcionários", "/app/employee", "Employee"), ("Departamentos", "/app/department", "Department"),
+                         ("Tipos de atividade (tempo)", "/app/activity-type", "Activity Type"), ("Projetos", "/app/project", "Project")]),
+    ("Avançado", [("Campos personalizados", "/app/custom-field", "Custom Field"), ("Personalizar formulários", "/app/customize-form", "Customize Form"),
+                  ("Tarefas agendadas", "/app/scheduled-job-type", "Scheduled Job Type"), ("Registo de erros", "/app/error-log", "Error Log")]),
+]
+
+
+@frappe.whitelist()
+def definicoes():
+    _guarda()
+    out = []
+    for grupo, itens in _DEFINICOES:
+        ok = []
+        for rotulo, url, dt in itens:
+            if not frappe.db.exists("DocType", dt):
+                continue
+            if not frappe.has_permission(dt, "read"):
+                continue
+            ok.append({"rotulo": rotulo, "url": url})
+        if ok:
+            out.append({"grupo": grupo, "itens": ok})
+    return out

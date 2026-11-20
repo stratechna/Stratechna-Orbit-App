@@ -63,11 +63,45 @@ const ICONES = {
   grelha: '<rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/>',
   lupa: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>', lua: '<path d="M20 14A8 8 0 1110 4a6 6 0 0010 10z"/>',
   tel: '<path d="M5 4h4l2 5-3 2a11 11 0 005 5l2-3 5 2v4a2 2 0 01-2 2A17 17 0 013 6a2 2 0 012-2"/>', nota: '<path d="M4 4h16v12l-4 4H4z"/><path d="M16 20v-4h4M8 9h8M8 13h5"/>',
+  roda: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/>',
   sair: '<path d="M14 4h5v16h-5"/><path d="M10 8l-4 4 4 4M6 12h10"/>', antigo: '<path d="M4 12a8 8 0 108-8"/><path d="M4 4v5h5"/>',
 };
 const Icone = { props: ["n"], template: `<svg viewBox="0 0 24 24" v-html="html"></svg>`, computed: { html() { return ICONES[this.n] || ""; } } };
 const IC_EVENTO = { email: ["mail", "var(--cinza-bg)", "var(--ink-2)"], nota: ["nota", "var(--ambar-bg)", "var(--ambar)"], tarefa: ["tarefa", "var(--ambar-bg)", "var(--ambar)"],
   chamada: ["tel", "var(--verde-bg)", "var(--verde)"], reuniao: ["cal", "var(--azul-bg)", "var(--azul)"], ticket: ["ticket", "var(--cinza-bg)", "var(--ink-2)"] };
+
+
+// ── Corpo de um email: numa moldura própria (sem scripts), com o histórico citado recolhido ─────────────
+const CITACOES = ".gmail_quote, blockquote[type=cite], #divRplyFwdMsg, #appendonsend, .yahoo_quoted, .moz-cite-prefix, div[id^=mail-editor-reference-message], .protonmail_quote, #reply-intro, .OutlookMessageHeader";
+function separarCitacao(html) {
+  try {
+    const doc = new DOMParser().parseFromString(html || "", "text/html");
+    const alvo = doc.body.querySelector(CITACOES);
+    if (!alvo) return [doc.body.innerHTML, ""];
+    let el = alvo; const fora = [];
+    // o que vem a seguir ao início da citação, no mesmo nível, também é citação (Outlook: <hr> + cabeçalho + texto)
+    const prev = el.previousElementSibling;
+    if (prev && prev.tagName === "HR") fora.push(prev);
+    while (el) { fora.push(el); el = el.nextElementSibling; }
+    const tmp = doc.createElement("div"); fora.forEach((n) => tmp.appendChild(n));
+    return [doc.body.innerHTML, tmp.innerHTML];
+  } catch (e) { return [html, ""]; }
+}
+const EST_EMAIL = `<style>html,body{margin:0;padding:0;background:#fff}body{font:14px/1.55 "DM Sans",system-ui,-apple-system,sans-serif;color:#1c2a31;overflow-wrap:anywhere;word-break:break-word}
+img{max-width:100%;height:auto}table{max-width:100%}p{margin:0 0 .8em}a{color:#2b3b44}blockquote{margin:0 0 0 .6em;padding-left:.8em;border-left:3px solid #e1e6e9;color:#4a5a63}pre{white-space:pre-wrap}</style><base target="_blank">`;
+const EmailCorpo = {
+  props: ["html"],
+  setup(props) {
+    const partes = computed(() => separarCitacao(props.html));
+    const verAnterior = ref(false);
+    const fonte = computed(() => EST_EMAIL + partes.value[0] + (verAnterior.value ? '<div style="margin-top:12px">' + partes.value[1] + "</div>" : ""));
+    const quadro = ref(null);
+    const medir = () => { try { const d = quadro.value.contentDocument; quadro.value.style.height = Math.min(Math.max(d.documentElement.scrollHeight, 40), 4000) + "px"; } catch (e) {} };
+    return { partes, verAnterior, fonte, quadro, medir };
+  },
+  template: `<div class="email-corpo"><iframe ref="quadro" class="email-quadro" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" :srcdoc="fonte" @load="medir" title="Mensagem"></iframe>
+    <button v-if="partes[1]" class="citacao-btn" @click="verAnterior=!verAnterior">{{ verAnterior ? 'Esconder a mensagem anterior' : '··· Mostrar a mensagem anterior' }}</button></div>`,
+};
 
 // ── Ecrãs ────────────────────────────────────────────────────────────────────────────────────────────
 const Inicio = {
@@ -179,7 +213,7 @@ const Lista = {
 };
 
 const Ficha = {
-  components: { Icone },
+  components: { Icone, EmailCorpo },
   props: ["doctype", "name"],
   setup(props) {
     const f = ref(null); const cron = ref(null); const filtro = ref(""); const ed = ref(""); const valorEd = ref("");
@@ -316,7 +350,7 @@ const Ficha = {
 
     <div class="modal-fundo" v-if="email" @click.self="email=null">
       <div class="modal"><header><div><b>{{ email.assunto }}</b><div class="sub">De {{ email.de }} · para {{ email.para }}<span v-if="email.cc"> · cc {{ email.cc }}</span> · {{ data(email.data) }}</div></div><div style="display:flex;gap:6px"><a class="btn sm prim" :href="'#/caixa/'+encodeURIComponent(email.id)">Responder</a><button class="btn sm" @click="email=null">Fechar</button></div></header>
-        <div class="corpo-email" v-html="email.html"></div></div>
+        <div class="corpo-email"><EmailCorpo :html="email.html"/></div></div>
     </div>
   </div>
   <div v-else class="carregar">A carregar…</div>`,
@@ -359,25 +393,23 @@ const Funil = {
 };
 
 const Caixa = {
+  components: { EmailCorpo, Icone },
   props: ["abrirId"],
   setup(props) {
-    let g0 = "todos"; try { g0 = localStorage.getItem("orbit.caixa.grupo") || "todos"; } catch (e) {}
-    const grupo = ref(g0); const itens = ref(null); const sel = ref(null); const conv = ref(null);
+    let c0 = { grupo: "equipa", conta: "" }; try { c0 = JSON.parse(localStorage.getItem("orbit.caixa.canal")) || c0; } catch (e) {}
+    const canal = ref(c0); const canais = ref(null); const itens = ref(null); const conv = ref(null);
     const resposta = ref(""); const para = ref(""); const cc = ref(""); const aEnviar = ref(false); const verCc = ref(false);
-    const carregar = async () => { itens.value = await api("caixa", { grupo: grupo.value }); };
-    watch(grupo, (v) => { try { localStorage.setItem("orbit.caixa.grupo", v); } catch (e) {} sel.value = null; conv.value = null; carregar(); });
+    const carregar = async () => { itens.value = null; itens.value = await api("caixa", { grupo: canal.value.grupo, conta: canal.value.conta }); };
+    const escolher = (grupo, conta = "") => { canal.value = { grupo, conta }; try { localStorage.setItem("orbit.caixa.canal", JSON.stringify(canal.value)); } catch (e) {} carregar(); };
     const abrirConversa = async (id) => {
       conv.value = null; resposta.value = ""; cc.value = ""; verCc.value = false;
       conv.value = await api("conversa", { nome: id });
       para.value = conv.value.para || "";
       nextTick(() => { const m = document.querySelector(".msgs"); if (m) m.scrollTop = m.scrollHeight; });
     };
-    const abrir = async (i) => {
-      if (i.tipo === "ticket") { window.open(i.url, "_blank"); return; }
-      sel.value = i; location.hash = "#/caixa/" + encodeURIComponent(i.id);
-    };
+    const abrir = (i) => { if (i.tipo === "ticket") { window.open(i.url, "_blank"); return; } location.hash = "#/caixa/" + encodeURIComponent(i.id); };
     watch(() => props.abrirId, (id) => { if (id) abrirConversa(id); });
-    onMounted(() => { carregar(); if (props.abrirId) abrirConversa(props.abrirId); });
+    onMounted(async () => { canais.value = await api("canais"); carregar(); if (props.abrirId) abrirConversa(props.abrirId); });
     const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const enviar = async () => {
       if (!resposta.value.trim() || aEnviar.value) return;
@@ -389,36 +421,47 @@ const Caixa = {
         resposta.value = ""; await abrirConversa(conv.value.responder_a); carregar();
       } finally { aEnviar.value = false; }
     };
-    const mailUrl = ((window.__ctx && window.__ctx.apps) || []).find((a) => a.nome === "Mail")?.url || "#";
-    return { grupo, itens, sel, conv, abrir, data, cor, ini, link, mailUrl, resposta, para, cc, verCc, enviar, aEnviar };
+    const ativo = (g, c = "") => canal.value.grupo === g && (canal.value.conta || "") === c;
+    const nomeCanal = computed(() => {
+      const c = canal.value; if (c.grupo === "tickets") return "Tickets do Desk";
+      if (c.conta) return c.conta.replace("Orbit CRM · ", "");
+      return c.grupo === "privado" ? "As minhas conversas" : "Todas as caixas de equipa";
+    });
+    return { canal, canais, itens, conv, abrir, data, cor, ini, link, resposta, para, cc, verCc, enviar, aEnviar, escolher, ativo, nomeCanal };
   },
   template: `
-  <div class="caixa">
+  <div class="caixa caixa3" :class="{'com-conv': !!abrirId}">
+    <aside class="canais">
+      <h6><span class="ponto-eq"></span>Equipa</h6>
+      <button :class="{ativo:ativo('equipa')}" @click="escolher('equipa')">Todas as caixas de equipa</button>
+      <button v-for="c in canais?.equipa||[]" :key="c.conta" :class="{ativo:ativo('equipa',c.conta)}" @click="escolher('equipa',c.conta)"><span class="txt">{{ c.email }}</span><span class="n" v-if="c.n">{{ c.n }}</span></button>
+      <button :class="{ativo:ativo('tickets','tickets')}" @click="escolher('tickets','tickets')"><span class="txt">Tickets do Desk</span><span class="n" v-if="canais?.tickets">{{ canais.tickets }}</span></button>
+      <h6><span class="ponto-pr"></span>Privado <small>só você vê</small></h6>
+      <button :class="{ativo:ativo('privado')}" @click="escolher('privado')">As minhas conversas</button>
+      <button v-for="c in canais?.privado||[]" :key="c.conta" :class="{ativo:ativo('privado',c.conta)}" @click="escolher('privado',c.conta)"><span class="txt">{{ c.email }}</span><span class="n" v-if="c.n">{{ c.n }}</span></button>
+      <p class="sub" v-if="canais && !canais.privado.length" style="font-size:12px;padding:0 10px">A sua caixa pessoal ainda não está ligada ao CRM («só para mim»): liga-se no portal, em Stratechna Orbit.</p>
+    </aside>
     <div class="lista-conv">
-      <header><div style="display:flex;justify-content:space-between;align-items:center"><h2>Caixa de entrada</h2><span class="sub" v-if="itens">{{ itens.length }}</span></div>
-        <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
-          <button class="etq" :class="{azul:grupo==='todos'}" @click="grupo='todos'" style="border:0">Todas</button>
-          <button class="etq" :class="{azul:grupo==='equipa'}" @click="grupo='equipa'" style="border:0">Equipa</button>
-          <button class="etq" :class="{azul:grupo==='privado'}" @click="grupo='privado'" style="border:0">Privado</button>
-        </div></header>
+      <header><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2 style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ nomeCanal }}</h2><span class="sub" v-if="itens">{{ itens.length }}</span></div>
+        <div class="sub" style="font-size:12px;margin-top:4px">{{ canal.grupo==='privado' ? 'Conversas da sua caixa com clientes do CRM — só você as vê.' : canal.grupo==='tickets' ? 'Pedidos de suporte em aberto.' : 'Conversas partilhadas — toda a equipa as vê.' }}</div></header>
       <div v-if="!itens" class="carregar">A carregar…</div>
       <div v-else-if="!itens.length" class="vazio">Nada por aqui.</div>
-      <div v-for="i in itens || []" :key="i.tipo+i.id" class="conv" :class="{ativo: (sel && sel.id===i.id) || abrirId===i.id, nova: i.por_responder}" @click="abrir(i)">
+      <div v-for="i in itens || []" :key="i.tipo+i.id" class="conv" :class="{ativo: abrirId===i.id, nova: i.por_responder}" @click="abrir(i)">
         <span class="av" style="width:30px;height:30px;font-size:11px" :style="{background:cor(i.quem)}">{{ ini(i.quem) }}</span>
         <div style="min-width:0"><div class="linha1"><b>{{ i.quem }}</b><time>{{ data(i.data,false) }}</time></div><p>{{ i.titulo }}</p>
           <div class="meta"><span class="etq" :class="i.tipo==='ticket'?'ambar':i.grupo==='privado'?'roxo':'azul'">{{ i.tipo==='ticket' ? 'Ticket · ' + i.estado : i.grupo==='privado' ? 'Privado' : 'Equipa' }}</span>
-            <span class="sub" style="font-size:12px" v-if="i.conta">{{ i.conta }}</span><span class="sub" style="font-size:12px" v-if="i.n>1">{{ i.n }} mensagens</span></div></div>
+            <span class="sub" style="font-size:12px" v-if="i.ref_titulo">{{ i.ref_titulo }}</span><span class="sub" style="font-size:12px" v-if="i.n>1">· {{ i.n }}</span></div></div>
       </div>
     </div>
     <div class="fio">
       <template v-if="conv">
-        <header><div style="min-width:0"><h2>{{ conv.assunto }}</h2><div class="sub">{{ conv.mensagens.length }} mensagens<template v-if="conv.de"> · caixa {{ conv.de }}</template></div></div>
+        <header><a class="voltar-conv" href="#/caixa">← Conversas</a><div style="min-width:0"><h2>{{ conv.assunto }}</h2><div class="sub">{{ conv.mensagens.length }} mensagens<template v-if="conv.de"> · caixa {{ conv.de }}</template></div></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap"><a v-if="conv.ref[0]" class="btn sm" :href="link(conv.ref[0], conv.ref[1])">Abrir {{ conv.ref_titulo }}</a></div></header>
         <div class="msgs">
           <div class="cartao msg" v-for="m in conv.mensagens" :key="m.id" :class="{nossa:m.enviado}">
             <header><b>{{ m.de }}</b><span>{{ data(m.data) }}</span></header>
             <div class="sub" style="font-size:12px;margin-bottom:8px">Para {{ m.para }}<template v-if="m.cc"> · cc {{ m.cc }}</template></div>
-            <div v-html="m.html"></div>
+            <EmailCorpo :html="m.html"/>
           </div>
         </div>
         <div class="cartao resposta" v-if="conv.pode_responder">
@@ -429,17 +472,43 @@ const Caixa = {
           <textarea v-model="resposta" rows="5" placeholder="Escrever a resposta…" @keydown.meta.enter="enviar" @keydown.ctrl.enter="enviar"></textarea>
           <footer><span class="sub">Fica nos Enviados de {{ conv.de }} e na cronologia do cliente · ⌘↵ envia</span><button class="btn prim sm" @click="enviar" :disabled="!resposta.trim() || aEnviar">{{ aEnviar ? 'A enviar…' : 'Enviar' }}</button></footer>
         </div>
-        <div v-else class="vazio" style="margin:0 20px 20px">Esta conversa é de uma caixa pessoal de outra pessoa ou de uma caixa sem ligação ao CRM. <a :href="mailUrl" target="_blank">Abrir o Mail</a></div>
+        <div v-else class="vazio" style="margin:0 20px 20px">Esta conversa é da caixa pessoal de outra pessoa: só ela pode responder.</div>
       </template>
       <div v-else-if="abrirId" class="carregar">A carregar…</div>
-      <div v-else class="vazio">Escolha uma conversa.<br><span class="sub">Equipa = caixas partilhadas e tickets. Privado = as suas conversas com clientes, só visíveis para si.</span></div>
+      <div v-else class="vazio">Escolha uma conversa.</div>
     </div>
   </div>`,
 };
 
+// ── Definições (uma só roda dentada) ─────────────────────────────────────────────────────────────────
+const Definicoes = {
+  setup() { const d = ref(null); onMounted(async () => (d.value = await api("definicoes"))); return { d }; },
+  template: `
+  <div class="pad">
+    <div class="ola"><div><h1>Definições</h1><div class="sub">Tudo o que se configura no Orbit, num só sítio.</div></div></div>
+    <div v-if="!d" class="carregar">A carregar…</div>
+    <div class="grelha-def" v-else>
+      <div class="cartao" v-for="g in d" :key="g.grupo"><header><h2>{{ g.grupo }}</h2></header>
+        <a class="linha" v-for="i in g.itens" :key="i.url" :href="i.url" style="text-decoration:none;color:inherit"><div class="cresce">{{ i.rotulo }}</div><span class="sub">›</span></a>
+      </div>
+    </div>
+  </div>`,
+};
+
+// ── Apps dentro da interface (as que o permitem: Meet e Booking) ──────────────────────────────────────
+const EMBUTIDAS = ["Meet", "Booking"];
+const AppEmbutida = {
+  props: ["nome"],
+  setup(props) {
+    const app = computed(() => ((window.__ctx && window.__ctx.apps) || []).find((a) => a.nome === props.nome));
+    return { app };
+  },
+  template: `<div class="embutida" v-if="app"><iframe :src="app.url" allow="camera; microphone; display-capture; fullscreen; clipboard-write; autoplay" :title="app.nome"></iframe></div><div v-else class="vazio">App desconhecida.</div>`,
+};
+
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -465,7 +534,7 @@ const App = {
     };
     const NAV = [["inicio", "casa", "Início"], ["sec", "CRM"], ["contactos", "pessoa", "Contactos"], ["empresas", "empresa", "Empresas"], ["leads", "lead", "Leads"],
       ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"]];
-    return { ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT };
+    return { ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS };
   },
   template: `
   <div class="app" v-if="ctx">
@@ -476,7 +545,7 @@ const App = {
         <a v-else :href="'#/'+n[0]" style="text-decoration:none"><button :class="{ativo: ecra===n[0] || (n[0]==='contactos'&&ecra==='contacto') || (n[0]==='negocios'&&ecra==='negocio') || (n[0]==='empresas'&&ecra==='empresa') || (n[0]==='leads'&&ecra==='lead')}" tabindex="-1"><Icone :n="n[1]"/>{{ n[2] }}<span class="conta" v-if="n[0]==='caixa' && ctx.contadores.tickets">{{ ctx.contadores.tickets }}</span></button></a>
       </template>
       <h6>Apps</h6>
-      <a v-for="a in ctx.apps" :key="a.nome" :href="a.url" style="text-decoration:none"><button tabindex="-1"><Icone :n="a.icone"/>{{ a.nome }}</button></a>
+      <a v-for="a in ctx.apps" :key="a.nome" :href="EMBUTIDAS.includes(a.nome) ? '#/app/'+a.nome : a.url" :target="EMBUTIDAS.includes(a.nome) ? null : '_blank'" style="text-decoration:none"><button tabindex="-1" :class="{ativo: ecra==='app' && partes[1]===a.nome}"><Icone :n="a.icone"/>{{ a.nome }}<span class="fora" v-if="!EMBUTIDAS.includes(a.nome)">↗</span></button></a>
       <a href="/crm" style="text-decoration:none"><button tabindex="-1"><Icone n="antigo"/>CRM clássico</button></a>
       <div class="fim"><div class="av" style="background:#5b6f7a">{{ ctx.iniciais }}</div><div style="min-width:0">{{ ctx.nome }}<br><a href="/?cmd=web_logout" style="color:#7f939d;font-size:12px">Sair</a></div></div>
     </nav>
@@ -490,6 +559,7 @@ const App = {
         </div>
         <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
           <button class="icone-btn" @click="tema" title="Claro / escuro"><Icone n="lua"/></button>
+          <a class="icone-btn" href="#/definicoes" title="Definições" :class="{ativo: ecra==='definicoes'}"><Icone n="roda"/></a>
         </div>
       </header>
       <main class="ecra">
@@ -498,6 +568,8 @@ const App = {
         <Ficha v-else-if="ROTAS_DT[ecra]" :doctype="ROTAS_DT[ecra]" :name="partes[1]" :key="ecra+partes[1]"/>
         <Funil v-else-if="ecra==='funil'"/>
         <Caixa v-else-if="ecra==='caixa'" :abrir-id="partes[1]"/>
+        <Definicoes v-else-if="ecra==='definicoes'"/>
+        <AppEmbutida v-else-if="ecra==='app'" :nome="partes[1]" :key="partes[1]"/>
         <div v-else class="vazio">Página desconhecida. <a href="#/inicio">Início</a></div>
       </main>
     </div>
