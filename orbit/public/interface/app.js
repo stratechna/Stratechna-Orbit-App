@@ -830,6 +830,48 @@ const Duplicados = {
   </div>`,
 };
 
+
+// ── Importar CSV/Excel (H8) ───────────────────────────────────────────────────────────────────────────
+const Importar = {
+  props: ["objeto"], emits: ["fechar", "feito"],
+  setup(props, { emit }) {
+    const passo = ref(1); const an = ref(null); const mapa = ref({}); const modo = ref("atualizar"); const res = ref(null); const ocupado = ref(false);
+    const POST = async (metodo, args) => {
+      const r = await fetch(`/api/method/orbit.interface.importar.${metodo}`, { method: "POST", headers: { "X-Frappe-CSRF-Token": window.csrf_token, "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(args) });
+      const j = await r.json().catch(() => ({})); if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(m); throw new Error(m); } return j.message; };
+    const enviar = async (ev) => {
+      const fd = new FormData(); const f = ev.target.files[0]; if (!f) return; fd.append("ficheiro", f); fd.append("objeto", props.objeto); ocupado.value = true;
+      try { const r = await fetch("/api/method/orbit.interface.importar.analisar", { method: "POST", body: fd, headers: { "X-Frappe-CSRF-Token": window.csrf_token } });
+        const j = await r.json().catch(() => ({})); if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(m); return; }
+        an.value = j.message; mapa.value = { ...an.value.sugestao }; passo.value = 2; } finally { ocupado.value = false; } };
+    const correr = async (simular) => { ocupado.value = true;
+      try { res.value = await POST("executar", { codigo: an.value.codigo, mapeamento: JSON.stringify(mapa.value), modo: modo.value, simular: simular ? 1 : 0 });
+        passo.value = simular ? 3 : 4; if (!simular) emit("feito"); } finally { ocupado.value = false; } };
+    const usados = computed(() => Object.values(mapa.value).filter(Boolean));
+    return { passo, an, mapa, modo, res, ocupado, enviar, correr, usados, TITULOS };
+  },
+  template: `<div class="modal-fundo" @click.self="$emit('fechar')"><div class="modal" style="max-width:860px">
+    <header><b>Importar {{ TITULOS[objeto].toLowerCase() }}</b><button class="btn sm" @click="$emit('fechar')">Fechar</button></header>
+    <div class="corpo-email">
+      <template v-if="passo===1"><p>Escolha um ficheiro <b>CSV</b> (separado por «;» ou «,») ou <b>Excel (.xlsx)</b>, com os nomes das colunas na 1.ª linha. Até 5 000 linhas.</p>
+        <input type="file" accept=".csv,.txt,.xlsx" @change="enviar" :disabled="ocupado"><p v-if="ocupado" class="sub">A ler…</p></template>
+      <template v-if="passo===2 && an"><p class="sub">{{ an.importaveis }} linhas. Confirme a que campo vai cada coluna (as vazias não se importam).</p>
+        <div class="tabela-wrap" style="margin:0;max-height:46vh"><table><thead><tr><th>Coluna do ficheiro</th><th>Exemplos</th><th>Campo no Orbit</th></tr></thead><tbody>
+          <tr v-for="(h,i) in an.cabecalhos" :key="i"><td><b>{{ h }}</b></td><td class="sub" style="white-space:normal;max-width:260px">{{ an.amostra.map(l=>l[i]).filter(Boolean).slice(0,3).join(' · ') }}</td>
+            <td><select v-model="mapa[i]" class="btn sm"><option value="">— não importar —</option><option v-for="c in an.campos" :key="c.campo" :value="c.campo" :disabled="usados.includes(c.campo) && mapa[i]!==c.campo">{{ c.rotulo }}</option></select></td></tr>
+        </tbody></table></div>
+        <div style="display:flex;gap:14px;align-items:center;margin-top:12px;flex-wrap:wrap"><span class="sub">Se já existir (mesmo email; empresas: mesmo NIPC ou nome):</span>
+          <label><input type="radio" value="atualizar" v-model="modo"> atualizar</label><label><input type="radio" value="ignorar" v-model="modo"> ignorar</label>
+          <button class="btn prim" style="margin-left:auto" @click="correr(true)" :disabled="ocupado || !usados.length">{{ ocupado ? 'A simular…' : 'Simular' }}</button></div></template>
+      <template v-if="(passo===3 || passo===4) && res">
+        <p><b>{{ res.simulado ? 'Simulação (nada foi gravado)' : 'Importação feita' }}:</b> {{ res.novos }} novos · {{ res.atualizados }} atualizados · {{ res.ignorados }} ignorados · {{ res.n_erros }} com erro</p>
+        <div v-if="res.erros.length" class="tabela-wrap" style="margin:0;max-height:36vh"><table><thead><tr><th>Linha</th><th>Erro</th></tr></thead><tbody><tr v-for="e in res.erros" :key="e.linha"><td>{{ e.linha }}</td><td style="white-space:normal">{{ e.erro }}</td></tr></tbody></table></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+          <template v-if="passo===3"><button class="btn" @click="passo=2">Voltar à correspondência</button><button class="btn prim" @click="correr(false)" :disabled="ocupado || !(res.novos+res.atualizados)">{{ ocupado ? 'A importar…' : 'Importar ' + (res.novos+res.atualizados) + ' registos' }}</button></template>
+          <button v-else class="btn prim" @click="$emit('fechar')">Fechar</button></div></template>
+    </div></div></div>`,
+};
+
 // ── Ecrãs ────────────────────────────────────────────────────────────────────────────────────────────
 const Inicio = {
   components: { Icone },
@@ -910,8 +952,10 @@ const OPS_TIPO = { user: [["igual", "é"], ["diferente", "não é"], ["vazio", "
 const CAMPOS_USER = ["orbit_responsavel", "deal_owner", "lead_owner"];
 const CAMPOS_DATA = ["orbit_ultima_atividade", "creation", "expected_closure_date", "ultimo_email"];
 const Lista = {
+  components: { Importar },
   props: ["objeto"],
   setup(props) {
+    const importar = ref(false);
     const vista = ref(VISTAS[props.objeto][0][0]); const q = ref(""); const linhas = ref([]); const total = ref(0); const mais = ref(false);
     const pagina = ref(0); const ordem = ref("modified desc"); const a = ref(false);
     const meta = ref(null); const salvas = ref([]); const salvaAtiva = ref(null);
@@ -968,13 +1012,13 @@ const Lista = {
       window.location.href = "/api/method/orbit.interface.vistas.exportar?" + p.toString(); };
     return { vista, q, linhas, total, mais, pagina, carregar, ordenar, valor, abrir, a, VISTAS, TITULOS, cor, ini, ordem, meta, salvas, salvaAtiva,
       filtros, colunas, novoF, verCols, sel, massa, escolherFixa, escolherSalva, apagarSalva, guardar, campoMeta, rotuloFiltro, juntarFiltro, tirarFiltro,
-      alternarCol, todos, opsMassa, opcoesMassa, aplicarMassa, exportar, OPS_TIPO };
+      alternarCol, todos, opsMassa, opcoesMassa, aplicarMassa, exportar, OPS_TIPO, importar };
   },
   template: `
   <div>
     <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <div><h1>{{ TITULOS[objeto] }}</h1><div class="sub">{{ total }} registos</div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" @click="exportar(false)">Exportar</button><a v-if="objeto==='contactos'||objeto==='empresas'" class="btn" :href="'#/duplicados/'+objeto">Duplicados</a><a class="btn" :href="'/crm/' + ({contactos:'contacts',empresas:'organizations',negocios:'deals',leads:'leads'})[objeto]">CRM clássico</a></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" @click="importar=true">Importar</button><button class="btn" @click="exportar(false)">Exportar</button><a v-if="objeto==='contactos'||objeto==='empresas'" class="btn" :href="'#/duplicados/'+objeto">Duplicados</a><a class="btn" :href="'/crm/' + ({contactos:'contacts',empresas:'organizations',negocios:'deals',leads:'leads'})[objeto]">CRM clássico</a></div>
     </div>
     <div class="vistas">
       <button v-for="v in VISTAS[objeto]" :key="v[0]" :class="{ativo: !salvaAtiva && vista===v[0]}" @click="escolherFixa(v[0])">{{ v[1] }}</button>
@@ -1023,6 +1067,7 @@ const Lista = {
     <div v-if="!a && !linhas.length" class="vazio">Nada encontrado.</div>
     <div class="mais-linhas" v-if="mais"><button class="btn sm" @click="pagina++; carregar(true)">Mostrar mais</button></div>
     </div>
+    <Importar v-if="importar" :objeto="objeto" @fechar="importar=false" @feito="carregar()"/>
   </div>`,
 };
 

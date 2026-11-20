@@ -489,7 +489,10 @@ def _pedir_recuperacao(emails) -> None:
 
 
 def ao_gravar_registo(doc, method=None):
-    """Gancho de Contact, CRM Lead e CRM Deal: um endereço novo no CRM → ir buscar o que já se trocou com ele."""
+    """Gancho de Contact, CRM Lead e CRM Deal: um endereço novo no CRM → ir buscar o que já se trocou com ele.
+    Desligado durante importações (`frappe.flags.orbit_sem_recuperar`): mil contactos não podem ser mil pesquisas."""
+    if frappe.flags.get("orbit_sem_recuperar"):
+        return
     if not frappe.db.exists("Email Account", {"enable_incoming": 1, "orbit_registo_crm": ["in", list(NIVEIS)]}):
         return
     if doc.doctype == "Contact":
