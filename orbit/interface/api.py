@@ -208,16 +208,17 @@ def inicio():
 # ── Listas ──────────────────────────────────────────────────────────────────────────────────────────────
 _LISTAS = {
     "contactos": {"dt": "Contact", "campos": ["full_name", "email_id", "mobile_no", "company_name", "modified", "owner", "image",
-                                               "orbit_responsavel"],
+                                               "orbit_responsavel", "orbit_ciclo", "orbit_ultima_atividade"],
                   "pesquisa": ["full_name", "email_id", "company_name", "mobile_no"], "dono": "orbit_responsavel"},
     "empresas": {"dt": "CRM Organization", "campos": ["organization_name", "website", "industry", "territory", "telefone",
-                                                       "estado_conta", "modified", "organization_logo", "orbit_responsavel"],
+                                                       "estado_conta", "modified", "organization_logo", "orbit_responsavel", "orbit_ciclo",
+                                                       "orbit_ultima_atividade"],
                  "pesquisa": ["organization_name", "website", "nipc"], "dono": "orbit_responsavel"},
     "negocios": {"dt": "CRM Deal", "campos": ["titulo", "organization", "lead_name", "status", "deal_value", "currency",
-                                               "expected_closure_date", "deal_owner", "modified", "email"],
+                                               "expected_closure_date", "deal_owner", "modified", "email", "orbit_ultima_atividade"],
                  "pesquisa": ["titulo", "organization", "lead_name", "email", "name"], "dono": "deal_owner"},
     "leads": {"dt": "CRM Lead", "campos": ["lead_name", "email", "mobile_no", "organization", "status", "source",
-                                            "lead_owner", "modified"],
+                                            "lead_owner", "modified", "orbit_ultima_atividade"],
               "pesquisa": ["lead_name", "email", "organization"], "dono": "lead_owner",
               "base": {"converted": 0}},
 }
@@ -237,7 +238,8 @@ def lista(objeto: str, vista: str = "todos", q: str = "", pagina: int = 0, ordem
     if vista == "meus":
         filtros[cfg["dono"]] = frappe.session.user
     elif vista == "parados":
-        filtros["modified"] = ["<", add_days(now_datetime(), -30)]
+        campo_at = "orbit_ultima_atividade" if meta.has_field("orbit_ultima_atividade") else "modified"
+        filtros[campo_at] = ["<", add_days(now_datetime(), -30)]
     elif vista == "abertos" and objeto == "negocios":
         filtros["status"] = ["not in", FECHADOS]
     if estado and objeto in ("negocios", "leads"):
@@ -277,20 +279,24 @@ def _ultima_actividade(contactos):
 
 # ── Ficha ───────────────────────────────────────────────────────────────────────────────────────────────
 _PROPS = {
-    "Contact": [("orbit_responsavel", "Responsável", "Link", 1), ("email_id", "Email", "Data", 0), ("mobile_no", "Telemóvel", "Data", 0), ("phone", "Telefone", "Data", 0),
+    "Contact": [("orbit_responsavel", "Responsável", "Link", 1), ("orbit_ciclo", "Fase do ciclo de vida", "Select", 1),
+                ("orbit_ultima_atividade", "Última atividade", "Datetime", 0), ("email_id", "Email", "Data", 0), ("mobile_no", "Telemóvel", "Data", 0), ("phone", "Telefone", "Data", 0),
                 ("designation", "Cargo", "Data", 1), ("company_name", "Empresa (texto)", "Data", 1),
                 ("nif", "NIF", "Data", 1), ("origem", "Origem", "Link", 1), ("mkt_estado", "Marketing por email", "Select", 0),
                 ("mkt_idioma", "Língua", "Select", 1), ("creation", "Criado", "Datetime", 0)],
-    "CRM Deal": [("deal_owner", "Responsável", "Link", 1), ("status", "Fase", "Link", 1), ("deal_value", "Valor", "Currency", 1), ("probability", "Probabilidade", "Percent", 1),
+    "CRM Deal": [("deal_owner", "Responsável", "Link", 1), ("orbit_ultima_atividade", "Última atividade", "Datetime", 0),
+                 ("status", "Fase", "Link", 1), ("deal_value", "Valor", "Currency", 1), ("probability", "Probabilidade", "Percent", 1),
                  ("expected_closure_date", "Data prevista de fecho", "Date", 1),
                  ("next_step", "Próximo passo", "Data", 1), ("source", "Origem", "Link", 1), ("marca", "Marca", "Link", 1),
                  ("orbit_referencia_loja", "Encomenda na loja", "Data", 0), ("closed_date", "Data de fecho", "Date", 0),
                  ("creation", "Criado", "Datetime", 0)],
-    "CRM Lead": [("lead_owner", "Responsável", "Link", 1), ("status", "Estado", "Link", 1), ("email", "Email", "Data", 1), ("mobile_no", "Telemóvel", "Data", 1),
+    "CRM Lead": [("lead_owner", "Responsável", "Link", 1), ("orbit_ultima_atividade", "Última atividade", "Datetime", 0),
+                 ("status", "Estado", "Link", 1), ("email", "Email", "Data", 1), ("mobile_no", "Telemóvel", "Data", 1),
                  ("organization", "Empresa", "Data", 1), ("job_title", "Cargo", "Data", 1), ("source", "Origem", "Link", 1),
                  ("mkt_estado", "Marketing por email", "Select", 0),
                  ("creation", "Criado", "Datetime", 0)],
-    "CRM Organization": [("orbit_responsavel", "Responsável", "Link", 1), ("website", "Site", "Data", 1), ("telefone", "Telefone", "Data", 1), ("email_geral", "Email geral", "Data", 1),
+    "CRM Organization": [("orbit_responsavel", "Responsável", "Link", 1), ("orbit_ciclo", "Fase do ciclo de vida", "Select", 1),
+                         ("orbit_ultima_atividade", "Última atividade", "Datetime", 0), ("website", "Site", "Data", 1), ("telefone", "Telefone", "Data", 1), ("email_geral", "Email geral", "Data", 1),
                          ("nipc", "NIPC", "Data", 1), ("industry", "Setor", "Link", 1), ("territory", "Território", "Link", 1),
                          ("no_of_employees", "Pessoas", "Select", 1), ("tipo_conta", "Tipo de conta", "Select", 1),
                          ("estado_conta", "Estado da conta", "Select", 1), ("creation", "Criado", "Datetime", 0)],

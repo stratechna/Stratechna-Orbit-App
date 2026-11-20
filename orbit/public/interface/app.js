@@ -828,10 +828,10 @@ const Inicio = {
 };
 
 const COLUNAS = {
-  contactos: [["full_name", "Nome"], ["company_name", "Empresa"], ["email_id", "Email"], ["mobile_no", "Telemóvel"], ["orbit_responsavel_nome", "Responsável"], ["ultimo_email", "Último email"]],
-  empresas: [["organization_name", "Empresa"], ["website", "Site"], ["telefone", "Telefone"], ["industry", "Setor"], ["orbit_responsavel_nome", "Responsável"], ["estado_conta", "Estado"]],
-  negocios: [["titulo", "Negócio"], ["organization", "Empresa"], ["estado", "Fase"], ["deal_value", "Valor"], ["expected_closure_date", "Fecho previsto"], ["deal_owner_nome", "Responsável"]],
-  leads: [["lead_name", "Nome"], ["organization", "Empresa"], ["email", "Email"], ["estado", "Estado"], ["source", "Origem"], ["lead_owner_nome", "Responsável"]],
+  contactos: [["full_name", "Nome"], ["company_name", "Empresa"], ["email_id", "Email"], ["mobile_no", "Telemóvel"], ["orbit_ciclo", "Fase"], ["orbit_responsavel_nome", "Responsável"], ["orbit_ultima_atividade", "Última atividade"]],
+  empresas: [["organization_name", "Empresa"], ["website", "Site"], ["telefone", "Telefone"], ["orbit_ciclo", "Fase"], ["orbit_responsavel_nome", "Responsável"], ["orbit_ultima_atividade", "Última atividade"]],
+  negocios: [["titulo", "Negócio"], ["organization", "Empresa"], ["estado", "Fase"], ["deal_value", "Valor"], ["expected_closure_date", "Fecho previsto"], ["deal_owner_nome", "Responsável"], ["orbit_ultima_atividade", "Última atividade"]],
+  leads: [["lead_name", "Nome"], ["organization", "Empresa"], ["email", "Email"], ["estado", "Estado"], ["source", "Origem"], ["lead_owner_nome", "Responsável"], ["orbit_ultima_atividade", "Última atividade"]],
 };
 const TITULOS = { contactos: "Contactos", empresas: "Empresas", negocios: "Negócios", leads: "Leads" };
 const VISTAS = { contactos: [["todos", "Todos"], ["meus", "Os meus"], ["parados", "Sem atividade há 30 dias"]],
@@ -858,7 +858,7 @@ const Lista = {
     watch(() => props.objeto, () => { vista.value = VISTAS[props.objeto][0][0]; q.value = ""; pagina.value = 0; carregar(); });
     onMounted(() => carregar());
     const ordenar = (c) => { ordem.value = ordem.value === `${c} desc` ? `${c} asc` : `${c} desc`; pagina.value = 0; carregar(); };
-    const valor = (l, c) => c === "deal_value" ? eur(l[c]) : (c === "ultimo_email" || c === "expected_closure_date") ? data(l[c], false) : l[c];
+    const valor = (l, c) => c === "deal_value" ? eur(l[c]) : (c === "ultimo_email" || c === "expected_closure_date" || c === "orbit_ultima_atividade") ? data(l[c], false) : l[c];
     const abrir = (l) => (location.hash = link(DT_LISTA[props.objeto], l.name));
     return { vista, q, linhas, total, mais, pagina, carregar, ordenar, valor, abrir, a, VISTAS, COLUNAS, TITULOS, cor, ini, ordem };
   },
@@ -877,6 +877,7 @@ const Lista = {
           <td v-for="(c,i) in COLUNAS[objeto]" :key="c[0]">
             <div v-if="i===0" class="pessoa"><span class="av" :style="{background:cor(l.name)}">{{ ini(l[c[0]]||l.name) }}</span><a :href="'#'" @click.prevent>{{ l[c[0]] || l.name }}</a></div>
             <span v-else-if="c[0]==='estado'" class="etq">{{ l.estado }}</span>
+            <span v-else-if="c[0]==='orbit_ciclo' && l.orbit_ciclo" class="etq" :class="{Cliente:'verde',Oportunidade:'roxo',Promotor:'verde','Lead qualificada (vendas)':'azul','Lead qualificada (marketing)':'azul'}[l.orbit_ciclo]">{{ l.orbit_ciclo }}</span>
             <span v-else>{{ valor(l,c[0]) }}</span>
           </td>
         </tr>
