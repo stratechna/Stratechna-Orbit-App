@@ -626,6 +626,92 @@ async function apiV(metodo, args = {}) {
 }
 const COR_V = { "Paga": "verde", "Aprovada": "verde", "Encomendada": "verde", "Por pagar": "ambar", "Em atraso": "ambar", "Por emitir": "ambar", "Enviada": "azul", "Vista": "roxo", "Respondida": "roxo" };
 
+
+// ── Chat (A7): o Stratechna Chat (Zulip) com a chave pessoal de cada um ────────────────────────────────
+async function apiC(metodo, args = {}, post = false) {
+  const url = `/api/method/orbit.interface.chat.${metodo}`;
+  const op = { headers: { "X-Frappe-CSRF-Token": window.csrf_token, Accept: "application/json" } };
+  let r;
+  if (post) { op.method = "POST"; op.headers["Content-Type"] = "application/json"; op.body = JSON.stringify(args); r = await fetch(url, op); }
+  else r = await fetch(url + "?" + new URLSearchParams(args), op);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(String(m).replace(/<[^>]+>/g, "")); throw new Error(m); }
+  return j.message;
+}
+function textoChat(t) {
+  const esc = String(t || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return esc.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/\n/g, "<br>");
+}
+const Chat = {
+  setup() {
+    const conv = ref(null); const sel = ref(null); const msgs = ref(null); const texto = ref(""); const pwd = ref(""); const novoTopico = ref("");
+    const pessoas = ref([]); const novaDm = ref(""); let rel;
+    const carregarConv = async () => { conv.value = await apiC("conversas"); };
+    const carregarMsgs = async (rolar = true) => {
+      if (!sel.value) return;
+      const a = sel.value.ids ? { ids: sel.value.ids.join(",") } : { canal: sel.value.canal, topico: sel.value.topico || "" };
+      const r = await apiC("mensagens", a); const novo = !msgs.value || r.mensagens.length !== msgs.value.length; msgs.value = r.mensagens;
+      if (rolar && novo) nextTick(() => { const m = document.querySelector(".chat-msgs"); if (m) m.scrollTop = m.scrollHeight; });
+    };
+    const abrir = (x) => { sel.value = x; msgs.value = null; carregarMsgs(); };
+    onMounted(async () => { await carregarConv(); if (conv.value?.ligado) pessoas.value = await apiC("pessoas");
+      rel = setInterval(() => { if (document.hidden) return; carregarConv(); carregarMsgs(); }, 15000); });
+    const sair = () => clearInterval(rel);
+    window.addEventListener("hashchange", sair, { once: true });
+    const ligar = async () => { await apiC("ligar", { pwd: pwd.value }, true); pwd.value = ""; toast("Chat ligado"); await carregarConv(); pessoas.value = await apiC("pessoas"); };
+    const enviar = async () => {
+      if (!texto.value.trim() || !sel.value) return;
+      const a = sel.value.ids ? { ids: sel.value.ids.join(",") } : { canal: sel.value.canal, topico: sel.value.topico || novoTopico.value || "geral" };
+      await apiC("enviar", { texto: texto.value, ...a }, true); texto.value = "";
+      if (!sel.value.ids && !sel.value.topico) sel.value = { ...sel.value, topico: a.topico };
+      carregarMsgs(); carregarConv();
+    };
+    const abrirDm = () => { const p = pessoas.value.find((x) => String(x.id) === novaDm.value); if (p) abrir({ ids: [p.id], nome: p.nome }); novaDm.value = ""; };
+    const hora = (ts) => { const d = new Date(ts * 1000); return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit" }) + " " + d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }); };
+    const titulo = computed(() => !sel.value ? "" : sel.value.ids ? sel.value.nome : `${sel.value.nomeCanal}${sel.value.topico ? " › " + sel.value.topico : ""}`);
+    return { conv, sel, msgs, texto, pwd, abrir, ligar, enviar, hora, titulo, textoChat, cor, ini, novoTopico, pessoas, novaDm, abrirDm };
+  },
+  template: `
+  <div class="caixa chat">
+    <aside class="canais">
+      <template v-if="conv && conv.ligado">
+        <h6>Canais</h6>
+        <template v-for="c in conv.canais" :key="c.id">
+          <button :class="{ativo: sel && !sel.ids && sel.canal===c.id && !sel.topico}" @click="abrir({canal:c.id, nomeCanal:c.nome})"><span class="ponto" :style="{background:c.cor||'var(--ink-3)'}"></span><span class="txt"># {{ c.nome }}</span><span class="n" v-if="c.por_ler">{{ c.por_ler }}</span></button>
+          <button v-for="t in c.topicos" :key="t.nome" class="topico" :class="{ativo: sel && sel.canal===c.id && sel.topico===t.nome}" @click="abrir({canal:c.id, nomeCanal:c.nome, topico:t.nome})"><span class="txt">{{ t.nome }}</span><span class="n" v-if="t.por_ler">{{ t.por_ler }}</span></button>
+        </template>
+        <h6>Mensagens diretas</h6>
+        <button v-for="d in conv.directas" :key="d.ids.join()" :class="{ativo: sel && sel.ids && sel.ids.join()===d.ids.join()}" @click="abrir({ids:d.ids, nome:d.nome})"><span class="txt">{{ d.nome }}</span><span class="n" v-if="d.por_ler">{{ d.por_ler }}</span></button>
+        <select class="filtro" style="margin:6px 8px;border-style:solid;width:calc(100% - 16px)" v-model="novaDm" @change="abrirDm"><option value="">+ Nova mensagem direta</option><option v-for="p in pessoas" :key="p.id" :value="String(p.id)">{{ p.nome }}</option></select>
+      </template>
+    </aside>
+    <div class="fio" style="grid-column: span 2">
+      <div v-if="!conv" class="carregar">A carregar…</div>
+      <div v-else-if="!conv.ligado" class="vazio" style="max-width:520px;margin:40px auto;text-align:left"><div class="cartao aviso-cal"><b>Ligar o Stratechna Chat</b>
+        <p class="sub">Escreva uma vez a palavra-passe do <b>Chat</b> (não é a da caixa). O Orbit troca-a pela sua chave pessoal do Chat, guarda só a chave (cifrada) e esquece a palavra-passe. Vê aqui só o que vê no Chat.</p>
+        <form @submit.prevent="ligar" style="display:flex;gap:8px;flex-wrap:wrap"><input type="password" v-model="pwd" autocomplete="current-password" placeholder="Palavra-passe do Chat" class="filtro" style="border-style:solid;min-width:240px"><button class="btn prim" :disabled="!pwd">Ligar</button></form></div></div>
+      <template v-else-if="sel">
+        <header><div><h2>{{ titulo }}</h2></div></header>
+        <div class="msgs chat-msgs">
+          <div v-if="!msgs" class="carregar">A carregar…</div>
+          <div v-for="m in msgs||[]" :key="m.id" class="chat-msg" :class="{meu:m.meu}">
+            <span class="av" :style="{background:cor(m.quem)}">{{ ini(m.quem) }}</span>
+            <div><div class="chat-cab"><b>{{ m.quem }}</b><span class="sub">{{ hora(m.quando) }}</span><span v-if="!sel.topico && m.topico && !sel.ids" class="etq" style="font-size:11px">{{ m.topico }}</span></div>
+              <div class="chat-txt" v-html="textoChat(m.texto)"></div></div>
+          </div>
+        </div>
+        <div class="cartao resposta">
+          <div class="tabs" v-if="!sel.ids && !sel.topico"><span class="sub">Tópico</span><input v-model="novoTopico" placeholder="geral" style="flex:1;border:0;background:none;font:inherit;color:var(--ink);outline:none"></div>
+          <textarea v-model="texto" rows="2" placeholder="Escrever uma mensagem…" @keydown.enter.exact.prevent="enviar"></textarea>
+          <footer><span class="sub">↵ envia · ⇧↵ nova linha</span><button class="btn prim sm" @click="enviar" :disabled="!texto.trim()">Enviar</button></footer>
+        </div>
+      </template>
+      <div v-else class="vazio">Escolha um canal, um tópico ou uma conversa.</div>
+    </div>
+  </div>`,
+};
+
 // ── Ecrãs ────────────────────────────────────────────────────────────────────────────────────────────
 const Inicio = {
   components: { Icone },
@@ -1068,7 +1154,7 @@ const AppEmbutida = {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, Calendario, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, Calendario, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -1093,7 +1179,7 @@ const App = {
       r.dataset.theme = escuro ? "light" : "dark"; try { localStorage.setItem("orbit.tema", r.dataset.theme); } catch (e) {}
     };
     const NAV = [["inicio", "casa", "Início"], ["sec", "CRM"], ["contactos", "pessoa", "Contactos"], ["empresas", "empresa", "Empresas"], ["leads", "lead", "Leads"],
-      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"], ["sec", "Trabalho"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"], ["projetos", "grelha", "Projetos"], ["documentos", "livro", "Documentos"], ["assinaturas", "nota", "Assinaturas"], ["tempo", "relogio", "Tempo"]];
+      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"], ["chat", "chat", "Chat"], ["sec", "Trabalho"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"], ["projetos", "grelha", "Projetos"], ["documentos", "livro", "Documentos"], ["assinaturas", "nota", "Assinaturas"], ["tempo", "relogio", "Tempo"]];
     const rotaCal = computed(() => partes.value.join("/"));
     return { ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal };
   },
@@ -1134,6 +1220,7 @@ const App = {
         <Documentos v-else-if="ecra==='documentos'"/>
         <Assinaturas v-else-if="ecra==='assinaturas'"/>
         <Tempo v-else-if="ecra==='tempo'"/>
+        <Chat v-else-if="ecra==='chat'"/>
         <Projetos v-else-if="ecra==='projetos'"/>
         <Projeto v-else-if="ecra==='projeto'" :nome="partes[1]" :key="partes[1]"/>
         <Calendario v-else-if="ecra==='calendario'" :nova="partes[1]==='nova'" :ref-dt="partes[2]" :ref-dn="partes[3]" :key="rotaCal"/>
