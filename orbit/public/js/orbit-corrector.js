@@ -100,7 +100,20 @@
       return null
     }
     return {
-      el: dom, ler,
+      el: dom, ler, tipo: 'pm', ed,
+      posicoes(d, ini, comp) {
+        const a = posicao(d, ini, false), b = posicao(d, ini + comp, true)
+        return a == null || b == null ? null : [a, b]
+      },
+      textoEntre(a, b) { try { return view.state.doc.textBetween(a, b) } catch (e) { return null } },
+      intervaloDom(a, b) {
+        const r = document.createRange()
+        const x = view.domAtPos(a), y = view.domAtPos(b)
+        r.setStart(x.node, x.offset); r.setEnd(y.node, y.offset)
+        return r
+      },
+      cursor() { const s = view.state.selection; return s.empty ? s.from : null },
+      substituir(a, b, novo) { view.dispatch(novo ? view.state.tr.insertText(novo, a, b) : view.state.tr.delete(a, b)) },
       trocar(d, ini, comp, novo) {
         const a = posicao(d, ini, false), b = posicao(d, ini + comp, true)
         if (a == null || b == null) return false
@@ -136,7 +149,22 @@
       return { texto: tudo.slice(0, fim).replace(/\n$/, ''), pedacos: null }
     }
     return {
-      el: root, ler,
+      el: root, ler, tipo: 'quill', ed: q,
+      posicoes(d, ini, comp) { return [ini, ini + comp] },
+      textoEntre(a, b) { try { return q.getText(a, b - a) } catch (e) { return null } },
+      intervaloDom(a, b) {
+        const [l1, o1] = q.getLeaf(a + 1), [l2, o2] = q.getLeaf(b)
+        if (!l1 || !l2 || l1.domNode.nodeType !== 3 || l2.domNode.nodeType !== 3) return null
+        const r = document.createRange()
+        r.setStart(l1.domNode, o1 - 1); r.setEnd(l2.domNode, o2)
+        return r
+      },
+      cursor() { const s = q.getSelection(); return s && !s.length ? s.index : null },
+      substituir(a, b, novo) {
+        const fmt = q.getFormat(a, Math.max(b - a, 1))
+        q.deleteText(a, b - a, 'user')
+        if (novo) q.insertText(a, novo, fmt, 'user')
+      },
       trocar(d, ini, comp, novo) {
         if (q.getText(ini, comp) !== d.texto.substr(ini, comp)) return false
         const fmt = q.getFormat(ini, Math.max(comp, 1))
@@ -222,6 +250,16 @@ box-shadow:0 10px 36px rgba(0,0,0,.28);font:14px/1.45 ${LETRA}}
 #orbit-corrector .oc-sug button.oc-sec{border-color:transparent;color:#6b7a88}
 #orbit-corrector .oc-vazio{padding:22px 16px;text-align:center;color:#3d5163}
 #orbit-corrector .oc-vazio b{display:block;font-size:15px;color:#22303d;margin-bottom:4px}
+::highlight(orbit-orto){text-decoration:underline wavy #b20009;text-decoration-skip-ink:none;text-underline-offset:3px;text-decoration-thickness:1.5px}
+::highlight(orbit-gram){text-decoration:underline wavy #1d6fd6;text-decoration-skip-ink:none;text-underline-offset:3px;text-decoration-thickness:1.5px}
+#orbit-corrector .oc-rod{display:flex;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid #e3e7eb;font-size:12.5px;color:#3d5163}
+#orbit-corrector .oc-rod input{margin:0;accent-color:#22303d}
+#orbit-corrector-dica{position:fixed;z-index:10001;width:300px;max-width:calc(100vw - 16px);background:#fff;color:#22303d;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.26);font:14px/1.45 ${LETRA};padding:10px 12px}
+#orbit-corrector-dica .oc-msg{font-size:12.5px;color:#6b7a88}
+#orbit-corrector-dica .oc-sug{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+#orbit-corrector-dica .oc-sug button{border:1px solid #c8d0d8;background:#fff;border-radius:7px;padding:4px 10px;cursor:pointer;font:500 13px ${LETRA};color:#22303d}
+#orbit-corrector-dica .oc-sug button.oc-pri{background:#22303d;border-color:#22303d;color:#fff}
+#orbit-corrector-dica .oc-sug button.oc-sec{border-color:transparent;color:#6b7a88}
 #orbit-corrector-botao{position:fixed;z-index:9999;display:none;align-items:center;gap:5px;height:26px;padding:0 9px 0 7px;
 border:1px solid #c8d0d8;border-radius:13px;background:#fff;color:#22303d;font:500 12px ${LETRA};cursor:pointer;
 box-shadow:0 2px 8px rgba(0,0,0,.12);opacity:.92}
@@ -283,6 +321,7 @@ box-shadow:0 2px 8px rgba(0,0,0,.12);opacity:.92}
     p.appendChild(cab)
     const lista = el('div', 'oc-lista')
     p.appendChild(lista)
+    p.appendChild(rodape())
     if (mensagem) { lista.appendChild(el('div', 'oc-vazio', mensagem)); return }
     if (!n) {
       const v = el('div', 'oc-vazio')
@@ -373,6 +412,168 @@ box-shadow:0 2px 8px rgba(0,0,0,.12);opacity:.92}
     }
   }
 
+  // ── F4 — sublinhar enquanto se escreve (20-11-2026) ────────────────────────
+  /* 1,5 s depois de parar de escrever (no máximo uma revisão a cada 4 s) revê-se o editor com o foco e os erros ficam
+   * sublinhados pela CSS Custom Highlight API (::highlight): nada muda no HTML do editor, por isso nada vai para o
+   * registo nem para o email. As posições acompanham o texto (mapeamento do ProseMirror; Delta do Quill) e o erro em que
+   * se mexe deixa de estar sublinhado. Tocar na palavra abre a dica. Sem a API (navegadores antigos) fica só o botão.
+   * Desliga-se no rodapé do painel (localStorage orbit-corrector:vivo = 0). Caixas de texto simples: só o botão. */
+  const VIVO = 'orbit-corrector:vivo'
+  const temRealce = typeof CSS !== 'undefined' && CSS.highlights && typeof Highlight === 'function'
+  const vivoLigado = () => { try { return temRealce && localStorage.getItem(VIVO) !== '0' } catch (e) { return temRealce } }
+  const vivo = { alvos: new Set(), temp: null, ultimoPedido: 0, aPedir: false, ignorados: {} }
+
+  function rodape() {
+    const r = el('label', 'oc-rod')
+    const c = el('input')
+    c.type = 'checkbox'
+    c.checked = vivoLigado()
+    c.disabled = !temRealce
+    c.addEventListener('change', () => {
+      try { localStorage.setItem(VIVO, c.checked ? '1' : '0') } catch (e) {}
+      if (c.checked) { if (actual && actual.posicoes) { ligarVivo(actual); actual.ed.__orbitVivo.ultimoTexto = null; agendar(actual) } }
+      else { vivo.alvos.forEach((a) => { a.ed.__orbitVivo.erros = [] }); desenhar(); fecharDica() }
+    })
+    r.appendChild(c)
+    r.appendChild(document.createTextNode(t('Sublinhar os erros enquanto escreve')))
+    return r
+  }
+
+  function desenhar() {
+    if (!temRealce) return
+    const orto = [], gram = []
+    vivo.alvos.forEach((a) => {
+      if (!a.el.isConnected) { vivo.alvos.delete(a); return }
+      a.ed.__orbitVivo.erros.forEach((e) => {
+        try { const r = a.intervaloDom(e.a, e.b); if (r) (e.orto ? orto : gram).push(r) } catch (x) {}
+      })
+    })
+    CSS.highlights.set('orbit-orto', new Highlight(...orto))
+    CSS.highlights.set('orbit-gram', new Highlight(...gram))
+  }
+
+  /* Depois de cada alteração: deslocar as posições e largar os erros em que se mexeu. */
+  function acompanhar(a, mapear) {
+    const v = a.ed.__orbitVivo
+    v.erros = v.erros.filter((e) => {
+      e.a = mapear(e.a, 1); e.b = mapear(e.b, -1)
+      return e.b > e.a && a.textoEntre(e.a, e.b) === e.palavra
+    })
+    fecharDica()
+    requestAnimationFrame(desenhar)
+    agendar(a)
+  }
+
+  function ligarVivo(a) {
+    if (!vivoLigado() || !a.posicoes) return
+    if (a.ed.__orbitVivo) { vivo.alvos.delete(a.ed.__orbitVivo.alvo); a.ed.__orbitVivo.alvo = a; vivo.alvos.add(a); return }
+    a.ed.__orbitVivo = { alvo: a, erros: [], ultimoTexto: null }
+    vivo.alvos.add(a)
+    if (a.tipo === 'pm') {
+      a.ed.on('transaction', ({ transaction }) => {
+        if (transaction.docChanged) acompanhar(a.ed.__orbitVivo.alvo, (p, lado) => transaction.mapping.map(p, lado))
+      })
+    } else {
+      a.ed.on('text-change', (delta) => {
+        acompanhar(a.ed.__orbitVivo.alvo, (p, lado) => delta.transformPosition(p, lado < 0))
+      })
+    }
+    a.el.addEventListener('click', () => setTimeout(() => clique(a.ed.__orbitVivo.alvo), 0))
+    agendar(a)
+  }
+
+  function agendar(a) {
+    if (!vivoLigado()) return
+    clearTimeout(vivo.temp)
+    vivo.temp = setTimeout(() => verificarVivo(a), 1500)
+  }
+
+  async function verificarVivo(a) {
+    if (!vivoLigado() || !a.el.isConnected) return
+    const falta = 4000 - (Date.now() - vivo.ultimoPedido)
+    if (vivo.aPedir || falta > 0) { clearTimeout(vivo.temp); vivo.temp = setTimeout(() => verificarVivo(a), Math.max(falta, 800)); return }
+    const v = a.ed.__orbitVivo
+    const doc = a.ler()
+    if (!doc.texto.replace(/\s/g, '') || doc.texto.length > 20000) { v.ultimoTexto = doc.texto; v.erros = []; desenhar(); return }
+    if (doc.texto === v.ultimoTexto) return
+    vivo.aPedir = true
+    vivo.ultimoPedido = Date.now()
+    try {
+      const r = await rever(doc.texto)
+      const agora = a.ler()
+      if (agora.texto !== doc.texto) { agendar(a); return }
+      v.ultimoTexto = doc.texto
+      const dic = dicionario()
+      v.erros = []
+      ;(r.erros || []).forEach((m) => {
+        if (!m.length) return
+        const palavra = agora.texto.substr(m.offset, m.length)
+        if ((m.ortografia && dic.includes(palavra)) || vivo.ignorados[palavra + '|' + m.message]) return
+        const pos = a.posicoes(agora, m.offset, m.length)
+        if (!pos) return
+        v.erros.push({ a: pos[0], b: pos[1], palavra, m, orto: m.ortografia })
+      })
+      desenhar()
+    } catch (e) {
+    } finally {
+      vivo.aPedir = false
+    }
+  }
+
+  function clique(a) {
+    const c = a.cursor()
+    if (c == null) return
+    const e = a.ed.__orbitVivo.erros.find((x) => c >= x.a && c <= x.b)
+    if (e) dica(a, e); else fecharDica()
+  }
+
+  function fecharDica() { const d = document.getElementById('orbit-corrector-dica'); if (d) d.remove() }
+
+  function dica(a, e) {
+    fecharDica()
+    let rect
+    try { rect = a.intervaloDom(e.a, e.b).getBoundingClientRect() } catch (x) { return }
+    const d = el('div')
+    d.id = 'orbit-corrector-dica'
+    d.setAttribute('role', 'dialog')
+    d.addEventListener('mousedown', (ev) => ev.preventDefault()) // o editor não perde o foco
+    if (e.m.message) d.appendChild(el('div', 'oc-msg', e.m.message))
+    const sug = el('div', 'oc-sug')
+    const v = a.ed.__orbitVivo
+    const botao = (txt, cls, f) => {
+      const b = el('button', cls, txt)
+      b.type = 'button'
+      b.addEventListener('click', (ev) => { ev.stopPropagation(); fecharDica(); f() })
+      sug.appendChild(b)
+    }
+    ;(e.m.replacements || []).forEach((r, i) => botao(r === '' ? t('(apagar)') : r, i ? '' : 'oc-pri', () => {
+      if (a.textoEntre(e.a, e.b) === e.palavra) a.substituir(e.a, e.b, r)
+    }))
+    botao(t('Ignorar'), 'oc-sec', () => {
+      vivo.ignorados[e.palavra + '|' + e.m.message] = 1
+      v.erros = v.erros.filter((x) => x !== e)
+      desenhar()
+    })
+    if (e.orto) botao(t('Juntar ao dicionário'), 'oc-sec', () => {
+      juntarAoDicionario(e.palavra)
+      v.erros = v.erros.filter((x) => !(x.orto && x.palavra === e.palavra))
+      desenhar()
+    })
+    d.appendChild(sug)
+    estilo()
+    document.body.appendChild(d)
+    const w = d.offsetWidth, h = d.offsetHeight
+    const top = rect.bottom + 6 + h > innerHeight ? rect.top - h - 6 : rect.bottom + 6
+    d.style.top = Math.round(Math.max(8, top)) + 'px'
+    d.style.left = Math.round(Math.max(8, Math.min(rect.left, innerWidth - w - 8))) + 'px'
+  }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fecharDica() }, true)
+  document.addEventListener('mousedown', (e) => {
+    const d = document.getElementById('orbit-corrector-dica')
+    if (d && !d.contains(e.target)) fecharDica()
+  }, true)
+  addEventListener('scroll', () => { fecharDica(); requestAnimationFrame(desenhar) }, true)
+
   // ── O botão no canto do editor ─────────────────────────────────────────────
   let actual = null
   let botao = null
@@ -402,6 +603,8 @@ box-shadow:0 2px 8px rgba(0,0,0,.12);opacity:.92}
     const a = alvoDe(e.target)
     if (!a) return
     actual = a
+    estilo()
+    ligarVivo(a)
     if (!botao) criarBotao()
     colocar()
   })
