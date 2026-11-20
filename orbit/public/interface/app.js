@@ -609,6 +609,124 @@ const Calendario = {
   </div>`,
 };
 
+
+// ── Tarefas e projetos (A2): tarefas do CRM + tarefas dos projetos (ERPNext) num só sítio ───────────────
+async function apiT(metodo, args = {}, post = false) {
+  const url = `/api/method/orbit.interface.trabalho.${metodo}`;
+  const op = { headers: { "X-Frappe-CSRF-Token": window.csrf_token, Accept: "application/json" } };
+  let r;
+  if (post) { op.method = "POST"; op.headers["Content-Type"] = "application/json"; op.body = JSON.stringify(args); r = await fetch(url, op); }
+  else r = await fetch(url + "?" + new URLSearchParams(args), op);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(String(m).replace(/<[^>]+>/g, "")); throw new Error(m); }
+  return j.message;
+}
+const GRUPOS_T = [["atrasadas", "Atrasadas"], ["hoje", "Hoje"], ["semana", "Esta semana"], ["depois", "Mais tarde"], ["sem_data", "Sem data"]];
+const Tarefas = {
+  setup() {
+    let v0 = "minhas"; try { v0 = localStorage.getItem("orbit.tarefas.vista") || "minhas"; } catch (e) {}
+    const vista = ref(v0); const itens = ref(null); const q = ref(""); const nova = ref({ titulo: "", data: "", projeto: "" }); const projs = ref([]);
+    let tq;
+    const carregar = async () => {
+      itens.value = await apiT("tarefas", { vista: vista.value, q: q.value });
+      if (vista.value === "minhas" && !itens.value.length && !q.value) { vista.value = "equipa"; }
+    };
+    watch(vista, (v) => { try { localStorage.setItem("orbit.tarefas.vista", v); } catch (e) {} carregar(); });
+    watch(q, () => { clearTimeout(tq); tq = setTimeout(carregar, 300); });
+    onMounted(async () => { carregar(); projs.value = await apiT("projetos", {}); });
+    const grupos = computed(() => GRUPOS_T.map(([g, r]) => ({ g, r, itens: (itens.value || []).filter((t) => t.grupo === g) })).filter((x) => x.itens.length));
+    const feita = async (t) => { await apiT("concluir", { tipo: t.tipo, nome: t.id }, true); itens.value = itens.value.filter((x) => x !== t); toast("Concluída"); };
+    const criar = async () => {
+      if (!nova.value.titulo.trim()) return;
+      await apiT("criar", { titulo: nova.value.titulo, data: nova.value.data || null, projeto: nova.value.projeto || null }, true);
+      nova.value = { titulo: "", data: "", projeto: nova.value.projeto }; toast("Tarefa criada"); carregar();
+    };
+    return { vista, itens, q, grupos, feita, nova, criar, projs, link, data };
+  },
+  template: `
+  <div>
+    <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div><h1>Tarefas</h1><div class="sub">Do CRM e dos projetos, num só sítio<template v-if="itens"> · {{ itens.length }} por fazer</template></div></div>
+      <a class="btn" href="#/projetos">Projetos</a>
+    </div>
+    <div class="vistas"><button :class="{ativo:vista==='minhas'}" @click="vista='minhas'">As minhas</button><button :class="{ativo:vista==='equipa'}" @click="vista='equipa'">Equipa</button></div>
+    <div class="filtros"><input class="filtro" style="border-style:solid;min-width:220px" v-model="q" placeholder="Procurar tarefas…"></div>
+    <form class="cartao compor" style="margin:0 24px 14px" @submit.prevent="criar">
+      <input v-model="nova.titulo" placeholder="Nova tarefa…"><input type="date" v-model="nova.data" style="flex:none;width:150px">
+      <select v-model="nova.projeto" class="btn sm" style="max-width:220px"><option value="">Sem projeto (CRM)</option><option v-for="p in projs" :key="p.name" :value="p.name">{{ p.project_name }}</option></select>
+      <button class="btn sm prim" :disabled="!nova.titulo.trim()">Criar</button>
+    </form>
+    <div v-if="!itens" class="carregar">A carregar…</div>
+    <div v-else-if="!itens.length" class="vazio">Nada por fazer.</div>
+    <div v-for="g in grupos" :key="g.g" class="cartao" style="margin:0 24px 14px">
+      <header><h2 :style="g.g==='atrasadas'?{color:'var(--acao)'}:{}">{{ g.r }} <span class="sub" style="font-weight:400">{{ g.itens.length }}</span></h2></header>
+      <div class="linha" v-for="t in g.itens" :key="t.tipo+t.id">
+        <span class="chk" @click="feita(t)" title="Marcar como concluída" style="cursor:pointer"></span>
+        <div class="cresce">{{ t.titulo }}<small>
+          <a v-if="t.projeto" :href="'#/projeto/'+encodeURIComponent(t.projeto)">{{ t.projeto_nome || t.projeto }}</a>
+          <a v-else-if="t.ref" :href="link(t.ref[0],t.ref[1])">{{ t.ref_titulo }}</a>
+          <span v-if="t.dono"> · {{ t.dono }}</span></small></div>
+        <span class="etq" :class="t.prioridade==='Alta'||t.prioridade==='Urgente'?'ambar':''" v-if="t.prioridade && t.prioridade!=='Média'">{{ t.prioridade }}</span>
+        <span class="sub" v-if="t.data">{{ data(t.data,false) }}</span>
+      </div>
+    </div>
+  </div>`,
+};
+
+const Projetos = {
+  setup() {
+    const estado = ref("Open"); const d = ref(null); const q = ref(""); let tq;
+    const carregar = async () => (d.value = await apiT("projetos", { estado: estado.value, q: q.value }));
+    watch(estado, carregar); watch(q, () => { clearTimeout(tq); tq = setTimeout(carregar, 300); }); onMounted(carregar);
+    return { estado, d, q, data };
+  },
+  template: `
+  <div>
+    <div class="pad" style="padding-bottom:12px"><h1>Projetos</h1><div class="sub" v-if="d">{{ d.length }} projetos</div></div>
+    <div class="vistas"><button v-for="e in [['Open','Em curso'],['On hold','Em pausa'],['Completed','Concluídos'],['','Todos']]" :key="e[0]" :class="{ativo:estado===e[0]}" @click="estado=e[0]">{{ e[1] }}</button></div>
+    <div class="filtros"><input class="filtro" style="border-style:solid;min-width:220px" v-model="q" placeholder="Procurar projeto ou cliente…"></div>
+    <div v-if="!d" class="carregar">A carregar…</div>
+    <div class="grelha-proj" v-else>
+      <a class="cartao proj" v-for="p in d" :key="p.name" :href="'#/projeto/'+encodeURIComponent(p.name)">
+        <b>{{ p.project_name }}</b><div class="sub">{{ p.customer || p.marca || '' }}</div>
+        <div class="barra"><i :style="{width:(p.progresso||0)+'%'}"></i></div>
+        <div class="proj-n"><span>{{ Math.round(p.progresso||0) }} %</span><span>{{ p.abertas }} por fazer</span><span v-if="p.atrasadas" style="color:var(--acao)">{{ p.atrasadas }} atrasadas</span><span v-if="p.expected_end_date">até {{ data(p.expected_end_date,false) }}</span></div>
+      </a>
+    </div>
+  </div>`,
+};
+
+const Projeto = {
+  props: ["nome"],
+  setup(props) {
+    const p = ref(null); const arrastar = ref(null); const alvo = ref(""); const nova = ref(""); const novaData = ref("");
+    const carregar = async () => (p.value = await apiT("projeto", { nome: props.nome }));
+    onMounted(carregar);
+    const largar = async (col) => { const t = arrastar.value; alvo.value = ""; arrastar.value = null; if (!t || t.estado === col.estado) return; await apiT("mover", { nome: t.id, estado: col.estado }, true); carregar(); };
+    const criar = async () => { if (!nova.value.trim()) return; await apiT("criar", { titulo: nova.value, data: novaData.value || null, projeto: props.nome }, true); nova.value = ""; novaData.value = ""; carregar(); };
+    return { p, arrastar, alvo, largar, nova, novaData, criar, data };
+  },
+  template: `
+  <div v-if="p">
+    <div class="pad" style="padding-bottom:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div><div style="font-size:13px"><a href="#/projetos">← Projetos</a></div><h1>{{ p.titulo }}</h1>
+        <div class="sub">{{ [p.cliente, p.marca].filter(Boolean).join(' · ') }}<template v-if="p.fim"> · até {{ data(p.fim,false) }}</template> · {{ Math.round(p.progresso) }} %<template v-if="p.horas_orcamento"> · {{ p.horas.toFixed(1) }} h de {{ p.horas_orcamento }} h</template><template v-else-if="p.horas"> · {{ p.horas.toFixed(1) }} h registadas</template></div></div>
+      <a class="btn" :href="p.classico">Abrir na secretária</a>
+    </div>
+    <form class="cartao compor" style="margin:0 24px 14px" @submit.prevent="criar"><input v-model="nova" placeholder="Nova tarefa neste projeto…"><input type="date" v-model="novaData" style="flex:none;width:150px"><button class="btn sm prim" :disabled="!nova.trim()">Criar</button></form>
+    <div class="funil" :style="{gridTemplateColumns:'repeat('+p.colunas.length+',minmax(220px,1fr))'}">
+      <div class="coluna" v-for="c in p.colunas" :key="c.estado" :class="{alvo:alvo===c.estado}" @dragover.prevent="alvo=c.estado" @dragleave="alvo=''" @drop.prevent="largar(c)">
+        <header><b>{{ c.rotulo }} <span class="sub" style="font-weight:500">{{ c.cartoes.length }}</span></b></header>
+        <div class="cartao negocio" v-for="t in c.cartoes" :key="t.id" :draggable="p.pode_editar" @dragstart="arrastar={...t, estado:c.estado}">
+          <h3 style="font-weight:500">{{ t.titulo }}</h3>
+          <div class="prox" :class="{atraso:c.estado==='Overdue'}"><template v-if="t.data">◷ {{ data(t.data,false) }}</template><template v-if="t.dono"> · {{ t.dono }}</template><template v-if="t.prioridade && t.prioridade!=='Média'"> · {{ t.prioridade }}</template></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div v-else class="carregar">A carregar…</div>`,
+};
+
 // ── Definições (uma só roda dentada) ─────────────────────────────────────────────────────────────────
 const Definicoes = {
   setup() { const d = ref(null); onMounted(async () => (d.value = await api("definicoes"))); return { d }; },
@@ -637,7 +755,7 @@ const AppEmbutida = {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, Calendario },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, Calendario, Tarefas, Projetos, Projeto },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -662,7 +780,7 @@ const App = {
       r.dataset.theme = escuro ? "light" : "dark"; try { localStorage.setItem("orbit.tema", r.dataset.theme); } catch (e) {}
     };
     const NAV = [["inicio", "casa", "Início"], ["sec", "CRM"], ["contactos", "pessoa", "Contactos"], ["empresas", "empresa", "Empresas"], ["leads", "lead", "Leads"],
-      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"], ["sec", "Trabalho"], ["calendario", "cal", "Calendário"]];
+      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"], ["sec", "Trabalho"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"], ["projetos", "grelha", "Projetos"]];
     const rotaCal = computed(() => partes.value.join("/"));
     return { ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal };
   },
@@ -672,7 +790,7 @@ const App = {
       <div class="marca"><div class="logo">O</div><div>Stratechna Orbit<small>{{ ctx.tenant }}</small></div></div>
       <template v-for="(n,i) in NAV" :key="i">
         <h6 v-if="n[0]==='sec'">{{ n[1] }}</h6>
-        <a v-else :href="'#/'+n[0]" style="text-decoration:none"><button :class="{ativo: ecra===n[0] || (n[0]==='contactos'&&ecra==='contacto') || (n[0]==='negocios'&&ecra==='negocio') || (n[0]==='empresas'&&ecra==='empresa') || (n[0]==='leads'&&ecra==='lead')}" tabindex="-1"><Icone :n="n[1]"/>{{ n[2] }}<span class="conta" v-if="n[0]==='caixa' && ctx.contadores.tickets">{{ ctx.contadores.tickets }}</span></button></a>
+        <a v-else :href="'#/'+n[0]" style="text-decoration:none"><button :class="{ativo: ecra===n[0] || (n[0]==='contactos'&&ecra==='contacto') || (n[0]==='negocios'&&ecra==='negocio') || (n[0]==='empresas'&&ecra==='empresa') || (n[0]==='leads'&&ecra==='lead') || (n[0]==='projetos'&&ecra==='projeto')}" tabindex="-1"><Icone :n="n[1]"/>{{ n[2] }}<span class="conta" v-if="n[0]==='caixa' && ctx.contadores.tickets">{{ ctx.contadores.tickets }}</span></button></a>
       </template>
       <h6>Apps</h6>
       <a v-for="a in ctx.apps" :key="a.nome" :href="EMBUTIDAS.includes(a.nome) ? '#/app/'+a.nome : a.url" :target="EMBUTIDAS.includes(a.nome) ? null : '_blank'" style="text-decoration:none"><button tabindex="-1" :class="{ativo: ecra==='app' && partes[1]===a.nome}"><Icone :n="a.icone"/>{{ a.nome }}<span class="fora" v-if="!EMBUTIDAS.includes(a.nome)">↗</span></button></a>
@@ -699,6 +817,9 @@ const App = {
         <Funil v-else-if="ecra==='funil'"/>
         <Caixa v-else-if="ecra==='caixa'" :abrir-id="partes[1]"/>
         <Definicoes v-else-if="ecra==='definicoes'"/>
+        <Tarefas v-else-if="ecra==='tarefas'"/>
+        <Projetos v-else-if="ecra==='projetos'"/>
+        <Projeto v-else-if="ecra==='projeto'" :nome="partes[1]" :key="partes[1]"/>
         <Calendario v-else-if="ecra==='calendario'" :nova="partes[1]==='nova'" :ref-dt="partes[2]" :ref-dn="partes[3]" :key="rotaCal"/>
         <AppEmbutida v-else-if="ecra==='app'" :nome="partes[1]" :key="partes[1]"/>
         <div v-else class="vazio">Página desconhecida. <a href="#/inicio">Início</a></div>

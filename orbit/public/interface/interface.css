@@ -277,3 +277,11 @@ a.icone-btn{color:var(--ink-2);text-decoration:none}a.icone-btn.ativo{background
 .form-cal .linha3{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:10px}
 .form-cal .chk-l{flex-direction:row;align-items:center;gap:8px}
 @media (max-width:760px){.cal{padding:12px}}
+
+/* ── Tarefas e projetos (A2) ── */
+.grelha-proj{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;padding:0 24px 24px}
+.cartao.proj{display:block;padding:14px 16px;text-decoration:none;color:inherit}
+.cartao.proj:hover{border-color:var(--ink-3)}
+.proj-n{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--ink-3);margin-top:8px}
+.compor select{max-width:220px}
+@media (max-width:760px){.grelha-proj{padding:0 16px 16px}}
