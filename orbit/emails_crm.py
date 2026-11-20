@@ -480,3 +480,46 @@ def filtrar_actividades(name: str):
         if len(r) > 2:
             r[2] = [n for n in notas if n.get("name") not in nts]
     return tuple(r)
+
+
+# ── Responder pelo CRM (E8 do plano dos emails; interface /orbit, 20-11-2026) ─────────────────────────────
+# A conta «Orbit CRM · <caixa>» ganha a saída: o SMTP do mesmo servidor com a mesma palavra-passe de aplicação, e o
+# Frappe guarda a resposta nos Enviados da caixa (aparece no Orbit Mail e no telemóvel como as outras).
+_SMTP_FORA = {"imap.gmail.com": ("smtp.gmail.com", 587), "imap.googlemail.com": ("smtp.gmail.com", 587),
+              "imap.zoho.eu": ("smtp.zoho.eu", 587), "imap.zoho.com": ("smtp.zoho.com", 587)}
+
+
+def preparar_saida(nome_conta: str):
+    """Liga a saída da conta (idempotente). O Frappe confirma o SMTP ao gravar — erro claro se a palavra-passe falhar."""
+    acc = frappe.get_doc("Email Account", nome_conta)
+    if acc.orbit_registo_crm not in NIVEIS:
+        frappe.throw("Esta caixa não está ligada ao CRM.")
+    if acc.enable_outgoing and acc.smtp_server:
+        return acc
+    if acc.email_server and not acc.domain:
+        smtp = _SMTP_FORA.get((acc.email_server or "").lower())
+        if not smtp:
+            frappe.throw(f"Não sei o servidor de envio de {acc.email_server}.")
+        servidor, porta, tls, ssl = smtp[0], smtp[1], 1, 0
+    else:
+        d = frappe.get_doc("Email Domain", acc.domain)
+        servidor, porta = d.smtp_server, int(d.smtp_port or 587)
+        tls, ssl = int(d.use_tls or 0), int(d.get("use_ssl_for_outgoing") or 0)
+    acc.update({"enable_outgoing": 1, "default_outgoing": 0, "smtp_server": servidor, "smtp_port": str(porta),
+                "use_tls": tls, "use_ssl_for_outgoing": ssl, "append_emails_to_sent_folder": 1,
+                "always_use_account_email_id_as_sender": 1, "send_unsubscribe_message": 0,
+                "track_email_status": 0, "add_signature": 1 if acc.get("signature") else 0})
+    if acc.meta.has_field("login_id_is_different") and not acc.get("login_id"):
+        acc.login_id_is_different = 0
+    acc.save(ignore_permissions=True)
+    frappe.db.commit()
+    return acc
+
+
+def pode_responder(nome_conta: str, user: str = None) -> bool:
+    """«Só para mim»: só o dono. Partilhadas: quem vê a conversa (a permissão de leitura já foi verificada)."""
+    user = user or frappe.session.user
+    nivel, dono = frappe.db.get_value("Email Account", nome_conta, ["orbit_registo_crm", "orbit_dono"]) or (None, None)
+    if nivel not in NIVEIS:
+        return False
+    return nivel != "so_eu" or dono == user

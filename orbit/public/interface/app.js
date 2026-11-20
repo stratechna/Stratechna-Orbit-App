@@ -315,7 +315,7 @@ const Ficha = {
     </aside>
 
     <div class="modal-fundo" v-if="email" @click.self="email=null">
-      <div class="modal"><header><div><b>{{ email.assunto }}</b><div class="sub">De {{ email.de }} · para {{ email.para }}<span v-if="email.cc"> · cc {{ email.cc }}</span> · {{ data(email.data) }}</div></div><button class="btn sm" @click="email=null">Fechar</button></header>
+      <div class="modal"><header><div><b>{{ email.assunto }}</b><div class="sub">De {{ email.de }} · para {{ email.para }}<span v-if="email.cc"> · cc {{ email.cc }}</span> · {{ data(email.data) }}</div></div><div style="display:flex;gap:6px"><a class="btn sm prim" :href="'#/caixa/'+encodeURIComponent(email.id)">Responder</a><button class="btn sm" @click="email=null">Fechar</button></div></header>
         <div class="corpo-email" v-html="email.html"></div></div>
     </div>
   </div>
@@ -359,18 +359,38 @@ const Funil = {
 };
 
 const Caixa = {
-  setup() {
+  props: ["abrirId"],
+  setup(props) {
     let g0 = "todos"; try { g0 = localStorage.getItem("orbit.caixa.grupo") || "todos"; } catch (e) {}
-    const grupo = ref(g0); const itens = ref(null); const sel = ref(null); const email = ref(null);
+    const grupo = ref(g0); const itens = ref(null); const sel = ref(null); const conv = ref(null);
+    const resposta = ref(""); const para = ref(""); const cc = ref(""); const aEnviar = ref(false); const verCc = ref(false);
     const carregar = async () => { itens.value = await api("caixa", { grupo: grupo.value }); };
-    watch(grupo, (v) => { try { localStorage.setItem("orbit.caixa.grupo", v); } catch (e) {} sel.value = null; email.value = null; carregar(); });
-    onMounted(carregar);
+    watch(grupo, (v) => { try { localStorage.setItem("orbit.caixa.grupo", v); } catch (e) {} sel.value = null; conv.value = null; carregar(); });
+    const abrirConversa = async (id) => {
+      conv.value = null; resposta.value = ""; cc.value = ""; verCc.value = false;
+      conv.value = await api("conversa", { nome: id });
+      para.value = conv.value.para || "";
+      nextTick(() => { const m = document.querySelector(".msgs"); if (m) m.scrollTop = m.scrollHeight; });
+    };
     const abrir = async (i) => {
       if (i.tipo === "ticket") { window.open(i.url, "_blank"); return; }
-      sel.value = i; email.value = await api("email_completo", { nome: i.id }, true);
+      sel.value = i; location.hash = "#/caixa/" + encodeURIComponent(i.id);
+    };
+    watch(() => props.abrirId, (id) => { if (id) abrirConversa(id); });
+    onMounted(() => { carregar(); if (props.abrirId) abrirConversa(props.abrirId); });
+    const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const enviar = async () => {
+      if (!resposta.value.trim() || aEnviar.value) return;
+      aEnviar.value = true;
+      try {
+        const html = resposta.value.trim().split(/\n{2,}/).map((p) => "<p>" + esc(p).replace(/\n/g, "<br>") + "</p>").join("");
+        await api("responder", { nome: conv.value.responder_a, html, para: para.value, cc: cc.value }, true);
+        toast("Resposta enviada de " + conv.value.de);
+        resposta.value = ""; await abrirConversa(conv.value.responder_a); carregar();
+      } finally { aEnviar.value = false; }
     };
     const mailUrl = ((window.__ctx && window.__ctx.apps) || []).find((a) => a.nome === "Mail")?.url || "#";
-    return { grupo, itens, sel, email, abrir, data, cor, ini, link, mailUrl };
+    return { grupo, itens, sel, conv, abrir, data, cor, ini, link, mailUrl, resposta, para, cc, verCc, enviar, aEnviar };
   },
   template: `
   <div class="caixa">
@@ -383,7 +403,7 @@ const Caixa = {
         </div></header>
       <div v-if="!itens" class="carregar">A carregar…</div>
       <div v-else-if="!itens.length" class="vazio">Nada por aqui.</div>
-      <div v-for="i in itens || []" :key="i.tipo+i.id" class="conv" :class="{ativo: sel && sel.id===i.id, nova: i.por_responder}" @click="abrir(i)">
+      <div v-for="i in itens || []" :key="i.tipo+i.id" class="conv" :class="{ativo: (sel && sel.id===i.id) || abrirId===i.id, nova: i.por_responder}" @click="abrir(i)">
         <span class="av" style="width:30px;height:30px;font-size:11px" :style="{background:cor(i.quem)}">{{ ini(i.quem) }}</span>
         <div style="min-width:0"><div class="linha1"><b>{{ i.quem }}</b><time>{{ data(i.data,false) }}</time></div><p>{{ i.titulo }}</p>
           <div class="meta"><span class="etq" :class="i.tipo==='ticket'?'ambar':i.grupo==='privado'?'roxo':'azul'">{{ i.tipo==='ticket' ? 'Ticket · ' + i.estado : i.grupo==='privado' ? 'Privado' : 'Equipa' }}</span>
@@ -391,11 +411,27 @@ const Caixa = {
       </div>
     </div>
     <div class="fio">
-      <template v-if="sel && email">
-        <header><div><h2>{{ email.assunto }}</h2><div class="sub">De {{ email.de }} · {{ data(email.data) }}<template v-if="sel.conta"> · {{ sel.conta }}</template></div></div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap"><a class="btn sm" :href="link(sel.ref[0], sel.ref[1])">Abrir {{ sel.ref_titulo }}</a><a class="btn sm prim" :href="mailUrl" target="_blank">Responder no Mail</a></div></header>
-        <div class="msgs"><div class="cartao msg" v-html="email.html"></div></div>
+      <template v-if="conv">
+        <header><div style="min-width:0"><h2>{{ conv.assunto }}</h2><div class="sub">{{ conv.mensagens.length }} mensagens<template v-if="conv.de"> · caixa {{ conv.de }}</template></div></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><a v-if="conv.ref[0]" class="btn sm" :href="link(conv.ref[0], conv.ref[1])">Abrir {{ conv.ref_titulo }}</a></div></header>
+        <div class="msgs">
+          <div class="cartao msg" v-for="m in conv.mensagens" :key="m.id" :class="{nossa:m.enviado}">
+            <header><b>{{ m.de }}</b><span>{{ data(m.data) }}</span></header>
+            <div class="sub" style="font-size:12px;margin-bottom:8px">Para {{ m.para }}<template v-if="m.cc"> · cc {{ m.cc }}</template></div>
+            <div v-html="m.html"></div>
+          </div>
+        </div>
+        <div class="cartao resposta" v-if="conv.pode_responder">
+          <div class="tabs" style="flex-wrap:wrap;align-items:center"><span class="sub">De {{ conv.de }} · Para</span>
+            <input v-model="para" style="flex:1;min-width:180px;border:0;background:none;font:inherit;color:var(--ink);outline:none">
+            <button class="sub" style="all:unset;cursor:pointer;font-size:12px" v-if="!verCc" @click="verCc=true">Cc</button></div>
+          <div class="tabs" v-if="verCc"><span class="sub">Cc</span><input v-model="cc" style="flex:1;border:0;background:none;font:inherit;color:var(--ink);outline:none"></div>
+          <textarea v-model="resposta" rows="5" placeholder="Escrever a resposta…" @keydown.meta.enter="enviar" @keydown.ctrl.enter="enviar"></textarea>
+          <footer><span class="sub">Fica nos Enviados de {{ conv.de }} e na cronologia do cliente · ⌘↵ envia</span><button class="btn prim sm" @click="enviar" :disabled="!resposta.trim() || aEnviar">{{ aEnviar ? 'A enviar…' : 'Enviar' }}</button></footer>
+        </div>
+        <div v-else class="vazio" style="margin:0 20px 20px">Esta conversa é de uma caixa pessoal de outra pessoa ou de uma caixa sem ligação ao CRM. <a :href="mailUrl" target="_blank">Abrir o Mail</a></div>
       </template>
+      <div v-else-if="abrirId" class="carregar">A carregar…</div>
       <div v-else class="vazio">Escolha uma conversa.<br><span class="sub">Equipa = caixas partilhadas e tickets. Privado = as suas conversas com clientes, só visíveis para si.</span></div>
     </div>
   </div>`,
@@ -461,7 +497,7 @@ const App = {
         <Lista v-else-if="['contactos','empresas','negocios','leads'].includes(ecra)" :objeto="ecra"/>
         <Ficha v-else-if="ROTAS_DT[ecra]" :doctype="ROTAS_DT[ecra]" :name="partes[1]" :key="ecra+partes[1]"/>
         <Funil v-else-if="ecra==='funil'"/>
-        <Caixa v-else-if="ecra==='caixa'"/>
+        <Caixa v-else-if="ecra==='caixa'" :abrir-id="partes[1]"/>
         <div v-else class="vazio">Página desconhecida. <a href="#/inicio">Início</a></div>
       </main>
     </div>

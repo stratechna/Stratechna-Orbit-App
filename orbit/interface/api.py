@@ -483,7 +483,7 @@ def email_completo(nome: str):
     _guarda()
     c = frappe.get_doc("Communication", nome)
     c.check_permission("read")
-    return {"assunto": c.subject, "de": c.sender, "para": c.recipients, "cc": c.cc, "data": c.communication_date,
+    return {"id": c.name, "assunto": c.subject, "de": c.sender, "para": c.recipients, "cc": c.cc, "data": c.communication_date,
             "html": frappe.utils.sanitize_html(c.content or "")}
 
 
@@ -616,3 +616,77 @@ def caixa(grupo: str = "todos"):
     out += list(conversas.values())
     out.sort(key=lambda i: str(i["data"] or ""), reverse=True)
     return out
+
+
+# ── Conversa e resposta dentro da caixa de entrada (20-11-2026) ─────────────────────────────────────────
+def _assunto_base(s):
+    return re.sub(r"^((re|fw|fwd|enc|res|rv)\s*:\s*)+", "", (s or "").strip(), flags=re.I).lower()
+
+
+@frappe.whitelist()
+def conversa(nome: str):
+    """A conversa toda (mesmo registo e mesmo assunto), da mais antiga para a mais recente."""
+    _guarda()
+    c = frappe.get_doc("Communication", nome)
+    c.check_permission("read")
+    base = _assunto_base(c.subject)
+    filtros = {"communication_medium": "Email", "communication_type": "Communication"}
+    if c.reference_doctype:
+        filtros.update({"reference_doctype": c.reference_doctype, "reference_name": c.reference_name})
+    else:
+        filtros["name"] = c.name
+    msgs = [m for m in frappe.get_list("Communication", filters=filtros,
+                                       fields=["name", "subject", "sender", "sender_full_name", "recipients", "cc",
+                                               "communication_date", "sent_or_received", "content", "email_account",
+                                               "orbit_privado_de"], order_by="communication_date asc", limit=200)
+            if _assunto_base(m.subject) == base] or [c]
+    from orbit.emails_crm import pode_responder
+    conta = next((m.email_account for m in reversed(msgs) if m.email_account), c.email_account)
+    ultima = msgs[-1]
+    if ultima.sent_or_received == "Received":
+        para = ultima.sender
+    else:
+        para = ultima.recipients
+    return {"assunto": c.subject, "ref": [c.reference_doctype, c.reference_name],
+            "ref_titulo": _titulo(c.reference_doctype, c.reference_name),
+            "conta": conta, "de": frappe.db.get_value("Email Account", conta, "email_id") if conta else None,
+            "pode_responder": bool(conta and pode_responder(conta)), "para": para, "responder_a": ultima.name,
+            "mensagens": [{"id": m.name, "de": m.sender_full_name or m.sender, "email_de": m.sender, "para": m.recipients,
+                           "cc": m.cc, "data": m.communication_date, "enviado": m.sent_or_received == "Sent",
+                           "html": frappe.utils.sanitize_html(m.content or "")} for m in msgs]}
+
+
+@frappe.whitelist(methods=["POST"])
+def responder(nome: str, html: str, para: str = None, cc: str = None):
+    """Responde a partir da caixa onde a conversa chegou; a resposta fica nos Enviados da caixa e na cronologia."""
+    _guarda()
+    from frappe.core.doctype.communication.email import make
+    from orbit.emails_crm import pode_responder, preparar_saida
+    conv = conversa(nome)
+    if not conv["pode_responder"]:
+        frappe.throw("Não pode responder a partir desta caixa.", frappe.PermissionError)
+    texto = (html or "").strip()
+    if not strip_html(texto).strip():
+        frappe.throw("A resposta está vazia.")
+    acc = preparar_saida(conv["conta"])
+    destino = (para or conv["para"] or "").strip()
+    if not destino:
+        frappe.throw("Falta o destinatário.")
+    assunto = conv["assunto"] or ""
+    if not re.match(r"^(re|res)\s*:", assunto, flags=re.I):
+        assunto = f"Re: {assunto}"
+    ref_dt, ref_dn = conv["ref"]
+    if ref_dt:
+        frappe.get_doc(ref_dt, ref_dn).check_permission("read")
+    r = make(doctype=ref_dt, name=ref_dn, content=texto, subject=assunto, sender=acc.email_id,
+             sender_full_name=frappe.db.get_value("User", frappe.session.user, "full_name"),
+             recipients=destino, cc=cc or None, send_email=True, in_reply_to=conv["responder_a"],
+             communication_medium="Email", now=True)
+    nome_novo = (r or {}).get("name")
+    if nome_novo:
+        # O Frappe só grava a conta de saída depois do insert: o «só para mim» e as ligações vêm a seguir, à mão.
+        if not frappe.db.get_value("Communication", nome_novo, "email_account"):
+            frappe.db.set_value("Communication", nome_novo, "email_account", acc.name, update_modified=False)
+        from orbit.emails_crm import filtrar
+        filtrar(frappe.get_doc("Communication", nome_novo))
+    return {"ok": True, "id": nome_novo}
