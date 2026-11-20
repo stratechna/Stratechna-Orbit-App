@@ -187,6 +187,8 @@ def _excluido(endereco: str, excl: list, propria: str) -> bool:
     dom = e.rsplit("@", 1)[-1]
     if dom == propria.rsplit("@", 1)[-1] and dom not in _PUBLICOS:
         return True   # internos do mesmo domínio nunca contam como «cliente»
+    if dom in _dominios_casa():
+        return True   # 20-11: nem os de outro domínio da casa (caixa @gmail.com a escrever para @stratechna.pt)
     return any(x == e or x.lstrip("@") == dom or (x.startswith("*.") and dom.endswith(x[1:])) for x in excl)
 
 
@@ -396,6 +398,21 @@ def _criar_lead(endereco: str, doc, dono: str = None):
 
 
 # ── Apagar uma lead apaga o que é dela (20-11-2026) ─────────────────────────────────────────────────────
+def _registo_da_casa(dt: str, nome: str) -> bool:
+    """Contactos/empresas que são a própria casa (as nossas caixas como contactos, a Stratechna, a Webgate…)."""
+    casa = _dominios_casa()
+    if dt == "Contact":
+        ems = [e.split("@")[-1].lower() for e in frappe.get_all("Contact Email", filters={"parent": nome, "parenttype": "Contact"},
+                                                                 pluck="email_id") if e and "@" in e]
+        return bool(ems) and all(d in casa for d in ems)
+    if dt == "CRM Organization":
+        o = frappe.db.get_value("CRM Organization", nome, ["website", "email_geral"], as_dict=True) or {}
+        doms = {re.sub(r"^https?://(www\.)?", "", (o.get("website") or "").lower()).split("/")[0],
+                (o.get("email_geral") or "").split("@")[-1].lower()}
+        return bool(doms & casa)
+    return False
+
+
 def lead_apagada(doc, method=None):
     """on_trash de CRM Lead: emails, notas, tarefas, chamadas e reuniões da lead saem com ela — excepto o que também
     está ligado a outro registo (um negócio que nasceu da lead, um contacto), que passa para esse registo."""
@@ -404,8 +421,9 @@ def lead_apagada(doc, method=None):
     comms |= set(frappe.get_all("Communication Link", filters={"parenttype": "Communication", "link_doctype": "CRM Lead",
                                                               "link_name": nome}, pluck="parent"))
     for c in comms:
-        outros = frappe.get_all("Communication Link", filters={"parent": c, "parenttype": "Communication",
-                                                               "link_doctype": ["!=", "CRM Lead"]}, fields=["link_doctype", "link_name"])
+        outros = [o for o in frappe.get_all("Communication Link", filters={"parent": c, "parenttype": "Communication",
+                                                                           "link_doctype": ["!=", "CRM Lead"]}, fields=["link_doctype", "link_name"])
+                  if not _registo_da_casa(o.link_doctype, o.link_name)]
         frappe.db.delete("Communication Link", {"parent": c, "link_doctype": "CRM Lead", "link_name": nome})
         if outros:
             ref = frappe.db.get_value("Communication", c, ["reference_doctype", "reference_name"])
