@@ -213,14 +213,16 @@ const Lista = {
 };
 
 const Ficha = {
-  components: { Icone, EmailCorpo },
+  components: { Icone, EmailCorpo, VerDocumento },
   props: ["doctype", "name"],
   setup(props) {
     const f = ref(null); const cron = ref(null); const filtro = ref(""); const ed = ref(""); const valorEd = ref("");
     const notaTxt = ref(""); const tarefaTxt = ref(""); const tarefaData = ref(""); const modo = ref("nota"); const email = ref(null);
+    const docs = ref(null); const verDoc = ref(null);
     const carregar = async () => {
       f.value = await api("ficha", { doctype: props.doctype, name: props.name });
       carregarCron();
+      apiD("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (docs.value = r)).catch(() => (docs.value = { erro: "falhou" }));
     };
     const carregarCron = async () => (cron.value = await api("cronologia", { doctype: props.doctype, name: props.name, tipo: filtro.value }));
     watch(() => [props.doctype, props.name], () => { f.value = null; cron.value = null; carregar(); });
@@ -260,7 +262,7 @@ const Ficha = {
       : dt === "Contact" ? [r.designation, r.email_id].filter(Boolean).join(" · ") : dt === "CRM Organization" ? [r.website, r.territory].filter(Boolean).join(" · ") : [r.estado, r.email].filter(Boolean).join(" · ");
     const ic = (t) => IC_EVENTO[t] || IC_EVENTO.nota;
     const marcarEmail = () => { window.__ref_email = (f.value && f.value.email_principal) || ""; };
-    return { marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
+    return { docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
       grupos, mudarFase, NOMES, tit, sub, link, data, eur, ic, cor, ESTADO_COR };
   },
   template: `
@@ -345,6 +347,12 @@ const Ficha = {
           </a>
         </template>
       </template>
+      <div class="bloco-tit">Documentos <span class="sub" style="font-weight:400" v-if="docs && !docs.erro">{{ docs.docs.length }}</span></div>
+      <div v-if="!docs" class="sub" style="font-size:13px">A procurar…</div>
+      <div v-else-if="docs.erro" class="sub" style="font-size:13px"><a href="#/documentos">Ligar a sua conta</a> para ver os documentos.</div>
+      <div v-else-if="!docs.docs.length" class="sub" style="font-size:13px">—</div>
+      <div v-for="x in (docs && docs.docs) || []" :key="x.id" class="assoc" style="cursor:pointer" @click="verDoc=x"><b>{{ x.titulo }}</b><small>{{ [x.tipo, x.criado].filter(Boolean).join(' · ') }}</small></div>
+      <VerDocumento v-if="verDoc" :doc="verDoc" @fechar="verDoc=null"/>
       <div class="bloco-tit">Tickets <span class="sub" style="font-weight:400">{{ f.tickets.length }}</span></div>
       <div v-if="!f.tickets.length" class="sub" style="font-size:13px">—</div>
       <a v-for="t in f.tickets" :key="t.name" class="assoc" :href="'/helpdesk/tickets/'+t.name" style="display:block;text-decoration:none;color:inherit"><b>#{{ t.name }} {{ t.subject }}</b><small>{{ t.status }} · {{ data(t.modified,false) }}</small></a>
@@ -727,6 +735,123 @@ const Projeto = {
   <div v-else class="carregar">A carregar…</div>`,
 };
 
+
+// ── Documentos (A3): o arquivo do Docs (Paperless) como a própria pessoa ─────────────────────────────────
+async function apiD(metodo, args = {}) {
+  const r = await fetch(`/api/method/orbit.interface.documentos.${metodo}?` + new URLSearchParams(args), { headers: { "X-Frappe-CSRF-Token": window.csrf_token, Accept: "application/json" } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(String(m).replace(/<[^>]+>/g, "")); throw new Error(m); }
+  return j.message;
+}
+const LigarConta = {
+  emits: ["ligado"],
+  setup(_, { emit }) {
+    const pwd = ref("");
+    const ligar = async () => { await apiCal("ligar", { pwd: pwd.value }, true); pwd.value = ""; toast("Conta ligada"); emit("ligado"); };
+    return { pwd, ligar, user: (window.__ctx || {}).utilizador };
+  },
+  template: `<div class="cartao aviso-cal"><b>Ligar a sua conta</b>
+    <p class="sub">Para ver o seu calendário e os seus documentos aqui, confirme uma vez a palavra-passe da sua caixa de correio ({{ user }}). Fica guardada cifrada no seu Orbit e só serve para isto. Quem entra no Orbit com a palavra-passe da caixa fica ligado sozinho.</p>
+    <form @submit.prevent="ligar" style="display:flex;gap:8px;flex-wrap:wrap"><input type="password" v-model="pwd" autocomplete="current-password" placeholder="Palavra-passe da caixa" class="filtro" style="border-style:solid;min-width:240px"><button class="btn prim" :disabled="!pwd">Ligar</button></form></div>`,
+};
+const VerDocumento = {
+  props: ["doc"], emits: ["fechar"],
+  setup(props) {
+    const url = ref(null); const erro = ref("");
+    onMounted(async () => {
+      try {
+        const r = await fetch(`/api/method/orbit.interface.documentos.ver?id=${props.doc.id}`, { headers: { "X-Frappe-CSRF-Token": window.csrf_token } });
+        if (!r.ok) throw new Error(); url.value = URL.createObjectURL(await r.blob());
+      } catch (e) { erro.value = "Não foi possível mostrar o documento."; }
+    });
+    return { url, erro };
+  },
+  template: `<div class="modal-fundo" @click.self="$emit('fechar')"><div class="modal doc-modal">
+    <header><div><b>{{ doc.titulo }}</b><div class="sub">{{ [doc.tipo, doc.correspondente, doc.criado].filter(Boolean).join(' · ') }}</div></div>
+      <div style="display:flex;gap:6px"><a class="btn sm" :href="'/api/method/orbit.interface.documentos.descarregar?id='+doc.id">Descarregar</a><button class="btn sm" @click="$emit('fechar')">Fechar</button></div></header>
+    <div class="doc-ver"><iframe v-if="url" :src="url" title="Documento"></iframe><div v-else class="carregar">{{ erro || 'A carregar…' }}</div></div>
+    <div class="doc-meta"><span v-for="t in doc.tags" :key="t.nome" class="etq">{{ t.nome }}</span><span v-for="(v,k) in doc.campos" :key="k" class="sub" style="font-size:12px">{{ k }}: {{ v }}</span></div>
+  </div></div>`,
+};
+const Documentos = {
+  components: { LigarConta, VerDocumento },
+  setup() {
+    const f = ref(null); const d = ref(null); const q = ref(""); const tag = ref(""); const tipo = ref(""); const pagina = ref(1); const ver = ref(null);
+    const subir = ref(null); const aSubir = ref(false); let tq;
+    const carregar = async (junta = false) => {
+      const r = await apiD("lista", { q: q.value, tag: tag.value, tipo: tipo.value, pagina: pagina.value });
+      if (junta && d.value && !r.erro) { r.docs = d.value.docs.concat(r.docs); }
+      d.value = r;
+    };
+    const inicio = async () => { f.value = await apiD("filtros"); if (!f.value.erro) carregar(); };
+    watch([tag, tipo], () => { pagina.value = 1; carregar(); });
+    watch(q, () => { clearTimeout(tq); tq = setTimeout(() => { pagina.value = 1; carregar(); }, 350); });
+    onMounted(inicio);
+    const areas = computed(() => {
+      if (!f.value || f.value.erro) return [];
+      const ts = f.value.tags; const filhos = (pai) => ts.filter((t) => (t.pai || null) === pai);
+      const out = []; const anda = (pai, nivel) => filhos(pai).forEach((t) => { out.push({ ...t, nivel }); anda(t.id, nivel + 1); });
+      anda(null, 0); return out;
+    });
+    const enviar = async (ev) => {
+      const fd = new FormData(ev.target); if (!fd.get("ficheiro") || !fd.get("ficheiro").size) { toast("Escolha um ficheiro"); return; }
+      aSubir.value = true;
+      try {
+        const r = await fetch("/api/method/orbit.interface.documentos.carregar", { method: "POST", body: fd, headers: { "X-Frappe-CSRF-Token": window.csrf_token } });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(m); return; }
+        toast("Carregado — o Docs está a processar (fica pesquisável dentro de instantes)"); subir.value = null;
+      } finally { aSubir.value = false; }
+    };
+    const mini = (id) => `/api/method/orbit.interface.documentos.miniatura?id=${id}`;
+    return { f, d, q, tag, tipo, pagina, ver, carregar, inicio, areas, subir, aSubir, enviar, mini, data };
+  },
+  template: `
+  <div>
+    <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div><h1>Documentos</h1><div class="sub" v-if="d && !d.erro">{{ d.total }} documentos</div></div>
+      <button class="btn prim" @click="subir={}" :disabled="!f || f.erro">Carregar documento</button>
+    </div>
+    <div v-if="f && f.erro" style="padding:0 24px"><LigarConta v-if="f.erro!=='sem_docs'" @ligado="inicio"/><div v-else class="vazio">Este Orbit ainda não tem o Stratechna Docs.</div></div>
+    <div v-else-if="!f" class="carregar">A carregar…</div>
+    <div v-else class="docs">
+      <aside class="canais">
+        <h6>Áreas</h6>
+        <button :class="{ativo:!tag}" @click="tag=''">Todos os documentos</button>
+        <button v-for="t in areas" :key="t.id" :class="{ativo:tag===String(t.id)}" @click="tag=String(t.id)" :style="{paddingLeft:(10+t.nivel*14)+'px'}"><span class="ponto" :style="{background:t.cor||'var(--ink-3)'}"></span><span class="txt">{{ t.nome }}</span></button>
+      </aside>
+      <div style="min-width:0">
+        <div class="filtros" style="padding-top:0"><input class="filtro" style="border-style:solid;min-width:260px" v-model="q" placeholder="Procurar no texto dos documentos…">
+          <select class="filtro" style="border-style:solid" v-model="tipo"><option value="">Todos os tipos</option><option v-for="t in f.tipos" :key="t.id" :value="String(t.id)">{{ t.nome }}</option></select></div>
+        <div v-if="!d" class="carregar">A carregar…</div>
+        <div v-else-if="d.erro" class="vazio">Não foi possível ler o Docs.</div>
+        <div v-else-if="!d.docs.length" class="vazio">Nenhum documento.</div>
+        <div class="grelha-docs" v-else>
+          <div class="cartao doc" v-for="x in d.docs" :key="x.id" @click="ver=x">
+            <img :src="mini(x.id)" loading="lazy" alt="">
+            <div class="doc-txt"><b>{{ x.titulo }}</b><div class="sub">{{ [x.tipo, x.correspondente].filter(Boolean).join(' · ') }}</div>
+              <div class="sub" style="font-size:12px">{{ data(x.criado,false) }}</div>
+              <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px"><span v-for="t in x.tags.slice(0,3)" :key="t.nome" class="etq" style="font-size:11px">{{ t.nome }}</span></div></div>
+          </div>
+        </div>
+        <div class="mais-linhas" v-if="d && d.mais"><button class="btn sm" @click="pagina++; carregar(true)">Mostrar mais</button></div>
+      </div>
+    </div>
+    <VerDocumento v-if="ver" :doc="ver" @fechar="ver=null"/>
+    <div class="modal-fundo" v-if="subir" @click.self="subir=null">
+      <div class="modal" style="max-width:520px"><header><b>Carregar documento</b><button class="btn sm" @click="subir=null">Fechar</button></header>
+        <form class="corpo-email form-cal" @submit.prevent="enviar">
+          <label>Ficheiro<input type="file" name="ficheiro" required></label>
+          <label>Título (opcional)<input name="titulo"></label>
+          <label>Área<select name="tags"><option value="">— o Docs decide pelas regras —</option><option v-for="t in areas" :key="t.id" :value="t.id">{{ '— '.repeat(t.nivel) + t.nome }}</option></select></label>
+          <label>Tipo<select name="tipo"><option value="">— o Docs decide —</option><option v-for="t in f.tipos" :key="t.id" :value="t.id">{{ t.nome }}</option></select></label>
+          <label>Processo (referência P-/WEB-/SUB-…)<input name="processo"></label>
+          <div style="display:flex;justify-content:flex-end"><button class="btn prim" :disabled="aSubir">{{ aSubir ? 'A carregar…' : 'Carregar' }}</button></div>
+        </form></div>
+    </div>
+  </div>`,
+};
+
 // ── Definições (uma só roda dentada) ─────────────────────────────────────────────────────────────────
 const Definicoes = {
   setup() { const d = ref(null); onMounted(async () => (d.value = await api("definicoes"))); return { d }; },
@@ -755,7 +880,7 @@ const AppEmbutida = {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, Calendario, Tarefas, Projetos, Projeto },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, Calendario, Tarefas, Projetos, Projeto, Documentos },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -780,7 +905,7 @@ const App = {
       r.dataset.theme = escuro ? "light" : "dark"; try { localStorage.setItem("orbit.tema", r.dataset.theme); } catch (e) {}
     };
     const NAV = [["inicio", "casa", "Início"], ["sec", "CRM"], ["contactos", "pessoa", "Contactos"], ["empresas", "empresa", "Empresas"], ["leads", "lead", "Leads"],
-      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"], ["sec", "Trabalho"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"], ["projetos", "grelha", "Projetos"]];
+      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"], ["sec", "Trabalho"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"], ["projetos", "grelha", "Projetos"], ["documentos", "livro", "Documentos"]];
     const rotaCal = computed(() => partes.value.join("/"));
     return { ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal };
   },
@@ -818,6 +943,7 @@ const App = {
         <Caixa v-else-if="ecra==='caixa'" :abrir-id="partes[1]"/>
         <Definicoes v-else-if="ecra==='definicoes'"/>
         <Tarefas v-else-if="ecra==='tarefas'"/>
+        <Documentos v-else-if="ecra==='documentos'"/>
         <Projetos v-else-if="ecra==='projetos'"/>
         <Projeto v-else-if="ecra==='projeto'" :nome="partes[1]" :key="partes[1]"/>
         <Calendario v-else-if="ecra==='calendario'" :nova="partes[1]==='nova'" :ref-dt="partes[2]" :ref-dn="partes[3]" :key="rotaCal"/>
