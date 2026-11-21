@@ -1,0 +1,170 @@
+{
+ "doctype": "DocType",
+ "name": "Fornecedor de Importacao",
+ "module": "Inventario",
+ "custom": 0,
+ "engine": "InnoDB",
+ "autoname": "field:importador_id",
+ "naming_rule": "By fieldname",
+ "track_changes": 0,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "creation": "2026-11-21 15:00:00.000000",
+ "modified": "2026-11-21 15:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "title_field": "nome",
+ "search_fields": "nome,supplier",
+ "description": "Um fornecedor do importador (F5). Até o motor passar para o Orbit, a configuração e as categorias são uma cópia só de leitura da do portal, enviada pelo espelho.",
+ "fields": [
+  {
+   "fieldname": "importador_id",
+   "fieldtype": "Int",
+   "label": "Id no importador",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "nome",
+   "fieldtype": "Data",
+   "label": "Nome",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "Fornecedor (ERP)",
+   "options": "Supplier",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col1",
+   "fieldtype": "Column Break",
+   "label": ""
+  },
+  {
+   "fieldname": "motor",
+   "fieldtype": "Select",
+   "label": "Motor do importador",
+   "options": "Portal\nSombra\nOrbit",
+   "default": "Portal",
+   "in_list_view": 1,
+   "read_only": 1,
+   "description": "Portal: como hoje. Sombra: o Orbit também processa e compara, sem efeito. Orbit: o Orbit é o motor deste fornecedor."
+  },
+  {
+   "fieldname": "tipo_ligacao",
+   "fieldtype": "Data",
+   "label": "Ligação",
+   "read_only": 1
+  },
+  {
+   "fieldname": "estado",
+   "fieldtype": "Data",
+   "label": "Estado",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "na_loja",
+   "fieldtype": "Check",
+   "label": "Na loja",
+   "read_only": 1
+  },
+  {
+   "fieldname": "prioridade",
+   "fieldtype": "Int",
+   "label": "Prioridade",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_cad",
+   "fieldtype": "Section Break",
+   "label": "Cadências"
+  },
+  {
+   "fieldname": "frequencia_sync",
+   "fieldtype": "Data",
+   "label": "Sync2 (completa)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col2",
+   "fieldtype": "Column Break",
+   "label": ""
+  },
+  {
+   "fieldname": "frequencia_sync_rapido",
+   "fieldtype": "Data",
+   "label": "Sync1 (preço/stock)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_regras",
+   "fieldtype": "Section Break",
+   "label": "Regras (cópia do portal)",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "config",
+   "fieldtype": "Code",
+   "label": "Configuração",
+   "options": "JSON",
+   "read_only": 1
+  },
+  {
+   "fieldname": "categorias",
+   "fieldtype": "Code",
+   "label": "Categorias",
+   "options": "JSON",
+   "read_only": 1
+  },
+  {
+   "fieldname": "recebido_em",
+   "fieldtype": "Datetime",
+   "label": "Cópia recebida em",
+   "read_only": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 0,
+   "email": 0,
+   "share": 0
+  },
+  {
+   "role": "Stock Manager",
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "delete": 0,
+   "report": 1,
+   "export": 1,
+   "print": 0,
+   "email": 0,
+   "share": 0
+  },
+  {
+   "role": "Purchase Manager",
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "delete": 0,
+   "report": 1,
+   "export": 1,
+   "print": 0,
+   "email": 0,
+   "share": 0
+  }
+ ]
+}

@@ -214,8 +214,32 @@ def _oferta(p: dict, item_code: str, caches: dict, agora) -> None:
 
 
 # ── entrada ────────────────────────────────────────────────────────────────────────────────────────────────
+def _fornecedores_importacao(lista: list, caches: dict) -> int:
+    """F5.0: cópia só de leitura da configuração e das categorias de cada fornecedor do importador."""
+    n = 0
+    for f in lista[:500]:
+        fid = cint(f.get("id"))
+        if not fid:
+            continue
+        valores = {"nome": _l(f.get("nome"), 140), "supplier": _fornecedor(fid, f.get("nome"), caches["fornecedores"]),
+                   "tipo_ligacao": _l(f.get("tipo_ligacao"), 40), "estado": _l(f.get("estado"), 40),
+                   "na_loja": 1 if f.get("na_loja") else 0, "prioridade": cint(f.get("prioridade")),
+                   "frequencia_sync": _l(f.get("frequencia_sync"), 40),
+                   "frequencia_sync_rapido": _l(f.get("frequencia_sync_rapido"), 40),
+                   "config": json.dumps(f.get("config") or {}, ensure_ascii=False, indent=1, default=str),
+                   "categorias": json.dumps(f.get("categorias") or [], ensure_ascii=False, indent=1, default=str),
+                   "recebido_em": now_datetime()}
+        if frappe.db.exists("Fornecedor de Importacao", fid):
+            frappe.db.set_value("Fornecedor de Importacao", fid, valores, update_modified=False)
+        else:
+            frappe.get_doc({"doctype": "Fornecedor de Importacao", "importador_id": fid, **valores}).insert(ignore_permissions=True)
+        n += 1
+    return n
+
+
 def receber(dados: dict) -> dict:
-    """Um lote: {"canal": {nome, url, conta, marca}, "itens": [...], "fim": bool, "chaves": [...]}."""
+    """Um lote: {"canal": {nome, url, conta, marca}, "itens": [...], "fim": bool, "chaves": [...],
+    "fornecedores": [...] (F5.0, na volta final)}."""
     frappe.set_user("Administrator")
     canal = _canal(dados.get("canal") or {})
     caches = {"grupos": {}, "fabricantes": {}, "fornecedores": {}, "lista_compra": _lista_compra()}
@@ -235,6 +259,9 @@ def receber(dados: dict) -> dict:
             falhadas.append(p.get("chave"))
     frappe.db.commit()
     out = {"ok": True, "gravados": ok, "erros": len(erros), "amostra_erros": erros[:5], "chaves_com_erro": falhadas}
+    if dados.get("fornecedores"):
+        out["fornecedores_importacao"] = _fornecedores_importacao(dados["fornecedores"], caches)
+        frappe.db.commit()
     if dados.get("fim"):
         out.update(_fechar(canal, set(dados.get("chaves") or []), agora))
     return out
