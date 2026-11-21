@@ -26,7 +26,7 @@ import frappe
 from frappe.utils import cint, flt, getdate, now_datetime
 
 RAIZ_GRUPO = "Loja online"
-ESTADOS = {"em_stock": "Em stock", "disponivel": "Em stock", "sob_encomenda": "Sob encomenda",
+ESTADOS = {"instock": "Em stock", "outofstock": "Esgotado", "onbackorder": "Sob encomenda", "em_stock": "Em stock", "disponivel": "Em stock", "sob_encomenda": "Sob encomenda",
            "esgotado": "Esgotado", "sem_stock": "Esgotado"}
 
 
@@ -199,6 +199,9 @@ def _oferta(p: dict, item_code: str, caches: dict, agora) -> None:
         "custo": _num(p.get("custo")), "preco_base_venda": _num(p.get("preco_base_venda")),
         "pvr": _num(p.get("pvr")), "ausente_desde": None,
     }
+    for k in ("quantidade", "custo", "preco_base_venda", "pvr"):
+        if valores[k] is None:
+            valores[k] = 0   # as colunas numéricas do Frappe não aceitam nulo; «quantidade_conhecida» diz se é real
     nome = frappe.db.get_value("Oferta do Fornecedor", {"chave": chave}, "name")
     if nome:
         frappe.db.set_value("Oferta do Fornecedor", nome, valores, update_modified=False)
