@@ -1,0 +1,223 @@
+{
+ "doctype": "DocType",
+ "name": "Oferta do Fornecedor",
+ "module": "Inventario",
+ "custom": 0,
+ "engine": "InnoDB",
+ "track_changes": 0,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "creation": "2026-11-21 10:00:00.000000",
+ "modified": "2026-11-21 10:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "label": "Artigo",
+   "options": "Item",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "Fornecedor",
+   "options": "Supplier",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "ref_fornecedor",
+   "fieldtype": "Data",
+   "label": "Referência no fornecedor",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "Interna — nunca aparece ao público."
+  },
+  {
+   "fieldname": "chave",
+   "fieldtype": "Data",
+   "label": "Chave do importador",
+   "unique": 1,
+   "read_only": 1,
+   "no_copy": 1,
+   "description": "«<id do fornecedor no importador>:<referência>»."
+  },
+  {
+   "fieldname": "col1",
+   "fieldtype": "Column Break",
+   "label": ""
+  },
+  {
+   "fieldname": "activa",
+   "fieldtype": "Check",
+   "label": "Activa",
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "pode_vender",
+   "fieldtype": "Check",
+   "label": "Pode vender com o stock do fornecedor",
+   "default": "1"
+  },
+  {
+   "fieldname": "estado_stock",
+   "fieldtype": "Select",
+   "label": "Estado no fornecedor",
+   "options": "\nEm stock\nSob encomenda\nEsgotado",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "ausente_desde",
+   "fieldtype": "Datetime",
+   "label": "Fora do fornecedor desde",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_qtd",
+   "fieldtype": "Section Break",
+   "label": "Quantidade e prazo"
+  },
+  {
+   "fieldname": "quantidade",
+   "fieldtype": "Float",
+   "label": "Quantidade do fornecedor",
+   "description": "Vazia quando o fornecedor não diz quantas tem."
+  },
+  {
+   "fieldname": "quantidade_conhecida",
+   "fieldtype": "Check",
+   "label": "Quantidade conhecida",
+   "read_only": 1
+  },
+  {
+   "fieldname": "lida_em",
+   "fieldtype": "Datetime",
+   "label": "Lida em",
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "Mais antiga do que a frescura do fornecedor → conta como zero (§4.2)."
+  },
+  {
+   "fieldname": "col2",
+   "fieldtype": "Column Break",
+   "label": ""
+  },
+  {
+   "fieldname": "tipo_fornecimento",
+   "fieldtype": "Data",
+   "label": "Tipo de fornecimento"
+  },
+  {
+   "fieldname": "prazo_entrega",
+   "fieldtype": "Data",
+   "label": "Prazo de entrega"
+  },
+  {
+   "fieldname": "data_reposicao",
+   "fieldtype": "Date",
+   "label": "Data de reposição"
+  },
+  {
+   "fieldname": "sec_preco",
+   "fieldtype": "Section Break",
+   "label": "Preços do fornecedor"
+  },
+  {
+   "fieldname": "custo",
+   "fieldtype": "Currency",
+   "label": "Custo",
+   "options": "EUR"
+  },
+  {
+   "fieldname": "col3",
+   "fieldtype": "Column Break",
+   "label": ""
+  },
+  {
+   "fieldname": "preco_base_venda",
+   "fieldtype": "Currency",
+   "label": "Preço base de venda",
+   "options": "EUR"
+  },
+  {
+   "fieldname": "pvr",
+   "fieldtype": "Currency",
+   "label": "PVR",
+   "options": "EUR"
+  }
+ ],
+ "autoname": "hash",
+ "naming_rule": "Random",
+ "title_field": "item_code",
+ "search_fields": "item_code,ref_fornecedor",
+ "description": "O que um fornecedor tem de um artigo. NÃO mexe no livro de stock: o stock do fornecedor é uma excepção contada à parte, por canal (docs/PLANO-INVENTARIO-IMPORTADOR-ORBIT.md §4.2).",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 0,
+   "email": 0,
+   "share": 0
+  },
+  {
+   "role": "Stock Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 0,
+   "email": 0,
+   "share": 0
+  },
+  {
+   "role": "Purchase Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 0,
+   "email": 0,
+   "share": 0
+  },
+  {
+   "role": "Stock User",
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "delete": 0,
+   "report": 1,
+   "export": 1,
+   "print": 0,
+   "email": 0,
+   "share": 0
+  },
+  {
+   "role": "Sales User",
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "delete": 0,
+   "report": 1,
+   "export": 1,
+   "print": 0,
+   "email": 0,
+   "share": 0
+  }
+ ]
+}

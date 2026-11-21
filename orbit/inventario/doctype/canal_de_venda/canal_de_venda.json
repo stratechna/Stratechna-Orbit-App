@@ -1,0 +1,184 @@
+{
+ "doctype": "DocType",
+ "name": "Canal de Venda",
+ "module": "Inventario",
+ "custom": 0,
+ "engine": "InnoDB",
+ "track_changes": 0,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "creation": "2026-11-21 10:00:00.000000",
+ "modified": "2026-11-21 10:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "fields": [
+  {
+   "fieldname": "nome",
+   "fieldtype": "Data",
+   "label": "Nome",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "activo",
+   "fieldtype": "Check",
+   "label": "Activo",
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "tipo",
+   "fieldtype": "Select",
+   "label": "Tipo",
+   "options": "WooCommerce",
+   "default": "WooCommerce"
+  },
+  {
+   "fieldname": "url",
+   "fieldtype": "Data",
+   "label": "Endereço da loja",
+   "options": "URL",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "col1",
+   "fieldtype": "Column Break",
+   "label": ""
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Empresa",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "marca",
+   "fieldtype": "Link",
+   "label": "Marca do negócio",
+   "options": "Brand",
+   "description": "A marca da loja (ex.: Shopinox). A marca do fabricante fica no campo «Fabricante» do artigo."
+  },
+  {
+   "fieldname": "lista_precos",
+   "fieldtype": "Link",
+   "label": "Lista de preços",
+   "options": "Price List"
+  },
+  {
+   "fieldname": "lingua",
+   "fieldtype": "Data",
+   "label": "Língua",
+   "default": "pt"
+  },
+  {
+   "fieldname": "sec_stock",
+   "fieldtype": "Section Break",
+   "label": "Stock"
+  },
+  {
+   "fieldname": "modo_stock",
+   "fieldtype": "Select",
+   "label": "Disponibilidade",
+   "options": "Próprio + fornecedor\nSó stock próprio",
+   "default": "Próprio + fornecedor",
+   "description": "Próprio + fornecedor: soma o stock do fornecedor lido dentro da frescura, menos a margem de segurança."
+  },
+  {
+   "fieldname": "armazens",
+   "fieldtype": "Table",
+   "label": "Armazéns que contam",
+   "options": "Armazem do Canal"
+  },
+  {
+   "fieldname": "sec_sync",
+   "fieldtype": "Section Break",
+   "label": "Sincronização"
+  },
+  {
+   "fieldname": "fonte_sync3",
+   "fieldtype": "Select",
+   "label": "A loja recebe do",
+   "options": "Portal\nOrbit",
+   "default": "Portal",
+   "description": "Portal: como hoje. Orbit: a Sync3 lê do inventário (F3, só depois de comparado)."
+  },
+  {
+   "fieldname": "conta_importador",
+   "fieldtype": "Data",
+   "label": "Conta no importador do portal",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col2",
+   "fieldtype": "Column Break",
+   "label": ""
+  },
+  {
+   "fieldname": "ultimo_espelho",
+   "fieldtype": "Datetime",
+   "label": "Último espelho",
+   "read_only": 1
+  },
+  {
+   "fieldname": "resumo_espelho",
+   "fieldtype": "Small Text",
+   "label": "Resumo do espelho",
+   "read_only": 1
+  }
+ ],
+ "autoname": "field:nome",
+ "naming_rule": "By fieldname",
+ "description": "Uma loja ligada ao inventário: que marcas e armazéns publica, com que lista de preços e com que regra para o stock do fornecedor.",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 0,
+   "email": 0,
+   "share": 0
+  },
+  {
+   "role": "Stock Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 0,
+   "email": 0,
+   "share": 0
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "delete": 0,
+   "report": 1,
+   "export": 1,
+   "print": 0,
+   "email": 0,
+   "share": 0
+  },
+  {
+   "role": "Stock User",
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "delete": 0,
+   "report": 1,
+   "export": 1,
+   "print": 0,
+   "email": 0,
+   "share": 0
+  }
+ ]
+}

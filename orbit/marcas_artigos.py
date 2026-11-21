@@ -48,6 +48,8 @@ def marca_do_codigo(codigo: str) -> str | None:
 
 
 def antes_de_validar_artigo(doc, method=None):
+    if doc.flags.get("orbit_espelho"):
+        return   # 21-11: os artigos do espelho do importador levam a marca do canal (a regra do prefixo é da casa)
     marca = marca_do_codigo(doc.item_code)
     if marca and doc.brand != marca:
         doc.brand = marca
