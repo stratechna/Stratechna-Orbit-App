@@ -1827,11 +1827,15 @@ const ErpFicha = {
     // U3: recálculo pelo ERPNext (preço da lista, nome, unidade, impostos, totais) — nada é gravado
     let memoItens = {}; let ultimaAss = ""; let tRec;
     const DERIVADOS = ["item_name", "description", "uom", "stock_uom", "conversion_factor", "rate", "price_list_rate", "base_rate", "amount", "base_amount", "image", "item_group", "brand"];
+    // o que, ao mudar, pede um novo cálculo ao ERPNext (vendas/compras, stock e RH — U3/U4)
+    const CAB = ["customer", "party_name", "supplier", "company", "currency", "selling_price_list", "buying_price_list", "taxes_and_charges",
+      "transaction_date", "posting_date", "posting_time", "additional_discount_percentage", "discount_amount", "apply_discount_on",
+      "stock_entry_type", "purpose", "from_warehouse", "to_warehouse", "employee", "leave_type", "from_date", "to_date", "half_day", "half_day_date"];
+    const LIN = { items: ["item_code", "qty", "rate", "uom", "discount_percentage", "warehouse", "s_warehouse", "t_warehouse", "basic_rate", "valuation_rate"],
+      taxes: ["charge_type", "account_head", "rate", "tax_amount"], time_logs: ["activity_type", "from_time", "to_time", "hours", "billing_rate", "costing_rate", "is_billable", "project", "task"],
+      expenses: ["expense_type", "amount", "sanctioned_amount"] };
     const assinatura = () => { const d = doc.value; if (!d || !meta.value?.transacao) return "";
-      return JSON.stringify([d.customer, d.party_name, d.supplier, d.company, d.currency, d.selling_price_list, d.buying_price_list, d.taxes_and_charges,
-        d.transaction_date, d.posting_date, d.additional_discount_percentage, d.discount_amount, d.apply_discount_on,
-        (d.items || []).map((l) => [l.item_code, l.qty, l.rate, l.uom, l.discount_percentage, l.warehouse]),
-        (d.taxes || []).map((t) => [t.charge_type, t.account_head, t.rate, t.tax_amount])]); };
+      return JSON.stringify([CAB.map((k) => d[k]), Object.entries(LIN).map(([t, ks]) => (d[t] || []).map((l) => ks.map((k) => l[k])))]); };
     const recalcular = async () => {
       const d = doc.value; if (!d || soLeitura.value || (d.docstatus || 0) !== 0) return;
       for (const l of d.items || []) if (l.item_code && memoItens[l.name] !== l.item_code) { for (const k of DERIVADOS) l[k] = null; }
@@ -1955,6 +1959,86 @@ const ErpFicha = {
   </div><div v-else class="vazio">A carregar…</div>`,
 };
 
+const ErpStock = {
+  components: { ErpLigacao },
+  props: ["artigo"],
+  setup(props) {
+    const escolhido = ref(props.artigo || ""); const r = ref(null); const resumo = ref([]); const a = ref(false);
+    const carregar = async () => {
+      if (!escolhido.value) { resumo.value = await api("erp.stock_resumo"); r.value = null; return; }
+      a.value = true; try { r.value = await api("erp.stock_artigo", { item_code: escolhido.value }); } finally { a.value = false; }
+    };
+    onMounted(carregar);
+    watch(escolhido, (v) => { const alvo = "#/erp-stock" + (v ? "/" + encodeURIComponent(v) : ""); if (location.hash !== alvo) location.hash = alvo; });
+    const num = (v) => new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 2 }).format(v || 0);
+    const eur2 = (v) => new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(v || 0);
+    const abrir = (m) => { location.hash = irErp(m.voucher_type, m.voucher_no); };
+    return { escolhido, r, resumo, a, num, eur2, irErp, data, abrir };
+  },
+  template: `<div class="pad">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+      <div><h1>Stock</h1><div class="sub">Por artigo: armazéns, movimentos e stock dos fornecedores</div></div>
+      <div class="erp-campo" style="min-width:320px;margin:0"><label>Artigo</label><ErpLigacao v-model="escolhido" alvo="Item"/></div>
+    </div>
+    <template v-if="r">
+      <div class="erp-totais cartao" style="margin:0 0 16px">
+        <div><small>Artigo</small><b><a :href="irErp('Item', r.artigo.item_code)">{{ r.artigo.item_name }}</a></b></div>
+        <div><small>Em armazém</small><b>{{ num(r.total) }} {{ r.artigo.stock_uom }}</b></div>
+        <div><small>Valor</small><b>{{ eur2(r.valor) }}</b></div>
+      </div>
+      <div class="cartao" style="margin-bottom:16px"><header><b>Por armazém</b></header>
+        <div class="tabela-wrap" style="margin:0;border:0"><table><thead><tr><th>Armazém</th><th>Em stock</th><th>Reservado</th><th>Encomendado</th><th>Previsto</th><th>Valor</th></tr></thead>
+          <tbody><tr v-for="b in r.armazens" :key="b.warehouse" style="cursor:default"><td>{{ b.warehouse }}</td><td>{{ num(b.actual_qty) }}</td><td>{{ num(b.reserved_qty) }}</td><td>{{ num(b.ordered_qty) }}</td><td>{{ num(b.projected_qty) }}</td><td>{{ eur2(b.stock_value) }}</td></tr></tbody></table>
+          <div v-if="!r.armazens.length" class="vazio">Sem stock próprio em nenhum armazém.</div></div></div>
+      <div class="cartao" style="margin-bottom:16px" v-if="r.ofertas.length"><header><b>Stock dos fornecedores</b><span class="sub">não entra no livro de stock</span></header>
+        <div class="tabela-wrap" style="margin:0;border:0"><table><thead><tr><th>Fornecedor</th><th>Estado</th><th>Quantidade</th><th>Custo</th><th>Lido em</th></tr></thead>
+          <tbody><tr v-for="o in r.ofertas" :key="o.supplier" style="cursor:default"><td>{{ o.supplier }}</td><td><span class="etq" :class="{verde:o.estado_stock==='Em stock', ambar:o.estado_stock==='Sob encomenda'}">{{ o.ausente_desde ? 'Fora do fornecedor' : (o.estado_stock || '—') }}</span></td><td>{{ o.quantidade_conhecida ? num(o.quantidade) : '—' }}</td><td>{{ eur2(o.custo) }}</td><td>{{ data(o.lida_em) }}</td></tr></tbody></table></div></div>
+      <div class="cartao"><header><b>Últimos movimentos</b></header>
+        <div class="tabela-wrap" style="margin:0;border:0"><table><thead><tr><th>Data</th><th>Documento</th><th>Armazém</th><th>Quantidade</th><th>Fica</th></tr></thead>
+          <tbody><tr v-for="m in r.movimentos" :key="m.voucher_no+m.warehouse+m.actual_qty" @click="abrir(m)"><td>{{ data(m.posting_date, false) }}</td><td>{{ m.voucher_rotulo }} {{ m.voucher_no }}</td><td>{{ m.warehouse }}</td><td :style="{color: m.actual_qty<0?'var(--acao)':'inherit'}">{{ m.actual_qty>0?'+':'' }}{{ num(m.actual_qty) }}</td><td>{{ num(m.qty_after_transaction) }}</td></tr></tbody></table>
+          <div v-if="!r.movimentos.length" class="vazio">Sem movimentos.</div></div></div>
+    </template>
+    <div v-else-if="!a" class="cartao"><header><b>Stock por armazém</b><span class="sub">escolha um artigo para ver o detalhe</span></header>
+      <div class="tabela-wrap" style="margin:0;border:0"><table><thead><tr><th>Armazém</th><th>Artigos com stock</th><th>Valor</th></tr></thead>
+        <tbody><tr v-for="w in resumo" :key="w.warehouse" style="cursor:default"><td>{{ w.warehouse }}</td><td>{{ num(w.artigos) }}</td><td>{{ eur2(w.valor) }}</td></tr></tbody></table>
+        <div v-if="!resumo.length" class="vazio">Ainda não há stock próprio registado (inventário inicial por fazer).</div></div></div>
+  </div>`,
+};
+
+const ErpPessoas = {
+  setup() {
+    const r = ref(null); const q = ref("");
+    onMounted(async () => { r.value = await api("erp.pessoas"); });
+    const lista = computed(() => (r.value?.equipa || []).filter((p) => !q.value || (p.employee_name + " " + (p.designacao || "") + " " + (p.department || "")).toLowerCase().includes(q.value.toLowerCase())));
+    return { r, q, lista, irErp, cor, ini, data };
+  },
+  template: `<div class="pad" v-if="r">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+      <div><h1>Pessoas</h1><div class="sub">Equipa, ausências de hoje e o seu saldo de férias</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" :href="irErp('Leave Application','novo')">Pedir férias / ausência</a><a class="btn" :href="irErp('Expense Claim','novo')">Nova despesa</a><a class="btn" :href="irErp('Timesheet','novo')">Nova folha de horas</a></div>
+    </div>
+    <div v-if="r.sem_rh" class="vazio cartao">O módulo de Recursos Humanos não está disponível para si.</div>
+    <template v-else>
+      <div class="erp-mod" style="margin-bottom:16px">
+        <section class="cartao"><header><b>Ausentes hoje</b></header>
+          <div class="erp-itens"><a v-for="a in r.ausentes_hoje" :key="a.employee+a.from_date" :href="irErp('Employee', a.employee)">{{ a.employee_name }}<span class="sub">{{ a.tipo }} · até {{ data(a.to_date, false) }}</span></a>
+            <div v-if="!r.ausentes_hoje.length" class="vazio" style="padding:12px">Ninguém ausente hoje.</div></div></section>
+        <section class="cartao"><header><b>O meu saldo</b></header>
+          <div class="erp-itens"><div v-for="s in r.saldo" :key="s.tipo" style="padding:8px 16px;display:flex;justify-content:space-between"><span>{{ s.tipo }}</span><b>{{ s.restam }} dias</b></div>
+            <div v-if="!r.saldo.length" class="vazio" style="padding:12px">{{ r.eu ? 'Sem dias atribuídos.' : 'A sua conta não está ligada a uma ficha de colaborador.' }}</div></div></section>
+      </div>
+      <div class="filtros" style="padding:0 0 12px"><input class="filtro" style="border-style:solid;min-width:260px" v-model="q" placeholder="Procurar na equipa…"></div>
+      <div class="erp-pessoas">
+        <a v-for="p in lista" :key="p.name" class="cartao" :href="irErp('Employee', p.name)">
+          <span class="av" :style="{background:cor(p.name)}">{{ ini(p.employee_name) }}</span>
+          <div class="cresce"><b>{{ p.employee_name }}</b><small>{{ [p.designacao, p.department].filter(Boolean).join(' · ') }}</small><small>{{ p.company_email || '' }} {{ p.cell_number || '' }}</small></div>
+        </a>
+      </div>
+      <div v-if="!lista.length" class="vazio cartao">Ainda não há fichas de colaboradores.</div>
+    </template>
+  </div><div v-else class="vazio">A carregar…</div>`,
+};
+
 const ErpDesk = {
   props: ["url"],
   template: `<div class="embutida"><iframe :src="url" title="ERPNext"></iframe></div>`,
@@ -1962,7 +2046,7 @@ const ErpDesk = {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpDesk, Calendario, DefLista, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpDesk, ErpStock, ErpPessoas, Calendario, DefLista, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -1987,7 +2071,7 @@ const App = {
       r.dataset.theme = escuro ? "light" : "dark"; try { localStorage.setItem("orbit.tema", r.dataset.theme); } catch (e) {}
     };
     const NAV = [["inicio", "casa", "Início"], ["sec", "CRM"], ["contactos", "pessoa", "Contactos"], ["empresas", "empresa", "Empresas"], ["leads", "lead", "Leads"],
-      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"], ["chat", "chat", "Chat"], ["sec", "Trabalho"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"], ["projetos", "grelha", "Projetos"], ["assinaturas", "nota", "Assinaturas"], ["tempo", "relogio", "Tempo"]];
+      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"], ["chat", "chat", "Chat"], ["sec", "Trabalho"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"], ["projetos", "grelha", "Projetos"], ["assinaturas", "nota", "Assinaturas"], ["tempo", "relogio", "Tempo"], ["sec", "Operação"], ["erp-stock", "caixa", "Stock"], ["pessoas", "pessoa", "Pessoas"]];
     const rotaCal = computed(() => partes.value.join("/"));
     return { ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal };
   },
@@ -2042,6 +2126,8 @@ const App = {
         <ErpModulo v-else-if="ecra==='erp-m'" :barra="partes[1]" :key="'m'+partes[1]"/>
         <ErpLista v-else-if="ecra==='erp' && !partes[2]" :doctype="partes[1]" :key="'l'+partes[1]"/>
         <ErpFicha v-else-if="ecra==='erp'" :doctype="partes[1]" :name="partes[2]" :key="'f'+partes[1]+'/'+partes[2]"/>
+        <ErpStock v-else-if="ecra==='erp-stock'" :artigo="partes[1]" :key="'s'+(partes[1]||'')"/>
+        <ErpPessoas v-else-if="ecra==='pessoas'"/>
         <ErpDesk v-else-if="ecra==='erp-desk'" :url="partes.slice(1).join('/')" :key="'d'+partes.slice(1).join('/')"/>
         <div v-else class="vazio">Página desconhecida. <a href="#/inicio">Início</a></div>
       </main>

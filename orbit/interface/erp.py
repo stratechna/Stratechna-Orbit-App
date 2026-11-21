@@ -271,7 +271,9 @@ def procurar(doctype: str, txt: str = "", filtros: str = None):
 # Os cálculos são os do ERPNext: o documento por gravar vai ao servidor, que preenche o que o ERPNext
 # preencheria (preço da lista, nome, unidade, impostos do modelo) e calcula os totais — sem gravar nada.
 TRANSACOES = {"Quotation", "Sales Order", "Sales Invoice", "Delivery Note", "Purchase Order", "Purchase Invoice",
-              "Purchase Receipt", "Material Request", "Supplier Quotation", "Request for Quotation"}
+              "Purchase Receipt", "Material Request", "Supplier Quotation", "Request for Quotation",
+              # U4 (21-11): stock e RH
+              "Stock Entry", "Stock Reconciliation", "Timesheet", "Leave Application", "Expense Claim"}
 
 # Criar o documento seguinte a partir de um submetido (as mesmas funções dos botões «Criar» do ERPNext).
 CRIAR = {
@@ -287,6 +289,74 @@ CRIAR = {
 }
 
 
+_TABELAS = ("items", "taxes", "time_logs", "expenses")
+
+
+def _artigo_basico(r) -> None:
+    """Nome, unidade e conversão de uma linha de artigo, como o ecrã do ERPNext preenche ao escolher o artigo."""
+    if not r.item_code or r.item_name:
+        return
+    i = frappe.db.get_value("Item", r.item_code, ["item_name", "stock_uom", "description"], as_dict=True) or {}
+    r.item_name = i.get("item_name")
+    r.description = r.description or i.get("description")
+    r.stock_uom = i.get("stock_uom")
+    r.uom = r.uom or i.get("stock_uom")
+    r.conversion_factor = r.conversion_factor or 1
+
+
+def _calc_movimento(d) -> None:
+    for r in d.items:
+        _artigo_basico(r)
+        r.transfer_qty = (r.qty or 0) * (r.conversion_factor or 1)
+    d.set_actual_qty()
+    d.calculate_rate_and_amount(raise_error_if_no_rate=False)
+
+
+def _calc_inventario(d) -> None:
+    from erpnext.stock.doctype.stock_reconciliation.stock_reconciliation import get_stock_balance_for
+    for r in d.items:
+        if not (r.item_code and r.warehouse):
+            continue
+        if not r.item_name:
+            r.item_name = frappe.db.get_value("Item", r.item_code, "item_name")
+        b = get_stock_balance_for(r.item_code, r.warehouse, d.posting_date, d.posting_time, company=d.company) or {}
+        r.current_qty = b.get("qty") or 0
+        r.current_valuation_rate = b.get("rate") or 0
+        if r.qty is None or r.qty == "":
+            r.qty = r.current_qty
+        if not r.valuation_rate:
+            r.valuation_rate = r.current_valuation_rate
+        r.amount = (r.qty or 0) * (r.valuation_rate or 0)
+        r.current_amount = r.current_qty * r.current_valuation_rate
+        r.quantity_difference = (r.qty or 0) - r.current_qty
+        r.amount_difference = r.amount - r.current_amount
+
+
+def _calc_horas(d) -> None:
+    d.calculate_hours() if hasattr(d, "calculate_hours") else None
+    d.calculate_total_amounts()
+
+
+def _calc_ausencia(d) -> None:
+    from hrms.hr.doctype.leave_application.leave_application import get_leave_balance_on, get_number_of_leave_days
+    if d.employee and d.leave_type and d.from_date and d.to_date:
+        d.total_leave_days = get_number_of_leave_days(d.employee, d.leave_type, d.from_date, d.to_date,
+                                                      d.half_day, d.half_day_date)
+        saldo = get_leave_balance_on(d.employee, d.leave_type, d.from_date, d.to_date,
+                                     consider_all_leaves_in_the_allocation_period=True, for_consumption=True)
+        d.leave_balance = saldo.get("leave_balance") if isinstance(saldo, dict) else saldo
+
+
+def _calc_despesas(d) -> None:
+    d.calculate_total_amount()
+    if hasattr(d, "calculate_taxes"):
+        d.calculate_taxes()
+
+
+_CALCULO_U4 = {"Stock Entry": _calc_movimento, "Stock Reconciliation": _calc_inventario, "Timesheet": _calc_horas,
+               "Leave Application": _calc_ausencia, "Expense Claim": _calc_despesas}
+
+
 @frappe.whitelist(methods=["POST"])
 def recalcular(doctype: str, dados: str):
     """O documento como ficaria: valores em falta preenchidos e totais calculados. Nunca grava."""
@@ -297,23 +367,26 @@ def recalcular(doctype: str, dados: str):
     dados = json.loads(dados) if isinstance(dados, str) else dados
     dados["doctype"] = doctype
     nomes = {}   # as linhas novas da interface («novo-…») voltam com o mesmo nome, pela posição
-    for t in ("items", "taxes"):
+    for t in _TABELAS:
         nomes[t] = [r.get("name") for r in dados.get(t) or []]
         for r in dados.get(t) or []:
             if str(r.get("name") or "").startswith("novo-"):
                 r.pop("name")
     d = frappe.get_doc(dados)
     try:
-        if hasattr(d, "set_missing_values"):
-            d.set_missing_values(for_validate=True)
-        if hasattr(d, "calculate_taxes_and_totals"):
-            d.calculate_taxes_and_totals()
+        if doctype in _CALCULO_U4:
+            _CALCULO_U4[doctype](d)
+        else:
+            if hasattr(d, "set_missing_values"):
+                d.set_missing_values(for_validate=True)
+            if hasattr(d, "calculate_taxes_and_totals"):
+                d.calculate_taxes_and_totals()
     except frappe.ValidationError as e:
         return {"doc": None, "aviso": str(e)[:300]}
     finally:
         frappe.db.rollback()   # nada do que o ERPNext tenha tocado fica gravado
     out = d.as_dict()
-    for t in ("items", "taxes"):
+    for t in _TABELAS:
         for i, r in enumerate(out.get(t) or []):
             if i < len(nomes.get(t, [])) and str(nomes[t][i] or "").startswith("novo-"):
                 r["name"] = nomes[t][i]
@@ -339,3 +412,84 @@ def criar_de(doctype: str, name: str, destino: str):
         frappe.throw(_("Sem permissão para criar {0}.").format(_(destino)), frappe.PermissionError)
     novo = frappe.get_attr(metodo)(name)
     return {"doc": novo.as_dict()}
+
+
+
+# ── U4: ecrãs Stock e Pessoas (21-11-2026) ─────────────────────────────────────────────────────────────
+@frappe.whitelist()
+def stock_artigo(item_code: str):
+    """Um artigo: stock por armazém (próprio), últimos movimentos e, se houver, o stock dos fornecedores."""
+    _guarda()
+    _ler("Item")
+    if not frappe.db.exists("Item", item_code):
+        frappe.throw(_("Artigo desconhecido."), frappe.DoesNotExistError)
+    art = frappe.get_doc("Item", item_code)
+    art.check_permission("read")
+    bins = frappe.get_list("Bin", filters={"item_code": item_code},
+                           fields=["warehouse", "actual_qty", "reserved_qty", "ordered_qty", "projected_qty",
+                                   "valuation_rate", "stock_value"], order_by="actual_qty desc") \
+        if frappe.has_permission("Bin", "read") else []
+    movs = frappe.get_list("Stock Ledger Entry", filters={"item_code": item_code, "is_cancelled": 0},
+                           fields=["posting_date", "posting_time", "voucher_type", "voucher_no", "warehouse", "actual_qty",
+                                   "qty_after_transaction", "valuation_rate"],
+                           order_by="posting_date desc, posting_time desc, creation desc", limit_page_length=20) \
+        if frappe.has_permission("Stock Ledger Entry", "read") else []
+    ofertas = []
+    if frappe.db.exists("DocType", "Oferta do Fornecedor") and frappe.has_permission("Oferta do Fornecedor", "read"):
+        ofertas = frappe.get_list("Oferta do Fornecedor", filters={"item_code": item_code},
+                                  fields=["supplier", "estado_stock", "quantidade", "quantidade_conhecida", "custo",
+                                          "lida_em", "ausente_desde"])
+    for m in movs:
+        m["voucher_rotulo"] = _(m.voucher_type)
+    return {"artigo": {"item_code": art.item_code, "item_name": art.item_name, "stock_uom": art.stock_uom,
+                       "image": art.image, "is_stock_item": art.is_stock_item},
+            "armazens": bins, "movimentos": movs, "ofertas": ofertas,
+            "total": sum((b.actual_qty or 0) for b in bins), "valor": sum((b.stock_value or 0) for b in bins)}
+
+
+@frappe.whitelist()
+def stock_resumo():
+    """Valor e quantidade por armazém (só os armazéns que a pessoa vê)."""
+    _guarda()
+    if not frappe.has_permission("Bin", "read"):
+        return []
+    acc = {}
+    for b in frappe.get_list("Bin", fields=["warehouse", "actual_qty", "stock_value"], filters={"actual_qty": ["!=", 0]},
+                             limit_page_length=20000):
+        a = acc.setdefault(b.warehouse, {"warehouse": b.warehouse, "artigos": 0, "valor": 0.0})
+        a["artigos"] += 1
+        a["valor"] += b.stock_value or 0
+    return sorted(acc.values(), key=lambda x: -x["valor"])
+
+
+@frappe.whitelist()
+def pessoas():
+    """Diretório, quem está ausente hoje e o saldo de férias de quem está a ver."""
+    _guarda()
+    if not frappe.db.exists("DocType", "Employee") or not frappe.has_permission("Employee", "read"):
+        return {"sem_rh": True}
+    hoje = frappe.utils.today()
+    equipa = frappe.get_list("Employee", filters={"status": "Active"},
+                             fields=["name", "employee_name", "designation", "department", "image", "company_email",
+                                     "cell_number", "user_id"], order_by="employee_name asc", limit_page_length=500)
+    ausentes = []
+    if frappe.db.exists("DocType", "Leave Application") and frappe.has_permission("Leave Application", "read"):
+        ausentes = frappe.get_list("Leave Application",
+                                   filters={"status": "Approved", "docstatus": 1, "from_date": ["<=", hoje], "to_date": [">=", hoje]},
+                                   fields=["employee", "employee_name", "leave_type", "from_date", "to_date"])
+    eu = frappe.db.get_value("Employee", {"user_id": frappe.session.user, "status": "Active"}, "name")
+    saldo = []
+    if eu:
+        try:
+            from hrms.hr.doctype.leave_application.leave_application import get_leave_details
+            det = get_leave_details(eu, hoje) or {}
+            for tipo, v in (det.get("leave_allocation") or {}).items():
+                saldo.append({"tipo": _(tipo), "atribuidos": v.get("total_leaves"), "gozados": v.get("leaves_taken"),
+                              "pendentes": v.get("leaves_pending_approval"), "restam": v.get("remaining_leaves")})
+        except Exception:  # noqa: BLE001 — sem atribuições ou sem acesso: fica sem saldo
+            saldo = []
+    for p in equipa:
+        p["designacao"] = _(p.designation) if p.designation else ""
+    for a in ausentes:
+        a["tipo"] = _(a.leave_type)
+    return {"equipa": equipa, "ausentes_hoje": ausentes, "eu": eu, "saldo": saldo}
