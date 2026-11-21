@@ -39,7 +39,7 @@ ignorados aqui, como no `WHERE` do portal ~6261). Colunas lidas:
     actualizado_em, dados_actualizado_em (datetime — sai `.isoformat()` —
         ou texto já em ISO, que passa como está; None → None)
 
-    ORDEM: a lista tem de vir pela ordem de `ORDER BY produto_ref` da base de
+    ORDEM: a lista tem de vir pela ordem de `ORDER BY produto_ref, fornecedor_id` (21-11) da base de
     origem (no portal, collation en_US.utf8 — diferente da ordem do Python).
     O feed não reordena: a ordem decide a ordem de saída, o «último ganha» de
     um `_matnr_interno` repetido e os empates da fusão (dois fornecedores com
@@ -565,14 +565,15 @@ def gerar_feed(produtos: List[dict], fornecedores: Dict[int, dict], definicoes: 
         crosssell_matnr = it.pop("_crosssell_matnr_tmp", [])
         upsell_matnr = it.pop("_upsell_matnr_tmp", [])
         item_ref = it["ref"]
+        fid_conteudo = it.get("dados_de_fornecedor_id") or it["fornecedor_id"]   # 21-11: corrigido como no portal
         it["cross_sell_refs"] = [
             r for m in crosssell_matnr
-            for r in [_resolver_relacionado(it["fornecedor_id"], m)]
+            for r in [_resolver_relacionado(fid_conteudo, m)]
             if r and r != item_ref
         ]
         it["upsell_refs"] = [
             r for m in upsell_matnr
-            for r in [_resolver_relacionado(it["fornecedor_id"], m)]
+            for r in [_resolver_relacionado(fid_conteudo, m)]
             if r and r != item_ref
         ]
 
@@ -586,8 +587,8 @@ def gerar_feed(produtos: List[dict], fornecedores: Dict[int, dict], definicoes: 
             _por_categoria.setdefault((r["fornecedor_id"], r["categoria_valor"]), []).append(r)
 
     def _candidatos_de(it) -> list:
-        # portal ~6418
-        fid = it["fornecedor_id"]
+        # portal ~6418 — 21-11: a categoria é a do fornecedor do conteúdo (corrigido como no portal)
+        fid = it.get("dados_de_fornecedor_id") or it["fornecedor_id"]
         ids_loja = {str(c) for c in (it.get("categorias_loja_ids") or [])}
         cat_forn = it.get("_categoria_valor_tmp")
         do_fornecedor = _por_categoria.get((fid, cat_forn), []) if cat_forn else []
@@ -654,6 +655,22 @@ def gerar_feed(produtos: List[dict], fornecedores: Dict[int, dict], definicoes: 
             it["upsell_refs"] = [c["produto_ref"] for c in acima[:LIMITE_RELACIONADOS_RECURSO]]
             if it["upsell_refs"]:
                 it["relacionados_por_recurso"] = True
+
+    # 21-11: relacionados que apontavam para referências absorvidas pela fusão vão para a que ficou
+    absorvido = {}
+    for it in itens:
+        for f in it.get("fundidos") or []:
+            absorvido[(f["fornecedor_id"], f["ref"])] = it["ref"]
+    if absorvido:
+        for it in itens:
+            fid_c = it.get("dados_de_fornecedor_id") or it["fornecedor_id"]
+            for campo in ("cross_sell_refs", "upsell_refs"):
+                novos = []
+                for r in it.get(campo) or []:
+                    r2 = absorvido.get((fid_c, r), r)
+                    if r2 != it["ref"] and r2 not in novos:
+                        novos.append(r2)
+                it[campo] = novos
 
     for it in itens:
         it.pop("_categoria_valor_tmp", None)
