@@ -101,7 +101,9 @@ def produto(it, canal, dados: dict) -> dict | None:
     estado = ESTADO_FEED[d["estado"]]
     mesmo_estado = loja.get("estado_stock") == estado
     _por(loja, "estado_stock", estado)
-    if d["quantidade"] is not None:
+    if mesmo_estado and estado != "instock":
+        pass   # fora de stock com o mesmo estado: fica o stock da loja (o portal manda None, não 0)
+    elif d["quantidade"] is not None:
         _por(loja, "stock", d["quantidade"])
     elif not mesmo_estado:
         loja["stock"] = None

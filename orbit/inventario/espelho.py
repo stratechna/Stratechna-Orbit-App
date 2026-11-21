@@ -145,7 +145,7 @@ def _artigo(p: dict, canal, caches: dict) -> str:
     chave = _l(p.get("chave"), 200)
     nome = frappe.db.get_value("Item", {"orbit_chave_importador": chave}, "name")
     doc = frappe.get_doc("Item", nome) if nome else frappe.new_doc("Item")
-    if nome and doc.get("orbit_hash_espelho") == p.get("hash"):
+    if nome and doc.get("orbit_hash_espelho") == p.get("hash") and (doc.get("orbit_dados_loja") or not p.get("loja")):
         return nome   # nada mudou desde a última volta
     if not nome:
         doc.item_code = _codigo_livre(p.get("sku"), chave)
