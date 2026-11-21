@@ -29,13 +29,15 @@ class Expressao(unittest.TestCase):
         self.assertAlmostEqual(motor._aplicar_expressao(100.0, "+5€ +10%"), 115.5)
         self.assertAlmostEqual(motor._aplicar_expressao(100.0, "+2,5%"), 102.5)
 
-    def test_absoluto_so_com_cifrao(self):
-        # Fiel ao portal: a expressão regular «absoluta» acaba em «\\$», que é o
-        # carácter «$» e não o fim do texto. «=123,45$» fixa o preço; «=123,45»
-        # (a sintaxe descrita no comentário do portal) não casa e devolve a base.
-        self.assertEqual(motor._aplicar_expressao(10.0, "=123,45$"), 123.45)
-        self.assertEqual(motor._aplicar_expressao(None, "=123,45$"), 123.45)
-        self.assertEqual(motor._aplicar_expressao(10.0, "=123,45"), 10.0)
+    def test_absoluto(self):
+        # 21-11-2026: «=123,45» fixa o preço (corrigido no portal); «=123,45$» deixa de ser a forma
+        self.assertEqual(motor._aplicar_expressao(10.0, "=123,45"), 123.45)
+        self.assertEqual(motor._aplicar_expressao(None, "=123,45"), 123.45)
+        self.assertEqual(motor._aplicar_expressao(10.0, "= 7"), 7.0)
+
+    def test_dropship_lista(self):
+        self.assertFalse(motor._dropshipping_proibido({"Dropshipping Permitido": ["Não"]}))
+        self.assertTrue(motor._dropshipping_proibido({"Dropshipping Permitido": "Não"}))
 
     def test_escaloes(self):
         linha = {"modo": "escaloes", "escaloes": [

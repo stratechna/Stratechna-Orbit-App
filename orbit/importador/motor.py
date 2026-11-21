@@ -107,7 +107,8 @@ def parametros_push(sync_run_id: Optional[str], finalizar: bool, cobertura_compl
 
 # ── Preços (portal ~2069–2170) ───────────────────────────────────────────
 _RE_EXPRESSAO = re.compile(r"([+-])\s*(\d+(?:[.,]\d+)?)\s*(%|€)")
-_RE_EXPRESSAO_ABSOLUTA = re.compile(r"^\s*=\s*(\d+(?:[.,]\d+)?)\s*\$")
+# 21-11-2026: corrigido no portal e aqui (acabava no carácter «$» e «=123,45» devolvia a base)
+_RE_EXPRESSAO_ABSOLUTA = re.compile(r"^\s*=\s*(\d+(?:[.,]\d+)?)\s*$")
 
 
 def _aplicar_expressao(base: Optional[float], expr: Optional[str]) -> Optional[float]:
@@ -334,7 +335,8 @@ def _dropshipping_proibido(linha: Dict[str, str]) -> bool:
     # portal ~2620
     for campo, valor in linha.items():
         if "dropship" in (campo or "").lower():
-            if (valor or "").strip().lower() in _VALORES_DROPSHIPPING_PROIBIDO:
+            texto_valor = valor if isinstance(valor, str) else ("" if valor is None else str(valor))   # 21-11: listas não derrubam o push
+            if texto_valor.strip().lower() in _VALORES_DROPSHIPPING_PROIBIDO:
                 return True
     return False
 
@@ -689,6 +691,9 @@ def normalizar(linhas: List[dict], ctx: dict, *, parcial: bool, finalizar: bool,
             texto_bruto[chave_pendente] = valor_bruto
             existente_attr = (existente.get("atributos") if filtravel else existente.get("atributos_locais")) or {}
             valor_ja_traduzido = existente_attr.get(chave_armazenamento)
+            if valor_ja_traduzido is None:   # 21-11: o atributo pode ter mudado de lado (local ↔ global)
+                outro_attr = (existente.get("atributos_locais") if filtravel else existente.get("atributos")) or {}
+                valor_ja_traduzido = outro_attr.get(chave_armazenamento)
             destino = atributos if filtravel else atributos_locais
             destino[chave_armazenamento] = _valor_canonico(chave_canonica or chave_armazenamento,
                                                            valor_ja_traduzido or valor_bruto)
@@ -1043,8 +1048,10 @@ def normalizar(linhas: List[dict], ctx: dict, *, parcial: bool, finalizar: bool,
     elif refs_vistas:
         filtro = lambda r, reg: r not in refs_vistas  # noqa: E731
     if filtro is not None and estado_final:
-        total = len(estado_final)
-        casam = [r for r, reg in estado_final.items() if filtro(r, reg)]
+        # 21-11: a perda suspeita mede-se só nos que ainda estavam presentes (como no portal corrigido)
+        presentes = {r: reg for r, reg in estado_final.items() if reg.get("ausente_desde") is None}
+        total = len(presentes)
+        casam = [r for r, reg in presentes.items() if filtro(r, reg)]
         if casam:
             if len(casam) > total * LIMIAR_AUSENCIA_SUSPEITA:
                 ausencia_suspeita = {"ausentes": len(casam), "total": total}
