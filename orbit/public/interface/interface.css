@@ -361,3 +361,42 @@ a.icone-btn{color:var(--ink-2);text-decoration:none}a.icone-btn.ativo{background
 .sino .icone-btn{position:relative}
 .sino-lista{position:absolute;right:0;top:40px;width:360px;max-height:60vh;overflow:auto;z-index:40}
 @media (max-width:900px){.fila{grid-template-columns:1fr}.sino-lista{width:300px}}
+
+/* ── ERP genérico (U1/U2, 21-11-2026) ─────────────────────────────────────────────────────────────── */
+.erp-mod{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;align-items:start}
+.erp-sec-mod{overflow:hidden}
+.erp-itens{display:flex;flex-direction:column;padding:6px 0}
+.erp-itens a{padding:8px 16px;color:var(--ink);text-decoration:none;display:flex;justify-content:space-between;gap:8px}
+.erp-itens a:hover{background:var(--surface-2)}
+.erp-itens .fora,.nav .fora{color:var(--ink-3);font-size:12px}
+.erp-ficha{padding:20px 24px 40px;max-width:1280px}
+.erp-topo{margin-bottom:16px}
+.erp-topo>a.sub{text-decoration:none;display:inline-block;margin-bottom:10px}
+.erp-tit{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.erp-tit .av{width:44px;height:44px;font-size:16px}
+.erp-tit h1{font-size:20px;margin:0}
+.erp-accoes{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.erp-corpo{display:flex;flex-direction:column;gap:16px}
+.erp-sec>header{display:flex;justify-content:space-between;align-items:center}
+.erp-cols{display:grid;gap:4px 24px;padding:14px 16px}
+.erp-campo{margin-bottom:12px;min-width:0}
+.erp-campo>label{display:block;font-size:12px;color:var(--ink-3);margin-bottom:4px}
+.erp-campo>small{display:block;margin-top:3px;font-size:12px}
+.erp-campo input:not([type=checkbox]):not([type=color]),.erp-campo select,.erp-campo textarea,.erp-editor,.erp-ro,.erp-anexo{width:100%;box-sizing:border-box;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:7px 9px}
+.erp-campo input:disabled,.erp-campo select:disabled,.erp-campo textarea:disabled{background:var(--surface-2);color:var(--ink-2)}
+.erp-campo input:focus,.erp-campo select:focus,.erp-campo textarea:focus,.erp-editor:focus{outline:2px solid var(--acao);outline-offset:-1px}
+.erp-editor{min-height:90px;max-height:420px;overflow:auto}
+.erp-ro,.erp-anexo{background:var(--surface-2)}
+.erp-chk{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:14px}
+.obrig{color:var(--acao);margin-left:3px}
+.erp-ligacao{position:relative}
+.erp-ligacao .ir{position:absolute;right:8px;top:50%;transform:translateY(-50%);text-decoration:none;color:var(--ink-3);font-size:13px}
+.erp-ops{position:absolute;z-index:30;left:0;right:0;top:calc(100% + 4px);max-height:280px;overflow:auto;padding:4px 0}
+.erp-ops .linha{padding:7px 10px;cursor:pointer}
+.erp-ops .linha:hover{background:var(--surface-2)}
+.erp-ops small{display:block;color:var(--ink-3);font-size:12px}
+.erp-tabela td{padding:4px 6px;vertical-align:top}
+.erp-tabela td input:not([type=checkbox]),.erp-tabela td select{width:100%;min-width:90px;box-sizing:border-box;font:inherit;border:1px solid transparent;background:transparent;color:var(--ink);border-radius:5px;padding:5px 6px}
+.erp-tabela td input:hover,.erp-tabela td select:hover{border-color:var(--line)}
+.erp-tabela td input:focus,.erp-tabela td select:focus{border-color:var(--acao);outline:none;background:var(--surface)}
+@media (max-width:900px){.erp-cols{grid-template-columns:1fr!important}.erp-ficha{padding:16px}.erp-accoes{margin-left:0;width:100%}}

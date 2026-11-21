@@ -4,7 +4,8 @@ import { createApp, reactive, ref, computed, watch, onMounted, nextTick } from "
 
 // ── API ──────────────────────────────────────────────────────────────────────────────────────────────
 async function api(metodo, args = {}, post = false) {
-  const url = `/api/method/orbit.interface.api.${metodo}`;
+  // «erp.meta» → orbit.interface.erp.meta; sem ponto → orbit.interface.api.<metodo>
+  const url = metodo.includes(".") ? `/api/method/orbit.interface.${metodo}` : `/api/method/orbit.interface.api.${metodo}`;
   const op = { headers: { "X-Frappe-CSRF-Token": window.csrf_token, Accept: "application/json" } };
   let r;
   if (post) {
@@ -1639,9 +1640,281 @@ const AppEmbutida = {
   template: `<div class="embutida" v-if="app"><iframe :src="app.url" allow="camera; microphone; display-capture; fullscreen; clipboard-write; autoplay" :title="app.nome"></iframe></div><div v-else class="vazio">App desconhecida.</div>`,
 };
 
+// ── ERP genérico (U1/U2, 21-11-2026): lista e ficha desenhadas a partir da definição de cada documento ───────
+// O motor é o ERPNext (orbit.interface.erp → get_list / get_doc().save() com as permissões da pessoa).
+const _metas = {};
+async function metaErp(dt) { if (!_metas[dt]) _metas[dt] = await api("erp.meta", { doctype: dt }); return _metas[dt]; }
+const ESTRUTURA = ["Section Break", "Column Break", "Tab Break"];
+const NUMERICOS = ["Int", "Float", "Currency", "Percent"];
+function avaliar(expr, doc) {
+  if (!expr) return true;
+  if (expr.startsWith("eval:")) { try { return !!new Function("doc", "parent", `return (${expr.slice(5)})`)(doc, doc); } catch (e) { return true; } }
+  return !!doc[expr];
+}
+const vazioV = (v) => v === null || v === undefined || v === "" || (Array.isArray(v) && !v.length);
+function textoValor(c, v) {
+  if (vazioV(v)) return "";
+  if (c.fieldtype === "Check") return v ? "✓" : "";
+  if (c.fieldtype === "Select") { const o = (c.opcoes || []).find((x) => x.v === v); return o ? o.r : v; }
+  if (c.fieldtype === "Currency") return new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(v);
+  if (c.fieldtype === "Date") return new Date(v).toLocaleDateString("pt-PT");
+  if (c.fieldtype === "Datetime") return data(v);
+  return String(v);
+}
+const ESTADO_DOC = { 0: ["Rascunho", "ambar"], 1: ["Submetido", "verde"], 2: ["Cancelado", ""] };
+const irErp = (dt, dn) => `#/erp/${encodeURIComponent(dt)}` + (dn ? `/${encodeURIComponent(dn)}` : "");
+
+const ErpModulo = {
+  props: ["barra"],
+  setup(props) {
+    const m = ref(null);
+    onMounted(async () => { m.value = await api("erp.menu", { barra: props.barra }); });
+    const href = (i) => i.tipo === "doc" ? irErp(i.doctype, i.single ? i.doctype : null) : "#/erp-desk/" + encodeURIComponent(i.url);
+    return { m, href };
+  },
+  template: `<div v-if="m" class="pad">
+    <h1>{{ m.titulo }}</h1><div class="sub" style="margin-bottom:16px">Documentos, configuração e relatórios deste módulo</div>
+    <div class="erp-mod">
+      <section v-for="s in m.secoes" :key="s.titulo" class="cartao erp-sec-mod">
+        <header v-if="s.titulo"><b>{{ s.titulo.charAt(0).toUpperCase() + s.titulo.slice(1) }}</b></header>
+        <div class="erp-itens"><a v-for="i in s.itens" :key="i.rotulo" :href="href(i)">{{ i.rotulo }}<span v-if="i.tipo==='desk'" class="fora" title="Ainda no ecrã do ERPNext">↗</span></a></div>
+      </section>
+    </div></div><div v-else class="vazio">A carregar…</div>`,
+};
+
+const ErpLista = {
+  props: ["doctype"],
+  setup(props) {
+    const meta = ref(null); const linhas = ref([]); const mais = ref(false); const q = ref(""); const pagina = ref(0);
+    const colunas = ref([]); const titulo = ref(null); const a = ref(false); const ordem = ref("modified desc"); let tq;
+    const carregar = async (junta = false) => {
+      a.value = true;
+      const r = await api("erp.lista", { doctype: props.doctype, q: q.value, pagina: pagina.value, ordem: ordem.value });
+      linhas.value = junta ? linhas.value.concat(r.linhas) : r.linhas; mais.value = r.mais; colunas.value = r.colunas; titulo.value = r.titulo; a.value = false;
+    };
+    onMounted(async () => { meta.value = await metaErp(props.doctype); if (meta.value.single) { location.replace(irErp(props.doctype, props.doctype)); return; } carregar(); });
+    watch(q, () => { clearTimeout(tq); tq = setTimeout(() => { pagina.value = 0; carregar(); }, 300); });
+    const campo = (f) => (meta.value?.campos || []).find((c) => c.fieldname === f) || { fieldname: f, label: f };
+    const ordenar = (f) => { ordem.value = ordem.value === f + " desc" ? f + " asc" : f + " desc"; pagina.value = 0; carregar(); };
+    const maisLinhas = () => { pagina.value++; carregar(true); };
+    const abrir = (n) => { location.hash = irErp(props.doctype, n); };
+    return { meta, linhas, mais, q, colunas, titulo, a, campo, textoValor, ordenar, ordem, maisLinhas, abrir, irErp, ESTADO_DOC, cor, ini };
+  },
+  template: `<div v-if="meta">
+    <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div><h1>{{ meta.rotulo }}</h1><div class="sub">{{ linhas.length }}{{ mais ? '+' : '' }} registos</div></div>
+      <div style="display:flex;gap:8px"><a v-if="meta.pode.create" class="btn prim" :href="irErp(doctype,'novo')">+ Novo</a></div>
+    </div>
+    <div class="filtros"><input class="filtro" style="border-style:solid;min-width:260px" v-model="q" :placeholder="'Procurar em ' + meta.rotulo.toLowerCase() + '…'"></div>
+    <div class="tabela-wrap"><table>
+      <thead><tr><th @click="ordenar(titulo||'name')" style="cursor:pointer">{{ titulo ? campo(titulo).label : 'Nome' }}</th>
+        <th v-for="c in colunas" :key="c" @click="ordenar(c)" style="cursor:pointer">{{ campo(c).label }}<span v-if="ordem.startsWith(c+' ')">{{ ordem.endsWith('asc') ? ' ↑' : ' ↓' }}</span></th>
+        <th v-if="meta.submetivel">Estado</th></tr></thead>
+      <tbody>
+        <tr v-for="l in linhas" :key="l.name" @click="abrir(l.name)">
+          <td><div class="pessoa"><span class="av" :style="{background:cor(l.name)}">{{ ini(l[titulo]||l.name) }}</span><a :href="irErp(doctype,l.name)" @click.stop>{{ l[titulo] || l.name }}</a></div><small v-if="titulo && l[titulo] && l[titulo]!==l.name" style="color:var(--ink-3)">{{ l.name }}</small></td>
+          <td v-for="c in colunas" :key="c">{{ textoValor(campo(c), l[c]) }}</td>
+          <td v-if="meta.submetivel"><span class="etq" :class="ESTADO_DOC[l.docstatus||0][1]">{{ l.status || ESTADO_DOC[l.docstatus||0][0] }}</span></td>
+        </tr>
+      </tbody></table>
+      <div v-if="!linhas.length && !a" class="vazio">Sem registos.</div>
+    </div>
+    <div v-if="mais" style="text-align:center;margin-bottom:24px"><button class="btn" @click="maisLinhas">Carregar mais</button></div>
+  </div><div v-else class="vazio">A carregar…</div>`,
+};
+
+const ErpLigacao = {
+  props: ["modelValue", "alvo", "ro", "filtros"],
+  emits: ["update:modelValue"],
+  setup(props, { emit }) {
+    const txt = ref(props.modelValue || ""); const ops = ref([]); const aberto = ref(false); let tq;
+    watch(() => props.modelValue, (v) => { if (v !== txt.value) txt.value = v || ""; });
+    const procurar = () => { clearTimeout(tq); tq = setTimeout(async () => { if (!props.alvo) return; ops.value = await api("erp.procurar", { doctype: props.alvo, txt: txt.value }); aberto.value = true; }, 200); };
+    const escolher = (o) => { txt.value = o.v; emit("update:modelValue", o.v); aberto.value = false; };
+    const sair = () => setTimeout(() => { aberto.value = false; if (txt.value !== (props.modelValue || "")) emit("update:modelValue", txt.value || null); }, 150);
+    return { txt, ops, aberto, procurar, escolher, sair, irErp };
+  },
+  template: `<div class="erp-ligacao">
+    <input v-model="txt" :disabled="ro" @focus="procurar" @input="procurar" @blur="sair" autocomplete="off">
+    <a v-if="modelValue && alvo" class="ir" :href="irErp(alvo, modelValue)" title="Abrir">↗</a>
+    <div v-if="aberto && ops.length" class="cartao erp-ops"><div v-for="o in ops" :key="o.v" class="linha" @mousedown.prevent="escolher(o)"><div class="cresce">{{ o.r }}<small v-if="o.d || o.r!==o.v">{{ o.r!==o.v ? o.v : '' }} {{ o.d }}</small></div></div></div>
+  </div>`,
+};
+
+const ErpCampo = {
+  components: { ErpLigacao },
+  props: ["c", "doc", "ro", "compacto"],
+  setup(props) {
+    const v = computed({ get: () => props.doc[props.c.fieldname], set: (x) => { props.doc[props.c.fieldname] = x; } });
+    const dt = computed({ get: () => (props.doc[props.c.fieldname] || "").replace(" ", "T").slice(0, 16), set: (x) => { props.doc[props.c.fieldname] = x ? x.replace("T", " ") + ":00" : null; } });
+    const num = computed({ get: () => props.doc[props.c.fieldname], set: (x) => { props.doc[props.c.fieldname] = x === "" ? null : Number(x); } });
+    const editor = ref(null);
+    onMounted(() => { if (editor.value) editor.value.innerHTML = props.doc[props.c.fieldname] || ""; });
+    const html = (e) => { props.doc[props.c.fieldname] = e.target.innerHTML; };
+    return { v, dt, num, editor, html, textoValor };
+  },
+  template: `
+    <template v-if="c.fieldtype==='Check'"><label class="erp-chk"><input type="checkbox" :checked="!!v" :disabled="ro" @change="v = $event.target.checked ? 1 : 0"> <span v-if="!compacto">{{ c.label }}</span></label></template>
+    <select v-else-if="c.fieldtype==='Select'" v-model="v" :disabled="ro"><option v-for="o in c.opcoes" :key="o.v" :value="o.v">{{ o.r }}</option></select>
+    <ErpLigacao v-else-if="c.fieldtype==='Link'" v-model="v" :alvo="c.options" :ro="ro"/>
+    <ErpLigacao v-else-if="c.fieldtype==='Dynamic Link'" v-model="v" :alvo="doc[c.options]" :ro="ro"/>
+    <input v-else-if="['Int','Float','Currency','Percent'].includes(c.fieldtype)" type="number" :step="c.fieldtype==='Int'?1:'any'" v-model="num" :disabled="ro">
+    <input v-else-if="c.fieldtype==='Date'" type="date" v-model="v" :disabled="ro">
+    <input v-else-if="c.fieldtype==='Datetime'" type="datetime-local" v-model="dt" :disabled="ro">
+    <input v-else-if="c.fieldtype==='Time'" type="time" step="1" v-model="v" :disabled="ro">
+    <input v-else-if="c.fieldtype==='Password'" type="password" v-model="v" :disabled="ro" autocomplete="new-password">
+    <input v-else-if="c.fieldtype==='Color'" type="color" v-model="v" :disabled="ro">
+    <div v-else-if="c.fieldtype==='Text Editor'" ref="editor" class="erp-editor" :contenteditable="!ro" @input="html"></div>
+    <textarea v-else-if="['Small Text','Text','Long Text'].includes(c.fieldtype) && !compacto" v-model="v" :disabled="ro" rows="3"></textarea>
+    <div v-else-if="['Attach','Attach Image'].includes(c.fieldtype)" class="erp-anexo"><a v-if="v" :href="v" target="_blank">{{ String(v).split('/').pop() }}</a><span v-else class="sub">sem ficheiro</span></div>
+    <div v-else-if="c.fieldtype==='Read Only'" class="erp-ro">{{ v }}</div>
+    <input v-else v-model="v" :disabled="ro" :type="c.options==='Email'?'email':c.options==='Phone'?'tel':'text'">`,
+};
+
+const ErpTabela = {
+  components: { ErpCampo },
+  props: ["c", "doc", "filha", "ro"],
+  setup(props) {
+    const linhas = computed(() => props.doc[props.c.fieldname] || (props.doc[props.c.fieldname] = []));
+    const cols = computed(() => {
+      const cs = (props.filha?.campos || []).filter((x) => !ESTRUTURA.includes(x.fieldtype) && !x.hidden && x.fieldtype !== "Table");
+      const lv = cs.filter((x) => x.in_list_view); return (lv.length ? lv : cs).slice(0, 6);
+    });
+    let n = 0;
+    const juntar = () => { linhas.value.push({ name: "novo-" + Date.now() + "-" + (n++), doctype: props.c.options }); };
+    const tirar = (i) => { linhas.value.splice(i, 1); };
+    return { linhas, cols, juntar, tirar };
+  },
+  template: `<div class="erp-tabela">
+    <div class="tabela-wrap" style="margin:0"><table>
+      <thead><tr><th style="width:34px">#</th><th v-for="x in cols" :key="x.fieldname">{{ x.label }}<span v-if="x.reqd" class="obrig">*</span></th><th v-if="!ro" style="width:34px"></th></tr></thead>
+      <tbody><tr v-for="(l,i) in linhas" :key="l.name||i" style="cursor:default">
+        <td class="sub">{{ i+1 }}</td>
+        <td v-for="x in cols" :key="x.fieldname"><ErpCampo :c="x" :doc="l" :ro="ro || x.read_only" compacto="1"/></td>
+        <td v-if="!ro"><button class="icone-btn" title="Tirar linha" @click="tirar(i)">×</button></td>
+      </tr></tbody></table>
+      <div v-if="!linhas.length" class="vazio" style="padding:12px">Sem linhas.</div>
+    </div>
+    <button v-if="!ro" class="btn sm" style="margin-top:8px" @click="juntar">+ Linha</button>
+  </div>`,
+};
+
+const ErpFicha = {
+  components: { ErpCampo, ErpTabela },
+  props: ["doctype", "name"],
+  setup(props) {
+    const meta = ref(null); const doc = ref(null); const novo = ref(false); const podeGravar = ref(true); const sujo = ref(false); const a = ref(false);
+    const aba = ref(0); const fechadas = ref({}); const nomeNovo = ref("");
+    const carregar = async () => {
+      meta.value = await metaErp(props.doctype);
+      const r = await api("erp.documento", { doctype: props.doctype, name: props.name === "novo" ? undefined : props.name });
+      doc.value = r.doc; novo.value = r.novo; podeGravar.value = r.novo ? meta.value.pode.create : r.pode_gravar; sujo.value = false;
+    };
+    onMounted(carregar);
+    watch(doc, (n, o) => { if (o) sujo.value = true; }, { deep: true });
+    const abas = computed(() => {
+      if (!meta.value) return [];
+      const out = []; let ab = { label: "Detalhes", secoes: [], implicita: true }; let sec = null; let col = null;
+      const novaSec = (c) => { sec = { label: c?.label || "", collapsible: c?.collapsible, depends_on: c?.depends_on, colunas: [] }; col = []; sec.colunas.push(col); ab.secoes.push(sec); };
+      for (const c of meta.value.campos) {
+        if (c.fieldtype === "Tab Break") {
+          if ((c.label || "Detalhes") === ab.label && !c.depends_on) { sec = null; continue; }   // separador com o mesmo nome: é o mesmo (campos acrescentados antes do 1.º)
+          if (ab.secoes.some((s) => s.colunas.some((x) => x.length))) out.push(ab); ab = { label: c.label || "Detalhes", secoes: [], depends_on: c.depends_on }; sec = null; continue; }
+        if (c.fieldtype === "Section Break") { novaSec(c); continue; }
+        if (c.fieldtype === "Column Break") { if (!sec) novaSec(null); col = []; sec.colunas.push(col); continue; }
+        if (!sec) novaSec(null);
+        col.push(c);
+      }
+      if (ab.secoes.some((s) => s.colunas.some((x) => x.length))) out.push(ab);
+      // campos soltos antes do 1.º separador (acrescentados pelo Orbit): vão para o fim do separador com o mesmo nome
+      if (out[0]?.implicita) { const i = out.findIndex((t, k) => k > 0 && t.label === out[0].label); if (i > 0) { out[i].secoes.push(...out[0].secoes); out.shift(); } }
+      return out;
+    });
+    const docstatus = computed(() => doc.value?.docstatus || 0);
+    const soLeitura = computed(() => !podeGravar.value || docstatus.value === 2);
+    const roCampo = (c) => soLeitura.value || c.read_only || (docstatus.value === 1 && !c.allow_on_submit) || (c.read_only_depends_on && avaliar(c.read_only_depends_on, doc.value));
+    const obrig = (c) => c.reqd || (c.mandatory_depends_on && avaliar(c.mandatory_depends_on, doc.value));
+    const visivel = (c) => {
+      if (c.hidden || !avaliar(c.depends_on, doc.value)) return false;
+      if (roCampo(c) && !novo.value && vazioV(doc.value[c.fieldname]) && c.fieldtype !== "Table") return false;   // como no ERPNext: só-leitura vazio não aparece
+      return true;
+    };
+    const secVisivel = (s) => avaliar(s.depends_on, doc.value) && s.colunas.some((col) => col.some(visivel));
+    const abaVisivel = (t) => avaliar(t.depends_on, doc.value) && t.secoes.some(secVisivel);
+    const abasVis = computed(() => abas.value.filter(abaVisivel));
+    const tituloDoc = computed(() => { const t = meta.value?.titulo; return (t && doc.value?.[t]) || (novo.value ? "Novo — " + meta.value?.rotulo : doc.value?.name); });
+    const precisaNome = computed(() => novo.value && meta.value && (!meta.value.nomeacao || meta.value.nomeacao.toLowerCase() === "prompt"));
+    const gravar = async () => {
+      const falta = meta.value.campos.filter((c) => !ESTRUTURA.includes(c.fieldtype) && visivel(c) && obrig(c) && vazioV(doc.value[c.fieldname]));
+      if (falta.length) { toast("Falta preencher: " + falta.map((c) => c.label).join(", ")); return; }
+      a.value = true;
+      try {
+        const dados = { ...doc.value }; if (precisaNome.value) dados.__nome = nomeNovo.value;
+        const r = await api("erp.gravar", { doctype: props.doctype, dados: JSON.stringify(dados) }, true);
+        toast("Gravado");
+        if (novo.value || r.doc.name !== props.name) { location.hash = irErp(props.doctype, r.doc.name); return; }
+        doc.value = r.doc; await nextTick(); sujo.value = false;
+      } finally { a.value = false; }
+    };
+    const accao = async (m, pergunta) => {
+      if (pergunta && !confirm(pergunta)) return;
+      a.value = true;
+      try { const r = await api("erp." + m, { doctype: props.doctype, name: doc.value.name }, true);
+        if (m === "apagar") { toast("Apagado"); location.hash = irErp(props.doctype); return; }
+        doc.value = r.doc; await nextTick(); sujo.value = false; toast(m === "submeter" ? "Submetido" : "Cancelado");
+      } finally { a.value = false; }
+    };
+    const aberta = (s, i) => !(s.collapsible && !fechadas.value[i + ":" + s.label]);
+    const alternar = (s, i) => { fechadas.value[i + ":" + s.label] = !fechadas.value[i + ":" + s.label]; };
+    return { meta, doc, novo, sujo, a, aba, abasVis, visivel, roCampo, obrig, secVisivel, tituloDoc, gravar, accao, docstatus, soLeitura, aberta, alternar, ESTADO_DOC, irErp, precisaNome, nomeNovo, cor, ini };
+  },
+  template: `<div v-if="meta && doc" class="erp-ficha">
+    <div class="erp-topo">
+      <a class="sub" :href="irErp(doctype)" v-if="!meta.single">← {{ meta.rotulo }}</a>
+      <div class="erp-tit"><span class="av" :style="{background:cor(doc.name||'n')}">{{ ini(tituloDoc) }}</span>
+        <div class="cresce"><h1>{{ tituloDoc }}</h1><div class="sub">{{ meta.rotulo }}<span v-if="!novo && tituloDoc!==doc.name"> · {{ doc.name }}</span></div></div>
+        <span v-if="meta.submetivel && !novo" class="etq" :class="ESTADO_DOC[docstatus][1]">{{ doc.status || ESTADO_DOC[docstatus][0] }}</span>
+        <span v-if="sujo" class="etq ambar">Por gravar</span>
+        <div class="erp-accoes">
+          <button v-if="!soLeitura && (novo || sujo)" class="btn prim" :disabled="a" @click="gravar">Gravar</button>
+          <button v-if="meta.pode.submit && docstatus===0 && !novo && !sujo" class="btn" :disabled="a" @click="accao('submeter','Submeter este documento? Depois de submetido só se altera cancelando.')">Submeter</button>
+          <button v-if="meta.pode.cancel && docstatus===1" class="btn" :disabled="a" @click="accao('cancelar','Cancelar este documento?')">Cancelar</button>
+          <button v-if="meta.pode.delete && !novo && docstatus!==1 && !meta.single" class="btn" :disabled="a" @click="accao('apagar','Apagar definitivamente este registo?')">Apagar</button>
+        </div>
+      </div>
+      <div v-if="precisaNome" class="erp-campo" style="max-width:420px;margin-top:10px"><label>Nome do registo<span class="obrig">*</span></label><input v-model="nomeNovo"></div>
+      <div class="vistas" v-if="abasVis.length>1" style="padding:12px 0 0"><button v-for="(t,i) in abasVis" :key="t.label+i" :class="{ativo: aba===i}" @click="aba=i">{{ t.label }}</button></div>
+    </div>
+    <div class="erp-corpo" v-if="abasVis[aba]">
+      <template v-for="(s,si) in abasVis[aba].secoes" :key="si">
+        <section v-if="secVisivel(s)" class="cartao erp-sec">
+          <header v-if="s.label" @click="s.collapsible && alternar(s,si)" :style="{cursor: s.collapsible?'pointer':'default'}"><b>{{ s.label }}</b><span v-if="s.collapsible" class="sub">{{ aberta(s,si) ? '▾' : '▸' }}</span></header>
+          <div v-show="aberta(s,si)" class="erp-cols" :style="{gridTemplateColumns: 'repeat(' + s.colunas.filter(c=>c.some(visivel)).length + ', minmax(0,1fr))'}">
+            <div v-for="(col,ci) in s.colunas.filter(c=>c.some(visivel))" :key="ci">
+              <template v-for="c in col" :key="c.fieldname">
+                <div v-if="visivel(c)" class="erp-campo" :class="{largo: c.fieldtype==='Table'}">
+                  <label v-if="c.fieldtype!=='Check'">{{ c.label }}<span v-if="obrig(c)" class="obrig">*</span></label>
+                  <ErpTabela v-if="c.fieldtype==='Table'" :c="c" :doc="doc" :filha="meta.filhas[c.options]" :ro="roCampo(c)"/>
+                  <ErpCampo v-else :c="c" :doc="doc" :ro="roCampo(c)"/>
+                  <small v-if="c.descricao" class="sub">{{ c.descricao }}</small>
+                </div>
+              </template>
+            </div>
+          </div>
+        </section>
+      </template>
+    </div>
+  </div><div v-else class="vazio">A carregar…</div>`,
+};
+
+const ErpDesk = {
+  props: ["url"],
+  template: `<div class="embutida"><iframe :src="url" title="ERPNext"></iframe></div>`,
+};
+
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, Calendario, DefLista, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpDesk, Calendario, DefLista, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -1679,7 +1952,7 @@ const App = {
         <a v-else :href="'#/'+n[0]" style="text-decoration:none"><button :class="{ativo: ecra===n[0] || (n[0]==='contactos'&&ecra==='contacto') || (n[0]==='negocios'&&ecra==='negocio') || (n[0]==='empresas'&&ecra==='empresa') || (n[0]==='leads'&&ecra==='lead') || (n[0]==='projetos'&&ecra==='projeto') || (n[0]==='tarefas'&&ecra==='fila')}" tabindex="-1"><Icone :n="n[1]"/>{{ n[2] }}<span class="conta" v-if="n[0]==='caixa' && ctx.contadores.tickets">{{ ctx.contadores.tickets }}</span></button></a>
       </template>
       <template v-for="g in ['Gestão','Recursos Humanos']" :key="g"><template v-if="(ctx.modulos||[]).some(m=>m.grupo===g)"><h6>{{ g }}</h6>
-      <a v-for="m in ctx.modulos.filter(m=>m.grupo===g)" :key="m.url" :href="m.url" target="_blank" style="text-decoration:none"><button tabindex="-1"><Icone n="grelha"/>{{ m.nome }}<span class="fora">↗</span></button></a></template></template>
+      <a v-for="m in ctx.modulos.filter(m=>m.grupo===g)" :key="m.url" :href="m.barra ? '#/erp-m/'+encodeURIComponent(m.barra) : m.url" :target="m.barra ? null : '_blank'" style="text-decoration:none"><button tabindex="-1" :class="{ativo: ecra==='erp-m' && partes[1]===m.barra}"><Icone n="grelha"/>{{ m.nome }}<span class="fora" v-if="!m.barra">↗</span></button></a></template></template>
       <h6>Apps</h6>
       <a v-for="a in ctx.apps" :key="a.nome" :href="EMBUTIDAS.includes(a.nome) ? '#/app/'+a.nome : a.url" :target="EMBUTIDAS.includes(a.nome) ? null : '_blank'" style="text-decoration:none"><button tabindex="-1" :class="{ativo: ecra==='app' && partes[1]===a.nome}"><Icone :n="a.icone"/>{{ a.nome }}<span class="fora" v-if="!EMBUTIDAS.includes(a.nome)">↗</span></button></a>
       <a href="/crm" style="text-decoration:none"><button tabindex="-1"><Icone n="antigo"/>CRM clássico</button></a>
@@ -1718,6 +1991,10 @@ const App = {
         <Projeto v-else-if="ecra==='projeto'" :nome="partes[1]" :key="partes[1]"/>
         <Calendario v-else-if="ecra==='calendario'" :nova="partes[1]==='nova'" :ref-dt="partes[2]" :ref-dn="partes[3]" :key="rotaCal"/>
         <AppEmbutida v-else-if="ecra==='app'" :nome="partes[1]" :key="partes[1]"/>
+        <ErpModulo v-else-if="ecra==='erp-m'" :barra="partes[1]" :key="'m'+partes[1]"/>
+        <ErpLista v-else-if="ecra==='erp' && !partes[2]" :doctype="partes[1]" :key="'l'+partes[1]"/>
+        <ErpFicha v-else-if="ecra==='erp'" :doctype="partes[1]" :name="partes[2]" :key="'f'+partes[1]+'/'+partes[2]"/>
+        <ErpDesk v-else-if="ecra==='erp-desk'" :url="partes.slice(1).join('/')" :key="'d'+partes.slice(1).join('/')"/>
         <div v-else class="vazio">Página desconhecida. <a href="#/inicio">Início</a></div>
       </main>
     </div>

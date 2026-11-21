@@ -115,7 +115,9 @@ def _modulos():
                 url = d.link
             else:
                 url = "/desk/" + (d.link_to or nome).lower().replace(" & ", "-").replace(" ", "-")
-            out.append({"nome": pt, "url": url, "grupo": grupo})
+            # 21-11 (U1): a barra lateral do módulo no Frappe 16 — a interface desenha o menu a partir dela
+            out.append({"nome": pt, "url": url, "grupo": grupo,
+                        "barra": (d.link_to or nome) if d.link_type == "Workspace Sidebar" else None})
     return out
 
 
