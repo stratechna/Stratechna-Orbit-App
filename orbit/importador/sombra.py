@@ -116,3 +116,30 @@ def receber_ficheiro(acao: str, caminho: str) -> dict:
     with gzip.open(caminho, "rt", encoding="utf-8") as f:
         dados = json.load(f)
     return semear(dados) if acao == "semear" else push(dados)
+
+
+# ── F5.4: o Orbit como motor (sem estado próprio) ──────────────────────────────────────────────────────
+def calcular(dados: dict) -> dict:
+    """Um push calculado pelo motor do Orbit com o estado que o PORTAL manda (`ctx.existentes`). Não grava nada:
+    o portal grava o resultado nas suas tabelas, para que tudo o que vem depois (feed, Sync3, IA) fique igual."""
+    ctx = dict(dados["ctx"])
+    ctx["agora"] = _dt(ctx.get("agora")) or datetime.now(timezone.utc)
+    linhas = motor.converter_linhas_push(dados.get("linhas") or [])
+    finalizar, cobertura = motor.parametros_push(ctx.get("sync_run_id"), bool(dados.get("finalizar")),
+                                                 bool(dados.get("cobertura_completa")))
+    res = motor.normalizar(linhas, ctx, parcial=bool(dados.get("parcial")), finalizar=finalizar,
+                           cobertura_completa=cobertura)
+    return {"ok": True, "linhas": res["linhas"], "ausentes": res["ausentes"], "ignoradas": res["ignoradas"],
+            "resumo": res["resumo"]}
+
+
+def calcular_ficheiro(entrada: str, saida: str) -> dict:
+    padrao = r"/tmp/orbit-sombra-[A-Za-z0-9_-]+\.json\.gz"
+    if not (re.fullmatch(padrao, entrada or "") and re.fullmatch(padrao, saida or "")):
+        return {"ok": False, "erro": "caminho inválido"}
+    with gzip.open(entrada, "rt", encoding="utf-8") as f:
+        dados = json.load(f)
+    r = calcular(dados)
+    with gzip.open(saida, "wt", encoding="utf-8") as f:
+        json.dump(r, f, ensure_ascii=False, default=str)
+    return {"ok": True, "linhas": len(r["linhas"])}
