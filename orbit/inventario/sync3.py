@@ -114,8 +114,8 @@ def produto(it, canal, dados: dict) -> dict | None:
         loja["prazo_entrega"] = None if not mesmo_estado else loja.get("prazo_entrega")
     if loja.get("estado_stock_com_preco") and not loja.get("preco_sob_consulta"):
         loja["estado_stock_com_preco"] = loja["estado_stock"]
-    if it.orbit_fabricante:
-        _por(loja, "marca", it.orbit_fabricante)
+    if it.orbit_fabricante and it.orbit_fabricante.casefold() != str(loja.get("marca") or "").casefold():
+        loja["marca"] = it.orbit_fabricante   # «NTS Japan» e «Nts Japan» são o mesmo fabricante: fica a grafia da loja
     for campo, valor in (("peso", it.weight_per_unit), ("comprimento", it.orbit_comprimento),
                          ("largura", it.orbit_largura), ("altura", it.orbit_altura)):
         if valor:
