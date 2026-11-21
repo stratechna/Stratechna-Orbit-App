@@ -102,7 +102,7 @@
    "label": "A loja recebe do",
    "options": "Portal\nOrbit",
    "default": "Portal",
-   "description": "Portal: como hoje. Orbit: a Sync3 lê do inventário (F3, só depois de comparado)."
+   "description": "Portal: como hoje. Orbit: a Sync3 lê os produtos do inventário (F3). O interruptor está no portal (inventario_espelho.ligar_sync3); aqui mostra-se o estado.", "read_only": 1
   },
   {
    "fieldname": "conta_importador",

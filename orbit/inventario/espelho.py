@@ -114,6 +114,8 @@ def _canal(c: dict) -> "frappe.model.document.Document":
                               "fonte_sync3": "Portal"}).insert(ignore_permissions=True)
     if c.get("conta") and doc.conta_importador != _l(c["conta"], 40):
         doc.db_set("conta_importador", _l(c["conta"], 40), update_modified=False)
+    if c.get("fonte_sync3") in ("Portal", "Orbit") and doc.fonte_sync3 != c["fonte_sync3"]:
+        doc.db_set("fonte_sync3", c["fonte_sync3"], update_modified=False)   # o interruptor está no portal (F3)
     return doc
 
 
