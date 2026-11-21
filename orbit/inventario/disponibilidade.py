@@ -42,28 +42,30 @@ def _fornecedores(item_code: str) -> list:
     return out
 
 
-def calcular(item_code: str, canal: str) -> dict:
-    """{quantidade, estado: Em stock|Sob encomenda|Esgotado, prazo, fonte: próprio|fornecedor|nenhuma}."""
-    c = frappe.get_cached_doc("Canal de Venda", canal)
-    proprio = _proprio(item_code, [a.warehouse for a in c.armazens])
+def decidir(proprio: float, ofertas: list, modo: str) -> dict:
+    """A regra da §4.2 sem acesso à base: `ofertas` já filtradas, cada uma {qtd, fresca, estado, prazo}."""
     if proprio > 0:
         return {"quantidade": proprio, "estado": "Em stock", "prazo": None, "fonte": "próprio"}
-    if c.modo_stock == MODO_SO_PROPRIO:
+    if modo == MODO_SO_PROPRIO:
         return {"quantidade": 0, "estado": "Esgotado", "prazo": None, "fonte": "nenhuma"}
-    melhores = [f for f in _fornecedores(item_code) if f.fresca]
-    com_qtd = [f for f in melhores if f.qtd]
+    frescas = [f for f in ofertas if f["fresca"]]
+    com_qtd = [f for f in frescas if f["qtd"]]
     if com_qtd:
-        f = max(com_qtd, key=lambda x: x.qtd)
-        return {"quantidade": f.qtd, "estado": "Em stock", "prazo": f.prazo, "fonte": "fornecedor"}
-    # quantidade desconhecida mas o fornecedor diz que tem (fresco) → em stock sem número
-    em_stock = [f for f in melhores if f.qtd is None and f.estado == "Em stock"]
+        f = max(com_qtd, key=lambda x: x["qtd"])
+        return {"quantidade": f["qtd"], "estado": "Em stock", "prazo": f["prazo"], "fonte": "fornecedor"}
+    em_stock = [f for f in frescas if f["qtd"] is None and f["estado"] == "Em stock"]
     if em_stock:
-        return {"quantidade": None, "estado": "Em stock", "prazo": em_stock[0].prazo, "fonte": "fornecedor"}
-    if any(f.estado == "Sob encomenda" for f in melhores) or _fornecedores_sob_encomenda(item_code):
+        return {"quantidade": None, "estado": "Em stock", "prazo": em_stock[0]["prazo"], "fonte": "fornecedor"}
+    if any(f["estado"] == "Sob encomenda" for f in ofertas):
         return {"quantidade": 0, "estado": "Sob encomenda", "prazo": None, "fonte": "fornecedor"}   # sem prazo (regra)
     return {"quantidade": 0, "estado": "Esgotado", "prazo": None, "fonte": "nenhuma"}
 
 
-def _fornecedores_sob_encomenda(item_code: str) -> bool:
-    return bool(frappe.db.exists("Oferta do Fornecedor", {"item_code": item_code, "activa": 1,
-                                                         "estado_stock": "Sob encomenda", "ausente_desde": ["is", "not set"]}))
+def calcular(item_code: str, canal: str) -> dict:
+    """{quantidade, estado: Em stock|Sob encomenda|Esgotado, prazo, fonte: próprio|fornecedor|nenhuma}."""
+    c = frappe.get_cached_doc("Canal de Venda", canal)
+    proprio = _proprio(item_code, [a.warehouse for a in c.armazens])
+    ofertas = [{"qtd": f.qtd, "fresca": f.fresca, "estado": f.estado, "prazo": f.prazo} for f in _fornecedores(item_code)]
+    return decidir(proprio, ofertas, c.modo_stock)
+
+

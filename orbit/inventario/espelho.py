@@ -177,6 +177,8 @@ def _artigo(p: dict, canal, caches: dict) -> str:
         if not dono or dono == doc.name:
             doc.append("barcodes", {"barcode": ean})
     doc.disabled = 0 if p.get("publicacao") in (None, "", "publicado") else 1
+    if isinstance(p.get("loja"), dict):
+        doc.orbit_dados_loja = json.dumps(p["loja"], ensure_ascii=False, default=str)
     doc.orbit_hash_espelho = _l(p.get("hash"), 64)
     doc.flags.ignore_permissions = True
     doc.flags.orbit_espelho = True

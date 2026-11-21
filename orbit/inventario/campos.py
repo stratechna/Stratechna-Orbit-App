@@ -27,8 +27,11 @@ ITEM = [
     {"fieldname": "orbit_imagens", "fieldtype": "Long Text", "label": "Imagens (endereços)",
      "insert_after": "orbit_categorias_loja", "read_only": 1, "no_copy": 1,
      "description": "Endereços alojados, um por linha — as galerias não entram nos ficheiros do Orbit."},
+    {"fieldname": "orbit_dados_loja", "fieldtype": "Long Text", "label": "Produto na loja (feed)",
+     "insert_after": "orbit_imagens", "hidden": 1, "read_only": 1, "no_copy": 1,
+     "description": "O produto tal como o importador o leva à loja — base do feed do Orbit (F2)."},
     {"fieldname": "orbit_hash_espelho", "fieldtype": "Data", "label": "Assinatura do espelho",
-     "insert_after": "orbit_imagens", "hidden": 1, "read_only": 1, "no_copy": 1},
+     "insert_after": "orbit_dados_loja", "hidden": 1, "read_only": 1, "no_copy": 1},
 ]
 
 SUPPLIER = [
