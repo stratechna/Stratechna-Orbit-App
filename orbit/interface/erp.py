@@ -87,11 +87,9 @@ def menu(barra: str):
             atual["itens"].append({"tipo": "doc", "rotulo": _(i.label or i.link_to), "doctype": i.link_to,
                                    "single": frappe.get_meta(i.link_to).issingle, "icone": i.icon})
         elif i.link_type == "Report":
+            # U5 (21-11): os relatórios abrem na interface (#/erp-rel/<nome>)
             if frappe.db.exists("Report", i.link_to) and frappe.has_permission("Report", "read"):
-                atual["itens"].append({"tipo": "desk", "rotulo": _(i.label or i.link_to),
-                                       "url": "/desk/query-report/" + i.link_to if frappe.db.get_value("Report", i.link_to, "report_type") != "Report Builder"
-                                       else "/desk/" + frappe.scrub(frappe.db.get_value("Report", i.link_to, "ref_doctype") or "").replace("_", "-") + "/view/report",
-                                       "icone": i.icon})
+                atual["itens"].append({"tipo": "rel", "rotulo": _(i.label or i.link_to), "relatorio": i.link_to, "icone": i.icon})
         elif i.link_type == "Page":
             atual["itens"].append({"tipo": "desk", "rotulo": _(i.label or i.link_to), "url": "/desk/" + i.link_to, "icone": i.icon})
         elif i.link_type == "URL" and i.url:
@@ -493,3 +491,117 @@ def pessoas():
     for a in ausentes:
         a["tipo"] = _(a.leave_type)
     return {"equipa": equipa, "ausentes_hoje": ausentes, "eu": eu, "saldo": saldo}
+
+
+# ── U5: relatórios e cartões de número (21-11-2026) ────────────────────────────────────────────────────
+# O motor é o do ERPNext (frappe.desk.query_report.run); a interface desenha filtros, resumo, gráfico e tabela.
+MAX_LINHAS_RELATORIO = 3000
+
+
+def _relatorio_permitido(nome: str):
+    if not frappe.db.exists("Report", nome):
+        frappe.throw(_("Relatório desconhecido."), frappe.DoesNotExistError)
+    r = frappe.get_doc("Report", nome)
+    if not r.is_permitted():
+        frappe.throw(_("Sem acesso a este relatório."), frappe.PermissionError)
+    return r
+
+
+@frappe.whitelist()
+def relatorio_meta(nome: str):
+    """O script do relatório (os filtros estão nele, como no ERPNext), o ficheiro partilhado das demonstrações
+    financeiras quando é preciso, e os valores por omissão da pessoa (empresa, ano fiscal, moeda)."""
+    _guarda()
+    r = _relatorio_permitido(nome)
+    if r.report_type == "Report Builder":
+        return {"tipo": "builder", "doctype": r.ref_doctype, "rotulo": _(r.name)}
+    from frappe.desk.query_report import get_script
+    sc = get_script(nome) or {}
+    script = sc.get("script") or ""
+    partilhado = ""
+    if "erpnext.financial_statements" in script:
+        try:
+            with open(frappe.get_app_path("erpnext", "public", "js", "financial_statements.js")) as f:
+                partilhado = f.read()
+        except OSError:
+            partilhado = ""
+    empresa = frappe.defaults.get_user_default("Company") or frappe.defaults.get_global_default("company") \
+        or frappe.db.get_value("Company", {}, "name")
+    ano, ano_ini, ano_fim = None, None, None
+    try:
+        from erpnext.accounts.utils import get_fiscal_year
+        fy = get_fiscal_year(frappe.utils.today(), company=empresa)
+        ano, ano_ini, ano_fim = fy[0], str(fy[1]), str(fy[2])
+    except Exception:  # noqa: BLE001 — sem ano fiscal configurado: fica vazio
+        ano = None
+    import re as _re
+    textos = set(_re.findall(r'__\(\s*["\']([^"\']{1,120})["\']', script + partilhado))
+    for bloco in _re.findall(r'options:\s*\[([^\]]{0,600})\]', script + partilhado):   # escolhas sem __()
+        textos.update(_re.findall(r'["\']([^"\']{1,60})["\']', bloco))
+    return {"tipo": r.report_type, "rotulo": _(r.name), "script": script, "partilhado": partilhado,
+            "traducoes": {t: _(t) for t in textos},
+            "omissao": {"company": empresa, "fiscal_year": ano, "ano_inicio": ano_ini, "ano_fim": ano_fim,
+                        "currency": frappe.db.get_value("Company", empresa, "default_currency") if empresa else "EUR",
+                        "today": frappe.utils.today()}}
+
+
+def _colunas(cols: list) -> list:
+    out = []
+    for c in cols or []:
+        if isinstance(c, str):   # forma antiga «Rótulo:Tipo/Opções:Largura»
+            partes = c.split(":")
+            tipo, opcoes = (partes[1].split("/") + [None])[:2] if len(partes) > 1 else ("Data", None)
+            c = {"label": partes[0], "fieldtype": tipo or "Data", "options": opcoes, "fieldname": frappe.scrub(partes[0])}
+        out.append({"fieldname": c.get("fieldname") or frappe.scrub(c.get("label") or ""), "label": _(c.get("label") or ""),
+                    "fieldtype": c.get("fieldtype") or "Data", "options": c.get("options"), "width": c.get("width")})
+    return out
+
+
+@frappe.whitelist(methods=["POST"])
+def relatorio(nome: str, filtros: str = None):
+    _guarda()
+    _relatorio_permitido(nome)
+    from frappe.desk.query_report import run
+    f = json.loads(filtros) if isinstance(filtros, str) and filtros else (filtros or {})
+    r = run(report_name=nome, filters=f, ignore_prepared_report=True, are_default_filters=False) or {}
+    cols = _colunas(r.get("columns"))
+    linhas = []
+    for row in (r.get("result") or [])[:MAX_LINHAS_RELATORIO]:
+        if isinstance(row, (list, tuple)):
+            row = {cols[i]["fieldname"]: v for i, v in enumerate(row) if i < len(cols)}
+        linhas.append(row)
+    resumo = [{"rotulo": _(s.get("label") or ""), "valor": s.get("value"), "tipo": s.get("datatype"),
+               "cor": s.get("indicator")} for s in (r.get("report_summary") or []) if isinstance(s, dict)]
+    return {"colunas": cols, "linhas": linhas, "cortado": len(r.get("result") or []) > MAX_LINHAS_RELATORIO,
+            "grafico": r.get("chart"), "resumo": resumo, "mensagem": r.get("message"),
+            "total": bool(r.get("add_total_row"))}
+
+
+@frappe.whitelist()
+def numeros(barra: str):
+    """Os cartões de número do painel do módulo (os mesmos da secretária do ERPNext), já calculados."""
+    _guarda()
+    if not frappe.db.exists("Workspace", barra):
+        return []
+    from frappe.desk.doctype.number_card.number_card import get_result
+    out = []
+    for nc in frappe.get_doc("Workspace", barra).number_cards or []:
+        nome = nc.number_card_name
+        if not nome or not frappe.db.exists("Number Card", nome):
+            continue
+        card = frappe.get_doc("Number Card", nome)
+        try:
+            if card.type == "Document Type":
+                if not frappe.has_permission(card.document_type, "read"):
+                    continue
+                valor = get_result(card.as_dict(), card.filters_json or "[]")
+                tipo = "Currency" if card.function in ("Sum", "Average") and card.aggregate_function_based_on else "Int"
+            elif card.type == "Custom" and card.method:
+                res = frappe.get_attr(card.method)(json.loads(card.filters_json or "{}")) or {}
+                valor, tipo = res.get("value"), res.get("fieldtype") or "Int"
+            else:
+                continue
+        except Exception:  # noqa: BLE001 — um cartão com problema não estraga o painel
+            continue
+        out.append({"rotulo": _(nc.label or card.label or nome), "valor": valor, "tipo": tipo, "cor": card.color})
+    return out[:8]

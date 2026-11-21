@@ -1667,13 +1667,15 @@ const irErp = (dt, dn) => `#/erp/${encodeURIComponent(dt)}` + (dn ? `/${encodeUR
 const ErpModulo = {
   props: ["barra"],
   setup(props) {
-    const m = ref(null);
-    onMounted(async () => { m.value = await api("erp.menu", { barra: props.barra }); });
-    const href = (i) => i.tipo === "doc" ? irErp(i.doctype, i.single ? i.doctype : null) : "#/erp-desk/" + encodeURIComponent(i.url);
-    return { m, href };
+    const m = ref(null); const nums = ref([]);
+    onMounted(async () => { m.value = await api("erp.menu", { barra: props.barra }); nums.value = await api("erp.numeros", { barra: props.barra }).catch(() => []); });
+    const href = (i) => i.tipo === "doc" ? irErp(i.doctype, i.single ? i.doctype : null) : i.tipo === "rel" ? "#/erp-rel/" + encodeURIComponent(i.relatorio) : "#/erp-desk/" + encodeURIComponent(i.url);
+    const valorN = (n) => n.tipo === "Currency" ? new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(n.valor || 0) : new Intl.NumberFormat("pt-PT").format(n.valor || 0);
+    return { m, href, nums, valorN };
   },
   template: `<div v-if="m" class="pad">
     <h1>{{ m.titulo }}</h1><div class="sub" style="margin-bottom:16px">Documentos, configuração e relatórios deste módulo</div>
+    <div v-if="nums.length" class="erp-numeros"><div v-for="n in nums" :key="n.rotulo" class="cartao"><small>{{ n.rotulo }}</small><b>{{ valorN(n) }}</b></div></div>
     <div class="erp-mod">
       <section v-for="s in m.secoes" :key="s.titulo" class="cartao erp-sec-mod">
         <header v-if="s.titulo"><b>{{ s.titulo.charAt(0).toUpperCase() + s.titulo.slice(1) }}</b></header>
@@ -2039,6 +2041,127 @@ const ErpPessoas = {
   </div><div v-else class="vazio">A carregar…</div>`,
 };
 
+// U5: os filtros de cada relatório estão no script dele (como no ERPNext). Avaliam-se num ambiente mínimo,
+// só com o que os scripts usam (datas, valores por omissão, $.extend); tudo o resto é inerte.
+function filtrosDoRelatorio(nome, m) {
+  const o = m.omissao || {}; const hoje = o.today || new Date().toISOString().slice(0, 10);
+  const d0 = (s) => new Date(String(s || hoje).slice(0, 10) + "T00:00:00");
+  const iso = (x) => x.toISOString().slice(0, 10);
+  const dt = { get_today: () => hoje, nowdate: () => hoje, now_date: () => hoje, now_datetime: () => hoje + " 00:00:00", get_time: () => "00:00:00",
+    add_months: (s, n) => { const x = d0(s); x.setMonth(x.getMonth() + Number(n)); return iso(x); },
+    add_days: (s, n) => { const x = d0(s); x.setDate(x.getDate() + Number(n)); return iso(x); },
+    month_start: (s) => (s || hoje).slice(0, 8) + "01", month_end: (s) => { const x = d0(s); return iso(new Date(x.getFullYear(), x.getMonth() + 1, 0, 12)); },
+    year_start: (s) => (s || hoje).slice(0, 4) + "-01-01", year_end: (s) => (s || hoje).slice(0, 4) + "-12-31",
+    str_to_user: (x) => x, user_to_str: (x) => x, get_diff: (a, b) => Math.round((d0(a) - d0(b)) / 864e5) };
+  const omissao = (k) => ({ company: o.company, Company: o.company, fiscal_year: o.fiscal_year, "Fiscal Year": o.fiscal_year, currency: o.currency, Currency: o.currency })[k] ?? "";
+  const inerte = new Proxy(function () {}, { get: (t, k) => (k === Symbol.toPrimitive ? () => "" : inerte), apply: () => inerte });
+  const comFolga = (obj) => new Proxy(obj, { get: (t, k) => (k in t ? t[k] : inerte), set: (t, k, v) => { t[k] = v; return true; } });
+  const frappe = comFolga({ query_reports: {}, datetime: dt, defaults: { get_user_default: omissao, get_default: omissao, get_global_default: omissao },
+    boot: comFolga({ sysdefaults: { company: o.company, currency: o.currency }, party_account_types: {} }), sys_defaults: { company: o.company },
+    user: comFolga({ has_role: () => true }), session: { user: "" } });
+  const anoFiscal = (d, comDatas) => (comDatas ? [o.fiscal_year, o.ano_inicio, o.ano_fim] : o.fiscal_year);
+  const erpnext = comFolga({ utils: comFolga({ get_fiscal_year: anoFiscal, add_dimensions: () => {} }) });
+  const $ = { extend: (...a) => Object.assign(...a) };
+  const __ = (t) => (m.traducoes && m.traducoes[t]) || t;
+  new Function("frappe", "erpnext", "__", "$", "moment", "window", "document", (m.partilhado || "") + "\n;\n" + (m.script || ""))(frappe, erpnext, __, $, inerte, inerte, inerte);
+  const rep = frappe.query_reports[nome];
+  if (!rep || !Array.isArray(rep.filters)) throw new Error("sem filtros");
+  return rep.filters.filter((f) => f && f.fieldname).map((f) => {
+    let def = f.default; if (typeof def === "function") { try { def = def(); } catch (e) { def = undefined; } }
+    if (Array.isArray(def)) def = def[0];   // «default: ["Fiscal Year"]» nas demonstrações financeiras
+    // o ERPNext preenche estes ao abrir o ecrã (onload); aqui ficam com o ano fiscal corrente
+    if (def === undefined || def === "") def = ({ fiscal_year: o.fiscal_year, from_fiscal_year: o.fiscal_year, to_fiscal_year: o.fiscal_year,
+      period_start_date: o.ano_inicio, period_end_date: o.ano_fim })[f.fieldname] ?? def;
+    let opcoes = null;
+    if (f.fieldtype === "Select") { const ops = Array.isArray(f.options) ? f.options : String(f.options || "").split("\n");
+      opcoes = ops.map((x) => (typeof x === "object" && x ? { v: x.value, r: __(x.label || x.value) } : { v: x, r: __(x) })); }
+    return { fieldname: f.fieldname, label: __(f.label || f.fieldname), fieldtype: ["MultiSelectList", "Autocomplete", "Dynamic Link"].includes(f.fieldtype) ? "Data" : f.fieldtype,
+      options: typeof f.options === "string" ? f.options : null, opcoes, reqd: f.reqd, depends_on: typeof f.depends_on === "string" ? f.depends_on : null,
+      mandatory_depends_on: typeof f.mandatory_depends_on === "string" ? f.mandatory_depends_on : null,
+      default: def === inerte ? undefined : def, hidden: f.hidden };
+  });
+}
+
+const ErpRelatorio = {
+  components: { ErpCampo },
+  props: ["nome"],
+  setup(props) {
+    const m = ref(null); const filtros = ref([]); const val = ref({}); const r = ref(null); const a = ref(false); const falhou = ref(false); const erro = ref("");
+    onMounted(async () => {
+      m.value = await api("erp.relatorio_meta", { nome: props.nome });
+      if (m.value.tipo === "builder") { location.replace(irErp(m.value.doctype)); return; }
+      try { filtros.value = filtrosDoRelatorio(props.nome, m.value); } catch (e) { falhou.value = true; return; }
+      const v = {}; for (const f of filtros.value) if (f.default !== undefined && f.default !== null && f.default !== "") v[f.fieldname] = f.default;
+      val.value = v;
+      if (filtros.value.every((f) => !f.reqd || !vazioV(v[f.fieldname]))) correr();
+    });
+    const visivel = (f) => !f.hidden && avaliar(f.depends_on, val.value);
+    const correr = async () => {
+      const obrigF = (f) => f.reqd || (f.mandatory_depends_on && avaliar(f.mandatory_depends_on, val.value));
+      const falta = filtros.value.filter((f) => obrigF(f) && visivel(f) && vazioV(val.value[f.fieldname]));
+      if (falta.length) { toast("Falta preencher: " + falta.map((f) => f.label).join(", ")); return; }
+      a.value = true; erro.value = "";
+      try { const limpos = Object.fromEntries(Object.entries(val.value).filter(([k, x]) => !vazioV(x)));
+        r.value = await api("erp.relatorio", { nome: props.nome, filtros: JSON.stringify(limpos) }, true); }
+      catch (e) { erro.value = String(e.message || e); } finally { a.value = false; }
+    };
+    const moedaR = (x) => new Intl.NumberFormat("pt-PT", { style: "currency", currency: m.value?.omissao?.currency || "EUR" }).format(x || 0);
+    const fmt = (c, x) => { if (x === null || x === undefined || x === "") return "";
+      if (["Currency"].includes(c.fieldtype)) return moedaR(x);
+      if (["Float", "Int", "Percent"].includes(c.fieldtype)) return new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 2 }).format(x) + (c.fieldtype === "Percent" ? " %" : "");
+      if (c.fieldtype === "Date") return new Date(x).toLocaleDateString("pt-PT");
+      if (c.fieldtype === "Check") return x ? "✓" : "";
+      return String(x).replace(/<[^>]+>/g, ""); };
+    const numerica = (c) => ["Currency", "Float", "Int", "Percent"].includes(c.fieldtype);
+    const ligacao = (c, x) => (c.fieldtype === "Link" && c.options && x ? irErp(c.options, x) : null);
+    // gráfico simples (barras) com os dados que o relatório já devolve
+    const grafico = computed(() => {
+      const g = r.value?.grafico; const dd = g?.data; if (!dd?.labels?.length || !dd.datasets?.length) return null;
+      const series = dd.datasets.slice(0, 3); const max = Math.max(1, ...series.flatMap((s) => (s.values || []).map((v) => Math.abs(Number(v) || 0))));
+      return { labels: dd.labels.slice(0, 24), series, max };
+    });
+    const CORES_G = ["var(--acao)", "#5b6f7a", "#8a7340"];
+    const csv = () => {
+      const cs = r.value.colunas; const esc = (x) => `"${String(x ?? "").replace(/<[^>]+>/g, "").replace(/"/g, '""')}"`;
+      const txt = [cs.map((c) => esc(c.label)).join(";")].concat(r.value.linhas.map((l) => cs.map((c) => esc(l[c.fieldname])).join(";"))).join("\n");
+      const b = new Blob(["\ufeff" + txt], { type: "text/csv;charset=utf-8" }); const u = URL.createObjectURL(b);
+      const el = document.createElement("a"); el.href = u; el.download = (m.value.rotulo || props.nome) + ".csv"; el.click(); URL.revokeObjectURL(u);
+    };
+    const desk = computed(() => "#/erp-desk/" + encodeURIComponent("/desk/query-report/" + props.nome));
+    return { m, filtros, val, r, a, falhou, erro, visivel, correr, fmt, numerica, ligacao, grafico, CORES_G, csv, desk, moedaR };
+  },
+  template: `<div class="pad" v-if="m">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+      <div><h1>{{ m.rotulo }}</h1><div class="sub">Relatório</div></div>
+      <div style="display:flex;gap:8px"><button class="btn prim" :disabled="a" @click="correr">{{ a ? 'A gerar…' : 'Gerar' }}</button><button v-if="r && r.linhas.length" class="btn" @click="csv">Exportar CSV</button><a class="btn" :href="desk">Ecrã do ERPNext</a></div>
+    </div>
+    <div v-if="falhou" class="cartao vazio">Este relatório ainda não abre aqui. <a :href="desk">Abri-lo no ecrã do ERPNext</a>.</div>
+    <template v-else>
+      <div class="cartao erp-filtros" v-if="filtros.length"><template v-for="f in filtros" :key="f.fieldname">
+        <div v-if="visivel(f)" class="erp-campo"><label v-if="f.fieldtype!=='Check'">{{ f.label }}<span v-if="f.reqd" class="obrig">*</span></label><ErpCampo :c="f" :doc="val"/></div></template></div>
+      <div v-if="erro" class="aviso" style="margin:12px 0">{{ erro }}</div>
+      <template v-if="r">
+        <div v-if="r.resumo.length" class="erp-totais cartao" style="margin:14px 0"><div v-for="s in r.resumo" :key="s.rotulo"><small>{{ s.rotulo }}</small><b :style="{color: s.cor==='Red'?'var(--acao)':s.cor==='Green'?'var(--verde)':'inherit'}">{{ s.tipo==='Currency' ? moedaR(s.valor) : s.valor }}</b></div></div>
+        <div v-if="grafico" class="cartao erp-grafico">
+          <svg :viewBox="'0 0 ' + Math.max(grafico.labels.length*48, 300) + ' 170'" preserveAspectRatio="none">
+            <template v-for="(l,i) in grafico.labels" :key="i"><template v-for="(sr,k) in grafico.series" :key="k">
+              <rect :x="i*48 + 6 + k*(36/grafico.series.length)" :width="36/grafico.series.length - 2" :y="140 - Math.abs(Number(sr.values[i])||0)/grafico.max*130" :height="Math.abs(Number(sr.values[i])||0)/grafico.max*130" :fill="CORES_G[k]" rx="2"><title>{{ sr.name }}: {{ sr.values[i] }}</title></rect></template>
+              <text :x="i*48+24" y="160" text-anchor="middle" font-size="10" fill="var(--ink-3)">{{ String(l).slice(0,8) }}</text></template>
+          </svg>
+          <div class="sub" style="display:flex;gap:14px;flex-wrap:wrap"><span v-for="(sr,k) in grafico.series" :key="k"><span :style="{display:'inline-block',width:'10px',height:'10px',borderRadius:'2px',background:CORES_G[k],marginRight:'5px'}"></span>{{ sr.name }}</span></div>
+        </div>
+        <div class="tabela-wrap" style="margin:14px 0 0"><table>
+          <thead><tr><th v-for="c in r.colunas" :key="c.fieldname" :style="{textAlign: numerica(c)?'right':'left'}">{{ c.label }}</th></tr></thead>
+          <tbody><tr v-for="(l,i) in r.linhas" :key="i" style="cursor:default" :class="{'erp-grupo': l.is_group || (r.total && i===r.linhas.length-1)}">
+            <td v-for="(c,ci) in r.colunas" :key="c.fieldname" :style="{textAlign: numerica(c)?'right':'left', paddingLeft: ci===0 && l.indent ? (12 + l.indent*16)+'px' : null}">
+              <a v-if="ligacao(c, l[c.fieldname])" :href="ligacao(c, l[c.fieldname])">{{ fmt(c, l[c.fieldname]) }}</a><span v-else>{{ fmt(c, l[c.fieldname]) }}</span></td></tr></tbody></table>
+          <div v-if="!r.linhas.length" class="vazio">Sem dados para estes filtros.</div></div>
+        <div v-if="r.cortado" class="sub" style="margin-top:8px">Mostram-se as primeiras 3000 linhas — exporte ou afine os filtros para ver o resto.</div>
+      </template>
+    </template>
+  </div><div v-else class="vazio">A carregar…</div>`,
+};
+
 const ErpDesk = {
   props: ["url"],
   template: `<div class="embutida"><iframe :src="url" title="ERPNext"></iframe></div>`,
@@ -2046,7 +2169,7 @@ const ErpDesk = {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpDesk, ErpStock, ErpPessoas, Calendario, DefLista, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Calendario, DefLista, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -2128,6 +2251,7 @@ const App = {
         <ErpFicha v-else-if="ecra==='erp'" :doctype="partes[1]" :name="partes[2]" :key="'f'+partes[1]+'/'+partes[2]"/>
         <ErpStock v-else-if="ecra==='erp-stock'" :artigo="partes[1]" :key="'s'+(partes[1]||'')"/>
         <ErpPessoas v-else-if="ecra==='pessoas'"/>
+        <ErpRelatorio v-else-if="ecra==='erp-rel'" :nome="partes[1]" :key="'r'+partes[1]"/>
         <ErpDesk v-else-if="ecra==='erp-desk'" :url="partes.slice(1).join('/')" :key="'d'+partes.slice(1).join('/')"/>
         <div v-else class="vazio">Página desconhecida. <a href="#/inicio">Início</a></div>
       </main>
