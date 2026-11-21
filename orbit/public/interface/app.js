@@ -1727,17 +1727,19 @@ const ErpLigacao = {
   props: ["modelValue", "alvo", "ro", "filtros"],
   emits: ["update:modelValue"],
   setup(props, { emit }) {
-    const txt = ref(props.modelValue || ""); const ops = ref([]); const aberto = ref(false); let tq;
+    const txt = ref(props.modelValue || ""); const ops = ref([]); const aberto = ref(false); const campo = ref(null); const pos = ref({}); let tq;
     watch(() => props.modelValue, (v) => { if (v !== txt.value) txt.value = v || ""; });
-    const procurar = () => { clearTimeout(tq); tq = setTimeout(async () => { if (!props.alvo) return; ops.value = await api("erp.procurar", { doctype: props.alvo, txt: txt.value }); aberto.value = true; }, 200); };
+    // a lista flutua por cima da página (dentro de uma tabela com deslocamento ficava cortada)
+    const posicionar = () => { const r = campo.value?.getBoundingClientRect(); if (r) pos.value = { position: "fixed", left: r.left + "px", top: (r.bottom + 4) + "px", width: Math.max(r.width, 260) + "px", right: "auto" }; };
+    const procurar = () => { clearTimeout(tq); tq = setTimeout(async () => { if (!props.alvo) return; ops.value = await api("erp.procurar", { doctype: props.alvo, txt: txt.value }); posicionar(); aberto.value = true; }, 200); };
     const escolher = (o) => { txt.value = o.v; emit("update:modelValue", o.v); aberto.value = false; };
     const sair = () => setTimeout(() => { aberto.value = false; if (txt.value !== (props.modelValue || "")) emit("update:modelValue", txt.value || null); }, 150);
-    return { txt, ops, aberto, procurar, escolher, sair, irErp };
+    return { txt, ops, aberto, procurar, escolher, sair, irErp, campo, pos };
   },
   template: `<div class="erp-ligacao">
-    <input v-model="txt" :disabled="ro" @focus="procurar" @input="procurar" @blur="sair" autocomplete="off">
+    <input ref="campo" v-model="txt" :disabled="ro" @focus="procurar" @input="procurar" @blur="sair" autocomplete="off">
     <a v-if="modelValue && alvo" class="ir" :href="irErp(alvo, modelValue)" title="Abrir">↗</a>
-    <div v-if="aberto && ops.length" class="cartao erp-ops"><div v-for="o in ops" :key="o.v" class="linha" @mousedown.prevent="escolher(o)"><div class="cresce">{{ o.r }}<small v-if="o.d || o.r!==o.v">{{ o.r!==o.v ? o.v : '' }} {{ o.d }}</small></div></div></div>
+    <div v-if="aberto && ops.length" class="cartao erp-ops" :style="pos"><div v-for="o in ops" :key="o.v" class="linha" @mousedown.prevent="escolher(o)"><div class="cresce">{{ o.r }}<small v-if="o.d || o.r!==o.v">{{ o.r!==o.v ? o.v : '' }} {{ o.d }}</small></div></div></div>
   </div>`,
 };
 
@@ -1781,7 +1783,11 @@ const ErpTabela = {
       const lv = cs.filter((x) => x.in_list_view); return (lv.length ? lv : cs).slice(0, 6);
     });
     let n = 0;
-    const juntar = () => { linhas.value.push({ name: "novo-" + Date.now() + "-" + (n++), doctype: props.c.options }); };
+    const juntar = () => {
+      const l = { name: "novo-" + Date.now() + "-" + (n++), doctype: props.c.options };
+      if ((props.filha?.campos || []).some((x) => x.fieldname === "qty")) l.qty = 1;   // como o ecrã do ERPNext
+      linhas.value.push(l);
+    };
     const tirar = (i) => { linhas.value.splice(i, 1); };
     return { linhas, cols, juntar, tirar };
   },
@@ -1804,14 +1810,46 @@ const ErpFicha = {
   props: ["doctype", "name"],
   setup(props) {
     const meta = ref(null); const doc = ref(null); const novo = ref(false); const podeGravar = ref(true); const sujo = ref(false); const a = ref(false);
-    const aba = ref(0); const fechadas = ref({}); const nomeNovo = ref("");
+    const aba = ref(0); const fechadas = ref({}); const nomeNovo = ref(""); const criarOps = ref([]); const aviso = ref("");
     const carregar = async () => {
       meta.value = await metaErp(props.doctype);
       const r = await api("erp.documento", { doctype: props.doctype, name: props.name === "novo" ? undefined : props.name });
-      doc.value = r.doc; novo.value = r.novo; podeGravar.value = r.novo ? meta.value.pode.create : r.pode_gravar; sujo.value = false;
+      // U3: «Criar →» deixa o documento seguinte preparado (ex.: encomenda → fatura)
+      let preparado = null; try { preparado = JSON.parse(sessionStorage.getItem("orbit.erp.novo") || "null"); } catch (e) {}
+      if (props.name === "novo" && preparado && preparado.doctype === props.doctype) { r.doc = preparado; sessionStorage.removeItem("orbit.erp.novo"); }
+      doc.value = r.doc; novo.value = r.novo; podeGravar.value = r.novo ? meta.value.pode.create : r.pode_gravar; sujo.value = !!(preparado && r.novo);
+      memoItens = Object.fromEntries((doc.value.items || []).map((l) => [l.name, l.item_code]));
+      ultimaAss = assinatura();
+      if (!r.novo && meta.value.submetivel && doc.value.docstatus === 1) criarOps.value = await api("erp.criar_opcoes", { doctype: props.doctype });
     };
     onMounted(carregar);
     watch(doc, (n, o) => { if (o) sujo.value = true; }, { deep: true });
+    // U3: recálculo pelo ERPNext (preço da lista, nome, unidade, impostos, totais) — nada é gravado
+    let memoItens = {}; let ultimaAss = ""; let tRec;
+    const DERIVADOS = ["item_name", "description", "uom", "stock_uom", "conversion_factor", "rate", "price_list_rate", "base_rate", "amount", "base_amount", "image", "item_group", "brand"];
+    const assinatura = () => { const d = doc.value; if (!d || !meta.value?.transacao) return "";
+      return JSON.stringify([d.customer, d.party_name, d.supplier, d.company, d.currency, d.selling_price_list, d.buying_price_list, d.taxes_and_charges,
+        d.transaction_date, d.posting_date, d.additional_discount_percentage, d.discount_amount, d.apply_discount_on,
+        (d.items || []).map((l) => [l.item_code, l.qty, l.rate, l.uom, l.discount_percentage, l.warehouse]),
+        (d.taxes || []).map((t) => [t.charge_type, t.account_head, t.rate, t.tax_amount])]); };
+    const recalcular = async () => {
+      const d = doc.value; if (!d || soLeitura.value || (d.docstatus || 0) !== 0) return;
+      for (const l of d.items || []) if (l.item_code && memoItens[l.name] !== l.item_code) { for (const k of DERIVADOS) l[k] = null; }
+      const r = await api("erp.recalcular", { doctype: props.doctype, dados: JSON.stringify(d) }, true).catch(() => null);
+      if (!r) return;
+      aviso.value = r.aviso || "";
+      if (!r.doc) return;
+      memoItens = Object.fromEntries((r.doc.items || []).map((l) => [l.name, l.item_code]));
+      doc.value = Object.assign(doc.value, r.doc); ultimaAss = assinatura();
+    };
+    watch(() => assinatura(), (a) => { if (!meta.value?.transacao || a === ultimaAss) return; ultimaAss = a; clearTimeout(tRec); tRec = setTimeout(recalcular, 500); });
+    const criarDe = async (o) => {
+      const r = await api("erp.criar_de", { doctype: props.doctype, name: doc.value.name, destino: o.doctype }, true);
+      try { sessionStorage.setItem("orbit.erp.novo", JSON.stringify(r.doc)); } catch (e) {}
+      location.hash = irErp(o.doctype, "novo");
+    };
+    const moeda = (v) => new Intl.NumberFormat("pt-PT", { style: "currency", currency: doc.value?.currency || "EUR" }).format(v || 0);
+    const pdf = computed(() => doc.value && !novo.value ? `/api/method/frappe.utils.print_format.download_pdf?doctype=${encodeURIComponent(props.doctype)}&name=${encodeURIComponent(doc.value.name)}` : "");
     const abas = computed(() => {
       if (!meta.value) return [];
       const out = []; let ab = { label: "Detalhes", secoes: [], implicita: true }; let sec = null; let col = null;
@@ -1866,7 +1904,7 @@ const ErpFicha = {
     };
     const aberta = (s, i) => !(s.collapsible && !fechadas.value[i + ":" + s.label]);
     const alternar = (s, i) => { fechadas.value[i + ":" + s.label] = !fechadas.value[i + ":" + s.label]; };
-    return { meta, doc, novo, sujo, a, aba, abasVis, visivel, roCampo, obrig, secVisivel, tituloDoc, gravar, accao, docstatus, soLeitura, aberta, alternar, ESTADO_DOC, irErp, precisaNome, nomeNovo, cor, ini };
+    return { meta, doc, novo, sujo, a, aba, abasVis, visivel, roCampo, obrig, secVisivel, tituloDoc, gravar, accao, docstatus, soLeitura, aberta, alternar, ESTADO_DOC, irErp, precisaNome, nomeNovo, cor, ini, criarOps, criarDe, moeda, pdf, aviso };
   },
   template: `<div v-if="meta && doc" class="erp-ficha">
     <div class="erp-topo">
@@ -1877,11 +1915,21 @@ const ErpFicha = {
         <span v-if="sujo" class="etq ambar">Por gravar</span>
         <div class="erp-accoes">
           <button v-if="!soLeitura && (novo || sujo)" class="btn prim" :disabled="a" @click="gravar">Gravar</button>
-          <button v-if="meta.pode.submit && docstatus===0 && !novo && !sujo" class="btn" :disabled="a" @click="accao('submeter','Submeter este documento? Depois de submetido só se altera cancelando.')">Submeter</button>
+          <button v-if="meta.pode.submit && docstatus===0 && !novo && !sujo" class="btn" :disabled="a" @click="accao('submeter', ['Sales Invoice','Purchase Invoice'].includes(doctype) ? 'Submeter esta fatura? O documento fiscal certificado é emitido pelo programa de faturação ligado (o Orbit nunca o emite). Depois de submetida só se altera cancelando.' : 'Submeter este documento? Depois de submetido só se altera cancelando.')">Submeter</button>
           <button v-if="meta.pode.cancel && docstatus===1" class="btn" :disabled="a" @click="accao('cancelar','Cancelar este documento?')">Cancelar</button>
           <button v-if="meta.pode.delete && !novo && docstatus!==1 && !meta.single" class="btn" :disabled="a" @click="accao('apagar','Apagar definitivamente este registo?')">Apagar</button>
+          <a v-if="meta.transacao && pdf" class="btn" :href="pdf" target="_blank">PDF</a>
+          <button v-for="o in criarOps" :key="o.doctype" class="btn" :disabled="a" @click="criarDe(o)">Criar {{ o.rotulo }} →</button>
         </div>
       </div>
+      <div v-if="meta.transacao && doc.grand_total !== undefined" class="erp-totais cartao">
+        <div><small>Total sem impostos</small><b>{{ moeda(doc.net_total) }}</b></div>
+        <div><small>Impostos</small><b>{{ moeda(doc.total_taxes_and_charges) }}</b></div>
+        <div v-if="doc.discount_amount"><small>Desconto</small><b>− {{ moeda(doc.discount_amount) }}</b></div>
+        <div class="total"><small>Total</small><b>{{ moeda(doc.rounded_total || doc.grand_total) }}</b></div>
+        <div v-if="docstatus===1 && doc.outstanding_amount !== undefined"><small>Em dívida</small><b>{{ moeda(doc.outstanding_amount) }}</b></div>
+      </div>
+      <div v-if="aviso" class="aviso" style="margin-top:8px">{{ aviso }}</div>
       <div v-if="precisaNome" class="erp-campo" style="max-width:420px;margin-top:10px"><label>Nome do registo<span class="obrig">*</span></label><input v-model="nomeNovo"></div>
       <div class="vistas" v-if="abasVis.length>1" style="padding:12px 0 0"><button v-for="(t,i) in abasVis" :key="t.label+i" :class="{ativo: aba===i}" @click="aba=i">{{ t.label }}</button></div>
     </div>

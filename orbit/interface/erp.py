@@ -134,6 +134,7 @@ def meta(doctype: str):
         "titulo": m.title_field or ("item_name" if doctype == "Item" else None), "imagem": m.image_field,
         "pesquisa": [c.strip() for c in (m.search_fields or "").split(",") if c.strip()],
         "nomeacao": m.autoname or "", "campos": _campos(m), "filhas": filhas, "pode": pode,
+        "transacao": doctype in TRANSACOES,
         "lista": [f.fieldname for f in m.fields if f.in_list_view and f.fieldtype not in _ESTRUTURA][:6],
         "filtros": [{"fieldname": f.fieldname, "label": _(f.label or f.fieldname), "fieldtype": f.fieldtype,
                      "options": f.options} for f in m.fields if f.in_standard_filter][:8],
@@ -264,3 +265,77 @@ def procurar(doctype: str, txt: str = "", filtros: str = None):
     from frappe.desk.search import search_link
     r = search_link(doctype, txt or "", filters=json.loads(filtros) if filtros else None, page_length=12)
     return [{"v": x.get("value"), "r": x.get("label") or x.get("value"), "d": x.get("description") or ""} for x in (r or [])]
+
+
+# ── U3: documentos de venda e compra (21-11-2026) ──────────────────────────────────────────────────────
+# Os cálculos são os do ERPNext: o documento por gravar vai ao servidor, que preenche o que o ERPNext
+# preencheria (preço da lista, nome, unidade, impostos do modelo) e calcula os totais — sem gravar nada.
+TRANSACOES = {"Quotation", "Sales Order", "Sales Invoice", "Delivery Note", "Purchase Order", "Purchase Invoice",
+              "Purchase Receipt", "Material Request", "Supplier Quotation", "Request for Quotation"}
+
+# Criar o documento seguinte a partir de um submetido (as mesmas funções dos botões «Criar» do ERPNext).
+CRIAR = {
+    "Quotation": [("Sales Order", "erpnext.selling.doctype.quotation.quotation.make_sales_order")],
+    "Sales Order": [("Delivery Note", "erpnext.selling.doctype.sales_order.sales_order.make_delivery_note"),
+                    ("Sales Invoice", "erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice")],
+    "Delivery Note": [("Sales Invoice", "erpnext.stock.doctype.delivery_note.delivery_note.make_sales_invoice")],
+    "Purchase Order": [("Purchase Receipt", "erpnext.buying.doctype.purchase_order.purchase_order.make_purchase_receipt"),
+                       ("Purchase Invoice", "erpnext.buying.doctype.purchase_order.purchase_order.make_purchase_invoice")],
+    "Purchase Receipt": [("Purchase Invoice", "erpnext.stock.doctype.purchase_receipt.purchase_receipt.make_purchase_invoice")],
+    "Material Request": [("Purchase Order", "erpnext.stock.doctype.material_request.material_request.make_purchase_order")],
+    "Supplier Quotation": [("Purchase Order", "erpnext.buying.doctype.supplier_quotation.supplier_quotation.make_purchase_order")],
+}
+
+
+@frappe.whitelist(methods=["POST"])
+def recalcular(doctype: str, dados: str):
+    """O documento como ficaria: valores em falta preenchidos e totais calculados. Nunca grava."""
+    _guarda()
+    _ler(doctype)
+    if doctype not in TRANSACOES:
+        frappe.throw(_("Este documento não tem cálculo de totais."))
+    dados = json.loads(dados) if isinstance(dados, str) else dados
+    dados["doctype"] = doctype
+    nomes = {}   # as linhas novas da interface («novo-…») voltam com o mesmo nome, pela posição
+    for t in ("items", "taxes"):
+        nomes[t] = [r.get("name") for r in dados.get(t) or []]
+        for r in dados.get(t) or []:
+            if str(r.get("name") or "").startswith("novo-"):
+                r.pop("name")
+    d = frappe.get_doc(dados)
+    try:
+        if hasattr(d, "set_missing_values"):
+            d.set_missing_values(for_validate=True)
+        if hasattr(d, "calculate_taxes_and_totals"):
+            d.calculate_taxes_and_totals()
+    except frappe.ValidationError as e:
+        return {"doc": None, "aviso": str(e)[:300]}
+    finally:
+        frappe.db.rollback()   # nada do que o ERPNext tenha tocado fica gravado
+    out = d.as_dict()
+    for t in ("items", "taxes"):
+        for i, r in enumerate(out.get(t) or []):
+            if i < len(nomes.get(t, [])) and str(nomes[t][i] or "").startswith("novo-"):
+                r["name"] = nomes[t][i]
+    return {"doc": out}
+
+
+@frappe.whitelist()
+def criar_opcoes(doctype: str):
+    _guarda()
+    return [{"doctype": dt, "rotulo": _(dt)} for dt, _m in CRIAR.get(doctype, []) if frappe.has_permission(dt, "create")]
+
+
+@frappe.whitelist(methods=["POST"])
+def criar_de(doctype: str, name: str, destino: str):
+    """O documento seguinte por gravar (ex.: encomenda → fatura), como o botão «Criar» do ERPNext."""
+    _guarda()
+    metodo = dict(CRIAR.get(doctype, [])).get(destino)
+    if not metodo:
+        frappe.throw(_("Não se cria {0} a partir de {1}.").format(_(destino), _(doctype)))
+    origem = frappe.get_doc(doctype, name)
+    origem.check_permission("read")
+    if not frappe.has_permission(destino, "create"):
+        frappe.throw(_("Sem permissão para criar {0}.").format(_(destino)), frappe.PermissionError)
+    novo = frappe.get_attr(metodo)(name)
+    return {"doc": novo.as_dict()}

@@ -400,3 +400,9 @@ a.icone-btn{color:var(--ink-2);text-decoration:none}a.icone-btn.ativo{background
 .erp-tabela td input:hover,.erp-tabela td select:hover{border-color:var(--line)}
 .erp-tabela td input:focus,.erp-tabela td select:focus{border-color:var(--acao);outline:none;background:var(--surface)}
 @media (max-width:900px){.erp-cols{grid-template-columns:1fr!important}.erp-ficha{padding:16px}.erp-accoes{margin-left:0;width:100%}}
+/* U3: totais dos documentos de venda e compra */
+.erp-totais{display:flex;flex-wrap:wrap;gap:4px 28px;padding:12px 16px;margin-top:14px}
+.erp-totais div{display:flex;flex-direction:column}
+.erp-totais small{font-size:12px;color:var(--ink-3)}
+.erp-totais b{font-size:16px}
+.erp-totais .total b{font-size:20px;color:var(--ink)}
