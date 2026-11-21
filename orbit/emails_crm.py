@@ -187,8 +187,8 @@ def _excluido(endereco: str, excl: list, propria: str) -> bool:
     dom = e.rsplit("@", 1)[-1]
     if dom == propria.rsplit("@", 1)[-1] and dom not in _PUBLICOS:
         return True   # internos do mesmo domínio nunca contam como «cliente»
-    if dom in _dominios_casa():
-        return True   # 20-11: nem os de outro domínio da casa (caixa @gmail.com a escrever para @stratechna.pt)
+    if dom in _dominios_casa() or e in _caixas_casa():
+        return True   # 20-11: nem os de outro domínio da casa; 21-11: nem as nossas caixas de domínio público (stratechna@gmail.com)
     return any(x == e or x.lstrip("@") == dom or (x.startswith("*.") and dom.endswith(x[1:])) for x in excl)
 
 
@@ -348,6 +348,21 @@ def _dominios_casa() -> set:
     return set(d)
 
 
+def _caixas_casa() -> set:
+    """Endereços das caixas ligadas a este tenant (também as de domínio público, ex.: stratechna@gmail.com)."""
+    chave = "orbit:emails_crm:caixas_casa"
+    d = frappe.cache.get_value(chave)
+    if d is None:
+        d = [x.strip().lower() for x in frappe.get_all("Email Account", pluck="email_id") if x and "@" in x]
+        frappe.cache.set_value(chave, d, expires_in_sec=3600)
+    return set(d)
+
+
+def _endereco_da_casa(e: str) -> bool:
+    e = (e or "").strip().lower()
+    return "@" in e and (e.rsplit("@", 1)[-1] in _dominios_casa() or e in _caixas_casa())
+
+
 _NOREPLY = re.compile(r"(^|[-_.+])(no[-_.]?reply|do[-_.]?not[-_.]?reply|donotreply|mailer[-_.]?daemon|bounces?)([-_.+]|@)", re.I)
 
 
@@ -399,17 +414,25 @@ def _criar_lead(endereco: str, doc, dono: str = None):
 
 # ── Apagar uma lead apaga o que é dela (20-11-2026) ─────────────────────────────────────────────────────
 def _registo_da_casa(dt: str, nome: str) -> bool:
-    """Contactos/empresas que são a própria casa (as nossas caixas como contactos, a Stratechna, a Webgate…)."""
+    """Contactos/empresas que são a própria casa (as nossas caixas como contactos, a Stratechna, a Webgate…).
+
+    21-11: as caixas ligadas contam mesmo em domínio público, e uma organização sem site nem email geral
+    é da casa quando todos os seus contactos (pelo menos um) são da casa."""
     casa = _dominios_casa()
     if dt == "Contact":
-        ems = [e.split("@")[-1].lower() for e in frappe.get_all("Contact Email", filters={"parent": nome, "parenttype": "Contact"},
-                                                                 pluck="email_id") if e and "@" in e]
-        return bool(ems) and all(d in casa for d in ems)
+        ems = [e for e in frappe.get_all("Contact Email", filters={"parent": nome, "parenttype": "Contact"},
+                                         pluck="email_id") if e and "@" in e]
+        return bool(ems) and all(_endereco_da_casa(e) for e in ems)
     if dt == "CRM Organization":
         o = frappe.db.get_value("CRM Organization", nome, ["website", "email_geral"], as_dict=True) or {}
         doms = {re.sub(r"^https?://(www\.)?", "", (o.get("website") or "").lower()).split("/")[0],
                 (o.get("email_geral") or "").split("@")[-1].lower()}
-        return bool(doms & casa)
+        if doms & casa:
+            return True
+        if o.get("website") or o.get("email_geral"):
+            return False   # tem site/email de fora: é um cliente
+        contactos = frappe.get_all("Contact", filters={"company_name": nome}, pluck="name", limit=50)
+        return bool(contactos) and all(_registo_da_casa("Contact", c) for c in contactos)
     return False
 
 
