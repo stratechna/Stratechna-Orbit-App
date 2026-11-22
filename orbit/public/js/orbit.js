@@ -289,6 +289,8 @@ try { if (window.self !== window.top && window.top.location.pathname.indexOf("/o
 		frappe.call({ method: "orbit.agenda.resumo", type: "GET" })
 			.then((r) => {
 				const d = (r && r.message) || {};
+				window.__orbitAgenda = d;
+				document.dispatchEvent(new CustomEvent("orbit-agenda", { detail: d }));
 				for (const [n, eventos] of Object.entries(d.dias || {})) {
 					const c = mes.querySelector(`.orbit-mes-dia[data-dia="${n}"]`);
 					if (!c || !eventos.length) continue;
@@ -566,6 +568,245 @@ try { if (window.self !== window.top && window.top.location.pathname.indexOf("/o
 		return a;
 	}
 
+	/* ── Página inicial com análises (22-11-2026) ─────────────────────────────────────────────────────────────
+	 * Os números vêm todos de `orbit.inicio.resumo` (já filtrados: dinheiro só para gestão/contas). Cada bloco
+	 * desenha-se com o que houver — um tenant sem faturação mostra os negócios ganhos no lugar dela, sem buracos. */
+	const PERIODOS = [["hoje", "Hoje"], ["semana", "Semana"], ["mes", "Mês"], ["ano", "Ano"]];
+	const CHAVE_PERIODO = "orbit-inicio-periodo";
+	const CHAVE_USO = "orbit-inicio-uso";
+	const esc = (t) => frappe.utils.escape_html(t == null ? "" : String(t));
+	function eur(v) {
+		const n = Number(v || 0);
+		return new Intl.NumberFormat(LOCALE, { style: "currency", currency: "EUR",
+			maximumFractionDigits: Math.abs(n) >= 100 ? 0 : 2 }).format(n);
+	}
+	const num = (v) => new Intl.NumberFormat(LOCALE).format(Number(v || 0));
+	function periodoGuardado() {
+		try { const p = localStorage.getItem(CHAVE_PERIODO); return PERIODOS.some((x) => x[0] === p) ? p : "mes"; }
+		catch (e) { return "mes"; }
+	}
+	function cabSec(titulo, extra) {
+		return `<div class="oi-cab"><b>${esc(__(titulo))}</b><i></i>${extra || ""}</div>`;
+	}
+	function spark(serie) {
+		const v = (serie || []).map(Number);
+		const max = Math.max(1, ...v);
+		return `<div class="oi-spark">${v.map((x, i) => `<i class="${i === v.length - 1 ? "u" : ""}" style="height:${Math.max(6, Math.round(100 * x / max))}%"></i>`).join("")}</div>`;
+	}
+	function delta(atual, anterior, rotulo) {
+		if (!anterior) return `<div class="oi-d oi-neutro">${esc(__("sem termo de comparação"))}</div>`;
+		const p = Math.round(100 * (atual - anterior) / anterior);
+		return `<div class="oi-d ${p >= 0 ? "oi-sobe" : "oi-desce"}">${p >= 0 ? "▲" : "▼"} ${Math.abs(p)} % ${esc(rotulo || "")}</div>`;
+	}
+	const NOME_PERIODO = { hoje: "face a ontem", semana: "face à semana passada", mes: "face ao mês passado", ano: "face ao ano passado" };
+	const TITULO_PERIODO = { hoje: "hoje", semana: "esta semana", mes: "este mês", ano: "este ano" };
+
+	function kpis(d) {
+		const p = d.periodo, out = [];
+		const f = d.faturacao, c = d.crm, k = d.desk;
+		if (f) {
+			out.push(`<div class="oi-cartao oi-kpi"><div class="oi-t">${esc(__("Faturado"))} ${esc(__(TITULO_PERIODO[p]))}<span>${esc(f.fonte)}</span></div>` +
+				`<div class="oi-v">${eur(f.faturado)}</div>${delta(f.faturado, f.anterior, __(NOME_PERIODO[p]))}${spark(f.meses.map((m) => m.valor))}</div>`);
+			out.push(`<div class="oi-cartao oi-kpi"><div class="oi-t">${esc(__("Por receber"))}<span>${f.por_receber_n} ${esc(__("faturas"))}</span></div>` +
+				`<div class="oi-v">${eur(f.por_receber)}</div>` +
+				`<div class="oi-d ${f.vencido ? "oi-desce" : "oi-neutro"}">${f.vencido ? esc(__("Vencido")) + " " + eur(f.vencido) + " · " + f.vencidas.length + " " + esc(__("faturas")) : esc(__("Nada vencido"))}</div>` +
+				`${spark(f.meses.map((m) => m.valor))}</div>`);
+		}
+		if (c) {
+			out.push(`<a class="oi-cartao oi-kpi" href="/crm/deals" target="orbit-frappe_crm"><div class="oi-t">${esc(__("Negócios em aberto"))}<span>CRM</span></div>` +
+				`<div class="oi-v">${num(c.abertos)}${c.abertos_valor != null ? ` <small>· ${eur(c.abertos_valor)}</small>` : ""}</div>` +
+				`<div class="oi-d oi-neutro">${num(c.ganhos)} ${esc(__("ganhos"))} ${esc(__(TITULO_PERIODO[p]))}${c.ganhos_valor != null && c.ganhos ? " · " + eur(c.ganhos_valor) : ""}</div>${spark(c.serie)}</a>`);
+			if (!f) out.push(`<a class="oi-cartao oi-kpi" href="/crm/deals" target="orbit-frappe_crm"><div class="oi-t">${esc(__("Negócios ganhos"))} ${esc(__(TITULO_PERIODO[p]))}<span>CRM</span></div>` +
+				`<div class="oi-v">${num(c.ganhos)}${c.ganhos_valor != null && c.ganhos ? ` <small>· ${eur(c.ganhos_valor)}</small>` : ""}</div>` +
+				`${delta(c.ganhos, c.ganhos_anterior, __(NOME_PERIODO[p]))}${spark(c.serie)}</a>`);
+		}
+		if (k) {
+			out.push(`<a class="oi-cartao oi-kpi" href="/helpdesk/tickets" target="orbit-helpdesk"><div class="oi-t">${esc(__("Atendimento"))}<span>Desk</span></div>` +
+				`<div class="oi-v">${num(k.abertos)} <small>${esc(__("abertos"))}</small></div>` +
+				`<div class="oi-d ${k.fora_prazo ? "oi-desce" : "oi-neutro"}">${num(k.fora_prazo)} ${esc(__("fora do prazo"))}${k.primeira_resposta_h != null ? " · " + esc(__("1.ª resposta")) + " " + num(k.primeira_resposta_h) + " h" : ""}</div>${spark(k.serie)}</a>`);
+		}
+		if (c && c.taxa_ganho != null && out.length < 4) {
+			out.push(`<div class="oi-cartao oi-kpi"><div class="oi-t">${esc(__("Taxa de ganho"))}<span>${esc(__("12 meses"))}</span></div>` +
+				`<div class="oi-v">${c.taxa_ganho} %</div><div class="oi-d oi-neutro">${esc(__("negócios ganhos sobre fechados"))}</div></div>`);
+		}
+		return out.slice(0, 4);
+	}
+
+	const MESES_CURTOS = (iso) => new Intl.DateTimeFormat(LOCALE, { month: "short" }).format(new Date(iso + "-15")).replace(".", "");
+	function grafico(d) {
+		const f = d.faturacao;
+		if (f) {
+			const desp = d.despesas || [];
+			const max = Math.max(1, ...f.meses.map((m) => m.valor), ...desp.map((m) => m.valor));
+			const barras = f.meses.map((m, i) => `<div><b style="height:${Math.round(110 * m.valor / max)}px" title="${eur(m.valor)}"></b>` +
+				(desp[i] ? `<b class="e" style="height:${Math.round(110 * desp[i].valor / max)}px" title="${eur(desp[i].valor)}"></b>` : "") + `</div>`).join("");
+			const ult = f.meses[f.meses.length - 1].valor - (desp.length ? desp[desp.length - 1].valor : 0);
+			return `<div class="oi-cartao"><header><h3>${esc(__(desp.length ? "Faturação e despesas" : "Faturação"))}</h3><small>${esc(__("últimos 6 meses"))}</small></header>` +
+				`<div class="oi-graf"><div class="oi-barras">${barras}</div><div class="oi-meses">${f.meses.map((m) => `<span>${esc(MESES_CURTOS(m.mes))}</span>`).join("")}</div>` +
+				`<div class="oi-legenda"><span><i class="oi-l1"></i>${esc(__("Faturado"))}</span>${desp.length ? `<span><i class="oi-l2"></i>${esc(__("Despesas"))}</span>` : ""}` +
+				`<span class="oi-dir">${esc(__(desp.length ? "Margem do mês" : "Este mês"))} <b>${eur(ult)}</b></span></div></div></div>`;
+		}
+		const c = d.crm, k = d.desk;
+		if (!c && !k) return "";
+		const a = (c && c.serie) || [], b = (k && k.serie) || [];
+		const n = Math.max(a.length, b.length), max = Math.max(1, ...a, ...b);
+		const hoje = new Date();
+		const meses = Array.from({ length: n }, (_, i) => { const x = new Date(hoje.getFullYear(), hoje.getMonth() - (n - 1 - i), 15); return x.toISOString().slice(0, 7); });
+		const barras = meses.map((_, i) => `<div>${c ? `<b style="height:${Math.round(110 * (a[i] || 0) / max)}px" title="${a[i] || 0}"></b>` : ""}${k ? `<b class="e" style="height:${Math.round(110 * (b[i] || 0) / max)}px" title="${b[i] || 0}"></b>` : ""}</div>`).join("");
+		return `<div class="oi-cartao"><header><h3>${esc(__("Entradas por mês"))}</h3><small>${esc(__("últimos {0} meses", [n]))}</small></header>` +
+			`<div class="oi-graf"><div class="oi-barras">${barras}</div><div class="oi-meses">${meses.map((m) => `<span>${esc(MESES_CURTOS(m))}</span>`).join("")}</div>` +
+			`<div class="oi-legenda">${c ? `<span><i class="oi-l1"></i>${esc(__("Negócios novos"))}</span>` : ""}${k ? `<span><i class="oi-l2"></i>${esc(__("Pedidos no Desk"))}</span>` : ""}</div></div></div>`;
+	}
+
+	function funil(c) {
+		if (!c || !c.funil.length) return "";
+		const max = Math.max(1, ...c.funil.map((e) => c.abertos_valor != null ? e.valor : e.n));
+		const linhas = c.funil.map((e) => {
+			const base = c.abertos_valor != null ? e.valor : e.n;
+			return `<div class="oi-etapa"><span>${esc(e.etapa)}</span><div class="oi-b"><i style="width:${Math.max(e.n ? 4 : 0, Math.round(100 * base / max))}%"></i></div>` +
+				`<span>${e.n}${e.valor != null && e.n ? " · " + eur(e.valor) : ""}</span></div>`;
+		}).join("");
+		const taxa = c.taxa_ganho != null ? `<div class="oi-etapa oi-taxa"><span>${esc(__("Taxa de ganho"))}</span><div class="oi-b"><i class="v" style="width:${c.taxa_ganho}%"></i></div><span>${c.taxa_ganho} %</span></div>` : "";
+		return `<a class="oi-cartao" href="/crm/deals" target="orbit-frappe_crm"><header><h3>${esc(__("Funil de vendas"))}</h3><small>${esc(__(c.abertos_valor != null ? "valor em aberto" : "negócios em aberto"))}</small></header><div class="oi-funil">${linhas}${taxa}</div></a>`;
+	}
+
+	function atencao(lista) {
+		const corpo = (lista || []).length
+			? lista.map((a) => `<${a.ligacao ? `a href="${esc(a.ligacao)}"` : "div"} class="oi-linha"><div class="oi-c">${esc(a.titulo)}<small>${esc(a.nota)}</small></div><span class="oi-etq oi-${esc(a.tom)}">${esc(__(a.selo))}</span></${a.ligacao ? "a" : "div"}>`).join("")
+			: `<p class="oi-vazio">${esc(__("Nada pendente. Bom trabalho."))}</p>`;
+		return `<div class="oi-cartao"><header><h3>${esc(__("A precisar de atenção"))}</h3><small>${(lista || []).length || ""}</small></header>${corpo}</div>`;
+	}
+
+	const IC_DIA = {
+		tarefas: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12 3 3 5-6"/>',
+		reunioes: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+		atribuidos: '<path d="M5 15a7 7 0 1 1 14 0"/><path d="M5 15v2M19 15v2"/>',
+		horas: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+	};
+	function cartaoDia(ic, valor, texto, extra, href) {
+		const tag = href ? `a href="${href}"` : "div";
+		return `<${tag} class="oi-cartao oi-dia" data-dia="${ic}"><span class="oi-ic"><svg viewBox="0 0 24 24">${IC_DIA[ic]}</svg></span>` +
+			`<div class="oi-dia-t"><b>${valor}</b><small>${texto}</small>${extra || ""}</div></${href ? "a" : "div"}>`;
+	}
+	function reunioesTexto(d) {
+		const hoje = (d && d.hoje) || [];
+		const agora = new Date(), seg = new Date(agora); seg.setDate(agora.getDate() - ((agora.getDay() + 6) % 7));
+		let semana = 0;
+		for (const [n, ev] of Object.entries((d && d.dias) || {})) {
+			const dt = new Date(agora.getFullYear(), agora.getMonth(), Number(n));
+			if (dt >= new Date(seg.getFullYear(), seg.getMonth(), seg.getDate()) && dt < new Date(seg.getFullYear(), seg.getMonth(), seg.getDate() + 7)) semana += ev.length;
+		}
+		return { valor: hoje.length, texto: `${esc(__(hoje.length === 1 ? "reunião hoje" : "reuniões hoje"))} · ${semana} ${esc(__("esta semana"))}` };
+	}
+	function meuDia(d) {
+		const m = d.meu_dia || {}, k = d.desk;
+		const cartoes = [];
+		if (m.abertas != null) cartoes.push(cartaoDia("tarefas", m.atrasadas || m.hoje || 0,
+			m.atrasadas ? `${esc(__("tarefas atrasadas"))} · ${m.hoje} ${esc(__("para hoje"))}` : `${esc(__("tarefas para hoje"))} · ${m.abertas} ${esc(__("abertas"))}`, "", "/app/todo?status=Open&allocated_to=" + encodeURIComponent(frappe.session.user)));
+		const r = reunioesTexto(window.__orbitAgenda);
+		cartoes.push(cartaoDia("reunioes", r.valor, r.texto));
+		if (k) cartoes.push(cartaoDia("atribuidos", k.meus, esc(__("pedidos atribuídos a mim")), "", "/helpdesk/tickets"));
+		if (m.horas != null) {
+			const pc = Math.min(100, Math.round(100 * m.horas / (m.horas_objetivo || 40)));
+			cartoes.push(cartaoDia("horas", `${num(Math.round(m.horas * 10) / 10)} h`, `${esc(__("registadas esta semana"))} · ${esc(__("objetivo"))} ${m.horas_objetivo} h`,
+				`<div class="oi-prog"><i style="width:${pc}%"></i></div>`, "/app/timesheet"));
+		}
+		const hoje = maiuscula(new Intl.DateTimeFormat(LOCALE, { weekday: "long", day: "numeric", month: "long" }).format(new Date()));
+		return cabSec("O meu dia", `<small>${esc(hoje)}</small>`) + `<div class="oi-grelha oi-n${cartoes.length}">${cartoes.join("")}</div>`;
+	}
+
+	function actividade(lista) {
+		if (!(lista || []).length) return "";
+		const rel = (q) => {
+			const s = (Date.now() - new Date(q.replace(" ", "T")).getTime()) / 1000;
+			if (s < 3600) return __("há {0} min", [Math.max(1, Math.round(s / 60))]);
+			if (s < 86400) return __("há {0} h", [Math.round(s / 3600)]);
+			const d = Math.round(s / 86400);
+			return d === 1 ? __("ontem") : __("há {0} dias", [d]);
+		};
+		return cabSec("Atividade recente") + `<div class="oi-cartao">` + lista.map((a) =>
+			`<a class="oi-linha" href="${esc(a.ligacao || "#")}"><div class="oi-c">${esc(a.texto)}<small>${esc(rel(a.quando))} · ${esc(a.app)}${a.valor != null ? " · " + eur(a.valor) : ""}</small></div>` +
+			(a.selo ? `<span class="oi-etq oi-${a.selo === "Lead" ? "azul" : "verde"}">${esc(__(a.selo))}</span>` : "") + `</a>`).join("") + `</div>`;
+	}
+
+	function desenharNegocio(el, d, aoMudar) {
+		const ks = kpis(d);
+		const g = grafico(d), fu = funil(d.crm), at = atencao(d.atencao);
+		if (!ks.length && !g && !fu) { el.innerHTML = ""; return; }
+		const tabs = `<div class="oi-tabs">${PERIODOS.map(([k, n]) => `<button type="button" data-p="${k}" class="${k === d.periodo ? "on" : ""}">${esc(__(n))}</button>`).join("")}</div>`;
+		el.className = "oi-sec";
+		el.innerHTML = cabSec("O negócio", tabs) +
+			`<div class="oi-grelha oi-n${ks.length}">${ks.join("")}</div>` +
+			`<div class="oi-graficos">${g}${fu}${at}</div>`;
+		el.querySelectorAll(".oi-tabs button").forEach((b) => b.addEventListener("click", () => aoMudar(b.dataset.p)));
+	}
+
+	function encherInicio(z) {
+		const carregar = (periodo) => {
+			z.negocio.classList.add("oi-a-carregar");
+			frappe.call({ method: "orbit.inicio.resumo", args: { periodo }, type: "GET" }).then((r) => {
+				const d = (r && r.message) || {};
+				z.negocio.classList.remove("oi-a-carregar");
+				desenharNegocio(z.negocio, d, (p) => { try { localStorage.setItem(CHAVE_PERIODO, p); } catch (e) { /* sem armazenamento */ } carregar(p); });
+				z.dia.className = "oi-sec";
+				z.dia.innerHTML = meuDia(d);
+				z.act.innerHTML = actividade(d.atividade);
+				z.ultimo = d;
+			}).catch(() => z.negocio.classList.remove("oi-a-carregar"));
+		};
+		document.addEventListener("orbit-agenda", () => { if (z.ultimo) z.dia.innerHTML = meuDia(z.ultimo); });
+		carregar(periodoGuardado());
+	}
+
+	// As apps num só bloco: as mais usadas por esta pessoa à frente (contadas neste browser), as outras por baixo
+	// com a área como título discreto. Sem uso registado ainda, à frente vão as apps de cada área (as de contorno).
+	function lerUso() { try { return JSON.parse(localStorage.getItem(CHAVE_USO) || "{}"); } catch (e) { return {}; } }
+	function contarUso(rotulo) {
+		const u = lerUso(); u[rotulo] = (u[rotulo] || 0) + 1;
+		try { localStorage.setItem(CHAVE_USO, JSON.stringify(u)); } catch (e) { /* sem armazenamento */ }
+	}
+	function appsNumBloco(grupos) {
+		const sec = document.createElement("section");
+		sec.className = "oi-sec oi-apps";
+		sec.innerHTML = cabSec("As suas apps", `<small>${esc(__("as mais usadas primeiro"))}</small>`);
+		const caixa = document.createElement("div");
+		caixa.className = "oi-cartao oi-apps-caixa";
+		const todos = [];
+		for (const g of grupos) for (const m of g.membros) todos.push([g, m]);
+		const uso = lerUso();
+		const fechada = (m) => !m.__virtual && inactiva(m);
+		const usadas = todos.filter(([, m]) => !fechada(m) && uso[m.label]).sort((a, b) => uso[b[1].label] - uso[a[1].label]);
+		const base = todos.filter(([, m]) => !fechada(m) && (m.__virtual || E_APP[m.label] || ["Mail", "Docs", "Meet", "Chat"].includes(m.label)));
+		const fav = [];
+		for (const x of usadas.concat(base)) { if (!fav.includes(x[1]) && fav.length < 9) fav.push(x[1]); }
+		const fila = document.createElement("div");
+		fila.className = "orbit-lista oi-fav";
+		for (const m of fav) fila.appendChild(m.__virtual ? cartaoApp(m) : cartao(m));
+		caixa.appendChild(fila);
+		for (const g of grupos) {
+			const resto = g.membros.filter((m) => !fav.includes(m));
+			if (!resto.length) continue;
+			const t = document.createElement("div");
+			t.className = "oi-grupo";
+			t.textContent = __(g.titulo);
+			caixa.appendChild(t);
+			const l = document.createElement("div");
+			l.className = "orbit-lista";
+			for (const m of resto) l.appendChild(m.__virtual ? cartaoApp(m) : cartao(m));
+			caixa.appendChild(l);
+		}
+		caixa.addEventListener("click", (e) => {
+			const a = e.target.closest(".orbit-cartao");
+			const nome = a && a.querySelector(".orbit-cartao-nome");
+			if (nome && !a.classList.contains("orbit-cartao--fechada")) {
+				const m = todos.find(([, x]) => (x.__virtual ? x.label : nomeVisivel(x.label)) === nome.textContent);
+				if (m) contarUso(m[1].label);
+			}
+		});
+		sec.appendChild(caixa);
+		return sec;
+	}
+
 	function pagina(container) {
 		const icones = (frappe.boot && frappe.boot.desktop_icons) || [];
 		if (!icones.length) return false;
@@ -647,6 +888,37 @@ try { if (window.self !== window.top && window.top.location.pathname.indexOf("/o
 		porDegrau(raiz, total > 24 ? 1 : 0);
 		raiz.appendChild(cabecalho());
 
+		// 22-11-2026 (Vítor, maqueta docs/orbit-interface/inicio/): com a interface nova, por baixo da faixa vêm
+		// «O negócio», «O meu dia» e, em baixo, as apps num só bloco ao lado da agenda e da atividade. A faixa e o
+		// símbolo de fundo ficam como estavam (claro e escuro); a página passa a rolar, por isso não há degraus.
+		if (novaLigada()) {
+			raiz.dataset.inicio = "nova";
+			porDegrau(raiz, 0);
+			const corpoN = document.createElement("div");
+			corpoN.id = "orbit-corpo";
+			corpoN.className = "oi";
+			const negocio = document.createElement("div");
+			const dia = document.createElement("div");
+			corpoN.appendChild(negocio);
+			corpoN.appendChild(dia);
+			const baixo = document.createElement("div");
+			baixo.className = "oi-baixo";
+			baixo.appendChild(appsNumBloco(grupos));
+			const lado = document.createElement("div");
+			lado.className = "oi-lado";
+			lado.appendChild(colunaAgenda());
+			const act = document.createElement("section");
+			act.className = "oi-sec oi-actividade";
+			lado.appendChild(act);
+			baixo.appendChild(lado);
+			corpoN.appendChild(baixo);
+			raiz.appendChild(corpoN);
+			container.parentNode.insertBefore(raiz, container);
+			document.querySelectorAll(".desktop-container").forEach((c) => c.classList.add("orbit-escondido"));
+			encherInicio({ negocio, dia, act });
+			return true;
+		}
+
 		// Duas colunas por baixo da faixa: os blocos à esquerda, a agenda à
 		// direita. A agenda é uma coluna e não uma faixa porque a altura é o
 		// recurso escasso deste ecrã — deitada, custava 185px a toda a largura;
@@ -706,6 +978,7 @@ try { if (window.self !== window.top && window.top.location.pathname.indexOf("/o
 	}
 
 	function ajustarDensidade(raiz) {
+		if (raiz.dataset.inicio === "nova") return; // a página com análises rola; não se aperta
 		// Um degrau por fotograma, para o browser desenhar entre cada um.
 		const passo = () => {
 			if (cabe(raiz)) return;
@@ -727,7 +1000,7 @@ try { if (window.self !== window.top && window.top.location.pathname.indexOf("/o
 	// mínimo quando o degrau anterior chegava perfeitamente.
 	function reavaliar() {
 		const raiz = document.getElementById("orbit-pagina");
-		if (!raiz) return;
+		if (!raiz || raiz.dataset.inicio === "nova") return;
 		porDegrau(raiz, 0);
 		ajustarDensidade(raiz);
 	}
