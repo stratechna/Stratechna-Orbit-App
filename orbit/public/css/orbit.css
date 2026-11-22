@@ -1238,3 +1238,8 @@ body:has(.wiki-page-content) .doc-sidebar .sidebar-item-active a { color: #fff !
 	body:has(.wiki-page-content) .navbar-brand-container { background-color: var(--background-color); color: var(--gray-800); }
 	body:has(.wiki-page-content) .navbar-brand-container svg { stroke: currentColor; color: currentColor; }
 }
+
+/* 22-11-2026: uma app por área — o cartão da app a vermelho, e por baixo dos outros o nome da app onde abrem */
+.orbit-cartao--app .orbit-cartao-img,.orbit-cartao--app .orbit-cartao-vazio{box-shadow:0 0 0 2px #b20009;border-radius:12px}
+.orbit-cartao--app .orbit-cartao-nome{font-weight:600;color:#b20009}
+.orbit-cartao-app{display:block;font-size:10.5px;color:#8a98a3;margin-top:1px;line-height:1.2}

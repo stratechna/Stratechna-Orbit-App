@@ -423,3 +423,13 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .erp-grafico{margin-top:14px;padding:14px 16px}
 .erp-grafico svg{width:100%;height:180px;display:block}
 tr.erp-grupo td{font-weight:600}
+/* 22-11-2026: seletor de apps (uma app por área) */
+.seletor-apps{position:absolute;top:44px;left:0;z-index:60;width:440px;max-width:92vw;padding:14px}
+.seletor-apps h6{margin:2px 4px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3)}
+.seletor-grelha{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.seletor-app{all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;border-radius:10px;font-size:12.5px;color:var(--ink-2);text-align:center}
+.seletor-app:hover{background:var(--surface-2)}
+.seletor-app .q{width:42px;height:42px;border-radius:11px;background:var(--nav);color:#fff;display:grid;place-items:center}
+.seletor-app .q svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.seletor-app.atual .q{background:var(--acao)}
+.nav .marca .logo svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}

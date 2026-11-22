@@ -82,6 +82,7 @@ def contexto():
         "apps": _apps(),
         "classico": {"crm": "/crm", "desk": "/helpdesk"},
         "modulos": _modulos(),
+        "admin": "System Manager" in frappe.get_roles(),
     }
 
 
@@ -90,6 +91,10 @@ _GESTAO = [("Accounting", "Contabilidade"), ("Invoicing", "Faturação"), ("Paym
            ("Financial Reports", "Relatórios financeiros"), ("Selling", "Vendas"), ("Buying", "Compras"), ("Stock", "Inventário"),
            ("Assets", "Ativos"), ("Projects", "Projetos (ERP)"), ("Quality", "Qualidade"), ("Manufacturing", "Produção"),
            ("Subcontracting", "Subcontratação"), ("Subscription", "Subscrições")]
+# 22-11-2026: módulos de sistema para a app «Administração» (o Orbit passa a uma app por área).
+_SISTEMA = [("ERPNext Settings", "Definições do ERP"), ("Users", "Utilizadores e permissões"), ("Website", "Site"),
+            ("Integrations", "Integrações"), ("Automation", "Automação"), ("Data", "Dados e importação"),
+            ("Email", "Email de envio"), ("Printing", "Impressão e PDF"), ("System", "Sistema")]
 _RH = [("Frappe HR", "Pessoas"), ("Recruitment", "Recrutamento"), ("Leaves", "Férias e ausências"),
        ("Shift & Attendance", "Turnos e presenças"), ("Payroll", "Salários"), ("Expenses", "Despesas"),
        ("Performance", "Desempenho"), ("Tenure", "Ciclo do colaborador"), ("Tax & Benefits", "Impostos e benefícios")]
@@ -106,7 +111,7 @@ def _modulos():
     for r in frappe.get_all("Has Role", filters={"parenttype": "Desktop Icon"}, fields=["parent", "role"]):
         restritos.setdefault(r.parent, set()).add(r.role)
     out = []
-    for grupo, lista in (("Gestão", _GESTAO), ("Recursos Humanos", _RH)):
+    for grupo, lista in (("Gestão", _GESTAO), ("Recursos Humanos", _RH), ("Sistema", _SISTEMA)):
         for nome, pt in lista:
             d = icones.get(nome)
             if not d or (restritos.get(nome) and not (restritos[nome] & papeis)):
@@ -116,7 +121,7 @@ def _modulos():
             else:
                 url = "/desk/" + (d.link_to or nome).lower().replace(" & ", "-").replace(" ", "-")
             # 21-11 (U1): a barra lateral do módulo no Frappe 16 — a interface desenha o menu a partir dela
-            out.append({"nome": pt, "url": url, "grupo": grupo,
+            out.append({"nome": pt, "url": url, "grupo": grupo, "chave": nome,
                         "barra": (d.link_to or nome) if d.link_type == "Workspace Sidebar" else None})
     return out
 

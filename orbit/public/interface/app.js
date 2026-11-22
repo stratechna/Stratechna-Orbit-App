@@ -54,6 +54,13 @@ const DT_ROTA = Object.fromEntries(Object.entries(ROTAS_DT).map(([k, v]) => [v, 
 const link = (dt, dn) => `#/${DT_ROTA[dt] || "contacto"}/${encodeURIComponent(dn)}`;
 
 const ICONES = {
+  apps: '<rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/>',
+  euro: '<path d="M17 6a7 7 0 1 0 0 12"/><path d="M4 10h9M4 14h9"/>',
+  cubo: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>',
+  pessoas: '<circle cx="9" cy="8" r="3.5"/><path d="M2 20a7 7 0 0 1 14 0"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14a5 5 0 0 1 5 5"/>',
+  relogio: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  projeto: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/>',
+  assin: '<path d="M3 17c3 0 4-8 7-8s1 8 4 8 3-4 7-4"/><path d="M3 21h18"/>',
   casa: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>', pessoa: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>',
   empresa: '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M10 21v-4h4v4"/>',
   negocio: '<path d="M3 7h18v12H3z"/><path d="M8 7V5h8v2"/><path d="M3 12h18"/>', lead: '<path d="M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z"/>',
@@ -1562,15 +1569,19 @@ async function apiDef(metodo, args = {}, post = false) {
   return j.message;
 }
 const Definicoes = {
-  setup() {
-    const d = ref(null); const nat = ref(null);
-    onMounted(async () => { [nat.value, d.value] = await Promise.all([apiDef("indice"), api("definicoes")]); });
-    const grupos = computed(() => { const g = {}; (nat.value || []).forEach((x) => (g[x.grupo] = g[x.grupo] || []).push(x)); return g; });
+  // 22-11-2026: cada app mostra só as definições dela (gruposApp = null → todas, na Administração).
+  props: ["gruposApp", "nomeApp"],
+  setup(props) {
+    const d0 = ref(null); const nat = ref(null);
+    onMounted(async () => { [nat.value, d0.value] = await Promise.all([apiDef("indice"), api("definicoes")]); });
+    const daApp = (g) => !props.gruposApp || props.gruposApp.includes(g);
+    const grupos = computed(() => { const g = {}; (nat.value || []).filter((x) => daApp(x.grupo)).forEach((x) => (g[x.grupo] = g[x.grupo] || []).push(x)); return g; });
+    const d = computed(() => d0.value && d0.value.filter((g) => daApp(g.grupo)));
     return { d, nat, grupos };
   },
   template: `
   <div class="pad">
-    <div class="ola"><div><h1>Definições</h1><div class="sub">Tudo o que se configura no Orbit, num só sítio.</div></div></div>
+    <div class="ola"><div><h1>Definições{{ nomeApp ? ' — ' + nomeApp : '' }}</h1><div class="sub">{{ gruposApp ? 'Só o que é desta app. O resto está na Administração.' : 'Tudo o que se configura no Orbit, num só sítio.' }}</div></div></div>
     <div v-if="!d" class="carregar">A carregar…</div>
     <template v-else>
       <div class="grelha-def" style="margin-bottom:22px">
@@ -1578,7 +1589,7 @@ const Definicoes = {
           <a class="linha" v-for="i in itens" :key="i.chave" :href="'#/definicoes/'+i.chave" style="text-decoration:none;color:inherit"><div class="cresce">{{ i.titulo }}</div><span class="sub">{{ i.n }} ›</span></a>
           <a v-if="g==='Correio'" class="linha" href="#/definicoes/caixas" style="text-decoration:none;color:inherit"><div class="cresce">Caixas ligadas ao Orbit</div><span class="sub">›</span></a>
         </div>
-        <div class="cartao"><header><h2>Pessoas</h2></header>
+        <div class="cartao" v-if="!gruposApp"><header><h2>Pessoas</h2></header>
           <a class="linha" href="#/definicoes/utilizadores" style="text-decoration:none;color:inherit"><div class="cresce">Utilizadores do Orbit</div><span class="sub">›</span></a></div>
       </div>
       <h2 style="margin:0 0 10px">Mais definições <span class="sub" style="font-weight:400">— abrem na secretária</span></h2>
@@ -2188,6 +2199,36 @@ const ErpDesk = {
   template: `<div class="embutida"><iframe :src="url" title="ERPNext"></iframe></div>`,
 };
 
+// ── As apps do Orbit (22-11-2026, maqueta docs/orbit-interface/apps/) ────────────────────────────────────────
+// Uma app por área, cada uma no seu separador (/orbit?app=<chave>), com a mesma barra de cima: seletor de apps, nome da
+// app, pesquisa, sino, claro/escuro e a roda dentada só com as definições dessa app. Os ecrãs são os mesmos de sempre.
+const APP_ATUAL = (new URLSearchParams(location.search).get("app") || "crm").toLowerCase();
+const APPS = {
+  crm: { nome: "CRM", sub: "Clientes e atendimento", ic: "pessoa", inicio: "inicio",
+    nav: [["inicio", "casa", "Início"], ["sec", "CRM"], ["contactos", "pessoa", "Contactos"], ["empresas", "empresa", "Empresas"], ["leads", "lead", "Leads"],
+      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"],
+      ["sec", "O meu dia"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"], ["app/Booking", "relogio", "Marcar reuniões"],
+      ["sec", "Documentos"], ["assinaturas", "assin", "Assinaturas"]],
+    modulos: [], defs: ["CRM", "Atendimento (Desk)", "Correio"] },
+  projetos: { nome: "Projetos", sub: "Projetos, tarefas e tempo", ic: "projeto", inicio: "projetos",
+    nav: [["sec", "Trabalho"], ["projetos", "projeto", "Projetos"], ["tarefas", "tarefa", "Tarefas"], ["calendario", "cal", "Calendário"], ["sec", "Tempo"], ["tempo", "relogio", "Registo de horas"]],
+    modulos: ["Projects"], defs: ["Pessoas e tempo"] },
+  rh: { nome: "RH", sub: "Pessoas e equipa", ic: "pessoas", inicio: "pessoas",
+    nav: [["sec", "Pessoas"], ["pessoas", "pessoas", "Colaboradores"]],
+    modulos: ["Frappe HR", "Recruitment", "Leaves", "Shift & Attendance", "Performance", "Tenure", "Payroll", "Expenses", "Tax & Benefits"], defs: ["Pessoas e tempo"] },
+  gestao: { nome: "Gestão", sub: "Dinheiro e obrigações", ic: "euro", inicio: "",
+    nav: [], modulos: ["Invoicing", "Payments", "Banking", "Accounting", "Financial Reports", "Subscription"], defs: ["Vendas e faturação", "Marcas e empresa"] },
+  operacoes: { nome: "Operações", sub: "Comprar, produzir, vender", ic: "cubo", inicio: "",
+    nav: [["sec", "Stock"], ["erp-stock", "cubo", "Inventário"]],
+    modulos: ["Selling", "Buying", "Stock", "Assets", "Manufacturing", "Subcontracting", "Quality"], defs: ["Vendas e faturação"] },
+  admin: { nome: "Administração", sub: "Só administradores", ic: "roda", inicio: "definicoes",
+    nav: [["sec", "Plataforma"], ["definicoes", "roda", "Definições do Orbit"], ["definicoes/utilizadores", "pessoas", "Utilizadores"]],
+    modulos: ["ERPNext Settings", "Users", "Website", "Integrations", "Automation", "Data", "Email", "Printing", "System"], defs: null },
+};
+const APP = APPS[APP_ATUAL] || APPS.crm;
+// Abrir uma app: volta ao separador onde já está (se foi o Orbit a abri-lo), senão abre um novo.
+const abrirApp = (chave, url) => { const w = window.open(url || ("/orbit?app=" + chave), "orbit-" + chave); if (w) w.focus(); };
+
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
   components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Calendario, DefLista, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
@@ -2214,28 +2255,51 @@ const App = {
       const escuro = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
       r.dataset.theme = escuro ? "light" : "dark"; try { localStorage.setItem("orbit.tema", r.dataset.theme); } catch (e) {}
     };
-    const NAV = [["inicio", "casa", "Início"], ["sec", "CRM"], ["contactos", "pessoa", "Contactos"], ["empresas", "empresa", "Empresas"], ["leads", "lead", "Leads"],
-      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"], ["chat", "chat", "Chat"], ["sec", "Trabalho"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"], ["projetos", "grelha", "Projetos"], ["assinaturas", "nota", "Assinaturas"], ["tempo", "relogio", "Tempo"], ["sec", "Operação"], ["erp-stock", "caixa", "Stock"], ["pessoas", "pessoa", "Pessoas"]];
+    const NAV = APP.nav;
+    window.name = window.name || ("orbit-" + APP_ATUAL);
+    document.title = APP.nome + " — Stratechna Orbit";
+    const modulosApp = computed(() => (ctx.value?.modulos || []).filter((m) => APP.modulos.includes(m.chave)));
+    // Sem rota: a 1.ª secção da app (o Início no CRM; o 1.º módulo na Gestão e nas Operações).
+    watch(ctx, (c) => {
+      if (!c || (location.hash && location.hash !== "#/")) return;
+      if (APP.inicio) { location.hash = "#/" + APP.inicio; return; }
+      const m = modulosApp.value[0]; if (m) location.hash = m.barra ? "#/erp-m/" + encodeURIComponent(m.barra) : "#/" + (APP.nav.find((n) => n[0] !== "sec") || ["inicio"])[0];
+    });
+    const seletor = ref(false);
+    const LISTA_APPS = computed(() => [
+      ...Object.entries(APPS).filter(([k]) => k !== "admin" || ctx.value?.admin !== false).map(([k, a]) => ({ chave: k, nome: a.nome, ic: a.ic })),
+      ...((ctx.value?.apps) || []).map((a) => ({ chave: a.nome.toLowerCase(), nome: a.nome, ic: a.icone, url: a.url })),
+    ]);
+    const irApp = (a) => { seletor.value = false; if (a.chave === APP_ATUAL) return; abrirApp(a.chave, a.url); };
+    const ativoNav = (n) => { const e = ecra.value; const r = partes.value.join("/"); return n[0] === r || e === n[0] || (n[0]==='contactos'&&e==='contacto') || (n[0]==='negocios'&&e==='negocio') || (n[0]==='empresas'&&e==='empresa') || (n[0]==='leads'&&e==='lead') || (n[0]==='projetos'&&e==='projeto') || (n[0]==='tarefas'&&e==='fila'); };
     const rotaCal = computed(() => partes.value.join("/"));
-    return { ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal };
+    return { ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal, APP, APP_ATUAL, modulosApp, seletor, LISTA_APPS, irApp, ativoNav };
   },
   template: `
   <div class="app" v-if="ctx">
     <nav class="nav" aria-label="Navegação principal">
-      <div class="marca"><div class="logo">O</div><div>Stratechna Orbit<small>{{ ctx.tenant }}</small></div></div>
+      <div class="marca"><div class="logo"><Icone :n="APP.ic"/></div><div>{{ APP.nome }}<small>{{ APP.sub }}</small></div></div>
       <template v-for="(n,i) in NAV" :key="i">
         <h6 v-if="n[0]==='sec'">{{ n[1] }}</h6>
-        <a v-else :href="'#/'+n[0]" style="text-decoration:none"><button :class="{ativo: ecra===n[0] || (n[0]==='contactos'&&ecra==='contacto') || (n[0]==='negocios'&&ecra==='negocio') || (n[0]==='empresas'&&ecra==='empresa') || (n[0]==='leads'&&ecra==='lead') || (n[0]==='projetos'&&ecra==='projeto') || (n[0]==='tarefas'&&ecra==='fila')}" tabindex="-1"><Icone :n="n[1]"/>{{ n[2] }}<span class="conta" v-if="n[0]==='caixa' && ctx.contadores.tickets">{{ ctx.contadores.tickets }}</span></button></a>
+        <a v-else :href="'#/'+n[0]" style="text-decoration:none"><button :class="{ativo: ativoNav(n)}" tabindex="-1"><Icone :n="n[1]"/>{{ n[2] }}<span class="conta" v-if="n[0]==='caixa' && ctx.contadores.tickets">{{ ctx.contadores.tickets }}</span></button></a>
       </template>
-      <template v-for="g in ['Gestão','Recursos Humanos']" :key="g"><template v-if="(ctx.modulos||[]).some(m=>m.grupo===g)"><h6>{{ g }}</h6>
-      <a v-for="m in ctx.modulos.filter(m=>m.grupo===g)" :key="m.url" :href="m.barra ? '#/erp-m/'+encodeURIComponent(m.barra) : m.url" :target="m.barra ? null : '_blank'" style="text-decoration:none"><button tabindex="-1" :class="{ativo: ecra==='erp-m' && partes[1]===m.barra}"><Icone n="grelha"/>{{ m.nome }}<span class="fora" v-if="!m.barra">↗</span></button></a></template></template>
-      <h6>Apps</h6>
-      <a v-for="a in ctx.apps" :key="a.nome" :href="EMBUTIDAS.includes(a.nome) ? '#/app/'+a.nome : a.url" :target="EMBUTIDAS.includes(a.nome) ? null : '_blank'" style="text-decoration:none"><button tabindex="-1" :class="{ativo: ecra==='app' && partes[1]===a.nome}"><Icone :n="a.icone"/>{{ a.nome }}<span class="fora" v-if="!EMBUTIDAS.includes(a.nome)">↗</span></button></a>
-      <a href="/crm" style="text-decoration:none"><button tabindex="-1"><Icone n="antigo"/>CRM clássico</button></a>
+      <template v-if="modulosApp.length"><h6>{{ APP_ATUAL==='admin' ? 'Sistema' : 'Módulos' }}</h6>
+      <a v-for="m in modulosApp" :key="m.url" :href="m.barra ? '#/erp-m/'+encodeURIComponent(m.barra) : m.url" :target="m.barra ? null : '_blank'" style="text-decoration:none"><button tabindex="-1" :class="{ativo: ecra==='erp-m' && partes[1]===m.barra}"><Icone n="grelha"/>{{ m.nome }}<span class="fora" v-if="!m.barra">↗</span></button></a></template>
+      <a v-if="APP_ATUAL==='crm'" href="/crm" style="text-decoration:none"><button tabindex="-1"><Icone n="antigo"/>CRM clássico</button></a>
       <div class="fim"><div class="av" style="background:#5b6f7a">{{ ctx.iniciais }}</div><div style="min-width:0">{{ ctx.nome }}<br><a href="/?cmd=web_logout" style="color:#7f939d;font-size:12px">Sair</a></div></div>
     </nav>
     <div class="main">
       <header class="topo">
+        <div style="position:relative">
+          <button class="icone-btn" :class="{ativo: seletor}" @click="seletor=!seletor" title="Todas as apps"><Icone n="apps"/></button>
+          <div class="cartao seletor-apps" v-if="seletor" @click.self="seletor=false">
+            <h6>As suas apps</h6>
+            <div class="seletor-grelha">
+              <button v-for="a in LISTA_APPS" :key="a.chave" class="seletor-app" :class="{atual: a.chave===APP_ATUAL}" @click="irApp(a)"><span class="q"><Icone :n="a.ic"/></span>{{ a.nome }}</button>
+            </div>
+            <div class="sub" style="font-size:12px;margin-top:8px">Cada app abre no seu separador; se já estiver aberta, volta a ele.</div>
+          </div>
+        </div>
         <div class="pesquisa"><Icone n="lupa"/><input id="pesq" v-model="q" placeholder="Pesquisar contactos, empresas, negócios, tickets…" @keydown="teclaPesq" autocomplete="off"><kbd>⌘K</kbd>
           <div class="cartao resultados" v-if="res.length">
             <div class="linha" v-for="(r,i) in res" :key="r.doctype+r.name" :class="{sel:i===selRes}" @mousedown.prevent="irRes(r)">
@@ -2245,7 +2309,7 @@ const App = {
         <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
           <Sino/>
           <button class="icone-btn" @click="tema" title="Claro / escuro"><Icone n="lua"/></button>
-          <a class="icone-btn" href="#/definicoes" title="Definições" :class="{ativo: ecra==='definicoes'}"><Icone n="roda"/></a>
+          <a class="icone-btn" :href="'#/definicoes'" :title="'Definições — ' + APP.nome" :class="{ativo: ecra==='definicoes'}"><Icone n="roda"/></a>
         </div>
       </header>
       <main class="ecra">
@@ -2254,7 +2318,7 @@ const App = {
         <Ficha v-else-if="ROTAS_DT[ecra]" :doctype="ROTAS_DT[ecra]" :name="partes[1]" :key="ecra+partes[1]"/>
         <Funil v-else-if="ecra==='funil'"/>
         <Caixa v-else-if="ecra==='caixa'" :abrir-id="partes[1]"/>
-        <Definicoes v-else-if="ecra==='definicoes' && !partes[1]"/>
+        <Definicoes v-else-if="ecra==='definicoes' && !partes[1]" :grupos-app="APP.defs" :nome-app="APP.nome"/>
         <DefConsulta v-else-if="ecra==='definicoes' && ['caixas','utilizadores'].includes(partes[1])" :chave="partes[1]" :key="partes[1]"/>
         <DefLista v-else-if="ecra==='definicoes'" :chave="partes[1]" :key="partes[1]"/>
         <Tarefas v-else-if="ecra==='tarefas'"/>

@@ -418,7 +418,7 @@
 
 		const lista = document.createElement("div");
 		lista.className = "orbit-lista";
-		for (const i of g.membros) lista.appendChild(cartao(i));
+		for (const i of g.membros) lista.appendChild(i.__virtual ? cartaoApp(i) : cartao(i));
 		sec.appendChild(lista);
 		return sec;
 	}
@@ -448,6 +448,61 @@
 		return icone.link_type === "External" || APPS_PROPRIAS.has(icone.label);
 	}
 
+	/* ── 22-11-2026 (Vítor, maqueta docs/orbit-interface/apps/): uma app por área ─────────────────────────────
+	 * Com a interface nova ligada no tenant, os blocos passam a Trabalho · Pessoas · Gestão · Operações · Sistema. O
+	 * primeiro cartão de cada bloco (a vermelho) é a app — abre-a no seu separador; os outros abrem essa app já na
+	 * secção (o separador da app é reutilizado). O resto da página (saudação, fundos, logótipos) fica como estava. */
+	const NOMES_APP = { crm: "CRM", projetos: "Projetos", rh: "RH", gestao: "Gestão", operacoes: "Operações", admin: "Administração" };
+	const novaLigada = () => !!(frappe.boot.orbit_apps && frappe.boot.orbit_apps.interface_nova);
+	const APP_DO_ICONE = {
+		"Frappe CRM": ["crm", ""], "Helpdesk": ["crm", "#/caixa"], "Sign": ["crm", "#/assinaturas"],
+		"Projects": ["projetos", ""], "Frappe HR": ["rh", ""],
+		"HR Setup": ["rh", "#/definicoes"], "Recruitment": ["rh"], "Leaves": ["rh"], "Performance": ["rh"], "Tenure": ["rh"],
+		"Shift & Attendance": ["rh"], "Payroll": ["rh"], "Expenses": ["rh"], "Tax & Benefits": ["rh"],
+		"Invoicing": ["gestao"], "Payments": ["gestao"], "Banking": ["gestao"], "Taxes": ["gestao"], "Budget": ["gestao"],
+		"Financial Reports": ["gestao"], "Accounts Setup": ["gestao", "#/definicoes"], "Account Setup": ["gestao", "#/definicoes"],
+		"Subscription": ["gestao"], "Share Management": ["gestao"], "Accounting": ["gestao"],
+		"Selling": ["operacoes"], "Buying": ["operacoes"], "Stock": ["operacoes"], "Assets": ["operacoes"], "Manufacturing": ["operacoes"],
+		"Subcontracting": ["operacoes"], "Quality": ["operacoes"], "Organization": ["operacoes"],
+		"ERPNext Settings": ["admin"], "Users": ["admin"], "Website": ["admin"], "Integrations": ["admin"], "Automation": ["admin"],
+		"Data": ["admin"], "Email": ["admin"], "Printing": ["admin"], "System": ["admin"],
+	};
+	// A app inteira (sem secção): o cartão leva-a ao ecrã inicial dela.
+	const E_APP = { "Frappe CRM": 1, "Projects": 1, "Frappe HR": 1 };
+	function destinoNovo(icone) {
+		if (!novaLigada()) return null;
+		const m = APP_DO_ICONE[icone.label];
+		if (!m) return null;
+		let hash = m[1];
+		// Módulos do ERP com barra lateral própria abrem dentro da app, nessa barra.
+		if (hash === undefined) hash = icone.link_type === "Workspace Sidebar" && icone.link_to ? "#/erp-m/" + encodeURIComponent(icone.link_to) : "";
+		return { app: m[0], url: "/orbit?app=" + m[0] + (hash || ""), seccao: !E_APP[icone.label] };
+	}
+	// Os cartões das apps que não têm ícone próprio na secretária (Gestão, Operações, Administração).
+	function cartaoApp(v) {
+		const a = document.createElement("a");
+		a.className = "orbit-cartao orbit-cartao--app";
+		a.href = "/orbit?app=" + v.__virtual;
+		a.target = "orbit-" + v.__virtual;
+		a.title = v.label;
+		a.innerHTML = (v.__img ? `<img class="orbit-cartao-img" alt="">` : `<span class="orbit-cartao-vazio"></span>`) + `<span class="orbit-cartao-nome"></span>`;
+		if (v.__img) a.querySelector(".orbit-cartao-img").src = v.__img;
+		a.querySelector(".orbit-cartao-nome").textContent = v.label;
+		return a;
+	}
+	const GRUPOS_NOVOS = [
+		{ titulo: "Trabalho", nota: "Clientes, equipa e o dia-a-dia",
+			itens: ["Frappe CRM", "Helpdesk", "Projects", "Mail", "Docs", "Sign", "Meet", "Chat", "Wiki", "Booking", "Marketing", "Events", "Social"] },
+		{ titulo: "Pessoas", nota: "Recursos humanos",
+			itens: ["Frappe HR", "Recruitment", "Leaves", "Performance", "Tenure", "Shift & Attendance", "Payroll", "Expenses", "Tax & Benefits", "HR Setup"] },
+		{ titulo: "Gestão", nota: "Dinheiro, contratos e obrigações", app: ["gestao", "Gestão", "Accounting"],
+			itens: ["Invoicing", "Payments", "Banking", "Taxes", "Budget", "Financial Reports", "Subscription", "Share Management", "Accounting", "Accounts Setup", "Account Setup"] },
+		{ titulo: "Operações", nota: "O que se compra, produz e vende", app: ["operacoes", "Operações", "Stock"],
+			itens: ["Propostas", "Selling", "Buying", "Stock", "Assets", "Manufacturing", "Subcontracting", "Quality", "Organization"] },
+		{ titulo: "Sistema", nota: "Configuração da plataforma · só administradores", app: ["admin", "Administração", "System"],
+			itens: ["ERPNext Settings", "Users", "Website", "Integrations", "Automation", "Data", "Email", "Printing", "System", "Support", "Home", "My Workspaces"] },
+	];
+
 	function cartao(icone) {
 		const fechada = inactiva(icone);
 		const a = document.createElement("a");
@@ -468,6 +523,21 @@
 			return a;
 		}
 		a.href = frappe.utils.get_route_for_icon(icone) || "#";
+		const destino = destinoNovo(icone);
+		if (destino) {
+			a.href = destino.url;
+			a.target = "orbit-" + destino.app;
+			if (!destino.seccao) a.classList.add("orbit-cartao--app");
+			a.title = nomeVisivel(icone.label);
+			const url = frappe.utils.get_desktop_icon(icone.label, frappe.boot.desktop_icon_style);
+			const fonte = (icone.icon_type !== "Folder" && url) || icone.logo_url || icone.icon_image;
+			a.innerHTML = (fonte ? `<img class="orbit-cartao-img" alt="">` : `<span class="orbit-cartao-vazio"></span>`) +
+				`<span class="orbit-cartao-nome"></span>` + (destino.seccao ? `<span class="orbit-cartao-app"></span>` : "");
+			if (fonte) a.querySelector(".orbit-cartao-img").src = fonte;
+			a.querySelector(".orbit-cartao-nome").textContent = nomeVisivel(icone.label);
+			if (destino.seccao) a.querySelector(".orbit-cartao-app").textContent = NOMES_APP[destino.app] + " ›";
+			return a;
+		}
 		// Cada APP abre no seu próprio separador, com NOME.
 		//
 		// Estava incoerente: as apps de fora abriam em separador novo e as do
@@ -505,11 +575,17 @@
 
 		const visiveis = icones.filter((i) => !i.hidden && !i.parent_icon);
 		const usados = new Set();
-		const grupos = GRUPOS.map((g) => {
+		const grupos = (novaLigada() ? GRUPOS_NOVOS : GRUPOS).map((g) => {
 			const membros = g.itens
 				.map((r) => visiveis.find((i) => i.label === r))
 				.filter(Boolean);
 			membros.forEach((m) => usados.add(m.label));
+			// 22-11-2026: a app do bloco à cabeça (Gestão, Operações, Administração não têm ícone próprio).
+			if (g.app && membros.length) {
+				const base = visiveis.find((i) => i.label === g.app[2]);
+				const url = base && frappe.utils.get_desktop_icon(base.label, frappe.boot.desktop_icon_style);
+				membros.unshift({ __virtual: g.app[0], label: g.app[1], __img: (base && ((base.icon_type !== "Folder" && url) || base.logo_url || base.icon_image)) || "" });
+			}
 			return { ...g, membros };
 		}).filter((g) => g.membros.length);
 

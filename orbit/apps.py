@@ -102,4 +102,6 @@ def acrescentar_ao_boot(bootinfo) -> None:
             for nome, d in APPS.items() if nome not in act
         },
         "portal": PORTAL,
+        # 22-11-2026: com a interface nova, a grelha abre as apps do /orbit (uma app por separador).
+        "interface_nova": bool(frappe.conf.get("orbit_interface_nova")),
     }
