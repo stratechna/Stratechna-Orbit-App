@@ -1247,3 +1247,8 @@ body:has(.wiki-page-content) .doc-sidebar .sidebar-item-active a { color: #fff !
 .orbit-cartao-app{display:block;font-size:10.5px;color:#8a98a3;margin-top:1px;line-height:1.2}
 
 /* 22-11-2026: textos do Helpdesk sem tradução no aviso dos campos — ver translations/pt.csv */
+
+/* 22-11-2026: secretária dentro do /orbit — só o conteúdo */
+html.orbit-embutida header.navbar,html.orbit-embutida .navbar,html.orbit-embutida .body-sidebar-container,html.orbit-embutida .layout-side-section,html.orbit-embutida .desk-sidebar{display:none!important}
+html.orbit-embutida .page-container,html.orbit-embutida .main-section{margin-top:0!important}
+html.orbit-embutida body{padding-top:0!important}
