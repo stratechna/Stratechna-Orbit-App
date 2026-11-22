@@ -582,7 +582,7 @@
 			membros.forEach((m) => usados.add(m.label));
 			// 22-11-2026: a app do bloco à cabeça (Gestão, Operações, Administração não têm ícone próprio).
 			if (g.app && membros.length) {
-				const base = visiveis.find((i) => i.label === g.app[2]);
+				const base = visiveis.find((i) => i.label === g.app[2]) || membros[0];
 				const url = base && frappe.utils.get_desktop_icon(base.label, frappe.boot.desktop_icon_style);
 				membros.unshift({ __virtual: g.app[0], label: g.app[1], __img: (base && ((base.icon_type !== "Folder" && url) || base.logo_url || base.icon_image)) || "" });
 			}
