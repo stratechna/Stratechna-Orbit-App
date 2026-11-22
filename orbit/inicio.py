@@ -70,7 +70,8 @@ def _bloco(fn, *a):
 
 # ── Faturação ────────────────────────────────────────────────────────────────
 def _portal_faturacao(periodo: str):
-	base = (frappe.conf.get("orbit_portal_url") or "").rstrip("/")
+	# O Orbit da casa só tem o endereço do tempo (`…/api/v1/orbit/tempo`); a raiz do portal tira-se dele.
+	base = (frappe.conf.get("orbit_portal_url") or (frappe.conf.get("orbit_portal_tempo_url") or "").split("/api/")[0]).rstrip("/")
 	seg = frappe.conf.get("orbit_portal_segredo")
 	if not base or not seg:
 		return None
