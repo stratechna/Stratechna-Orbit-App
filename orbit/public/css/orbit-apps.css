@@ -31,9 +31,10 @@ html:root[data-theme="light"] {
 	--orbit-accao: #b20009;
 	--orbit-accao-hover: #8c0007;
 	--orbit-accao-activo: #730006;
-	--orbit-estrutura: #1a2a33;
-	--orbit-estrutura-2: #22343f;
-	--orbit-estrutura-3: #2c414e;
+	/* 22-11-2026 (Vítor): a grafite da barra lateral do portal (#161a1d) */
+	--orbit-estrutura: #161a1d;
+	--orbit-estrutura-2: #20252a;
+	--orbit-estrutura-3: #2a3036;
 
 	--surface-gray-1: oklch(97.9% .004 235);
 	--surface-gray-2: oklch(96.3% .006 235);

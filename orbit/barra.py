@@ -94,7 +94,7 @@ _GUIAO = r"""
   var sitio = qs.sitio || 'baixo-esquerda';
   var css = [
     '#orbit-barra-botao{position:fixed;z-index:2147483000;width:44px;height:44px;border-radius:50%;border:0;cursor:pointer;',
-    'background:#22303d;color:#fff;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.28);padding:0}',
+    'background:#161a1d;color:#fff;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.28);padding:0}',
     '#orbit-barra-botao:hover{background:#b20009}',
     '#orbit-barra-botao svg{width:20px;height:20px}',
     '#orbit-barra-botao.baixo-esquerda{left:16px;bottom:16px}#orbit-barra-botao.baixo-direita{right:16px;bottom:16px}',

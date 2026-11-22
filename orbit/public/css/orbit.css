@@ -455,7 +455,7 @@ a.orbit-agenda-linha:focus-visible {
 	width: 13px;
 	height: 13px;
 	border-radius: 3px;
-	background: #22303d;
+	background: #161a1d;
 	opacity: 0.5;
 }
 
@@ -1116,7 +1116,7 @@ body[data-path="login"] .page-card, body[data-path="login"] .page-card * { font-
 
 /* A doca (os símbolos dos módulos, à esquerda) em ardósia. */
 .dock {
-	background: #1a2a33 !important;
+	background: #161a1d !important;
 	border-right-color: rgba(0, 0, 0, .25) !important;
 	--icon-stroke: #cfd7de;
 	--text-color: #e4e9ed;
@@ -1254,7 +1254,7 @@ html.orbit-embutida .page-container,html.orbit-embutida .main-section{margin-top
 html.orbit-embutida body{padding-top:0!important}
 
 /* ── 22-11-2026: o Wiki com o aspecto do Orbit (pedido do Vítor: rebranding de todas as apps) ─────────────────── */
-.wiki-navbar{background:#22303d!important;border-bottom:0!important;min-height:56px;box-shadow:0 1px 0 rgba(0,0,0,.2)}
+.wiki-navbar{background:#161a1d!important;border-bottom:0!important;min-height:56px;box-shadow:0 1px 0 rgba(0,0,0,.2)}
 .wiki-navbar,.wiki-navbar a,.wiki-navbar .nav-link,.wiki-navbar button,.wiki-navbar svg{color:#e6ecef!important;stroke:currentColor}
 .wiki-navbar .navbar-brand img{height:28px!important;width:auto;filter:brightness(0) invert(1)}
 .wiki-navbar .navbar-brand::after{content:"Wiki";font:600 15px "DM Sans",system-ui,sans-serif;color:#fff;margin-left:10px;vertical-align:middle}
