@@ -1167,6 +1167,22 @@ def _perfil(email: str):
     if ult:
         out["ultimo_contacto"] = {"data": str(ult[0].communication_date), "meio": ult[0].communication_medium}
     out["encontrado"] = bool(out["contacto"] or out["organizacao"] or out["lead"])
+    # 22-11-2026: os estados em português (a coluna do webmail mostrava «New», «Open»…). O pedido vem do portal, sem
+    # a língua de ninguém: força-se o pt da casa.
+    try:
+        from orbit.interface.api import _rotulo_estado
+        frappe.local.lang = "pt"
+        if out.get("lead"):
+            out["lead"]["estado"] = _rotulo_estado(out["lead"].get("estado"))
+        for d in out.get("negocios") or []:
+            d["estado"] = _rotulo_estado(d.get("estado"))
+        if out.get("organizacao") and out["organizacao"].get("estado"):
+            out["organizacao"]["estado"] = _rotulo_estado(out["organizacao"]["estado"])
+        for c in (out.get("casos") or []) + (out.get("bilhetes") or []):
+            if c.get("estado"):
+                c["estado"] = _rotulo_estado(c["estado"])
+    except Exception:
+        pass
     return out
 
 

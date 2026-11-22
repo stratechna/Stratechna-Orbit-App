@@ -452,10 +452,10 @@
 	 * Com a interface nova ligada no tenant, os blocos passam a Trabalho · Pessoas · Gestão · Operações · Sistema. O
 	 * primeiro cartão de cada bloco (a vermelho) é a app — abre-a no seu separador; os outros abrem essa app já na
 	 * secção (o separador da app é reutilizado). O resto da página (saudação, fundos, logótipos) fica como estava. */
-	const NOMES_APP = { crm: "CRM", projetos: "Projetos", rh: "RH", gestao: "Gestão", operacoes: "Operações", admin: "Administração" };
+	const NOMES_APP = { crm: "CRM", desk: "Desk", projetos: "Projetos", rh: "RH", gestao: "Gestão", operacoes: "Operações", admin: "Administração" };
 	const novaLigada = () => !!(frappe.boot.orbit_apps && frappe.boot.orbit_apps.interface_nova);
 	const APP_DO_ICONE = {
-		"Frappe CRM": ["crm", ""], "Helpdesk": ["crm", "#/caixa"], "Sign": ["crm", "#/assinaturas"],
+		"Frappe CRM": ["crm", ""], "Helpdesk": ["desk", ""], "Sign": ["crm", "#/assinaturas"],
 		"Projects": ["projetos", ""], "Frappe HR": ["rh", ""],
 		"HR Setup": ["rh", "#/definicoes"], "Recruitment": ["rh"], "Leaves": ["rh"], "Performance": ["rh"], "Tenure": ["rh"],
 		"Shift & Attendance": ["rh"], "Payroll": ["rh"], "Expenses": ["rh"], "Tax & Benefits": ["rh"],
@@ -468,7 +468,7 @@
 		"Data": ["admin"], "Email": ["admin"], "Printing": ["admin"], "System": ["admin"],
 	};
 	// A app inteira (sem secção): o cartão leva-a ao ecrã inicial dela.
-	const E_APP = { "Frappe CRM": 1, "Projects": 1, "Frappe HR": 1 };
+	const E_APP = { "Frappe CRM": 1, "Helpdesk": 1, "Projects": 1, "Frappe HR": 1 };
 	function destinoNovo(icone) {
 		if (!novaLigada()) return null;
 		const m = APP_DO_ICONE[icone.label];

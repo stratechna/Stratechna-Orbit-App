@@ -5614,3 +5614,200 @@ yyyy-mm-dd,aaaa-mm-dd
 "⚠️ No class found for doctype: {0}, it is mandatory to have a class for the parent doctype. it can be empty, but it should be present.","⚠️ Nenhuma classe encontrada para o doctype: {0}; é obrigatório existir uma classe para o doctype principal. Pode estar vazia, mas tem de existir."
 ⚠️ No data found for parent field: {0},⚠️ Nenhum dado encontrado para o campo principal: {0}
 ⚠️ No row found for idx: {0} in parent field: {1},⚠️ Nenhuma linha encontrada para idx: {0} no campo principal: {1}
+AI Agents,Agentes de IA
+Accepted Stock Value Difference,Diferença de valor de stock aceite
+Accounts and Transaction Details,Contas e detalhes das transações
+Actual End date (via Timesheet),Data de fim real (pela folha de horas)
+Actual Start date (via Timesheet),Data de início real (pela folha de horas)
+Actual Time in hours (via Timesheet),Tempo real em horas (pela folha de horas)
+Add Search Bar,Acrescentar barra de pesquisa
+Additional Terms,Condições adicionais
+Adjustment Entry,Lançamento de ajuste
+Agent Instructions,Instruções do agente
+Allow Leave Application After (Calendar Days),Permitir pedido de ausência depois de (dias de calendário)
+Allow documents to be created from an uploaded file,Permitir criar documentos a partir de um ficheiro carregado
+Annual Gross Earning,Rendimento bruto anual
+App Switcher List,Lista do seletor de apps
+App Switcher Logo,Logótipo do seletor de apps
+Application Web Form Route,Endereço do formulário de candidatura
+Approved By,Aprovado por
+Ask for contact details,Pedir os contactos
+Assignment Starts From,Atribuição começa em
+Audits,Auditorias
+Background Job,Tarefa em segundo plano
+Bank Reconciliation,Reconciliação bancária
+Base and Variable,Base e variável
+"Base, Variable & Leave Encashment","Base, variável e pagamento de férias"
+Benefit Application,Pedido de benefício
+Benefit Claim,Reclamação de benefício
+Boarding Status,Estado da integração
+Broken Links Report,Relatório de ligações partidas
+CRM Availability,Disponibilidade no CRM
+CRM Availability Changed By,Disponibilidade no CRM alterada por
+CRM Availability Changed On,Disponibilidade no CRM alterada em
+CTC Break-up,Decomposição do custo total
+Calculate Component Amount From,Calcular o valor da componente a partir de
+Changes Requested,Alterações pedidas
+Chart of Accounts,Plano de contas
+Classic,Clássico
+Client,Cliente
+Collapse Sidebar Groups,Recolher grupos da barra lateral
+Compare Changes,Comparar alterações
+Compensation,Remuneração
+Components,Componentes
+Cost,Custo
+Costing Dashboard,Painel de custos
+Costing Details,Detalhes de custos
+Daily time to send,Hora diária de envio
+Dark Mode Logo,Logótipo do modo escuro
+Day Book,Diário
+Default Wiki Space,Espaço do Wiki por omissão
+Delivered,Entregue
+Design File,Ficheiro de design
+Design Name,Nome do design
+Disable guest access,Desligar o acesso de convidados
+Email Read Tracker URL,Endereço de seguimento de leitura do email
+Email users for progress updates,Enviar email aos utilizadores com o ponto de situação
+Embedding,Incorporação
+Employee CTC Break-up,Decomposição do custo total do colaborador
+Employee Hours Utilization,Utilização das horas dos colaboradores
+Employer Contribution,Contribuição da entidade patronal
+Employer Contributions,Contribuições da entidade patronal
+Employment,Emprego
+Employment Policy,Política de emprego
+Enable Combobox Fields (Beta),Ligar campos de caixa de seleção (beta)
+Enable Feedback,Ligar opiniões
+Enable MCP,Ligar MCP
+Enable Multi-Currency Expense Claims,Ligar despesas em várias moedas
+Enable Table of Contents,Ligar índice
+Enable Upload First Workflow,Ligar fluxo com carregamento primeiro
+Exemption Declaration,Declaração de isenção
+Exemption Submission Proof,Comprovativo de isenção
+Expected End date,Data de fim prevista
+Expected Start date,Data de início prevista
+Expenses Settings,Definições das despesas
+Expiry time of QR Code Image Page,Validade da página da imagem do código QR
+Feedback Submission Limit,Limite de envio de opiniões
+First email,Primeiro email
+Frequency to collect progress,Frequência do ponto de situação
+From time,Hora de início
+Google Calender,Google Calendar
+Health Report,Relatório de saúde
+Hiring Pipeline,Funil de recrutamento
+Holiday List Assignment,Atribuição do calendário de feriados
+Holiday List End,Fim do calendário de feriados
+Holiday List Start,Início do calendário de feriados
+Interview Type Name,Nome do tipo de entrevista
+Inward Order,Encomenda de entrada
+Island,Ilha
+Item Group for New Items,Grupo de artigos para artigos novos
+Job Portal,Portal de emprego
+Leave & Holidays,Ausências e feriados
+Leave Balance Summary,Resumo do saldo de ausências
+Leave Policy Name,Nome da política de ausências
+Leave Settings,Definições das ausências
+Leave for optional holiday,Ausência em feriado facultativo
+Letter Body,Corpo da carta
+Letter Date,Data da carta
+Light Mode Logo,Logótipo do modo claro
+Link Display Mode,Modo de apresentação das ligações
+List title,Título da lista
+MCP Settings,Definições do MCP
+Model,Modelo
+My Workspaces,As minhas áreas de trabalho
+Navbar Items,Itens da barra de navegação
+New HTML,HTML novo
+New Sidebar Group,Grupo novo da barra lateral
+New Title,Título novo
+Notice Period (Days),Pré-aviso (dias)
+Notice Period During Probation (Days),Pré-aviso durante o período experimental (dias)
+Offer Valid Till,Proposta válida até
+Original HTML,HTML original
+Outward Order,Encomenda de saída
+Overview Dashboard,Painel geral
+Page Display,Apresentação da página
+Paper Size,Tamanho do papel
+Part Number,Referência da peça
+Pay Details,Dados de pagamento
+Pay via Payment Entry,Pagar por lançamento de pagamento
+Permission Manager,Gestor de permissões
+Prevent Duplicate Applications,Impedir candidaturas repetidas
+Previous Revision,Revisão anterior
+Print & Email,Impressão e email
+Print Format Editor,Editor de formatos de impressão
+Print the PDF,Imprimir o PDF
+Probation Period (Days),Período experimental (dias)
+Produce Item per Operation,Produzir artigo por operação
+Progress updates,Ponto de situação
+Public Holidays,Feriados
+Raised By Username,Aberto por (utilizador)
+Ready to Send,Pronto a enviar
+Receipt 58 mm,Talão 58 mm
+Receipt 80 mm,Talão 80 mm
+Receive,Receber
+Reconcile,Reconciliar
+Repost Accounting Ledger Settings,Definições do relançamento contabilístico
+Respondent Permissions,Permissões dos inquiridos
+Revision,Revisão
+Role & Joining,Função e admissão
+Sales Taxes,Impostos sobre vendas
+Second email,Segundo email
+Server Name,Nome do servidor
+Shared Page,Página partilhada
+Shift and Attendance,Turnos e assiduidade
+Shortlisted,Pré-selecionado
+Show Image in Link Fields,Mostrar imagem nos campos de ligação
+Show Organizational Chart to All Employees,Mostrar o organograma a todos os colaboradores
+Sign to show on appointment letter,Assinatura na carta de nomeação
+Sign to show on offer letter,Assinatura na carta de proposta
+Slack Channel,Canal do Slack
+Space Name,Nome do espaço
+Stock Ledger Entries of Cancelled Vouchers,Movimentos de stock de documentos anulados
+Stock Valuation Comparison,Comparação da valorização do stock
+Submission,Envio
+Submission Queue Timeout,Tempo limite da fila de envio
+Superseded,Substituído
+Task Name,Nome da tarefa
+Task Progress,Progresso da tarefa
+Terms of Appointment,Condições da nomeação
+Title & Content,Título e conteúdo
+To time,Hora de fim
+Tools,Ferramentas
+Total Billable amount (via Timesheet),Total faturável (pela folha de horas)
+Total Billed amount (via Sales Invoice),Total faturado (pelas faturas)
+Total Consumed Material Cost,Custo total do material consumido
+Total Cost To Company (CTC),Custo total para a empresa
+Total Cost to Company (CTC),Custo total para a empresa
+Total Sales amount (via Sales Order),Total de vendas (pelas encomendas)
+Use Classic Charts,Usar gráficos clássicos
+Use Redisearch for Search,Usar Redisearch na pesquisa
+Use SQLite for Search,Usar SQLite na pesquisa
+Value Adjustment Amount,Valor do ajuste
+Variable Name,Nome da variável
+Vue Component,Componente Vue
+Weekly time to send,Hora semanal de envio
+Wiki Broken Links,Ligações partidas do Wiki
+Wiki Feedback,Opiniões do Wiki
+Wiki Page,Página do Wiki
+Wiki Page Configurations,Configurações das páginas do Wiki
+Wiki Page Patch,Alteração de página do Wiki
+Wiki Page Patches,Alterações de páginas do Wiki
+Wiki Page Revision,Revisão de página do Wiki
+Wiki Page Revisions,Revisões de páginas do Wiki
+Wiki Pages,Páginas do Wiki
+Wiki Settings,Definições do Wiki
+Wiki Sidebars,Barras laterais do Wiki
+Wiki Space,Espaço do Wiki
+After Save,Depois de guardar
+After Save (Submitted Document),Depois de guardar (documento submetido)
+Asset Maintenance Log,Registo de manutenção de ativos
+Asset Maintenance Team,Equipa de manutenção de ativos
+Cellphone Number,Número de telemóvel
+Customer Addresses And Contacts,Moradas e contactos de clientes
+Item-wise Purchase Register,Registo de compras por artigo
+Item-wise Sales Register,Registo de vendas por artigo
+Registers,Registos
+Salary Register,Registo salarial
+Update Billed Amount in Delivery Note,Atualizar valor faturado na guia de remessa
+Ticket fields update,Campos dos bilhetes atualizados
+Some fields are now hidden from customers,Alguns campos passaram a estar escondidos dos clientes

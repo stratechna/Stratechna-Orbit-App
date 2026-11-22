@@ -551,7 +551,9 @@ a.orbit-agenda-linha:hover .orbit-agenda-meet { opacity: 0.9; }
 /* Em ecrãs estreitos a coluna passa para baixo dos blocos em vez de os
    espremer; abaixo de tablet sai, como já saía. */
 @media (max-width: 1100px) {
-	#orbit-corpo { flex-direction: column; }
+	/* 22-11-2026: em coluna, os blocos esticam à largura toda (com flex-start encolhiam a um ícone por linha). */
+	#orbit-corpo { flex-direction: column; align-items: stretch; }
+	#orbit-corpo > #orbit-grelha { width: 100%; }
 	#orbit-corpo > .orbit-agenda-caixa { width: 100%; flex-direction: row; }
 }
 
@@ -1243,3 +1245,5 @@ body:has(.wiki-page-content) .doc-sidebar .sidebar-item-active a { color: #fff !
 .orbit-cartao--app .orbit-cartao-img,.orbit-cartao--app .orbit-cartao-vazio{box-shadow:0 0 0 2px #b20009;border-radius:12px}
 .orbit-cartao--app .orbit-cartao-nome{font-weight:600;color:#b20009}
 .orbit-cartao-app{display:block;font-size:10.5px;color:#8a98a3;margin-top:1px;line-height:1.2}
+
+/* 22-11-2026: textos do Helpdesk sem tradução no aviso dos campos — ver translations/pt.csv */

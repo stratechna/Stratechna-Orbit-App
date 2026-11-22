@@ -2206,10 +2206,14 @@ const APP_ATUAL = (new URLSearchParams(location.search).get("app") || "crm").toL
 const APPS = {
   crm: { nome: "CRM", sub: "Clientes e atendimento", ic: "pessoa", inicio: "inicio",
     nav: [["inicio", "casa", "Início"], ["sec", "CRM"], ["contactos", "pessoa", "Contactos"], ["empresas", "empresa", "Empresas"], ["leads", "lead", "Leads"],
-      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"],
+      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"],
       ["sec", "O meu dia"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"], ["app/Booking", "relogio", "Marcar reuniões"],
       ["sec", "Documentos"], ["assinaturas", "assin", "Assinaturas"]],
-    modulos: [], defs: ["CRM", "Atendimento (Desk)", "Correio"] },
+    modulos: [], defs: ["CRM", "Correio"] },
+  // 22-11-2026 (Vítor): o Desk separado do CRM — quem só faz atendimento tem a sua app.
+  desk: { nome: "Desk", sub: "Atendimento", ic: "ticket", inicio: "caixa",
+    nav: [["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"]],
+    modulos: [], defs: ["Atendimento (Desk)", "Correio"] },
   projetos: { nome: "Projetos", sub: "Projetos, tarefas e tempo", ic: "projeto", inicio: "projetos",
     nav: [["sec", "Trabalho"], ["projetos", "projeto", "Projetos"], ["tarefas", "tarefa", "Tarefas"], ["calendario", "cal", "Calendário"], ["sec", "Tempo"], ["tempo", "relogio", "Registo de horas"]],
     modulos: ["Projects"], defs: ["Pessoas e tempo"] },

@@ -116,6 +116,10 @@ def _modulos():
             d = icones.get(nome)
             if not d or (restritos.get(nome) and not (restritos[nome] & papeis)):
                 continue
+            # 22-11-2026: um módulo de barra lateral sem barra que exista (ex.: «Accounting», com link vazio) não abria
+            # nada na interface — «Módulo desconhecido». Fica de fora.
+            if d.link_type == "Workspace Sidebar" and not frappe.db.exists("Workspace Sidebar", d.link_to or nome):
+                continue
             if d.link_type == "External" and d.link:
                 url = d.link
             else:
