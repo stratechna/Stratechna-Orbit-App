@@ -16,13 +16,13 @@ app_license = "agpl-3.0"
 #
 # SUBIR ESTE NÚMERO sempre que se mexer no CSS ou no JS.
 # 20-11-2026: «Rever texto» (orbit-corrector.js; corrector.py) — também carregado por www/crm.html e www/helpdesk
-app_include_js = ["/assets/orbit/js/orbit.js?v=32", "/assets/orbit/js/orbit-corrector.js?v=2"]
+app_include_js = ["/assets/orbit/js/orbit.js?v=32", "/assets/orbit/js/orbit-corrector.js?v=2", "/api/method/orbit.barra.barra_js?app=inicio"]
 app_include_css = "/assets/orbit/css/orbit.css?v=33"
 # As cores tambem nas paginas publicas — a entrada e a primeira coisa que
 # alguem ve, e e servida pelo lado do site e nao pela secretaria.
 web_include_css = "/assets/orbit/css/orbit.css?v=33"
 # 17-10-2026: na página de entrada, seguir para o portal (entrada única) quando o tenant o tem ligado
-web_include_js = "/assets/orbit/js/entrada.js?v=10"
+web_include_js = ["/assets/orbit/js/entrada.js?v=10", "/api/method/orbit.barra.barra_js?app=wiki"]
 
 # Sair do Orbit sai também do portal e do webmail (entrada_unica.ao_sair)
 on_logout = "orbit.entrada_unica.ao_sair"
