@@ -99,6 +99,8 @@ _GUIAO = r"""
     '#orbit-barra-botao svg{width:20px;height:20px}',
     '#orbit-barra-botao.baixo-esquerda{left:16px;bottom:16px}#orbit-barra-botao.baixo-direita{right:16px;bottom:16px}',
     '#orbit-barra-botao.topo-esquerda{left:12px;top:12px}#orbit-barra-botao.topo-direita{right:12px;top:12px}',
+    // no telemóvel as apps têm uma barra de navegação em baixo: o botão fica por cima dela
+    '@media (max-width:767px){#orbit-barra-botao.baixo-esquerda,#orbit-barra-botao.baixo-direita{bottom:76px}}',
     '#orbit-barra-botao.embutido{position:static;width:34px;height:34px;box-shadow:none;background:transparent;color:inherit}',
     '#orbit-barra-botao.embutido:hover{background:rgba(127,127,127,.15)}',
     '#orbit-barra-painel{position:fixed;z-index:2147483001;width:400px;max-width:calc(100vw - 24px);background:#fff;color:#1c2a31;',
