@@ -645,11 +645,22 @@ def mover(negocio: str, estado: str):
 # ── Caixa de entrada (como a do HubSpot: conversas, não a caixa de correio inteira) ───────────────────────
 # «Equipa» = caixas partilhadas ligadas ao CRM e tickets do Desk; «Privado» = as conversas da minha caixa pessoal
 # com contactos do CRM («só para mim», orbit_privado_de = eu). O resto do correio fica no Orbit Mail (SOGo).
+def _resp(a):
+    """O 1.º utilizador de um campo _assign (JSON)."""
+    try:
+        l = json.loads(a or "[]")
+        return l[0] if l else None
+    except Exception:
+        return None
+
+
 @frappe.whitelist()
-def caixa(grupo: str = "todos", conta: str = ""):
+def caixa(grupo: str = "todos", conta: str = "", minhas: int = 0):
     _guarda()
     u = frappe.session.user
     out = []
+    if conta == "minhas":
+        conta, grupo, minhas = "", "todos", 1
     if conta == "tickets":
         grupo = "tickets"
     if grupo in ("todos", "equipa", "tickets") and not (conta and conta != "tickets") and frappe.db.exists("DocType", "HD Ticket"):
@@ -658,7 +669,7 @@ def caixa(grupo: str = "todos", conta: str = ""):
                                  order_by="modified desc", limit=50):
             out.append({"tipo": "ticket", "grupo": "equipa", "id": t.name, "titulo": t.subject, "quem": t.raised_by,
                         "data": t.modified, "estado": _rotulo_estado(t.status), "url": f"/helpdesk/tickets/{t.name}",
-                        "atribuido": bool(t._assign and t._assign != "[]")})
+                        "atribuido": bool(t._assign and t._assign != "[]"), "responsavel": _resp(t._assign)})
     filtros = {"communication_medium": "Email", "communication_type": "Communication",
                "communication_date": [">", add_days(now_datetime(), -30)],
                "reference_doctype": ["in", ["Contact", "CRM Deal", "CRM Lead", "CRM Organization"]]}
@@ -675,18 +686,28 @@ def caixa(grupo: str = "todos", conta: str = ""):
     for e in frappe.get_list("Communication", filters=filtros,
                              fields=["name", "subject", "sender", "sender_full_name", "recipients", "communication_date",
                                      "sent_or_received", "reference_doctype", "reference_name", "email_account", "content",
-                                     "orbit_privado_de"], order_by="communication_date desc", limit=400):
+                                     "orbit_privado_de", "_assign"], order_by="communication_date desc", limit=400):
         chave = (e.reference_doctype, e.reference_name, re.sub(r"^(re|fw|fwd|enc|res)\s*:\s*", "", (e.subject or "").strip(), flags=re.I).lower())
         if chave in conversas:
             conversas[chave]["n"] += 1
+            if not conversas[chave].get("responsavel") and _resp(e.get("_assign")):
+                conversas[chave]["responsavel"] = _resp(e.get("_assign"))
             continue
         conversas[chave] = {"tipo": "email", "grupo": "privado" if e.orbit_privado_de else "equipa", "id": e.name,
                             "titulo": e.subject or "(sem assunto)", "quem": e.sender_full_name or e.sender, "data": e.communication_date,
                             "por_responder": e.sent_or_received == "Received", "n": 1,
                             "conta": (e.email_account or "").replace("Orbit CRM · ", ""),
                             "ref": [e.reference_doctype, e.reference_name], "ref_titulo": _titulo(e.reference_doctype, e.reference_name),
-                            "texto": _texto(e.content, 160)}
+                            "texto": _texto(e.content, 160), "responsavel": _resp(e.get("_assign"))}
     out += list(conversas.values())
+    if cint(minhas):
+        out = [i for i in out if i.get("responsavel") == u]
+    nomes = {}
+    for i in out:
+        r = i.get("responsavel")
+        if r and r not in nomes:
+            nomes[r] = frappe.db.get_value("User", r, "full_name") or r
+        i["responsavel_nome"] = nomes.get(r) if r else None
     out.sort(key=lambda i: str(i["data"] or ""), reverse=True)
     return out
 
@@ -694,6 +715,50 @@ def caixa(grupo: str = "todos", conta: str = ""):
 # ── Conversa e resposta dentro da caixa de entrada (20-11-2026) ─────────────────────────────────────────
 def _assunto_base(s):
     return re.sub(r"^((re|fw|fwd|enc|res|rv)\s*:\s*)+", "", (s or "").strip(), flags=re.I).lower()
+
+
+@frappe.whitelist()
+def equipa_atribuir():
+    """Quem pode ficar responsável por uma conversa: os utilizadores do Orbit activos."""
+    _guarda()
+    return [{"email": x.name, "nome": x.full_name or x.name} for x in frappe.get_all(
+        "User", filters={"enabled": 1, "user_type": "System User", "name": ["not in", ["Administrator", "Guest"]]},
+        fields=["name", "full_name"], order_by="full_name asc")]
+
+
+@frappe.whitelist(methods=["POST"])
+def atribuir_conversa(nome: str, utilizador: str = ""):
+    """Responsável por uma conversa da caixa de entrada (22-11-2026: a atribuição passa do webmail para aqui).
+    Usa a atribuição do próprio Frappe: o responsável recebe o aviso (sino e email) e a conversa entra em
+    «Atribuídas a mim». Uma conversa tem um só responsável: tira-se a atribuição de todas as mensagens dela."""
+    _guarda()
+    from frappe.desk.form import assign_to
+    c = frappe.get_doc("Communication", nome)
+    c.check_permission("read")
+    base = _assunto_base(c.subject)
+    filtros = {"communication_medium": "Email", "communication_type": "Communication"}
+    if c.reference_doctype:
+        filtros.update({"reference_doctype": c.reference_doctype, "reference_name": c.reference_name})
+    else:
+        filtros["name"] = c.name
+    msgs = [m for m in frappe.get_all("Communication", filters=filtros, fields=["name", "subject", "_assign"], limit=200)
+            if _assunto_base(m.subject) == base]
+    utilizador = (utilizador or "").strip()
+    if utilizador and not frappe.db.get_value("User", {"name": utilizador, "enabled": 1}):
+        frappe.throw("Utilizador desconhecido.")
+    for m in msgs:
+        try:
+            for quem in json.loads(m.get("_assign") or "[]"):
+                if quem != utilizador or m.name != nome:
+                    assign_to.remove("Communication", m.name, quem, ignore_permissions=True)
+        except Exception:
+            frappe.log_error(title="atribuir_conversa: tirar")
+    if utilizador and utilizador not in json.loads(frappe.db.get_value("Communication", nome, "_assign") or "[]"):
+        assign_to.add({"assign_to": [utilizador], "doctype": "Communication", "name": nome,
+                       "description": c.subject or "Conversa da caixa de entrada"}, ignore_permissions=True)
+    frappe.db.commit()
+    return {"ok": True, "responsavel": utilizador or None,
+            "responsavel_nome": frappe.db.get_value("User", utilizador, "full_name") if utilizador else None}
 
 
 @frappe.whitelist()
@@ -720,7 +785,10 @@ def conversa(nome: str):
         para = ultima.sender
     else:
         para = ultima.recipients
+    resp = next((_resp(frappe.db.get_value("Communication", m.name, "_assign")) for m in reversed(msgs)
+                 if _resp(frappe.db.get_value("Communication", m.name, "_assign"))), None)
     return {"assunto": c.subject, "ref": [c.reference_doctype, c.reference_name],
+            "responsavel": resp, "responsavel_nome": frappe.db.get_value("User", resp, "full_name") if resp else None,
             "ref_titulo": _titulo(c.reference_doctype, c.reference_name),
             "conta": conta, "de": frappe.db.get_value("Email Account", conta, "email_id") if conta else None,
             "pode_responder": bool(conta and pode_responder(conta)), "para": para, "responder_a": ultima.name,

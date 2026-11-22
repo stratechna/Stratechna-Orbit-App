@@ -1448,6 +1448,18 @@ const Caixa = {
     const canal = ref(c0); const canais = ref(null); const itens = ref(null); const conv = ref(null);
     const resposta = ref(""); const para = ref(""); const cc = ref(""); const aEnviar = ref(false); const verCc = ref(false);
     const carregar = async () => { itens.value = null; itens.value = await api("caixa", { grupo: canal.value.grupo, conta: canal.value.conta }); };
+    // 22-11-2026: a atribuição passa do Orbit Mail para aqui — um responsável por conversa, com aviso do Frappe.
+    const equipa = ref([]); const aAtribuir = ref(false);
+    const atribuir = async (u) => {
+      if (!conv.value || aAtribuir.value) return;
+      aAtribuir.value = true;
+      try {
+        const r = await api("atribuir_conversa", { nome: conv.value.responder_a, utilizador: u || "" }, true);
+        conv.value.responsavel = r.responsavel; conv.value.responsavel_nome = r.responsavel_nome;
+        toast(r.responsavel ? "Atribuída a " + (r.responsavel_nome || r.responsavel) : "Sem responsável");
+        carregar();
+      } finally { aAtribuir.value = false; }
+    };
     const escolher = (grupo, conta = "") => { canal.value = { grupo, conta }; try { localStorage.setItem("orbit.caixa.canal", JSON.stringify(canal.value)); } catch (e) {} carregar(); };
     const abrirConversa = async (id) => {
       conv.value = null; resposta.value = ""; cc.value = ""; verCc.value = false;
@@ -1457,7 +1469,7 @@ const Caixa = {
     };
     const abrir = (i) => { if (i.tipo === "ticket") { window.open(i.url, "_blank"); return; } location.hash = "#/caixa/" + encodeURIComponent(i.id); };
     watch(() => props.abrirId, (id) => { if (id) abrirConversa(id); });
-    onMounted(async () => { canais.value = await api("canais"); carregar(); if (props.abrirId) abrirConversa(props.abrirId); });
+    onMounted(async () => { canais.value = await api("canais"); carregar(); if (props.abrirId) abrirConversa(props.abrirId); equipa.value = await api("equipa_atribuir"); });
     const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const enviar = async () => {
       if (!resposta.value.trim() || aEnviar.value) return;
@@ -1472,10 +1484,11 @@ const Caixa = {
     const ativo = (g, c = "") => canal.value.grupo === g && (canal.value.conta || "") === c;
     const nomeCanal = computed(() => {
       const c = canal.value; if (c.grupo === "tickets") return "Tickets do Desk";
+      if (c.conta === "minhas") return "Atribuídas a mim";
       if (c.conta) return c.conta.replace("Orbit CRM · ", "");
       return c.grupo === "privado" ? "As minhas conversas" : "Todas as caixas de equipa";
     });
-    return { canal, canais, itens, conv, abrir, data, cor, ini, link, resposta, para, cc, verCc, enviar, aEnviar, escolher, ativo, nomeCanal };
+    return { canal, canais, itens, conv, abrir, data, cor, ini, link, resposta, para, cc, verCc, enviar, aEnviar, escolher, ativo, nomeCanal, equipa, atribuir, aAtribuir };
   },
   template: `
   <div class="caixa caixa3" :class="{'com-conv': !!abrirId}">
@@ -1484,6 +1497,7 @@ const Caixa = {
       <button :class="{ativo:ativo('equipa')}" @click="escolher('equipa')">Todas as caixas de equipa</button>
       <button v-for="c in canais?.equipa||[]" :key="c.conta" :class="{ativo:ativo('equipa',c.conta)}" @click="escolher('equipa',c.conta)"><span class="txt">{{ c.email }}</span><span class="n" v-if="c.n">{{ c.n }}</span></button>
       <button :class="{ativo:ativo('tickets','tickets')}" @click="escolher('tickets','tickets')"><span class="txt">Tickets do Desk</span><span class="n" v-if="canais?.tickets">{{ canais.tickets }}</span></button>
+      <button :class="{ativo:ativo('todos','minhas')}" @click="escolher('todos','minhas')"><span class="txt">Atribuídas a mim</span></button>
       <h6><span class="ponto-pr"></span>Privado <small>só você vê</small></h6>
       <button :class="{ativo:ativo('privado')}" @click="escolher('privado')">As minhas conversas</button>
       <button v-for="c in canais?.privado||[]" :key="c.conta" :class="{ativo:ativo('privado',c.conta)}" @click="escolher('privado',c.conta)"><span class="txt">{{ c.email }}</span><span class="n" v-if="c.n">{{ c.n }}</span></button>
@@ -1498,13 +1512,20 @@ const Caixa = {
         <span class="av" style="width:30px;height:30px;font-size:11px" :style="{background:cor(i.quem)}">{{ ini(i.quem) }}</span>
         <div style="min-width:0"><div class="linha1"><b>{{ i.quem }}</b><time>{{ data(i.data,false) }}</time></div><p>{{ i.titulo }}</p>
           <div class="meta"><span class="etq" :class="i.tipo==='ticket'?'ambar':i.grupo==='privado'?'roxo':'azul'">{{ i.tipo==='ticket' ? 'Ticket · ' + i.estado : i.grupo==='privado' ? 'Privado' : 'Equipa' }}</span>
-            <span class="sub" style="font-size:12px" v-if="i.ref_titulo">{{ i.ref_titulo }}</span><span class="sub" style="font-size:12px" v-if="i.n>1">· {{ i.n }}</span></div></div>
+            <span class="sub" style="font-size:12px" v-if="i.ref_titulo">{{ i.ref_titulo }}</span><span class="sub" style="font-size:12px" v-if="i.n>1">· {{ i.n }}</span>
+            <span class="etq" v-if="i.responsavel_nome" :title="'Responsável: ' + i.responsavel_nome">👤 {{ i.responsavel_nome }}</span></div></div>
       </div>
     </div>
     <div class="fio">
       <template v-if="conv">
         <header><a class="voltar-conv" href="#/caixa">← Conversas</a><div style="min-width:0"><h2>{{ conv.assunto }}</h2><div class="sub">{{ conv.mensagens.length }} mensagens<template v-if="conv.de"> · caixa {{ conv.de }}</template></div></div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap"><a v-if="conv.ref[0]" class="btn sm" :href="link(conv.ref[0], conv.ref[1])">Abrir {{ conv.ref_titulo }}</a></div></header>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <label class="sub" style="display:flex;align-items:center;gap:6px;font-size:12px">Responsável
+              <select class="btn sm" style="padding:4px 6px" :value="conv.responsavel || ''" :disabled="aAtribuir" @change="atribuir($event.target.value)">
+                <option value="">— ninguém —</option>
+                <option v-for="p in equipa" :key="p.email" :value="p.email">{{ p.nome }}</option>
+              </select></label>
+            <a v-if="conv.ref[0]" class="btn sm" :href="link(conv.ref[0], conv.ref[1])">Abrir {{ conv.ref_titulo }}</a></div></header>
         <div class="msgs">
           <div class="cartao msg" v-for="m in conv.mensagens" :key="m.id" :class="{nossa:m.enviado}">
             <header><b>{{ m.de }}</b><span>{{ data(m.data) }}</span></header>
