@@ -137,6 +137,15 @@ _GUIAO = r"""
       if (a.getAttribute('data-chave') === atual) { return; }
       var w = window.open(a.href, 'orbit-' + a.getAttribute('data-chave')); if (w) { w.focus(); }
     });
+    // Sítios conhecidos: a barra do Wiki e a da secretária do Frappe — o botão entra a seguir à marca.
+    if (!document.querySelector('[data-orbit-barra]')) {
+      var marca = document.querySelector('.wiki-navbar .navbar-brand, header.navbar .navbar-brand, .navbar .navbar-home');
+      if (marca && marca.parentNode) {
+        var s0 = document.createElement('span'); s0.setAttribute('data-orbit-barra', '');
+        s0.style.cssText = 'display:inline-flex;align-items:center;margin:0 6px';
+        marca.parentNode.insertBefore(s0, marca.nextSibling);
+      }
+    }
     // Sítio próprio na app (um elemento com data-orbit-barra), senão flutuante.
     var casa = document.querySelector('[data-orbit-barra]');
     if (casa) { b.classList.add('embutido'); casa.appendChild(b); } else { b.classList.add(sitio); document.body.appendChild(b); }

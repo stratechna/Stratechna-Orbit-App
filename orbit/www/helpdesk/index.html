@@ -2,4 +2,4 @@
     orbit/www/crm.py). «</body>» fica neste comentário para o Frappe não o
     embrulhar no modelo base do site. -#}
 {%- set pagina -%}{% include "helpdesk/www/helpdesk/index.html" %}{%- endset -%}
-{{ pagina | replace("</head>", '<link rel="stylesheet" href="/assets/orbit/css/orbit-apps.css?v=4"><script src="/assets/orbit/js/orbit-corrector.js?v=2" defer></script><script src="/api/method/orbit.barra.barra_js?app=desk" defer></script></head>', 1) }}
+{{ pagina | replace("</head>", '<link rel="stylesheet" href="/assets/orbit/css/orbit-apps.css?v=4"><script src="/assets/orbit/js/orbit-corrector.js?v=2" defer></script><script src="/api/method/orbit.barra.barra_js?app=desk&sitio=baixo-direita" defer></script></head>', 1) }}

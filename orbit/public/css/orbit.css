@@ -1252,3 +1252,15 @@ body:has(.wiki-page-content) .doc-sidebar .sidebar-item-active a { color: #fff !
 html.orbit-embutida header.navbar,html.orbit-embutida .navbar,html.orbit-embutida .body-sidebar-container,html.orbit-embutida .layout-side-section,html.orbit-embutida .desk-sidebar{display:none!important}
 html.orbit-embutida .page-container,html.orbit-embutida .main-section{margin-top:0!important}
 html.orbit-embutida body{padding-top:0!important}
+
+/* ── 22-11-2026: o Wiki com o aspecto do Orbit (pedido do Vítor: rebranding de todas as apps) ─────────────────── */
+.wiki-navbar{background:#22303d!important;border-bottom:0!important;min-height:56px;box-shadow:0 1px 0 rgba(0,0,0,.2)}
+.wiki-navbar,.wiki-navbar a,.wiki-navbar .nav-link,.wiki-navbar button,.wiki-navbar svg{color:#e6ecef!important;stroke:currentColor}
+.wiki-navbar .navbar-brand img{height:28px!important;width:auto;filter:brightness(0) invert(1)}
+.wiki-navbar .navbar-brand::after{content:"Wiki";font:600 15px "DM Sans",system-ui,sans-serif;color:#fff;margin-left:10px;vertical-align:middle}
+.wiki-navbar input,.wiki-navbar .search-bar,.wiki-navbar .form-control{background:rgba(255,255,255,.08)!important;border-color:rgba(255,255,255,.14)!important;color:#fff!important}
+.wiki-content a,.from-markdown a{color:#b20009}
+.dark .wiki-content a,.dark .from-markdown a{color:#ff6b72}
+.sidebar-item.active,.sidebar-item.active > a,.web-sidebar .active{border-left:3px solid #b20009!important;font-weight:600}
+.wiki-content h1,.wiki-content h2,.from-markdown h1,.from-markdown h2{letter-spacing:-.01em}
+.btn-primary{background:#b20009!important;border-color:#b20009!important}
