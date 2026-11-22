@@ -71,3 +71,56 @@ def verificar(texto=None, lingua=None):
 			or any(k in (regra.get("id") or "") for k in ("MORFOLOGIK", "HUNSPELL", "SPELLER")),
 		})
 	return {"lingua": (r.get("language") or {}).get("code"), "lingua_pessoa": pessoa, "erros": erros}
+
+
+# ── 22-11-2026: o corrector também nas apps de outro domínio (Chat, Docs, Meet, Sign, Booking) ────────────────────
+# Estas apps não têm sessão no Orbit; o pedido vem do browser delas. Aceita-se só de origens nossas (o mesmo domínio
+# do Orbit ou os da casa) e com limite por endereço. Pedido «simples» (form-urlencoded, sem credenciais) para não haver
+# pré-voo de CORS; a resposta leva Access-Control-Allow-Origin dessa origem.
+_ORIGENS_CASA = ("stratechna.com", "stratechna.pt", "webgate.pt", "mbontime.pt")
+
+
+def _origem_aceite(origem: str) -> bool:
+	from urllib.parse import urlparse
+	h = (urlparse(origem or "").hostname or "").lower()
+	if not h:
+		return False
+	proprio = (urlparse(frappe.utils.get_url()).hostname or "").lower()
+	raiz = ".".join(proprio.split(".")[-2:]) if proprio else ""
+	return any(h == d or h.endswith("." + d) for d in (*_ORIGENS_CASA, raiz) if d)
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+def verificar_externo(texto=None, lingua=None):
+	import json as _json
+	from frappe.rate_limiter import rate_limit  # noqa: F401  (o limite aplica-se abaixo, à mão)
+	from werkzeug.wrappers import Response
+	origem = frappe.get_request_header("Origin") or ""
+	if not _origem_aceite(origem):
+		return Response(_json.dumps({"erro": "origem"}), status=403, mimetype="application/json")
+	# 30 pedidos por minuto por endereço
+	chave = f"orbit:corrector-ext:{frappe.local.request_ip}"
+	n = frappe.cache.incrby(chave, 1)
+	if n == 1:
+		frappe.cache.expire(chave, 60)
+	cab = {"Access-Control-Allow-Origin": origem, "Vary": "Origin"}
+	if n > 30:
+		return Response(_json.dumps({"erro": "ocupado"}), status=429, mimetype="application/json", headers=cab)
+	conf = frappe.conf.get("orbit_corrector") or {}
+	texto = (texto or "")[:MAXIMO]
+	if not conf.get("auth") or not texto.strip():
+		return Response(_json.dumps({"lingua": None, "lingua_pessoa": "pt-PT", "erros": []}), mimetype="application/json", headers=cab)
+	lg = lingua if lingua in VARIANTES.values() else "pt-PT"
+	try:
+		r = _pedir(conf, texto, lg)
+	except requests.RequestException:
+		return Response(_json.dumps({"erro": "falhou"}), status=502, mimetype="application/json", headers=cab)
+	erros = []
+	for m in r.get("matches") or []:
+		regra = m.get("rule") or {}
+		erros.append({"offset": m.get("offset"), "length": m.get("length"), "message": m.get("message") or "",
+		              "replacements": [x.get("value") for x in (m.get("replacements") or [])[:5]],
+		              "ortografia": regra.get("issueType") == "misspelling"
+		              or any(k in (regra.get("id") or "") for k in ("MORFOLOGIK", "HUNSPELL", "SPELLER"))})
+	return Response(_json.dumps({"lingua": (r.get("language") or {}).get("code"), "lingua_pessoa": lg, "erros": erros}),
+	                mimetype="application/json", headers=cab)

@@ -209,6 +209,18 @@
     return (window.frappe && frappe.csrf_token) || window.csrf_token || ''
   }
   async function rever(texto) {
+    // 22-11-2026: nas apps de outro domínio (Chat, Docs, Meet, Sign, Booking) a barra de apps aponta para o Orbit do
+    // tenant — pedido simples, sem credenciais, para a rota aberta só às nossas origens.
+    if (window.ORBIT_CORRECTOR_EXTERNO) {
+      const r = await fetch(window.ORBIT_CORRECTOR_EXTERNO, {
+        method: 'POST', credentials: 'omit',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ texto }).toString(),
+      })
+      if (r.status === 429) throw new Error(t('O corrector está ocupado. Tente daqui a um momento.'))
+      if (!r.ok) throw new Error(t('Não foi possível rever o texto.'))
+      return await r.json()
+    }
     const r = await fetch('/api/method/orbit.corrector.verificar', {
       method: 'POST',
       credentials: 'same-origin',

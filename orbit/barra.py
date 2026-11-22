@@ -171,5 +171,17 @@ _GUIAO = r"""
     try { if (!window.name || window.name.indexOf('orbit-') !== 0) { window.name = 'orbit-' + (atual || 'app'); } } catch (e) {}
   }
   if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', montar); } else { montar(); }
+  // O corrector do Orbit também nas apps de outro domínio (o Mail tem o seu).
+  // No Wiki (mesmo domínio, páginas do site) o corrector entra pela via normal, com a sessão.
+  if (location.origin === D.base && atual === 'wiki' && !window.__orbitCorrectorCarregado && !document.querySelector('script[src*="orbit-corrector"]')) {
+    window.__orbitCorrectorCarregado = true;
+    var w = document.createElement('script'); w.src = '/assets/orbit/js/orbit-corrector.js?v=3'; w.async = true; document.head.appendChild(w);
+  }
+  if (location.origin !== D.base && atual !== 'mail' && !window.__orbitCorrectorCarregado) {
+    window.__orbitCorrectorCarregado = true;
+    window.ORBIT_CORRECTOR_EXTERNO = D.base + '/api/method/orbit.corrector.verificar_externo';
+    var c = document.createElement('script'); c.src = D.base + '/assets/orbit/js/orbit-corrector.js?v=3'; c.async = true;
+    document.head.appendChild(c);
+  }
 })();
 """
