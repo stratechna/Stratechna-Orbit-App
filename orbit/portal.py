@@ -1137,7 +1137,7 @@ def _perfil(email: str):
     if cn:
         c = frappe.get_doc("Contact", cn[0])
         org = _org_do_contacto(c)
-        out["contacto"] = {"nome": c.full_name or c.name, "cargo": c.designation, "telefone": c.mobile_no or c.phone,
+        out["contacto"] = {"id": c.name, "nome": c.full_name or c.name, "cargo": c.designation, "telefone": c.mobile_no or c.phone,
                            "url": _url_crm("contacts", c.name)}
     else:
         # sem contacto: a organização pelo domínio do email (se for de empresa e único)
@@ -1148,7 +1148,7 @@ def _perfil(email: str):
     if org:
         o = frappe.db.get_value("CRM Organization", org, ["name", "organization_name", "crm_account_id", "estado_conta",
                                                           "tipo_conta", "marca", "owner"], as_dict=True)
-        out["organizacao"] = {"nome": o.organization_name, "crm_account_id": o.crm_account_id, "estado": o.estado_conta,
+        out["organizacao"] = {"id": o.name, "nome": o.organization_name, "crm_account_id": o.crm_account_id, "estado": o.estado_conta,
                               "tipo": o.tipo_conta, "marca": o.marca, "url": _url_crm("organizations", o.name)}
         for d in frappe.get_all("CRM Deal", filters={"organization": org, "status": ["not in", ESTADOS_FECHADOS]},
                                 fields=["name", "titulo", "status", "deal_value", "deal_owner"], order_by="modified desc", limit=5):
@@ -1168,6 +1168,121 @@ def _perfil(email: str):
         out["ultimo_contacto"] = {"data": str(ult[0].communication_date), "meio": ult[0].communication_medium}
     out["encontrado"] = bool(out["contacto"] or out["organizacao"] or out["lead"])
     return out
+
+
+# ── Notas do CRM na coluna do webmail (22-11-2026, pedido do Vítor) ─────────────────────────────────────────
+# A coluna «Sobre quem escreveu» mostra as notas do remetente (empresa, contacto, negócios em curso, lead) e grava
+# notas novas. Ao gravar pergunta-se SEMPRE onde a nota fica — empresa, contacto, negócio ou lead, e qual — e só se
+# aceita um dos registos deste remetente. A nota fica em nome de quem a escreveu (o portal prova-o pelo webmail).
+
+def _alvos_notas(p):
+    alvos = []
+    if p.get("organizacao") and p["organizacao"].get("id"):
+        alvos.append({"doctype": "CRM Organization", "nome": p["organizacao"]["id"], "tipo": "empresa",
+                      "rotulo": p["organizacao"].get("nome") or p["organizacao"]["id"]})
+    if p.get("contacto") and p["contacto"].get("id"):
+        alvos.append({"doctype": "Contact", "nome": p["contacto"]["id"], "tipo": "contacto",
+                      "rotulo": p["contacto"].get("nome") or p["contacto"]["id"]})
+    for d in p.get("negocios") or []:
+        alvos.append({"doctype": "CRM Deal", "nome": d["id"], "tipo": "negocio", "rotulo": d.get("titulo") or d["id"]})
+    if p.get("lead"):
+        alvos.append({"doctype": "CRM Lead", "nome": p["lead"]["id"], "tipo": "lead",
+                      "rotulo": p["lead"].get("nome") or p["lead"]["id"]})
+    return alvos
+
+
+def _texto_nota(html, maximo=600):
+    import re
+    t = re.sub(r"<br\s*/?>|</p>|</div>|</li>", "\n", html or "", flags=re.I)
+    t = re.sub(r"<[^>]+>", "", t)
+    import html as _html
+    t = _html.unescape(t)
+    t = re.sub(r"\n{3,}", "\n\n", t).strip()
+    return t[:maximo] + ("…" if len(t) > maximo else "")
+
+
+def _notas(alvos, por=None, limite=8):
+    if not alvos:
+        return []
+    meta = frappe.get_meta("FCRM Note")
+    privado = meta.has_field("orbit_privado_de")
+    campos = ["name", "title", "content", "creation", "owner", "reference_doctype", "reference_docname"]
+    if privado:
+        campos.append("orbit_privado_de")
+    rot = {(a["doctype"], a["nome"]): a for a in alvos}
+    linhas = []
+    for dt in {a["doctype"] for a in alvos}:
+        nomes = [a["nome"] for a in alvos if a["doctype"] == dt]
+        linhas += frappe.get_all("FCRM Note", filters={"reference_doctype": dt, "reference_docname": ["in", nomes]},
+                                 fields=campos, order_by="creation desc", limit=limite * 2)
+    linhas.sort(key=lambda x: x.creation, reverse=True)
+    out = []
+    for n in linhas:
+        if privado and n.get("orbit_privado_de") and n.orbit_privado_de != por:
+            continue
+        a = rot.get((n.reference_doctype, n.reference_docname)) or {}
+        tipo = {"empresa": "Empresa", "contacto": "Contacto", "negocio": "Negócio", "lead": "Lead"}.get(a.get("tipo"), "")
+        out.append({"id": n.name, "titulo": n.title or "", "texto": _texto_nota(n.content), "quando": str(n.creation),
+                    "autor": _nome_utilizador(n.owner) or n.owner, "sobre": f"{tipo} · {a.get('rotulo', '')}".strip(" ·")})
+        if len(out) >= limite:
+            break
+    return out
+
+
+@frappe.whitelist()
+def perfil_remetente_notas(email: str, por: str = None):
+    """perfil_remetente + os registos onde se pode pôr uma nota + as últimas notas (para a coluna do webmail)."""
+    _so_portal()
+    p = _perfil(email)
+    if p.get("encontrado"):
+        p["alvos_nota"] = _alvos_notas(p)
+        # Para LER: o mesmo âmbito do botão «Actividade» do CRM (organização, contactos, todos os negócios e leads,
+        # também os fechados); para ESCREVER só os registos em curso (alvos_nota).
+        leitura = list(p["alvos_nota"])
+        try:
+            from orbit import actividade_crm as AC
+            base = ("Contact", p["contacto"]["id"]) if p.get("contacto") else \
+                   ("CRM Organization", p["organizacao"]["id"]) if p.get("organizacao") else None
+            if base:
+                amb = AC._ambito(*base)
+                vistos = {(a["doctype"], a["nome"]) for a in leitura}
+                for dt, ns in AC._refs(base[0], base[1], amb):
+                    for n in ns:
+                        if (dt, n) not in vistos:
+                            vistos.add((dt, n))
+                            d = amb["negocios"].get(n) if dt == "CRM Deal" else amb["leads"].get(n) if dt == "CRM Lead" else None
+                            tipo = {"CRM Deal": "negocio", "CRM Lead": "lead", "Contact": "contacto",
+                                    "CRM Organization": "empresa"}.get(dt, "")
+                            rot = (d and (d.get("organization") or d.get("lead_name"))) or n
+                            leitura.append({"doctype": dt, "nome": n, "tipo": tipo, "rotulo": rot})
+        except Exception:
+            frappe.log_error(title="perfil_remetente_notas: âmbito")
+        p["notas"] = _notas(leitura, por=(por or "").strip().lower() or None)
+    return p
+
+
+@frappe.whitelist(methods=["POST"])
+def gravar_nota(email: str, doctype: str, nome: str, texto: str, por: str = None):
+    """Grava uma nota escrita no webmail no registo escolhido pela pessoa (tem de ser um dos deste remetente)."""
+    _so_portal()
+    texto = (texto or "").strip()
+    if not texto:
+        return {"ok": False, "erro": "A nota está vazia."}
+    if len(texto) > 20000:
+        return {"ok": False, "erro": "A nota é demasiado longa."}
+    alvos = _alvos_notas(_perfil(email))
+    if not any(a["doctype"] == doctype and a["nome"] == nome for a in alvos):
+        return {"ok": False, "erro": "Esse registo não é deste remetente."}
+    paragrafos = [frappe.utils.escape_html(x).replace("\n", "<br>") for x in texto.split("\n\n")]
+    titulo = " ".join(texto.split())[:80]
+    doc = frappe.get_doc({"doctype": "FCRM Note", "title": titulo, "content": "".join(f"<p>{x}</p>" for x in paragrafos),
+                          "reference_doctype": doctype, "reference_docname": nome})
+    doc.insert(ignore_permissions=True)
+    quem = (por or "").strip().lower()
+    if quem and frappe.db.get_value("User", quem, "enabled"):
+        frappe.db.set_value("FCRM Note", doc.name, "owner", quem, update_modified=False)
+    frappe.db.commit()
+    return {"ok": True, "id": doc.name}
 
 
 def _alvo_crm(email: str):
