@@ -705,12 +705,17 @@ def procurar_emails(doctype: str, name: str):
 
 # ── Funil ───────────────────────────────────────────────────────────────────────────────────────────────
 @frappe.whitelist()
-def funil(responsavel: str = ""):
+def funil(responsavel: str = "", marca: str = ""):
     _guarda()
     estados = frappe.get_all("CRM Deal Status", fields=["name", "type", "color", "position"], order_by="position asc")
     filtros = {"status": ["not in", ["Lost"]]}
     if responsavel == "eu":
         filtros["deal_owner"] = frappe.session.user
+    # 23-11-2026: separadores de marca também no funil
+    from orbit.interface.marcas import lista as _marcas
+    tem_marca = frappe.get_meta("CRM Deal").has_field("marca")
+    if marca and tem_marca and frappe.db.exists("Brand", marca):
+        filtros["marca"] = marca
     negocios = frappe.get_list("CRM Deal", filters=filtros, fields=["name", "titulo", "organization", "lead_name", "status",
                                "deal_value", "deal_owner", "expected_closure_date", "modified", "closed_date"],
                                order_by="modified desc", limit=1000)
@@ -737,7 +742,7 @@ def funil(responsavel: str = ""):
                             "parado": (agora - d.modified).days if not t else 0})
         colunas.append({"estado": s.name, "rotulo": _rotulo_estado(s.name), "tipo": s.type, "cor": s.color,
                         "total": sum(c["valor"] for c in cartoes), "cartoes": cartoes})
-    return {"colunas": colunas}
+    return {"colunas": colunas, "marcas": _marcas() if tem_marca else []}
 
 
 @frappe.whitelist(methods=["POST"])

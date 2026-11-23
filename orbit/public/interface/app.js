@@ -1491,7 +1491,11 @@ const Ficha = {
 const Funil = {
   setup() {
     const d = ref(null); const resp = ref(""); const arrastar = ref(null); const alvo = ref("");
-    const carregar = async () => (d.value = await api("funil", { responsavel: resp.value }));
+    // 23-11-2026: separador da marca — o mesmo que o da lista dos negócios (partilham a escolha)
+    let m0 = ""; try { m0 = localStorage.getItem("orbit.marca.negocios") || ""; } catch (e) {}
+    const marca = ref(m0);
+    const carregar = async () => (d.value = await api("funil", { responsavel: resp.value, marca: marca.value }));
+    const escolherMarca = (m) => { marca.value = m; try { localStorage.setItem("orbit.marca.negocios", m); } catch (e) {} carregar(); };
     watch(resp, carregar); onMounted(carregar);
     const largar = async (col) => {
       const n = arrastar.value; alvo.value = ""; arrastar.value = null;
@@ -1500,13 +1504,17 @@ const Funil = {
     };
     const total = computed(() => d.value ? d.value.colunas.filter((c) => c.tipo !== "Won").reduce((a, c) => a + c.total, 0) : 0);
     const n = computed(() => d.value ? d.value.colunas.filter((c) => c.tipo !== "Won").reduce((a, c) => a + c.cartoes.length, 0) : 0);
-    return { d, resp, arrastar, alvo, largar, total, n, eur, link, data, FAIXA };
+    return { d, resp, arrastar, alvo, largar, total, n, eur, link, data, FAIXA, marca, escolherMarca };
   },
   template: `
   <div>
     <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <div><h1>Funil de negócios</h1><div class="sub">{{ n }} em curso · {{ eur(total) }} · ganhos dos últimos 30 dias</div></div>
       <div style="display:flex;gap:8px"><select class="btn" v-model="resp"><option value="">Todos os responsáveis</option><option value="eu">Só os meus</option></select><a class="btn" href="#/negocios">Lista</a></div>
+    </div>
+    <div class="vistas marcas-sep" v-if="d && (d.marcas||[]).length > 1">
+      <button :class="{ativo: !marca}" @click="escolherMarca('')">Todas as marcas</button>
+      <button v-for="m in d.marcas" :key="m" :class="{ativo: marca===m}" @click="escolherMarca(m)">{{ m }}</button>
     </div>
     <div v-if="!d" class="carregar">A carregar…</div>
     <div class="funil" v-else :style="{gridTemplateColumns:'repeat('+d.colunas.length+',minmax(230px,1fr))'}">
