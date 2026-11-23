@@ -440,6 +440,13 @@ def stock_artigo(item_code: str):
                                           "lida_em", "ausente_desde"])
     for m in movs:
         m["voucher_rotulo"] = _(m.voucher_type)
+    # 23-11-2026: cada oferta mostrada no armazém virtual do fornecedor (não contabilizado — orbit/inventario/armazens.py)
+    try:
+        from orbit.inventario.armazens import nome_do_virtual
+        for o in ofertas:
+            o["armazem"] = nome_do_virtual(o.supplier) or f"{o.supplier} (fornecedor)"
+    except Exception:  # noqa: BLE001
+        pass
     return {"artigo": {"item_code": art.item_code, "item_name": art.item_name, "stock_uom": art.stock_uom,
                        "image": art.image, "is_stock_item": art.is_stock_item},
             "armazens": bins, "movimentos": movs, "ofertas": ofertas,

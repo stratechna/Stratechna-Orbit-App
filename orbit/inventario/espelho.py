@@ -181,6 +181,7 @@ def _artigo(p: dict, canal, caches: dict) -> str:
     doc.disabled = 0 if p.get("publicacao") in (None, "", "publicado") else 1
     if isinstance(p.get("loja"), dict):
         doc.orbit_dados_loja = json.dumps(p["loja"], ensure_ascii=False, default=str)
+        preencher_loja(doc, p["loja"])
     doc.orbit_hash_espelho = _l(p.get("hash"), 64)
     doc.flags.ignore_permissions = True
     doc.flags.orbit_espelho = True
@@ -301,3 +302,79 @@ def receber_ficheiro(caminho: str) -> dict:
     with gzip.open(caminho, "rt", encoding="utf-8") as f:
         dados = json.load(f)
     return receber(dados)
+
+
+
+# ── 23-11-2026: os campos do produto da loja na ficha do artigo (campos.py ITEM_LOJA) ─────────────────────────────────
+def _texto(v) -> str:
+    """Lista/dicionário do feed → texto legível, uma entrada por linha («nome: valor»)."""
+    if v is None or v == "" or v == [] or v == {}:
+        return ""
+    if isinstance(v, dict):
+        return "\n".join(f"{k}: {_texto(x) if isinstance(x, (list, dict)) else x}" for k, x in v.items() if x not in (None, "", [], {}))
+    if isinstance(v, list):
+        out = []
+        for x in v:
+            if isinstance(x, dict):
+                nome = x.get("nome") or x.get("name") or x.get("titulo") or x.get("label") or x.get("chave")
+                valor = x.get("valor") or x.get("value") or x.get("url") or x.get("ficheiro")
+                out.append(f"{nome}: {valor}" if nome and valor else (str(nome or valor) if (nome or valor) else json.dumps(x, ensure_ascii=False)))
+            else:
+                out.append(str(x))
+        return "\n".join(out)
+    return str(v)
+
+
+def _dinheiro(v):
+    try:
+        return float(v) if v not in (None, "") else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+MAPA_LOJA = {   # campo da ficha ← campo do produto do feed
+    "orbit_ref_feed": "ref", "orbit_ean": "ean", "orbit_mpn": "mpn", "orbit_estado_publicacao": "estado_publicacao",
+    "orbit_tipo_fornecimento": "tipo_fornecimento", "orbit_transporte": "transporte", "orbit_tags_loja": "tags_loja",
+    "orbit_descricao_curta": "descricao_curta", "orbit_stock_feed": "stock", "orbit_estado_stock": "estado_stock",
+    "orbit_estado_stock_com_preco": "estado_stock_com_preco", "orbit_prazo_entrega": "prazo_entrega",
+    "orbit_prazo_entrega_com_preco": "prazo_entrega_com_preco", "orbit_data_reposicao": "data_reposicao",
+    "orbit_atributos": "atributos", "orbit_atributos_locais": "atributos_locais", "orbit_atributos_variacao": "atributos_variacao",
+    "orbit_especificacoes": "especificacoes", "orbit_o_que_vem_na_caixa": "o_que_vem_na_caixa",
+    "orbit_campos_personalizados": "campos_personalizados", "orbit_documentos": "documentos", "orbit_medidas_rever": "medidas_rever",
+    "orbit_cross_sell": "cross_sell_refs", "orbit_upsell": "upsell_refs", "orbit_fornecedor_feed": "fornecedor_nome",
+    "orbit_actualizado_feed": "actualizado_em", "orbit_pendente_ia": "pendente_ia",
+}
+DINHEIRO = {"orbit_custo": "custo", "orbit_preco_base": "preco_base", "orbit_preco_base_venda": "preco_base_venda",
+            "orbit_preco_pvp": "preco_pvp", "orbit_preco_regular": "preco_regular", "orbit_preco_promocional": "preco_promocional"}
+SIM_NAO = {"orbit_preco_congelado": "preco_congelado", "orbit_preco_sob_consulta": "preco_sob_consulta",
+           "orbit_categoria_confirmada_ia": "categoria_confirmada_ia"}
+
+
+def preencher_loja(doc, loja: dict) -> None:
+    if not doc.meta.has_field("orbit_ref_feed"):
+        return
+    for campo, k in MAPA_LOJA.items():
+        v = _texto(loja.get(k))
+        doc.set(campo, v[:140] if doc.meta.get_field(campo).fieldtype == "Data" else v[:60000])
+    for campo, k in DINHEIRO.items():
+        doc.set(campo, _dinheiro(loja.get(k)))
+    for campo, k in SIM_NAO.items():
+        doc.set(campo, 1 if loja.get(k) else 0)
+
+
+def preencher_todos(lote: int = 500) -> dict:
+    """Uma vez (e sempre que se queira): enche os campos novos a partir do produto já guardado, sem mexer no resto."""
+    feitos = 0
+    for nome in frappe.get_all("Item", filters={"orbit_dados_loja": ["is", "set"]}, pluck="name"):
+        try:
+            d = frappe.get_doc("Item", nome)
+            preencher_loja(d, json.loads(d.orbit_dados_loja or "{}"))
+            valores = {c: d.get(c) for c in list(MAPA_LOJA) + list(DINHEIRO) + list(SIM_NAO)}
+            frappe.db.set_value("Item", nome, valores, update_modified=False)
+            feitos += 1
+            if feitos % lote == 0:
+                frappe.db.commit()
+        except Exception:  # noqa: BLE001
+            frappe.log_error(title=f"Orbit inventário: campos da loja de {nome}")
+    frappe.db.commit()
+    return {"artigos": feitos}
