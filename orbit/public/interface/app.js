@@ -2861,7 +2861,8 @@ const ErpDesk = {
 const APP_ATUAL = (new URLSearchParams(location.search).get("app") || "crm").toLowerCase();
 const APPS = {
   crm: { nome: "CRM", sub: "Clientes e atendimento", ic: "pessoa", inicio: "inicio",
-    nav: [["inicio", "casa", "Início"], ["sec", "CRM"], ["leads", "lead", "Leads"], ["contactos", "pessoa", "Contactos"], ["empresas", "empresa", "Empresas"],
+    // 23-11-2026 (Vítor): a caixa de entrada (correio por IMAP, partilhadas, conversas do CRM, tickets) e o Chat na barra
+    nav: [["inicio", "casa", "Início"], ["caixa", "caixa", "Caixa de entrada"], ["chat", "chat", "Chat"], ["sec", "CRM"], ["leads", "lead", "Leads"], ["contactos", "pessoa", "Contactos"], ["empresas", "empresa", "Empresas"],
       ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"],
       ["sec", "O meu dia"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"],
       ["erp/FCRM%20Note", "nota", "Notas"], ["erp/CRM%20Call%20Log", "tel", "Chamadas"], ["app/Booking", "relogio", "Marcar reuniões"],
