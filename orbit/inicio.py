@@ -215,17 +215,19 @@ def _meu_dia():
 	u = frappe.session.user
 	hoje = nowdate()
 	out = {}
-	if _existe("ToDo"):
-		base = {"allocated_to": u, "status": "Open"}
-		out["atrasadas"] = cint(frappe.db.count("ToDo", {**base, "date": ["<", hoje]}))
-		out["hoje"] = cint(frappe.db.count("ToDo", {**base, "date": hoje}))
-		out["abertas"] = cint(frappe.db.count("ToDo", base))
-		out["tarefas"] = frappe.get_all("ToDo", filters=base, fields=["name", "description", "date", "reference_type", "reference_name"],
-			order_by="date asc", limit=12)
-		out["tarefas"] = sorted(out["tarefas"], key=lambda t: (t.date is None, str(t.date or ""), ))[:4]
-		for t in out["tarefas"]:
-			t["description"] = frappe.utils.strip_html(t.description or "")[:120]
-			t["atrasada"] = bool(t.date and str(t.date) < hoje)
+	# 23-11-2026: as tarefas são as da interface (CRM Task e tarefas de projeto, como em #/tarefas) — não os ToDo, que são
+	# sobretudo avisos de atribuição automática («Assignment for CRM Lead…») e davam 194 «atrasadas» que não o eram.
+	try:
+		from orbit.interface.trabalho import tarefas as _tarefas
+		lista = _tarefas("minhas")
+	except Exception:
+		lista = []
+	out["atrasadas"] = sum(1 for t in lista if t["grupo"] == "atrasadas")
+	out["hoje"] = sum(1 for t in lista if t["grupo"] == "hoje")
+	out["abertas"] = len(lista)
+	out["tarefas"] = [{"name": t["id"], "description": t["titulo"], "date": t["data"], "atrasada": t["grupo"] == "atrasadas",
+	                   "reference_type": (t.get("ref") or [None, None])[0], "reference_name": (t.get("ref") or [None, None])[1]}
+	                  for t in sorted(lista, key=lambda t: (t["data"] is None, t["data"] or ""))[:4]]
 	if _existe("Timesheet"):
 		seg = add_days(getdate(hoje), -getdate(hoje).weekday())
 		emp = frappe.db.get_value("Employee", {"user_id": u}, "name") if _existe("Employee") else None

@@ -741,6 +741,24 @@ try { if (window.self !== window.top && window.top.location.pathname.indexOf("/o
 		el.querySelectorAll(".oi-tabs button").forEach((b) => b.addEventListener("click", () => aoMudar(b.dataset.p)));
 	}
 
+	// 23-11-2026 (Vítor): nada na página inicial leva aos ecrãs antigos — CRM clássico, lista de ToDo, ERP do Frappe.
+	const NOVO_CRM = { deals: ["negocios", "negocio"], leads: ["leads", "lead"], contacts: ["contactos", "contacto"], organizations: ["empresas", "empresa"] };
+	const NOVO_APP = { "sales-invoice": ["gestao", "Sales Invoice"], "purchase-invoice": ["gestao", "Purchase Invoice"], "item": ["operacoes", "Item"],
+		"timesheet": null, "todo": null, "expense-claim": ["rh", "Expense Claim"] };
+	function urlNova(u) {
+		let m = /^\/crm\/(deals|leads|contacts|organizations)(?:\/([^?#]+))?/.exec(u || "");
+		if (m) return "/orbit#/" + (m[2] ? NOVO_CRM[m[1]][1] + "/" + m[2] : NOVO_CRM[m[1]][0]);
+		if (/^\/app\/todo/.test(u)) return "/orbit#/tarefas";
+		if (/^\/app\/timesheet/.test(u)) return "/orbit?app=projetos#/tempo";
+		m = /^\/app\/([a-z-]+)(?:\/([^?#]+))?/.exec(u || "");
+		if (m && NOVO_APP[m[1]]) return `/orbit?app=${NOVO_APP[m[1]][0]}#/erp/${encodeURIComponent(NOVO_APP[m[1]][1])}` + (m[2] ? "/" + m[2] : "");
+		return null;
+	}
+	function reescrever(el) {
+		if (!novaLigada() || !el) return;
+		el.querySelectorAll("a[href]").forEach((a) => { const n = urlNova(a.getAttribute("href")); if (n) { a.setAttribute("href", n); a.removeAttribute("target"); } });
+	}
+
 	function encherInicio(z) {
 		const carregar = (periodo) => {
 			z.negocio.classList.add("oi-a-carregar");
@@ -751,10 +769,11 @@ try { if (window.self !== window.top && window.top.location.pathname.indexOf("/o
 				z.dia.className = "oi-sec";
 				z.dia.innerHTML = meuDia(d);
 				z.act.innerHTML = actividade(d.atividade);
+				[z.negocio, z.dia, z.act].forEach(reescrever);
 				z.ultimo = d;
 			}).catch(() => z.negocio.classList.remove("oi-a-carregar"));
 		};
-		document.addEventListener("orbit-agenda", () => { if (z.ultimo) z.dia.innerHTML = meuDia(z.ultimo); });
+		document.addEventListener("orbit-agenda", () => { if (z.ultimo) { z.dia.innerHTML = meuDia(z.ultimo); reescrever(z.dia); } });
 		carregar(periodoGuardado());
 	}
 
