@@ -1530,7 +1530,7 @@ const DeskTicket = {
         <div class="desk-chips"><span class="etq" :class="corEstado(t.estado)">{{ (meta.estados.find(e=>e.v===t.estado)||{}).r || t.estado }}</span>
           <span class="etq" :class="{Urgent:'ambar',High:'ambar'}[t.prioridade]">{{ (meta.prioridades.find(e=>e.v===t.prioridade)||{}).r || t.prioridade }}</span>
           <span :class="t.atrasado ? 'etq ambar' : 'etq'">{{ t.sla || 'Sem SLA' }}</span>
-          <span v-if="t.avaliacao != null" class="etq" :class="t.avaliacao >= .9 ? 'verde' : t.avaliacao >= .5 ? '' : 'ambar'">Avaliação: {{ estrelas(t.avaliacao) }}</span></div></div>
+          <span v-if="t.inquerito === 'respondido' && t.avaliacao" class="etq" :class="t.avaliacao >= .9 ? 'verde' : t.avaliacao >= .5 ? '' : 'ambar'">Avaliação: {{ estrelas(t.avaliacao) }}</span></div></div>
       <div class="desk-acoes" v-if="t.pode_editar">
         <button v-if="!inicio" class="btn" @click="iniciar"><Icone n="relogio"/> Iniciar cronómetro</button>
         <button v-else class="btn cron-a-correr" @click="pararCron">⏹ {{ decorrido }} · Parar</button>
