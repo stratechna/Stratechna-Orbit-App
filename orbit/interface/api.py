@@ -664,6 +664,11 @@ def cronologia(doctype: str, name: str, tipo: str = ""):
         for nt in por_ref("FCRM Note", ["name", "title", "content", "creation", "owner"]):
             itens.append({"tipo": "nota", "id": nt.name, "data": nt.creation, "titulo": nt.title or "Nota",
                           "quem": _nome_user(nt.owner), "texto": _texto(nt.content, 600)})
+    if tipo in ("", "conversa"):   # 23-11-2026: a conversa interna com @menções (orbit/interface/conversa.py)
+        for c in por_ref("Comment", ["name", "content", "owner", "creation", "comment_type"], ref_dn="reference_name"):
+            if c.comment_type == "Comment":
+                itens.append({"tipo": "comentario", "id": c.name, "data": c.creation, "titulo": "Comentário",
+                              "quem": _nome_user(c.owner), "texto": _texto(c.content, 600)})
     if tipo in ("", "tarefas"):
         for t in por_ref("CRM Task", ["name", "title", "status", "due_date", "assigned_to", "creation", "description"]):
             futura = t.status not in ("Done", "Canceled")

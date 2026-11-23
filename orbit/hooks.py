@@ -81,7 +81,7 @@ _LINGUA = ["orbit.lingua.garantir"]
 # 05-11-2026: os emails no CRM (orbit/emails_crm.py; docs/PLANO-EMAILS-NO-CRM.md) — campos próprios
 _EMAILS_CRM = ["orbit.emails_crm.instalar"]
 # 20-11-2026: campos da interface /orbit (Responsável em contactos e empresas)
-_INTERFACE = ["orbit.interface.instalar.instalar", "orbit.interface.ciclo.instalar", "orbit.interface.marcas.instalar", "orbit.interface.detalhes.instalar", "orbit.fluxos_crm.instalar", "orbit.interface.formularios.instalar"]
+_INTERFACE = ["orbit.interface.conversa.instalar", "orbit.interface.instalar.instalar", "orbit.interface.ciclo.instalar", "orbit.interface.marcas.instalar", "orbit.interface.detalhes.instalar", "orbit.fluxos_crm.instalar", "orbit.interface.formularios.instalar"]
 _FATURACAO = ["orbit.faturacao.instalar.garantir"]   # DP8, 05-11-2026
 _BOOKING = ["orbit.booking.garantir"]   # O1/I1, 06-11-2026: negócio do CRM ligado à marcação do Booking
 # 10-11-2026: propostas comerciais por cima do Orçamento (orbit/propostas; docs/PLANO-PROPOSTAS-ORBIT.md)
@@ -98,7 +98,9 @@ scheduler_events = {
         # 05-11-2026 (DP8): faturação certificada — repetir o que ficou por emitir e ler anulações do programa
         "*/15 * * * *": ["orbit.faturacao.emissao.periodico", "orbit.interface.trabalho.lembretes"],
     },
-    "hourly": ["orbit.marketing.envio.contagens_do_dia", "orbit.marketing.automacoes.correr"],
+    # 23-11-2026: menções por ver há mais de 3 h seguem por email (orbit/interface/conversa.py)
+    "hourly": ["orbit.marketing.envio.contagens_do_dia", "orbit.marketing.automacoes.correr",
+               "orbit.interface.conversa.avisos_por_email"],
 }
 
 # Esta app não tem nada que valha a pena mostrar no ecrã de apps: é marca e
@@ -116,6 +118,8 @@ doc_events = {
              "on_update": "orbit.palavra_passe.gravado"},
     # 17-10-2026: cada bilhete nasce na equipa da sua marca (formulário, destinatário) ou em Triagem
     "HD Ticket": {"before_insert": "orbit.organizacao.ticket_equipa"},
+    # 23-11-2026: a @menção também vai para o telemóvel (Orbit instalado como app; orbit/interface/push.py)
+    "Notification Log": {"after_insert": "orbit.interface.push.aviso_criado"},
     "Communication": {"after_insert": ["orbit.organizacao.ticket_por_destinatario", "orbit.emails_crm.filtrar",
                                        "orbit.interface.ciclo.atividade", "orbit.interface.marcas.de_email"]},
     # 20-11-2026 (H4): fase do ciclo de vida e última actividade (orbit/interface/ciclo.py)
@@ -177,3 +181,6 @@ has_permission = {
 # remendo aplicado em cada pedido e em cada trabalho de fundo (a recolha do correio corre no agendador).
 before_request = ["orbit.remendo_enviados.aplicar"]
 before_job = ["orbit.remendo_enviados.aplicar"]
+
+# 23-11-2026: o service worker do Orbit (avisos no telemóvel) pode cuidar de /orbit (orbit/interface/push.py)
+after_request = ["orbit.interface.push.cabecalhos"]

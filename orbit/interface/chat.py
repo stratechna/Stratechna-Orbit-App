@@ -118,7 +118,7 @@ def _narrow(canal=None, topico=None, ids=None):
 
 
 @frappe.whitelist()
-def mensagens(canal: str = None, topico: str = None, ids: str = None):
+def mensagens(canal: str = None, topico: str = None, ids: str = None, marcar: int = 1):
     _guarda()
     lst_ids = [i for i in re.split(r"[,\s]+", ids or "") if i.isdigit()]
     d = _api("GET", "/messages", params={"anchor": "newest", "num_before": 100, "num_after": 0, "apply_markdown": "false",
@@ -132,9 +132,9 @@ def mensagens(canal: str = None, topico: str = None, ids: str = None):
                     "meu": (m.get("sender_email") or "").lower() == frappe.session.user.lower()})
         if "read" not in (m.get("flags") or []):
             por_ler.append(m["id"])
-    if por_ler:
+    if por_ler and cint(marcar):
         _api("POST", "/messages/flags", data={"messages": json.dumps(por_ler), "op": "add", "flag": "read"})
-    return {"ligado": True, "mensagens": out}
+    return {"ligado": True, "mensagens": out, "por_ler": len(por_ler)}
 
 
 @frappe.whitelist(methods=["POST"])

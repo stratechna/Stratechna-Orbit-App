@@ -87,7 +87,8 @@ const ICONES = {
 };
 const Icone = { props: ["n"], template: `<svg viewBox="0 0 24 24" v-html="html"></svg>`, computed: { html() { return ICONES[this.n] || ""; } } };
 const IC_EVENTO = { email: ["mail", "var(--cinza-bg)", "var(--ink-2)"], nota: ["nota", "var(--ambar-bg)", "var(--ambar)"], tarefa: ["tarefa", "var(--ambar-bg)", "var(--ambar)"],
-  chamada: ["tel", "var(--verde-bg)", "var(--verde)"], reuniao: ["cal", "var(--azul-bg)", "var(--azul)"], ticket: ["ticket", "var(--cinza-bg)", "var(--ink-2)"] };
+  chamada: ["tel", "var(--verde-bg)", "var(--verde)"], reuniao: ["cal", "var(--azul-bg)", "var(--azul)"], ticket: ["ticket", "var(--cinza-bg)", "var(--ink-2)"],
+  comentario: ["chat", "var(--roxo-bg)", "var(--roxo)"] };
 
 
 // ── Corpo de um email: numa moldura própria (sem scripts), com o histórico citado recolhido ─────────────
@@ -1003,11 +1004,39 @@ const Sino = {
     const carregar = async () => { try { d.value = await apiT("notificacoes"); } catch (e) {} };
     onMounted(() => { carregar(); setInterval(() => { if (!document.hidden) carregar(); }, 60000); });
     const abrir = async () => { aberto.value = !aberto.value; if (aberto.value && d.value.por_ler) { await apiT("marcar_lidas", {}, true); setTimeout(carregar, 1500); } };
-    const ir = (n) => { aberto.value = false; if (["Contact", "CRM Deal", "CRM Lead", "CRM Organization"].includes(n.document_type)) location.hash = link(n.document_type, n.document_name); else if (n.document_type === "CRM Task") location.hash = "#/tarefas"; };
-    return { d, aberto, abrir, ir, data };
+    const ir = (n) => { aberto.value = false; if (["Contact", "CRM Deal", "CRM Lead", "CRM Organization"].includes(n.document_type)) location.hash = link(n.document_type, n.document_name);
+      else if (n.document_type === "HD Ticket") location.href = "/orbit?app=desk#/ticket/" + encodeURIComponent(n.document_name);
+      else if (n.document_type === "Communication") location.hash = "#/caixa"; else if (n.document_type === "CRM Task") location.hash = "#/tarefas"; };
+    // 23-11-2026: avisos no telemóvel/computador (Web Push). O iPhone só deixa com o Orbit gravado no ecrã principal.
+    const push = ref({ suporta: "serviceWorker" in navigator && "PushManager" in window && "Notification" in window, ligado: false, aLigar: false });
+    const iosSemApp = /iPhone|iPad/.test(navigator.userAgent) && !(window.navigator.standalone || matchMedia("(display-mode: standalone)").matches);
+    const b64 = (s) => { const p = "=".repeat((4 - s.length % 4) % 4); const r = atob((s + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from([...r].map((c) => c.charCodeAt(0))); };
+    const registo = async () => push.value.suporta ? navigator.serviceWorker.register("/api/method/orbit.interface.push.sw", { scope: "/orbit" }) : null;
+    onMounted(async () => { try { const reg = await registo(); const sub = reg && await reg.pushManager.getSubscription(); push.value.ligado = !!sub && Notification.permission === "granted"; } catch (e) {} });
+    const ligarAvisos = async () => {
+      push.value.aLigar = true;
+      try {
+        const perm = await Notification.requestPermission();
+        if (perm !== "granted") { toast("Os avisos ficaram bloqueados neste aparelho — permita-os nas definições do browser."); return; }
+        const reg = await registo(); await navigator.serviceWorker.ready;
+        const { publica } = await apiConvPush("chave");
+        const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(publica) });
+        await apiConvPush("subscrever", { sub: JSON.stringify(sub) }, true);
+        push.value.ligado = true; toast("Avisos ligados neste aparelho");
+      } catch (e) { toast("Não foi possível ligar os avisos: " + (e.message || e)); } finally { push.value.aLigar = false; }
+    };
+    const desligarAvisos = async () => {
+      const reg = await navigator.serviceWorker.getRegistration("/orbit"); const sub = reg && await reg.pushManager.getSubscription();
+      if (sub) { await apiConvPush("retirar", { endpoint: sub.endpoint }, true); await sub.unsubscribe(); }
+      push.value.ligado = false; toast("Avisos desligados neste aparelho");
+    };
+    return { d, aberto, abrir, ir, data, push, iosSemApp, ligarAvisos, desligarAvisos };
   },
   template: `<span class="sino"><button class="icone-btn" @click="abrir" title="Avisos"><Icone n="sino"/><span v-if="d.por_ler" class="sino-n">{{ d.por_ler }}</span></button>
-    <div v-if="aberto" class="cartao sino-lista"><header style="padding:10px 14px"><b>Avisos</b></header>
+    <div v-if="aberto" class="cartao sino-lista"><header style="padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px"><b>Avisos</b>
+        <template v-if="push.suporta && !iosSemApp"><button v-if="!push.ligado" class="btn sm" :disabled="push.aLigar" @click="ligarAvisos">Receber avisos neste aparelho</button>
+          <button v-else class="sub" style="all:unset;cursor:pointer;font-size:12px" @click="desligarAvisos" title="Deixar de receber avisos neste aparelho">🔔 ligados aqui</button></template>
+        <span v-else-if="iosSemApp" class="sub" style="font-size:11px;max-width:200px;text-align:right">No iPhone: Partilhar › Adicionar ao ecrã principal, e abrir a partir do ícone para ligar os avisos.</span></header>
       <div v-if="!d.itens.length" class="vazio">Sem avisos.</div>
       <div v-for="n in d.itens" :key="n.name" class="linha" style="cursor:pointer" :style="n.read?{}:{background:'var(--azul-bg)'}" @click="ir(n)"><div class="cresce">{{ n.subject }}<small>{{ n.email_content }} · {{ data(n.creation) }}</small></div></div>
     </div></span>`,
@@ -1285,6 +1314,91 @@ const DeskTickets = {
     </div>
   </div>`,
 };
+// ── Conversa interna num registo, com @menções (23-11-2026) ──────────────────────────────────────────────────────
+// Comentários do Frappe ligados ao registo; «@» abre a lista da equipa e a pessoa escolhida é mencionada — recebe o
+// aviso no sino, a notificação no telemóvel (se ligou os avisos) e, se ficar por ver 3 h, o email.
+async function apiConv(metodo, args = {}, post = false) {
+  const url = `/api/method/orbit.interface.conversa.${metodo}`;
+  const op = { headers: { "X-Frappe-CSRF-Token": window.csrf_token, Accept: "application/json" } };
+  let r;
+  if (post) { op.method = "POST"; op.headers["Content-Type"] = "application/json"; op.body = JSON.stringify(args); r = await fetch(url, op); }
+  else r = await fetch(url + "?" + new URLSearchParams(args), op);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(String(m).replace(/<[^>]+>/g, "")); throw new Error(m); }
+  return j.message;
+}
+let _pessoasConv = null;
+async function apiConvPush(metodo, args = {}, post = false) {
+  const url = `/api/method/orbit.interface.push.${metodo}`;
+  const op = { headers: { "X-Frappe-CSRF-Token": window.csrf_token, Accept: "application/json" } };
+  if (post) { op.method = "POST"; op.headers["Content-Type"] = "application/json"; op.body = JSON.stringify(args); }
+  const r = await fetch(post ? url : url + "?" + new URLSearchParams(args), op); const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error("o servidor recusou"); return j.message;
+}
+const ConversaRegisto = {
+  props: ["doctype", "nome", "compacto"],
+  emits: ["mudou"],
+  setup(props, { emit }) {
+    const itens = ref(null); const texto = ref(""); const mencoes = ref([]); const pessoas = ref([]); const sug = ref([]); const iSug = ref(0);
+    const aEnviar = ref(false); const caixa = ref(null);
+    const carregar = async () => { itens.value = await apiConv("lista", { doctype: props.doctype, nome: props.nome }); };
+    onMounted(async () => { carregar(); if (!_pessoasConv) _pessoasConv = await apiConv("pessoas"); pessoas.value = _pessoasConv; });
+    watch(() => props.nome, carregar);
+    const aEscrever = () => {
+      const t = caixa.value; const ate = texto.value.slice(0, t ? t.selectionStart : texto.value.length);
+      const m = /(^|\s)@([\p{L}\w.\- ]{0,30})$/u.exec(ate);
+      if (!m) { sug.value = []; return; }
+      const q = m[2].toLowerCase().trim();
+      sug.value = pessoas.value.filter((p) => !q || p.nome.toLowerCase().includes(q) || p.email.toLowerCase().startsWith(q)).slice(0, 6); iSug.value = 0;
+    };
+    const escolher = (p) => {
+      const t = caixa.value; const pos = t ? t.selectionStart : texto.value.length;
+      const antes = texto.value.slice(0, pos).replace(/@([\p{L}\w.\- ]{0,30})$/u, "@" + p.nome + " ");
+      texto.value = antes + texto.value.slice(pos); sug.value = [];
+      if (!mencoes.value.find((x) => x.email === p.email)) mencoes.value.push({ email: p.email, nome: p.nome });
+      nextTick(() => { if (t) { t.focus(); t.selectionStart = t.selectionEnd = antes.length; } });
+    };
+    const tecla = (e) => {
+      if (sug.value.length) {
+        if (e.key === "ArrowDown") { iSug.value = (iSug.value + 1) % sug.value.length; e.preventDefault(); return; }
+        if (e.key === "ArrowUp") { iSug.value = (iSug.value - 1 + sug.value.length) % sug.value.length; e.preventDefault(); return; }
+        if (e.key === "Enter" || e.key === "Tab") { escolher(sug.value[iSug.value]); e.preventDefault(); return; }
+        if (e.key === "Escape") { sug.value = []; return; }
+      }
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); enviar(); }
+    };
+    const enviar = async () => {
+      if (!texto.value.trim() || aEnviar.value) return;
+      aEnviar.value = true;
+      try {
+        const usadas = mencoes.value.filter((m) => texto.value.includes("@" + m.nome));
+        const r = await apiConv("comentar", { doctype: props.doctype, nome: props.nome, texto: texto.value, mencoes: JSON.stringify(usadas) }, true);
+        toast(r.mencionados.length ? "Comentário enviado — " + r.mencionados.length + (r.mencionados.length === 1 ? " pessoa avisada" : " pessoas avisadas") : "Comentário gravado");
+        texto.value = ""; mencoes.value = []; await carregar(); emit("mudou");
+      } finally { aEnviar.value = false; }
+    };
+    const apagar = async (c) => { if (!confirm("Apagar este comentário?")) return; await apiConv("apagar", { id: c.id }, true); carregar(); emit("mudou"); };
+    const limpo = (h) => String(h || "").replace(/<script[\s\S]*?<\/script>/gi, "").replace(/\son\w+="[^"]*"/gi, "");
+    return { itens, texto, sug, iSug, aEnviar, caixa, aEscrever, escolher, tecla, enviar, apagar, limpo, data };
+  },
+  template: `<div class="conversa-reg">
+    <div v-if="!itens" class="carregar">A carregar…</div>
+    <p v-else-if="!itens.length && !compacto" class="sub" style="font-size:13px;margin:4px 0 10px">Ainda não há conversa. Escreva e use <b>@</b> para chamar alguém da equipa — recebe o aviso no sino e no telemóvel.</p>
+    <div v-for="c in itens || []" :key="c.id" class="comentario" :class="{meu:c.meu}">
+      <AvFoto :email="c.email" :nome="c.quem" :tam="28"/>
+      <div class="cresce"><div class="chat-cab"><b>{{ c.quem }}</b><span class="sub">{{ data(c.data) }}</span>
+        <button v-if="c.meu" class="sub" style="all:unset;cursor:pointer;font-size:12px;margin-left:auto" @click="apagar(c)">apagar</button></div>
+        <div class="comentario-txt" v-html="limpo(c.html)"></div></div>
+    </div>
+    <div class="cartao compor" style="position:relative;flex-direction:column;align-items:stretch">
+      <textarea ref="caixa" v-model="texto" rows="2" placeholder="Escrever na conversa… use @ para chamar alguém" @input="aEscrever" @click="aEscrever" @keydown="tecla"></textarea>
+      <div v-if="sug.length" class="mencao-sug"><button v-for="(p, k) in sug" :key="p.email" :class="{ativo:k===iSug}" @mousedown.prevent="escolher(p)"><AvFoto :email="p.email" :nome="p.nome" :tam="20"/>{{ p.nome }}</button></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><span class="sub" style="font-size:12px">@ menciona · ⌘↵ envia · só a equipa vê</span>
+        <button class="btn sm prim" @click="enviar" :disabled="!texto.trim() || aEnviar">{{ aEnviar ? 'A enviar…' : 'Comentar' }}</button></div>
+    </div>
+  </div>`,
+};
+
 const DeskTicket = {
   components: { EmailCorpo },
   props: ["nome"],
@@ -1309,7 +1423,7 @@ const DeskTicket = {
   },
   template: `
   <div class="pad desk-ticket" v-if="t && meta">
-    <div style="font-size:13px"><a href="#/tickets">← Tickets</a></div>
+    <div style="font-size:13px;display:flex;justify-content:space-between;align-items:center"><a href="#/tickets">← Tickets</a></div>
     <div class="ola" style="margin-top:4px"><div><h1>{{ t.assunto }}</h1><div class="sub">#{{ t.name }} · aberto {{ data(t.aberto) }} · {{ t.email }}</div></div>
       <span :class="t.atrasado ? 'etq ambar' : 'etq'">{{ t.sla || 'Sem SLA' }}</span></div>
     <div class="desk-grelha">
@@ -1447,7 +1561,7 @@ const FichaDetalhes = {
   </div>`,
 };
 const Ficha = {
-  components: { FichaDetalhes, Icone, EmailCorpo, VerDocumento, EnviarAssinatura, NovoEmail },
+  components: { FichaDetalhes, Icone, EmailCorpo, VerDocumento, EnviarAssinatura, NovoEmail, ConversaRegisto },
   props: ["doctype", "name"],
   setup(props) {
     const f = ref(null); const cron = ref(null); const filtro = ref(""); const ed = ref(""); const valorEd = ref("");
@@ -1484,7 +1598,7 @@ const Ficha = {
     const registarTempo = () => { window.__tempo_cliente = (tempo.value && tempo.value.cliente) || ""; };
     const assin = ref(null); const assinar = ref(false);
     const carregarAssin = () => apiS("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (assin.value = r)).catch(() => (assin.value = { itens: [] }));
-    const carregarCron = async () => { if (filtro.value === "detalhes") return; cron.value = await api("cronologia", { doctype: props.doctype, name: props.name, tipo: filtro.value }); };
+    const carregarCron = async () => { if (filtro.value === "detalhes" || filtro.value === "conversa") return; cron.value = await api("cronologia", { doctype: props.doctype, name: props.name, tipo: filtro.value }); };
     watch(() => [props.doctype, props.name], () => { f.value = null; cron.value = null; carregar(); });
     watch(filtro, carregarCron);
     onMounted(carregar);
@@ -1556,6 +1670,7 @@ const Ficha = {
           <button @click="novoEmail=true"><span><Icone n="mail"/></span>Email</button>
           <a v-if="f.telefone" :href="'tel:'+f.telefone" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)"><span style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface-2)"><Icone n="tel"/></span>Ligar</a>
           <button @click="modo='tarefa'"><span><Icone n="tarefa"/></span>Tarefa</button>
+          <button @click="filtro='conversa'"><span><Icone n="chat"/></span>Conversa</button>
           <a :href="'#/calendario/nova/'+encodeURIComponent(doctype)+'/'+encodeURIComponent(name)" @click="marcarEmail" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)"><span style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface-2)"><Icone n="cal"/></span>Reunião</a>
         </div>
       </div>
@@ -1634,6 +1749,7 @@ const Ficha = {
         <button :class="{ativo:filtro===''}" @click="filtro=''">Atividade</button>
         <button :class="{ativo:filtro==='detalhes'}" @click="filtro='detalhes'">Detalhes</button>
         <button :class="{ativo:filtro==='emails'}" @click="filtro='emails'">Emails <span class="sub">{{ cron?.contagem?.email || '' }}</span></button>
+        <button :class="{ativo:filtro==='conversa'}" @click="filtro='conversa'">Conversa <span class="sub">{{ cron?.contagem?.comentario || '' }}</span></button>
         <button :class="{ativo:filtro==='notas'}" @click="filtro='notas'">Notas</button>
         <button :class="{ativo:filtro==='chamadas'}" @click="filtro='chamadas'">Chamadas</button>
         <button :class="{ativo:filtro==='tarefas'}" @click="filtro='tarefas'">Tarefas</button>
@@ -1641,6 +1757,7 @@ const Ficha = {
         <button :class="{ativo:filtro==='tickets'}" @click="filtro='tickets'">Tickets</button>
       </div>
       <FichaDetalhes v-if="filtro==='detalhes'" :doctype="doctype" :name="name" :key="doctype+name" @mudou="carregar"/>
+      <ConversaRegisto v-else-if="filtro==='conversa'" :doctype="doctype" :nome="name" :key="'c'+doctype+name"/>
       <template v-else>
       <div class="cartao compor" v-if="modo==='nota'"><textarea v-model="notaTxt" rows="1" :placeholder="'Escrever uma nota sobre ' + f.titulo + '…'" @keydown.meta.enter="enviarNota" @keydown.ctrl.enter="enviarNota"></textarea><button class="btn sm prim" @click="enviarNota" :disabled="!notaTxt.trim()">Gravar nota</button></div>
       <div class="cartao compor" v-else><input v-model="tarefaTxt" placeholder="Nova tarefa…" @keyup.enter="enviarTarefa"><input type="date" v-model="tarefaData" style="flex:none;width:150px"><button class="btn sm prim" @click="enviarTarefa" :disabled="!tarefaTxt.trim()">Criar tarefa</button></div>
@@ -1781,7 +1898,7 @@ const Funil = {
 };
 
 const Caixa = {
-  components: { EmailCorpo, Icone, Compositor },
+  components: { EmailCorpo, Icone, Compositor, ConversaRegisto },
   props: ["abrirId"],
   setup(props) {
     let c0 = { grupo: "equipa", conta: "" }; try { c0 = JSON.parse(localStorage.getItem("orbit.caixa.canal")) || c0; } catch (e) {}
@@ -2034,6 +2151,8 @@ const Caixa = {
           <footer><span class="sub">Fica nos Enviados de {{ conv.de }} e na cronologia do cliente · ⌘↵ envia</span><button class="btn prim sm" @click="enviar" :disabled="!resposta.trim() || aEnviar">{{ aEnviar ? 'A enviar…' : 'Enviar' }}</button></footer>
         </div>
         <div v-else class="vazio" style="margin:0 20px 20px">Esta conversa é da caixa pessoal de outra pessoa: só ela pode responder.</div>
+        <details class="conversa-interna" style="margin:0 20px 20px"><summary class="sub" style="cursor:pointer;font-size:13px">Conversa interna sobre este email (só a equipa vê · @ chama alguém)</summary>
+          <ConversaRegisto doctype="Communication" :nome="conv.responder_a" :key="'cv'+conv.responder_a" :compacto="true"/></details>
       </template>
       <div v-else-if="abrirId" class="carregar">A carregar…</div>
       <div v-else class="vazio">Escolha uma conversa.</div>
@@ -2914,7 +3033,16 @@ const App = {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
     window.addEventListener("hashchange", () => { rota.value = location.hash || "#/inicio"; document.querySelector(".ecra")?.scrollTo(0, 0); });
-    onMounted(async () => { ctx.value = await api("contexto"); window.__ctx = ctx.value; });
+    onMounted(async () => { ctx.value = await api("contexto"); window.__ctx = ctx.value; contarChat(); setInterval(() => { if (!document.hidden) contarChat(); }, 60000); });
+    // 23-11-2026: as não lidas do Chat no menu (mensagens diretas e tópicos dos canais)
+    const contarChat = async () => {
+      try {
+        // sem toast: um Orbit sem Chat (ou com o Chat em baixo) não pode encher o ecrã de avisos de minuto a minuto
+        const rr = await fetch("/api/method/orbit.interface.chat.conversas", { headers: { Accept: "application/json" } });
+        const c = rr.ok ? (await rr.json()).message : null; if (!c || !c.ligado) { estado.chat = 0; return; }
+        estado.chat = (c.directas || []).reduce((a, d) => a + (d.por_ler || 0), 0) + (c.canais || []).reduce((a, k) => a + (k.por_ler || 0), 0);
+      } catch (e) { estado.chat = 0; }
+    };
     const partes = computed(() => rota.value.replace(/^#\/?/, "").split("/").map(decodeURIComponent));
     const ecra = computed(() => partes.value[0] || "inicio");
     watch(q, (v) => { clearTimeout(tq); if (v.trim().length < 2) { res.value = []; return; } tq = setTimeout(async () => { res.value = await api("pesquisa", { q: v }); selRes.value = 0; }, 200); });
@@ -2959,7 +3087,7 @@ const App = {
       <div class="marca"><div class="logo"><Icone :n="APP.ic"/></div><div>{{ APP.nome }}<small>{{ APP.sub }}</small></div></div>
       <template v-for="(n,i) in NAV" :key="i">
         <h6 v-if="n[0]==='sec'">{{ n[1] }}</h6>
-        <a v-else :href="'#/'+n[0]" style="text-decoration:none"><button :class="{ativo: ativoNav(n)}" tabindex="-1"><Icone :n="n[1]"/>{{ n[2] }}<span class="conta" v-if="n[0]==='caixa' && ctx.contadores.tickets">{{ ctx.contadores.tickets }}</span></button></a>
+        <a v-else :href="'#/'+n[0]" style="text-decoration:none"><button :class="{ativo: ativoNav(n)}" tabindex="-1"><Icone :n="n[1]"/>{{ n[2] }}<span class="conta" v-if="n[0]==='caixa' && ctx.contadores.tickets">{{ ctx.contadores.tickets }}</span><span class="conta" v-if="n[0]==='chat' && estado.chat" title="Mensagens por ler no Chat">{{ estado.chat }}</span></button></a>
       </template>
       <template v-if="modulosApp.length"><h6>{{ APP_ATUAL==='admin' ? 'Sistema' : 'Módulos' }}</h6>
       <a v-for="m in modulosApp" :key="m.url" :href="m.barra ? '#/erp-m/'+encodeURIComponent(m.barra) : m.url" :target="m.barra ? null : '_blank'" style="text-decoration:none"><button tabindex="-1" :class="{ativo: ecra==='erp-m' && partes[1]===m.barra}"><Icone n="grelha"/>{{ m.nome }}<span class="fora" v-if="!m.barra">↗</span></button></a></template>

@@ -536,3 +536,15 @@ div.desk-prop{flex-direction:row;justify-content:space-between;color:var(--ink)}
 .ponto-ch{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--verde,#16a34a)}
 .compor-mail textarea{width:100%;box-sizing:border-box;resize:vertical}
 .anexos-mail a.etq{text-decoration:none;color:inherit;cursor:pointer}
+/* 23-11-2026: conversa interna com @menções */
+.conversa-reg .comentario{display:flex;gap:10px;margin:0 0 12px}
+.conversa-reg .comentario .cresce{min-width:0;flex:1;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.conversa-reg .comentario.meu .cresce{background:var(--surface-2)}
+.conversa-reg .chat-cab{display:flex;gap:8px;align-items:baseline;font-size:13px}
+.comentario-txt{font-size:14px;line-height:1.5;margin-top:2px;overflow-wrap:anywhere}
+.comentario-txt p{margin:0 0 6px}
+.comentario-txt .mention,.evento .mention{color:var(--azul,#2563eb);font-weight:600;background:var(--azul-bg,#eff6ff);border-radius:4px;padding:0 3px}
+.mencao-sug{position:absolute;left:12px;bottom:calc(100% - 4px);background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:4px;z-index:20;min-width:220px}
+.mencao-sug button{all:unset;display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:13px}
+.mencao-sug button.ativo,.mencao-sug button:hover{background:var(--azul-bg,#eff6ff)}
+.conversa-reg textarea{width:100%;box-sizing:border-box;resize:vertical;border:0;background:none;font:inherit;color:var(--ink);outline:none}

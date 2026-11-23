@@ -3,8 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Stratechna Orbit</title>
-<link rel="icon" href="/assets/orbit/img/simbolo.svg">
+<title>{{ app_nome }}</title>
+<link rel="icon" type="image/svg+xml" href="/assets/orbit/pwa/{{ app }}.svg?v=1">
+<link rel="manifest" href="/api/method/orbit.interface.push.manifesto?app={{ app }}">
+<link rel="apple-touch-icon" href="/assets/orbit/pwa/{{ app }}-180.png?v=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="{{ app_nome }}">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="{{ app_cor }}">
 <link rel="stylesheet" href="/assets/orbit/css/orbit-fontes.css">
 <link rel="stylesheet" href="/assets/orbit/interface/interface.css?v={{ versao }}">
 <script>window.csrf_token = "{{ csrf_token }}";</script>
