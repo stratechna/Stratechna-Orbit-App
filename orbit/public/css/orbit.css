@@ -1421,3 +1421,8 @@ a.oi-linha:hover { background: var(--bg-color, #f8f9fa); text-decoration: none; 
 @media (max-width: 520px) {
 	.oi-grelha, .oi-grelha.oi-n3, .oi-grelha.oi-n2 { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* 23-11-2026: total da barra ao passar o rato (página inicial) */
+.oi-spark i, .oi-barras b { position: relative; cursor: default; }
+.oi-spark i[data-v]:hover, .oi-barras b[data-v]:hover { filter: brightness(1.12); }
+.oi-spark i[data-v]:hover::after, .oi-barras b[data-v]:hover::after { content: attr(data-v); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: #161a1d; color: #fff; font: 600 11px/1.3 "DM Sans", system-ui, sans-serif; padding: 4px 8px; border-radius: 6px; white-space: nowrap; z-index: 20; pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,.25); }

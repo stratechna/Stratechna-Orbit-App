@@ -588,10 +588,12 @@ try { if (window.self !== window.top && window.top.location.pathname.indexOf("/o
 	function cabSec(titulo, extra) {
 		return `<div class="oi-cab"><b>${esc(__(titulo))}</b><i></i>${extra || ""}</div>`;
 	}
-	function spark(serie) {
+	// 23-11-2026: ao passar o rato, cada barra mostra o seu total (e o mês, quando se sabe)
+	function spark(serie, fmt, rotulos) {
 		const v = (serie || []).map(Number);
 		const max = Math.max(1, ...v);
-		return `<div class="oi-spark">${v.map((x, i) => `<i class="${i === v.length - 1 ? "u" : ""}" style="height:${Math.max(6, Math.round(100 * x / max))}%"></i>`).join("")}</div>`;
+		const f = fmt || num;
+		return `<div class="oi-spark">${v.map((x, i) => `<i class="${i === v.length - 1 ? "u" : ""}" data-v="${esc((rotulos && rotulos[i] ? rotulos[i] + " · " : "") + f(x))}" style="height:${Math.max(6, Math.round(100 * x / max))}%"></i>`).join("")}</div>`;
 	}
 	function delta(atual, anterior, rotulo) {
 		if (!anterior) return `<div class="oi-d oi-neutro">${esc(__("sem termo de comparação"))}</div>`;
@@ -606,11 +608,11 @@ try { if (window.self !== window.top && window.top.location.pathname.indexOf("/o
 		const f = d.faturacao, c = d.crm, k = d.desk;
 		if (f) {
 			out.push(`<div class="oi-cartao oi-kpi"><div class="oi-t">${esc(__("Faturado"))} ${esc(__(TITULO_PERIODO[p]))}<span>${esc(f.fonte)}</span></div>` +
-				`<div class="oi-v">${eur(f.faturado)}</div>${delta(f.faturado, f.anterior, __(NOME_PERIODO[p]))}${spark(f.meses.map((m) => m.valor))}</div>`);
+				`<div class="oi-v">${eur(f.faturado)}</div>${delta(f.faturado, f.anterior, __(NOME_PERIODO[p]))}${spark(f.meses.map((m) => m.valor), eur, f.meses.map((m) => MESES_CURTOS(m.mes)))}</div>`);
 			out.push(`<div class="oi-cartao oi-kpi"><div class="oi-t">${esc(__("Por receber"))}<span>${f.por_receber_n} ${esc(__("faturas"))}</span></div>` +
 				`<div class="oi-v">${eur(f.por_receber)}</div>` +
 				`<div class="oi-d ${f.vencido ? "oi-desce" : "oi-neutro"}">${f.vencido ? esc(__("Vencido")) + " " + eur(f.vencido) + " · " + f.vencidas.length + " " + esc(__("faturas")) : esc(__("Nada vencido"))}</div>` +
-				`${spark(f.meses.map((m) => m.valor))}</div>`);
+				`${spark(f.meses.map((m) => m.valor), eur, f.meses.map((m) => MESES_CURTOS(m.mes)))}</div>`);
 		}
 		if (c) {
 			out.push(`<a class="oi-cartao oi-kpi" href="/crm/deals" target="orbit-frappe_crm"><div class="oi-t">${esc(__("Negócios em aberto"))}<span>CRM</span></div>` +
@@ -638,8 +640,8 @@ try { if (window.self !== window.top && window.top.location.pathname.indexOf("/o
 		if (f) {
 			const desp = d.despesas || [];
 			const max = Math.max(1, ...f.meses.map((m) => m.valor), ...desp.map((m) => m.valor));
-			const barras = f.meses.map((m, i) => `<div><b style="height:${Math.round(110 * m.valor / max)}px" title="${eur(m.valor)}"></b>` +
-				(desp[i] ? `<b class="e" style="height:${Math.round(110 * desp[i].valor / max)}px" title="${eur(desp[i].valor)}"></b>` : "") + `</div>`).join("");
+			const barras = f.meses.map((m, i) => `<div><b style="height:${Math.round(110 * m.valor / max)}px" data-v="${esc(MESES_CURTOS(m.mes) + " · " + eur(m.valor))}"></b>` +
+				(desp[i] ? `<b class="e" style="height:${Math.round(110 * desp[i].valor / max)}px" data-v="${esc(__("Despesas") + " · " + eur(desp[i].valor))}"></b>` : "") + `</div>`).join("");
 			const ult = f.meses[f.meses.length - 1].valor - (desp.length ? desp[desp.length - 1].valor : 0);
 			return `<div class="oi-cartao"><header><h3>${esc(__(desp.length ? "Faturação e despesas" : "Faturação"))}</h3><small>${esc(__("últimos 6 meses"))}</small></header>` +
 				`<div class="oi-graf"><div class="oi-barras">${barras}</div><div class="oi-meses">${f.meses.map((m) => `<span>${esc(MESES_CURTOS(m.mes))}</span>`).join("")}</div>` +
@@ -652,7 +654,7 @@ try { if (window.self !== window.top && window.top.location.pathname.indexOf("/o
 		const n = Math.max(a.length, b.length), max = Math.max(1, ...a, ...b);
 		const hoje = new Date();
 		const meses = Array.from({ length: n }, (_, i) => { const x = new Date(hoje.getFullYear(), hoje.getMonth() - (n - 1 - i), 15); return x.toISOString().slice(0, 7); });
-		const barras = meses.map((_, i) => `<div>${c ? `<b style="height:${Math.round(110 * (a[i] || 0) / max)}px" title="${a[i] || 0}"></b>` : ""}${k ? `<b class="e" style="height:${Math.round(110 * (b[i] || 0) / max)}px" title="${b[i] || 0}"></b>` : ""}</div>`).join("");
+		const barras = meses.map((_, i) => `<div>${c ? `<b style="height:${Math.round(110 * (a[i] || 0) / max)}px" data-v="${esc(MESES_CURTOS(meses[i]) + " · " + (a[i] || 0) + " " + __("negócios"))}"></b>` : ""}${k ? `<b class="e" style="height:${Math.round(110 * (b[i] || 0) / max)}px" data-v="${esc(MESES_CURTOS(meses[i]) + " · " + (b[i] || 0) + " " + __("pedidos"))}"></b>` : ""}</div>`).join("");
 		return `<div class="oi-cartao"><header><h3>${esc(__("Entradas por mês"))}</h3><small>${esc(__("últimos {0} meses", [n]))}</small></header>` +
 			`<div class="oi-graf"><div class="oi-barras">${barras}</div><div class="oi-meses">${meses.map((m) => `<span>${esc(MESES_CURTOS(m))}</span>`).join("")}</div>` +
 			`<div class="oi-legenda">${c ? `<span><i class="oi-l1"></i>${esc(__("Negócios novos"))}</span>` : ""}${k ? `<span><i class="oi-l2"></i>${esc(__("Pedidos no Desk"))}</span>` : ""}</div></div></div>`;
