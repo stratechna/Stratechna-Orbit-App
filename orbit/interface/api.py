@@ -413,7 +413,22 @@ def ficha(doctype: str, name: str):
     pode_editar = frappe.has_permission(doctype, "write", doc)
     meta = frappe.get_meta(doctype)
     props = []
-    for campo, rotulo, tipo, editavel in _PROPS[doctype]:
+    # 23-11-2026: a ordem e os campos do resumo vêm do editor de formulários (CRM Fields Layout «Side Panel»)
+    from orbit.interface.formularios import secoes as _secoes
+    _base = {c[0]: c for c in _PROPS[doctype]}
+    _ordem = [c for sec in _secoes(doctype, "resumo") for c in sec["campos"]]
+    _extra = []
+    _lista = []
+    for c in _ordem:
+        if c in _base:
+            _lista.append(_base[c])
+        elif c not in ("marcas",) and meta.has_field(c):
+            _extra.append(c)
+            _lista.append((c, None, None, None))
+    for campo, rotulo, tipo, editavel in _lista:
+        if rotulo is None:
+            props.append(_prop_campo(doc, meta, meta.get_field(campo), pode_editar))
+            continue
         if not meta.has_field(campo) and campo != "creation":
             continue
         v = doc.get(campo)
@@ -441,8 +456,9 @@ def ficha(doctype: str, name: str):
         if (doctype, p["campo"]) in (("Contact", "nif"), ("CRM Organization", "nipc")):
             p["tipo"] = "Fiscal"
     from orbit.interface import marcas as _M, campos as _C, fiscal as _F
-    if doctype == "Contact" and meta.has_field("marcas"):
-        props.insert(2, {"campo": "marcas", "rotulo": "Marcas", "tipo": "Marcas", "valor": _M.marcas_do_contacto(name),
+    if doctype == "Contact" and meta.has_field("marcas") and "marcas" in _ordem:
+        _antes = set(_ordem[:_ordem.index("marcas")])
+        props.insert(sum(1 for p in props if p["campo"] in _antes), {"campo": "marcas", "rotulo": "Marcas", "tipo": "Marcas", "valor": _M.marcas_do_contacto(name),
                          "mostra": "", "editavel": bool(pode_editar), "opcoes": _M.lista(), "rotulos": {}})
     for cf in _C.personalizados(doctype):
         tipo = {"Data": "Data", "Small Text": "Text", "Float": "Number", "Int": "Number", "Currency": "Currency",
@@ -1059,32 +1075,30 @@ def canais():
 
 # ── Definições: tudo o que é configuração numa só roda dentada (como o HubSpot) ─────────────────────────
 _DEFINICOES = [
-    ("Conta e utilizadores", [("Utilizadores", "/app/user", "User"), ("Papéis e permissões", "/app/role", "Role"),
-                              ("Perfis de módulos", "/app/module-profile", "Module Profile"),
-                              ("Definições do sistema", "/app/system-settings", "System Settings")]),
-    ("Correio", [("Caixas de email", "/app/email-account", "Email Account"), ("Domínios de email", "/app/email-domain", "Email Domain"),
-                 ("Modelos de email", "/app/email-template", "Email Template"), ("Notificações", "/app/notification", "Notification")]),
-    ("CRM", [("Fases dos negócios", "/app/crm-deal-status", "CRM Deal Status"), ("Estados das leads", "/app/crm-lead-status", "CRM Lead Status"),
-             ("Origens", "/app/crm-lead-source", "CRM Lead Source"), ("Motivos de perda", "/app/crm-lost-reason", "CRM Lost Reason"),
-             ("Setores", "/app/crm-industry", "CRM Industry"), ("Territórios", "/app/crm-territory", "CRM Territory"),
-             ("Acordos de nível de serviço (CRM)", "/app/crm-service-level-agreement", "CRM Service Level Agreement"),
-             ("Campos e formulários do CRM", "/app/crm-fields-layout", "CRM Fields Layout")]),
-    ("Atendimento (Desk)", [("Equipas", "/app/hd-team", "HD Team"), ("Tipos de ticket", "/app/hd-ticket-type", "HD Ticket Type"),
-                            ("Prioridades", "/app/hd-ticket-priority", "HD Ticket Priority"),
-                            ("Acordos de nível de serviço", "/app/hd-service-level-agreement", "HD Service Level Agreement"),
-                            ("Respostas-modelo", "/app/hd-canned-response", "HD Canned Response"),
-                            ("Definições do Desk", "/app/hd-settings", "HD Settings")]),
-    ("Marcas e empresa", [("Marcas", "/app/brand", "Brand"), ("Empresas (ERP)", "/app/company", "Company"),
-                          ("Cabeçalhos de documentos", "/app/letter-head", "Letter Head"),
-                          ("Modelos de impressão", "/app/print-format", "Print Format")]),
-    ("Vendas e faturação", [("Artigos", "/app/item", "Item"), ("Listas de preços", "/app/price-list", "Price List"),
-                            ("Impostos de venda", "/app/sales-taxes-and-charges-template", "Sales Taxes and Charges Template"),
-                            ("Termos e condições", "/app/terms-and-conditions", "Terms and Conditions"),
-                            ("Ligação à faturação certificada", "/app/ligacao-faturacao", "Ligacao Faturacao")]),
-    ("Pessoas e tempo", [("Funcionários", "/app/employee", "Employee"), ("Departamentos", "/app/department", "Department"),
-                         ("Tipos de atividade (tempo)", "/app/activity-type", "Activity Type"), ("Projetos", "/app/project", "Project")]),
-    ("Avançado", [("Campos personalizados", "/app/custom-field", "Custom Field"), ("Personalizar formulários", "/app/customize-form", "Customize Form"),
-                  ("Tarefas agendadas", "/app/scheduled-job-type", "Scheduled Job Type"), ("Registo de erros", "/app/error-log", "Error Log")]),
+    # 23-11-2026: tudo abre na interface nova (lista/ficha genéricas, #/erp/<doctype>); as listas simples que têm ecrã
+    # próprio (fases, estados, origens…) vêm de definicoes.py e não se repetem aqui.
+    ("Conta e utilizadores", [("Papéis e permissões", "Role"), ("Perfis de módulos", "Module Profile"),
+                              ("Definições do sistema", "System Settings")]),
+    ("Correio", [("Caixas de email", "Email Account"), ("Domínios de email", "Email Domain"),
+                 ("Notificações automáticas", "Notification")]),
+    ("CRM", [("Definições do CRM", "FCRM Settings"), ("Regras de atribuição", "Assignment Rule"),
+             ("Acordos de nível de serviço (CRM)", "CRM Service Level Agreement"), ("Feriados (para os prazos)", "CRM Holiday List"),
+             ("Hierarquia de vendas", "CRM Sales Hierarchy"), ("Sincronização de leads (Facebook)", "Lead Sync Source"),
+             ("Enriquecimento de dados", "CRM Enrichment Settings"), ("Ligação ao ERPNext", "ERPNext CRM Settings"),
+             ("Telefonia — agentes", "CRM Telephony Agent"), ("Telefonia — Twilio", "CRM Twilio Settings"),
+             ("Telefonia — Exotel", "CRM Exotel Settings"),
+             ("Motor dos fluxos", "Automation Settings")]),
+    ("Atendimento (Desk)", [("Equipas", "HD Team"), ("Acordos de nível de serviço", "HD Service Level Agreement"),
+                            ("Respostas-modelo", "HD Canned Response"), ("Definições do Desk", "HD Settings")]),
+    ("Marcas e empresa", [("Marcas", "Brand"), ("Empresas (ERP)", "Company"), ("Cabeçalhos de documentos", "Letter Head"),
+                          ("Modelos de impressão", "Print Format")]),
+    ("Vendas e faturação", [("Artigos", "Item"), ("Listas de preços", "Price List"),
+                            ("Impostos de venda", "Sales Taxes and Charges Template"),
+                            ("Termos e condições", "Terms and Conditions"), ("Ligação à faturação certificada", "Ligacao Faturacao")]),
+    ("Pessoas e tempo", [("Funcionários", "Employee"), ("Departamentos", "Department"),
+                         ("Tipos de atividade (tempo)", "Activity Type"), ("Projetos", "Project")]),
+    ("Avançado", [("Campos personalizados (todos os registos)", "Custom Field"), ("Personalizar formulários", "Customize Form"),
+                  ("Tarefas agendadas", "Scheduled Job Type"), ("Registo de erros", "Error Log")]),
 ]
 
 
@@ -1094,12 +1108,10 @@ def definicoes():
     out = []
     for grupo, itens in _DEFINICOES:
         ok = []
-        for rotulo, url, dt in itens:
-            if not frappe.db.exists("DocType", dt):
+        for rotulo, dt in itens:
+            if not frappe.db.exists("DocType", dt) or not frappe.has_permission(dt, "read"):
                 continue
-            if not frappe.has_permission(dt, "read"):
-                continue
-            ok.append({"rotulo": rotulo, "url": url})
+            ok.append({"rotulo": rotulo, "url": "#/erp/" + frappe.utils.quote(dt), "doctype": dt})
         if ok:
             out.append({"grupo": grupo, "itens": ok})
     return out

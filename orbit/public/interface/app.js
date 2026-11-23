@@ -1849,7 +1849,7 @@ const Definicoes = {
       const g = {};
       const junta = (grupo, item) => { (g[grupo] = g[grupo] || []).push(item); };
       nat.value.filter((x) => daApp(x.grupo)).forEach((x) => junta(x.grupo, { href: "#/definicoes/" + x.chave, rotulo: x.titulo, n: x.n }));
-      if (daApp("CRM")) { junta("CRM", { href: "#/definicoes/fluxos", rotulo: "Fluxos (automatismos)" }); junta("CRM", { href: "#/definicoes/campos", rotulo: "Campos personalizados" }); }
+      if (daApp("CRM")) { junta("CRM", { href: "#/definicoes/fluxos", rotulo: "Fluxos (automatismos)" }); junta("CRM", { href: "#/definicoes/formularios", rotulo: "Formulários (disposição das fichas)" }); junta("CRM", { href: "#/definicoes/campos", rotulo: "Campos personalizados" }); }
       if (daApp("Correio")) junta("Correio", { href: "#/definicoes/caixas", rotulo: "Caixas ligadas ao Orbit" });
       if (!props.gruposApp) junta("Conta e utilizadores", { href: "#/definicoes/utilizadores", rotulo: "Utilizadores do Orbit" });
       d0.value.filter((x) => daApp(x.grupo)).forEach((x) => x.itens.forEach((i) => junta(x.grupo, { href: i.url, rotulo: i.rotulo })));
@@ -1990,6 +1990,53 @@ const DefFluxos = {
         <td @click.stop><label class="interruptor"><input type="checkbox" :checked="x.ativo" @change="ligar(x)"><span></span></label></td>
         <td><b>{{ x.titulo }}</b></td><td>{{ x.registo }}</td><td>{{ x.quando }}</td><td>{{ x.passos }}</td><td>{{ x.execucoes }}</td></tr></tbody></table>
       <div v-if="!lista.length" class="vazio">Ainda não há fluxos.</div></div>
+  </div>`,
+};
+// ── Formulários do CRM (23-11-2026): a disposição da ficha — «Detalhes» e o resumo lateral (orbit/interface/formularios.py) ──
+const DefFormularios = {
+  setup() {
+    const dt = ref("CRM Lead"); const parte = ref("detalhes"); const d = ref(null); const aGravar = ref(false); const sujo = ref(false);
+    const carregar = async () => { d.value = null; sujo.value = false; d.value = await api("formularios.obter", { doctype: dt.value, parte: parte.value }); };
+    onMounted(carregar);
+    const escolher = async (novoDt, novaParte) => { if (sujo.value && !confirm("Há alterações por gravar. Continuar sem gravar?")) return; dt.value = novoDt; parte.value = novaParte; carregar(); };
+    const usados = computed(() => new Set((d.value?.secoes || []).flatMap((s) => s.campos.map((c) => c.campo))));
+    const livres = computed(() => (d.value?.disponiveis || []).filter((c) => !usados.value.has(c.campo)));
+    const mexe = () => { sujo.value = true; };
+    const moverCampo = (s, i, dir) => { const j = i + dir; if (j < 0 || j >= s.campos.length) return; [s.campos[i], s.campos[j]] = [s.campos[j], s.campos[i]]; mexe(); };
+    const passarPara = (s, i, destino) => { const c = s.campos.splice(i, 1)[0]; d.value.secoes[destino].campos.push(c); mexe(); };
+    const tirar = (s, i) => { s.campos.splice(i, 1); mexe(); };
+    const juntar = (s, campo) => { if (!campo) return; const c = d.value.disponiveis.find((x) => x.campo === campo); s.campos.push({ campo: c.campo, rotulo: c.rotulo }); mexe(); };
+    const moverSec = (i, dir) => { const j = i + dir; const l = d.value.secoes; if (j < 0 || j >= l.length) return; [l[i], l[j]] = [l[j], l[i]]; mexe(); };
+    const novaSec = () => { d.value.secoes.push({ titulo: "Secção nova", campos: [] }); mexe(); };
+    const tirarSec = (i) => { if (d.value.secoes[i].campos.length && !confirm("Os campos desta secção deixam de aparecer na ficha (não se apaga nenhum dado). Continuar?")) return; d.value.secoes.splice(i, 1); mexe(); };
+    const gravar = async () => { aGravar.value = true; try { await api("formularios.gravar", { doctype: dt.value, parte: parte.value, secoes_json: JSON.stringify(d.value.secoes.map((s) => ({ titulo: s.titulo, campos: s.campos.map((c) => c.campo) }))) }, true); toast("Formulário gravado — a ficha já o mostra assim"); carregar(); } catch (e) {} finally { aGravar.value = false; } };
+    const repor = async () => { if (!confirm("Voltar à disposição de origem do Orbit para este formulário?")) return; await api("formularios.repor", { doctype: dt.value, parte: parte.value }, true); toast("Reposto"); carregar(); };
+    return { dt, parte, d, aGravar, sujo, escolher, livres, mexe, moverCampo, passarPara, tirar, juntar, moverSec, novaSec, tirarSec, gravar, repor };
+  },
+  template: `
+  <div class="pad def-form">
+    <div class="ola"><div><div style="font-size:13px"><a href="#/definicoes">← Definições</a></div><h1>Formulários</h1>
+      <div class="sub">A disposição da ficha de cada registo: as secções e os campos do separador «Detalhes» e do resumo na coluna lateral. Nenhum dado se apaga — só muda o que se mostra e onde.</div></div></div>
+    <div class="vistas" style="padding:0;margin-bottom:6px"><button v-for="r in (d?.registos || [{v:'CRM Lead',r:'Leads'},{v:'Contact',r:'Contactos'},{v:'CRM Organization',r:'Empresas'},{v:'CRM Deal',r:'Negócios'}])" :key="r.v" :class="{ativo: dt===r.v}" @click="escolher(r.v, parte)">{{ r.r }}</button></div>
+    <div class="vistas" style="padding:0;margin-bottom:14px"><button :class="{ativo: parte==='detalhes'}" @click="escolher(dt,'detalhes')">Separador «Detalhes»</button><button :class="{ativo: parte==='resumo'}" @click="escolher(dt,'resumo')">Resumo lateral («Sobre este registo»)</button></div>
+    <div v-if="!d" class="carregar">A carregar…</div>
+    <template v-else>
+      <div v-for="(s,si) in d.secoes" :key="si" class="cartao form-sec">
+        <header class="fl-linha"><input class="ed-campo form-titulo" v-model="s.titulo" @input="mexe">
+          <span style="margin-left:auto;display:flex;gap:4px"><button class="btn sm" @click="moverSec(si,-1)" :disabled="si===0" title="Subir a secção">↑</button><button class="btn sm" @click="moverSec(si,1)" :disabled="si===d.secoes.length-1" title="Descer a secção">↓</button><button class="btn sm" @click="tirarSec(si)" title="Tirar a secção">✕</button></span></header>
+        <div v-for="(c,ci) in s.campos" :key="c.campo" class="form-campo">
+          <span class="cresce">{{ c.rotulo }}</span>
+          <button class="btn sm" @click="moverCampo(s,ci,-1)" :disabled="ci===0" title="Subir">↑</button><button class="btn sm" @click="moverCampo(s,ci,1)" :disabled="ci===s.campos.length-1" title="Descer">↓</button>
+          <select v-if="d.secoes.length>1" class="btn sm" @change="passarPara(s,ci,+$event.target.value); $event.target.value=''"><option value="">Passar para…</option><option v-for="(o,oi) in d.secoes" :key="oi" v-show="oi!==si" :value="oi">{{ o.titulo }}</option></select>
+          <button class="btn sm" @click="tirar(s,ci)" title="Tirar da ficha">✕</button>
+        </div>
+        <div v-if="!s.campos.length" class="sub" style="padding:6px 0">Secção vazia — junte campos ou tire-a.</div>
+        <select class="btn sm" style="margin-top:8px" @change="juntar(s,$event.target.value); $event.target.value=''"><option value="">+ Juntar campo…</option><option v-for="c in livres" :key="c.campo" :value="c.campo">{{ c.rotulo }}</option></select>
+      </div>
+      <div class="fl-linha" style="margin-top:12px"><button class="btn" @click="novaSec">+ Secção</button><button class="btn" @click="repor">Repor a de origem</button>
+        <span style="margin-left:auto" class="sub" v-if="sujo">Alterações por gravar</span><button class="btn prim" :disabled="aGravar || !sujo" @click="gravar">{{ aGravar ? 'A gravar…' : 'Gravar' }}</button></div>
+      <p class="sub" style="font-size:12px;margin-top:10px">Campos fora do formulário: {{ livres.length }}. No separador «Detalhes», os que não estiverem em nenhuma secção aparecem em «Outros campos».</p>
+    </template>
   </div>`,
 };
 const DefLista = {
@@ -2633,7 +2680,7 @@ const abrirApp = (chave, url) => { const w = window.open(url || ("/orbit?app=" +
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Calendario, DefLista, DefCampos, DefFluxos, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -2723,6 +2770,7 @@ const App = {
         <Definicoes v-else-if="ecra==='definicoes' && !partes[1]" :grupos-app="APP.defs" :nome-app="APP.nome"/>
         <DefCampos v-else-if="ecra==='definicoes' && partes[1]==='campos'" key="campos"/>
         <DefFluxos v-else-if="ecra==='definicoes' && partes[1]==='fluxos'" key="fluxos"/>
+        <DefFormularios v-else-if="ecra==='definicoes' && partes[1]==='formularios'" key="formularios"/>
         <DefConsulta v-else-if="ecra==='definicoes' && ['caixas','utilizadores'].includes(partes[1])" :chave="partes[1]" :key="partes[1]"/>
         <DefLista v-else-if="ecra==='definicoes'" :chave="partes[1]" :key="partes[1]"/>
         <Tarefas v-else-if="ecra==='tarefas'"/>

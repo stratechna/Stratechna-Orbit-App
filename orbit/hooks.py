@@ -81,7 +81,7 @@ _LINGUA = ["orbit.lingua.garantir"]
 # 05-11-2026: os emails no CRM (orbit/emails_crm.py; docs/PLANO-EMAILS-NO-CRM.md) — campos próprios
 _EMAILS_CRM = ["orbit.emails_crm.instalar"]
 # 20-11-2026: campos da interface /orbit (Responsável em contactos e empresas)
-_INTERFACE = ["orbit.interface.instalar.instalar", "orbit.interface.ciclo.instalar", "orbit.interface.marcas.instalar", "orbit.interface.detalhes.instalar"]
+_INTERFACE = ["orbit.interface.instalar.instalar", "orbit.interface.ciclo.instalar", "orbit.interface.marcas.instalar", "orbit.interface.detalhes.instalar", "orbit.fluxos_crm.instalar", "orbit.interface.formularios.instalar"]
 _FATURACAO = ["orbit.faturacao.instalar.garantir"]   # DP8, 05-11-2026
 _BOOKING = ["orbit.booking.garantir"]   # O1/I1, 06-11-2026: negócio do CRM ligado à marcação do Booking
 # 10-11-2026: propostas comerciais por cima do Orçamento (orbit/propostas; docs/PLANO-PROPOSTAS-ORBIT.md)

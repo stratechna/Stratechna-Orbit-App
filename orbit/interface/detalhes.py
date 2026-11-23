@@ -122,7 +122,9 @@ def detalhes(doctype: str, name: str):
 
     secoes = []
     usados = set()
-    for tit, campos in SECOES[doctype]:
+    from orbit.interface.formularios import secoes as _secoes   # a disposição editável (CRM Fields Layout «Data Fields»)
+    for sec in _secoes(doctype, "detalhes"):
+        tit, campos = sec["titulo"], sec["campos"]
         s = {"titulo": tit, "campos": [], "tabelas": []}
         for c in campos:
             if c == "@morada":
