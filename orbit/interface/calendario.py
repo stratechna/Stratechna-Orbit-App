@@ -349,9 +349,72 @@ def _ocupado(alvo: str, ini, fim, user, pwd):
     return out
 
 
+# ── Partilha da agenda com a equipa (23-11-2026, pedido do Vítor): três modos por pessoa ───────────────────────
+# «nenhum» = sem partilha; «livre» = livre/ocupado (por omissão); «tudo» = os colegas vêem as marcações (assunto, hora,
+# local). Fica nos valores por omissão da pessoa no Frappe (`orbit_cal_partilha`); quem aplica nas permissões do Orbit
+# Mail é o vigia do servidor (/opt/orbit/scripts/sogo-livre-ocupado.py, de 2 em 2 min), que lê `partilhas_sogo()`.
+PARTILHA = "orbit_cal_partilha"
+MODOS_PARTILHA = ("nenhum", "livre", "tudo")
+
+
+def _modo(user: str) -> str:
+    v = frappe.defaults.get_user_default(PARTILHA, user=user)
+    return v if v in MODOS_PARTILHA else "livre"
+
+
+@frappe.whitelist()
+def minha_partilha():
+    _guarda()
+    return {"modo": _modo(frappe.session.user)}
+
+
+@frappe.whitelist(methods=["POST"])
+def definir_partilha(modo: str):
+    _guarda()
+    if modo not in MODOS_PARTILHA:
+        frappe.throw("Modo de partilha desconhecido.")
+    frappe.defaults.set_user_default(PARTILHA, modo, user=frappe.session.user)
+    return {"modo": modo, "aviso": "Fica activo nos próximos 2 minutos."}
+
+
+def partilhas_sogo():
+    """Para o vigia do servidor (bench execute, sem sessão): {email: modo} de todas as pessoas deste Orbit."""
+    us = frappe.get_all("User", filters={"enabled": 1, "user_type": "System User"}, pluck="name")
+    return {u.lower(): _modo(u) for u in us
+            if "@" in u and not u.lower().startswith(("portal@", "suporte@", "it@", "noreply@", "admin@", "calendarios-sync@"))}
+
+
+def _marcacoes_de(alvo: str, ini, fim, user, pwd):
+    """As marcações de um colega que partilha «tudo»: o calendário pessoal dele, lido com a credencial de quem pede
+    (o SOGo só o deixa ler se o colega deu a permissão). None se não se conseguir ler."""
+    from zoneinfo import ZoneInfo
+    a = ini.replace(tzinfo=ZoneInfo(TZ)) if ini.tzinfo is None else ini
+    b = fim.replace(tzinfo=ZoneInfo(TZ)) if fim.tzinfo is None else fim
+    faixa = (f'<c:time-range start="{a.astimezone(ZoneInfo("UTC")).strftime("%Y%m%dT%H%M%SZ")}" '
+             f'end="{b.astimezone(ZoneInfo("UTC")).strftime("%Y%m%dT%H%M%SZ")}"/>')
+    corpo = ('<?xml version="1.0"?><c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">'
+             '<d:prop><c:calendar-data/></d:prop><c:filter><c:comp-filter name="VCALENDAR">'
+             f'<c:comp-filter name="VEVENT">{faixa}</c:comp-filter></c:comp-filter></c:filter></c:calendar-query>')
+    r = _pedido("REPORT", _base(alvo) + "personal/", user, pwd, corpo, {"Depth": "1"}, timeout=30)
+    if r.status_code != 207:
+        return None
+    out = []
+    for resp in ET.fromstring(r.content).findall("d:response", NS):
+        dados = resp.findtext("d:propstat/d:prop/c:calendar-data", namespaces=NS)
+        if not dados:
+            continue
+        for ev in _ics_eventos(dados, a, b):
+            if ev["dia_todo"]:
+                continue
+            out.append({"inicio": ev["inicio"], "fim": ev["fim"], "tentativo": False, "titulo": ev["titulo"],
+                        "local": ev["local"]})
+    return out
+
+
 @frappe.whitelist()
 def disponibilidade(pessoas: str, inicio: str, fim: str):
-    """Blocos ocupados de cada colega (`pessoas` = emails separados por vírgulas) entre `inicio` e `fim`."""
+    """Blocos ocupados de cada colega (`pessoas` = emails separados por vírgulas) entre `inicio` e `fim`, conforme a
+    partilha que cada um escolheu: sem partilha → nada; livre/ocupado → só os blocos; tudo → com o assunto."""
     _guarda()
     user, pwd = _credenciais()
     if not pwd:
@@ -359,11 +422,22 @@ def disponibilidade(pessoas: str, inicio: str, fim: str):
     ini, fi = get_datetime(inicio), get_datetime(fim)
     lista = [e.strip().lower() for e in (pessoas or "").split(",") if "@" in e][:12]
     validos = set(frappe.get_all("User", filters={"enabled": 1, "name": ["in", lista]}, pluck="name"))
-    out = {}
+    out, modos = {}, {}
     for e in lista:
-        if e in validos:
-            out[e] = _ocupado(e, ini, fi, user, pwd)
-    return {"ligado": True, "ocupado": out}
+        if e not in validos:
+            continue
+        modos[e] = _modo(e)
+        if modos[e] == "nenhum":
+            out[e] = []
+            continue
+        blocos = None
+        if modos[e] == "tudo":
+            try:
+                blocos = _marcacoes_de(e, ini, fi, user, pwd)
+            except Exception:  # noqa: BLE001
+                blocos = None
+        out[e] = blocos if blocos is not None else _ocupado(e, ini, fi, user, pwd)
+    return {"ligado": True, "ocupado": out, "modos": modos}
 
 
 @frappe.whitelist()

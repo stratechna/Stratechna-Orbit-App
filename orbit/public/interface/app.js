@@ -150,13 +150,15 @@ const Calendario = {
     });
     const minutos = (iso) => { const t = iso.slice(11, 16).split(":"); return +t[0] * 60 + +t[1]; };
     const equipa = ref([]); let sel0 = []; try { sel0 = JSON.parse(localStorage.getItem("orbit.cal.equipa") || "[]"); } catch (e) {}
-    const verEquipa = ref(sel0); const ocupado = ref({});
+    const verEquipa = ref(sel0); const ocupado = ref({}); const modos = ref({}); const partilha = ref("livre");
+    // 23-11-2026: como a equipa vê a MINHA agenda (sem partilha · livre/ocupado · tudo) — o vigia do servidor aplica-o no Orbit Mail.
+    const mudarPartilha = async () => { const r = await apiCal("definir_partilha", { modo: partilha.value }, true); toast(r.aviso || "Guardado"); };
     const carregarEquipa = async () => {
       try { localStorage.setItem("orbit.cal.equipa", JSON.stringify(verEquipa.value)); } catch (e) {}
       if (!verEquipa.value.length || !d.value?.ligado) { ocupado.value = {}; return; }
       const ini = dias.value[0]; const fim = new Date(dias.value[dias.value.length - 1]); fim.setDate(fim.getDate() + 1);
       const r = await apiCal("disponibilidade", { pessoas: verEquipa.value.join(","), inicio: isoDia(ini) + " 00:00:00", fim: isoDia(fim) + " 00:00:00" });
-      ocupado.value = r.ocupado || {};
+      ocupado.value = r.ocupado || {}; modos.value = r.modos || {};
     };
     watch(verEquipa, carregarEquipa, { deep: true });
     const carregar = async () => {
@@ -171,12 +173,12 @@ const Calendario = {
       verEquipa.value.forEach((em, k) => (ocupado.value[em] || []).forEach((b) => {
         if (b.inicio.slice(0, 10) !== isoDia(dia)) return;
         const a = minutos(b.inicio), z = Math.max(minutos(b.fim.slice(0, 10) > b.inicio.slice(0, 10) ? b.inicio.slice(0, 11) + "23:59" : b.fim), a + 15);
-        out.push({ k: em + b.inicio, cor: corDe(em), nome: nomeDe(em), top: Math.max((a - HORA0 * 60) / 60 * ALT, 0), alt: Math.max((z - a) / 60 * ALT - 2, 10), esq: (k / n) * 100, larg: 100 / n });
+        out.push({ k: em + b.inicio, cor: corDe(em), nome: nomeDe(em), titulo: b.titulo || "", hora: b.inicio.slice(11, 16) + "–" + b.fim.slice(11, 16), top: Math.max((a - HORA0 * 60) / 60 * ALT, 0), alt: Math.max((z - a) / 60 * ALT - 2, 10), esq: (k / n) * 100, larg: 100 / n });
       }));
       return out;
     };
     watch([semana, diaMovel, estreito], carregar);
-    onMounted(async () => { await carregar(); equipa.value = await apiCal("equipa"); if (props.nova) abrirNova(); });
+    onMounted(async () => { await carregar(); equipa.value = await apiCal("equipa"); try { partilha.value = (await apiCal("minha_partilha")).modo || "livre"; } catch (e) {} if (props.nova) abrirNova(); });
     const mover = (n) => { if (estreito.value) { const x = new Date(diaMovel.value); x.setDate(x.getDate() + n); diaMovel.value = x; } else { const x = new Date(semana.value); x.setDate(x.getDate() + 7 * n); semana.value = x; } };
     const hoje = () => { semana.value = segunda(new Date()); diaMovel.value = new Date(); };
     const titulo = computed(() => {
@@ -225,7 +227,7 @@ const Calendario = {
     };
     const apagar = async (e) => { if (!confirm("Apagar esta reunião? Os convidados são avisados.")) return; await apiCal("apagar", { href: e.href }, true); sel.value = null; toast("Reunião apagada"); carregar(); };
     const horas = [...Array(HORA1 - HORA0)].map((_, i) => HORA0 + i);
-    return { equipa, verEquipa, ocupadoDia, procurar, primeiroLivre, semana, d, pwd, sel, form, aGravar, dias, mover, hoje, titulo, disposicao, diaTodo, agoraTop, ehHoje, ligar, hm, abrirNova, gravar, apagar, horas, ALT, link, data, estreito };
+    return { equipa, verEquipa, ocupadoDia, modos, partilha, mudarPartilha, procurar, primeiroLivre, semana, d, pwd, sel, form, aGravar, dias, mover, hoje, titulo, disposicao, diaTodo, agoraTop, ehHoje, ligar, hm, abrirNova, gravar, apagar, horas, ALT, link, data, estreito };
   },
   template: `
   <div class="cal">
@@ -237,7 +239,9 @@ const Calendario = {
     <div class="equipa-cal" v-if="d && d.ligado && equipa.length"><span class="sub">Ver também:</span>
       <label v-for="p in equipa" :key="p.email" class="chip-eq" :style="{borderColor:p.cor, background: verEquipa.includes(p.email) ? p.cor : 'transparent', color: verEquipa.includes(p.email) ? '#fff' : 'var(--ink)'}">
         <input type="checkbox" :value="p.email" v-model="verEquipa" style="display:none">{{ p.nome }}</label>
-      <span class="sub" style="font-size:12px" v-if="verEquipa.length">ocupado de cada colega, sem detalhes</span></div>
+      <span class="sub" style="font-size:12px" v-for="em in verEquipa.filter(x => modos[x] === 'nenhum')" :key="'n'+em">{{ (equipa.find(p => p.email === em) || {}).nome || em }} não partilha a agenda</span>
+      <label class="sub partilha-cal" title="Como os colegas vêem a sua agenda aqui e no Orbit Mail">A minha agenda para a equipa:
+        <select v-model="partilha" @change="mudarPartilha"><option value="nenhum">Sem partilha</option><option value="livre">Livre/ocupado</option><option value="tudo">Tudo (com as marcações)</option></select></label></div>
     <div v-if="d && !d.ligado" class="cartao aviso-cal">
       <b>Ligar o calendário do Orbit Mail</b>
       <p class="sub">Para ver e marcar reuniões na sua agenda, confirme uma vez a palavra-passe da sua caixa de correio ({{ d.utilizador }}). Fica guardada cifrada no seu Orbit e só serve o seu calendário. Quem entra no Orbit com a palavra-passe da caixa fica ligado sozinho.</p>
@@ -254,7 +258,7 @@ const Calendario = {
       <div v-for="dia in dias" :key="'c'+dia" class="cal-col" :style="{height:(horas.length*ALT)+'px'}" @dblclick="(ev)=>abrirNova(dia, Math.floor(ev.offsetY/ALT)+7)">
         <div v-for="h in horas" :key="h" class="cal-linha" :style="{top:((h-7)*ALT)+'px'}"></div>
         <div v-if="ehHoje(dia) && agoraTop>0" class="cal-agora" :style="{top:agoraTop+'px'}"></div>
-        <div v-for="o in ocupadoDia(dia)" :key="o.k" class="cal-ocupado" :title="'Ocupado — ' + o.nome" :style="{top:o.top+'px',height:o.alt+'px',left:'calc('+o.esq+'% + 1px)',width:'calc('+o.larg+'% - 2px)',background:o.cor}"><span>{{ o.nome.split(' ')[0] }}</span></div>
+        <div v-for="o in ocupadoDia(dia)" :key="o.k" class="cal-ocupado" :title="o.nome + ' · ' + o.hora + (o.titulo ? ' — ' + o.titulo : ' — ocupado')" :style="{top:o.top+'px',height:o.alt+'px',left:'calc('+o.esq+'% + 1px)',width:'calc('+o.larg+'% - 2px)',background:o.cor}"><span>{{ o.nome.split(' ')[0] }}<template v-if="o.titulo"> · {{ o.titulo }}</template></span></div>
         <div v-for="e in disposicao(dia)" :key="e.id" class="cal-ev" :style="{top:e.top+'px',height:e.alt+'px',left:'calc('+e.esq+'% + 2px)',width:'calc('+e.larg+'% - 4px)',borderLeftColor:e.cor}" @click="sel=e">
           <b>{{ e.titulo }}</b><span>{{ hm(e.inicio) }}–{{ hm(e.fim) }}<template v-if="e.local"> · {{ e.local }}</template></span>
         </div>
@@ -1232,6 +1236,120 @@ const AvFoto = {
   },
   // as iniciais ficam sempre por baixo; a fotografia aparece por cima só depois de carregada
   template: `<span class="av av-foto" :style="estilo">{{ ini(nome || email || '?') }}<img v-if="src" :src="src" alt="" :class="{pronta}" @load="pronta=true" @error="erro"></span>`,
+};
+// ── Desk na interface nova (23-11-2026): tickets e ficha do ticket, sobre o Helpdesk (orbit/interface/desk.py) ──
+const DeskTickets = {
+  setup() {
+    let v0 = "abertos"; try { v0 = localStorage.getItem("orbit.desk.vista") || v0; } catch (e) {}
+    const vista = ref(v0); const q = ref(""); const f = ref({ equipa: "", estado: "", prioridade: "", marca: "" });
+    const d = ref(null); const meta = ref(null); const pagina = ref(0); let tq;
+    const carregar = async (junta = false) => {
+      const r = await api("desk.tickets", { vista: vista.value, q: q.value, pagina: pagina.value, ...f.value });
+      d.value = junta && d.value ? { ...r, linhas: d.value.linhas.concat(r.linhas) } : r;
+    };
+    onMounted(async () => { meta.value = await api("desk.metadados"); carregar(); });
+    const escolher = (v) => { vista.value = v; pagina.value = 0; try { localStorage.setItem("orbit.desk.vista", v); } catch (e) {} carregar(); };
+    watch(q, () => { clearTimeout(tq); tq = setTimeout(() => { pagina.value = 0; carregar(); }, 300); });
+    watch(f, () => { pagina.value = 0; carregar(); }, { deep: true });
+    const VISTAS_D = [["abertos", "Abertos"], ["meus", "Os meus"], ["sem_resposta", "Sem resposta"], ["fora_prazo", "Fora do prazo"], ["resolvidos", "Resolvidos"], ["todos", "Todos"]];
+    const abrir = (t) => { location.hash = "#/ticket/" + encodeURIComponent(t.name); };
+    return { vista, q, f, d, meta, pagina, carregar, escolher, VISTAS_D, data, abrir };
+  },
+  template: `
+  <div>
+    <div class="pad" style="padding-bottom:12px"><h1>Tickets</h1><div class="sub">Pedidos de atendimento do Desk.</div></div>
+    <div class="vistas">
+      <button v-for="v in VISTAS_D" :key="v[0]" :class="{ativo: vista===v[0]}" @click="escolher(v[0])">{{ v[1] }}<span v-if="d && d.contagens[v[0]] != null" class="sub"> {{ d.contagens[v[0]] }}</span></button>
+    </div>
+    <div class="filtros" v-if="meta">
+      <input class="filtro" style="border-style:solid;min-width:220px" v-model="q" placeholder="Procurar por assunto, email ou n.º…">
+      <select class="filtro" v-model="f.equipa"><option value="">Todas as equipas</option><option v-for="e in meta.equipas" :key="e" :value="e">{{ e }}</option></select>
+      <select v-if="meta.marcas.length" class="filtro" v-model="f.marca"><option value="">Todas as marcas</option><option v-for="m in meta.marcas" :key="m" :value="m">{{ m }}</option></select>
+      <select class="filtro" v-model="f.estado"><option value="">Todos os estados</option><option v-for="e in meta.estados" :key="e.v" :value="e.v">{{ e.r }}</option></select>
+      <select class="filtro" v-model="f.prioridade"><option value="">Todas as prioridades</option><option v-for="e in meta.prioridades" :key="e.v" :value="e.v">{{ e.r }}</option></select>
+    </div>
+    <div class="tabela-wrap"><table>
+      <thead><tr><th style="width:70px">N.º</th><th>Assunto</th><th>Cliente</th><th>Estado</th><th>Prioridade</th><th>Equipa</th><th>Responsável</th><th>Prazo</th><th>Última atividade</th></tr></thead>
+      <tbody><tr v-for="t in d?.linhas||[]" :key="t.name" @click="abrir(t)" style="cursor:pointer">
+        <td class="sub">#{{ t.name }}</td><td><b>{{ t.assunto }}</b><div class="sub" style="font-size:12px" v-if="t.marca">{{ t.marca }}</div></td>
+        <td><span class="pessoa"><AvFoto :email="t.email" :nome="t.cliente" :tam="24"/>{{ t.cliente }}</span></td>
+        <td><span class="etq" :class="{Open:'azul',Replied:'roxo',Paused:'ambar',Resolved:'verde',Closed:''}[t.estado]">{{ t.estado_pt }}</span></td>
+        <td><span class="etq" :class="{Urgent:'ambar',High:'ambar'}[t.prioridade]">{{ t.prioridade_pt }}</span></td>
+        <td>{{ t.equipa || '—' }}</td><td>{{ t.responsavel_nome || '—' }}</td>
+        <td><span :class="t.atrasado ? 'etq ambar' : 'sub'">{{ t.prazo ? data(t.prazo) : '—' }}</span></td><td class="sub">{{ data(t.atividade) }}</td></tr></tbody></table>
+      <div v-if="d && !d.linhas.length" class="vazio">Nenhum ticket nesta vista.</div>
+      <div v-if="!d" class="carregar">A carregar…</div>
+      <div class="mais-linhas" v-if="d && d.mais"><button class="btn sm" @click="pagina++; carregar(true)">Mostrar mais</button></div>
+    </div>
+  </div>`,
+};
+const DeskTicket = {
+  components: { EmailCorpo },
+  props: ["nome"],
+  setup(props) {
+    const t = ref(null); const meta = ref(null); const modo = ref("responder"); const texto = ref(""); const cc = ref(""); const aEnviar = ref(false);
+    const carregar = async () => { t.value = await api("desk.ticket", { nome: props.nome }); nextTick(() => { const m = document.querySelector(".desk-linha"); if (m) m.scrollTop = m.scrollHeight; }); };
+    onMounted(async () => { meta.value = await api("desk.metadados"); carregar(); });
+    const esc = (x) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const html = () => texto.value.trim().split(/\n{2,}/).map((p) => "<p>" + esc(p).replace(/\n/g, "<br>") + "</p>").join("");
+    const enviar = async () => {
+      if (!texto.value.trim() || aEnviar.value) return; aEnviar.value = true;
+      try {
+        if (modo.value === "responder") { await api("desk.responder", { nome: props.nome, html: html(), cc: cc.value }, true); toast("Resposta enviada ao cliente"); }
+        else { await api("desk.comentar", { nome: props.nome, html: html() }, true); toast("Comentário interno gravado"); }
+        texto.value = ""; cc.value = ""; carregar();
+      } catch (e) {} finally { aEnviar.value = false; }
+    };
+    const mudar = async (campo, valor) => { await api("desk.mudar", { nome: props.nome, campo, valor }, true); toast("Gravado"); carregar(); };
+    const atribuir = async (agente) => { await api("desk.atribuir", { nome: props.nome, agente }, true); toast(agente ? "Atribuído" : "Sem responsável"); carregar(); };
+    const modelo = async (r) => { if (!r) return; const x = await api("desk.resposta_modelo", { nome: r, ticket: props.nome }); const tmp = document.createElement("div"); tmp.innerHTML = (x && (x.message || x.response || x)) || ""; texto.value = (texto.value ? texto.value + "\n\n" : "") + (tmp.innerText || "").trim(); };
+    return { t, meta, modo, texto, cc, aEnviar, enviar, mudar, atribuir, modelo, data, link };
+  },
+  template: `
+  <div class="pad desk-ticket" v-if="t && meta">
+    <div style="font-size:13px"><a href="#/tickets">← Tickets</a></div>
+    <div class="ola" style="margin-top:4px"><div><h1>{{ t.assunto }}</h1><div class="sub">#{{ t.name }} · aberto {{ data(t.aberto) }} · {{ t.email }}</div></div>
+      <span :class="t.atrasado ? 'etq ambar' : 'etq'">{{ t.sla || 'Sem SLA' }}</span></div>
+    <div class="desk-grelha">
+      <div class="cartao desk-conversa">
+        <div class="desk-linha">
+          <div v-if="!t.linha.length" class="vazio">Ainda sem mensagens.</div>
+          <div v-for="m in t.linha" :key="m.tipo+m.id" class="cartao msg" :class="{nossa: m.enviado, interno: m.tipo==='comentario'}">
+            <header><b>{{ m.tipo==='comentario' ? '🔒 ' + m.quem + ' (interno)' : (m.enviado ? 'Respondemos' : (m.quem || m.de)) }}</b><span>{{ data(m.quando) }}</span></header>
+            <div v-if="m.tipo==='email' && !m.enviado" class="sub" style="font-size:12px;margin-bottom:6px">De {{ m.de }}</div>
+            <EmailCorpo :html="m.html"/>
+            <div v-if="m.anexos && m.anexos.length" class="anexos-mail"><a v-for="a in m.anexos" :key="a.url" class="etq" :href="a.url" target="_blank">📎 {{ a.nome }}</a></div>
+          </div>
+        </div>
+        <div class="desk-resposta" v-if="t.pode_editar">
+          <div class="vistas" style="padding:0"><button :class="{ativo: modo==='responder'}" @click="modo='responder'">Responder ao cliente</button><button :class="{ativo: modo==='comentar'}" @click="modo='comentar'">Comentário interno</button>
+            <select v-if="modo==='responder' && meta.respostas.length" class="btn sm" style="margin-left:auto" @change="modelo($event.target.value); $event.target.value=''"><option value="">Resposta-modelo…</option><option v-for="r in meta.respostas" :key="r.name" :value="r.name">{{ r.title || r.name }}</option></select></div>
+          <input v-if="modo==='responder'" class="ed-campo" v-model="cc" placeholder="Cc (opcional)" style="width:100%;margin:8px 0 0">
+          <textarea v-model="texto" rows="5" :placeholder="modo==='responder' ? 'Escreva a resposta ao cliente…' : 'Nota só para a equipa (o cliente não vê)…'" @keydown.meta.enter="enviar" @keydown.ctrl.enter="enviar"></textarea>
+          <div class="fl-linha" style="justify-content:flex-end"><span class="sub" style="font-size:12px;margin-right:auto">{{ modo==='responder' ? 'Sai por email e fica no ticket · ⌘↵ envia' : 'Só a equipa vê · ⌘↵ grava' }}</span>
+            <button class="btn prim" :disabled="!texto.trim() || aEnviar" @click="enviar">{{ aEnviar ? 'A enviar…' : (modo==='responder' ? 'Enviar resposta' : 'Gravar comentário') }}</button></div>
+        </div>
+      </div>
+      <aside class="cartao desk-lado">
+        <div class="bloco-tit" style="margin-top:0">Ticket</div>
+        <label class="desk-prop">Estado<select class="ed-campo" :value="t.estado" :disabled="!t.pode_editar" @change="mudar('status',$event.target.value)"><option v-for="e in meta.estados" :key="e.v" :value="e.v">{{ e.r }}</option></select></label>
+        <label class="desk-prop">Prioridade<select class="ed-campo" :value="t.prioridade" :disabled="!t.pode_editar" @change="mudar('priority',$event.target.value)"><option v-for="e in meta.prioridades" :key="e.v" :value="e.v">{{ e.r }}</option></select></label>
+        <label class="desk-prop">Tipo<select class="ed-campo" :value="t.tipo" :disabled="!t.pode_editar" @change="mudar('ticket_type',$event.target.value)"><option value=""></option><option v-for="e in meta.tipos" :key="e.v" :value="e.v">{{ e.r }}</option></select></label>
+        <label class="desk-prop">Equipa<select class="ed-campo" :value="t.equipa" :disabled="!t.pode_editar" @change="mudar('agent_group',$event.target.value)"><option value=""></option><option v-for="e in meta.equipas" :key="e" :value="e">{{ e }}</option></select></label>
+        <label class="desk-prop" v-if="meta.marcas.length">Marca<select class="ed-campo" :value="t.marca" :disabled="!t.pode_editar" @change="mudar('orbit_marca',$event.target.value)"><option value=""></option><option v-for="m in meta.marcas" :key="m" :value="m">{{ m }}</option></select></label>
+        <label class="desk-prop">Responsável<select class="ed-campo" :value="(t.responsaveis[0]||{}).v || ''" :disabled="!t.pode_editar" @change="atribuir($event.target.value)"><option value="">— ninguém —</option><option v-for="a in meta.agentes" :key="a.v" :value="a.v">{{ a.r }}</option></select></label>
+        <div class="bloco-tit">Prazos</div>
+        <div class="desk-prop"><span class="sub">1.ª resposta</span><span>{{ t.primeira_resposta ? 'feita ' + data(t.primeira_resposta) : (t.resposta_ate ? 'até ' + data(t.resposta_ate) : '—') }}</span></div>
+        <div class="desk-prop"><span class="sub">Resolução</span><span>{{ t.resolucao_ate ? 'até ' + data(t.resolucao_ate) : '—' }}</span></div>
+        <div class="bloco-tit">Cliente</div>
+        <template v-if="t.contacto"><a :href="link('Contact', t.contacto.name)" class="pessoa"><AvFoto :email="t.contacto.email_id || t.email" :nome="t.contacto.full_name" :tam="28"/><b>{{ t.contacto.full_name }}</b></a>
+          <div class="sub" style="font-size:12px;margin-top:4px">{{ [t.contacto.email_id, t.contacto.mobile_no || t.contacto.phone, t.contacto.company_name].filter(Boolean).join(' · ') }}</div></template>
+        <div v-else class="sub">{{ t.email }}</div>
+        <div v-if="t.cliente" class="sub" style="margin-top:4px">Cliente: {{ t.cliente }}</div>
+      </aside>
+    </div>
+  </div>
+  <div v-else class="carregar">A carregar…</div>`,
 };
 const FichaDetalhes = {
   props: ["doctype", "name"], emits: ["mudou"],
@@ -2650,8 +2768,10 @@ const APPS = {
       ["sec", "Documentos"], ["assinaturas", "assin", "Assinaturas"]],
     modulos: [], defs: ["CRM", "Correio"] },
   // 22-11-2026 (Vítor): o Desk separado do CRM — quem só faz atendimento tem a sua app.
-  desk: { nome: "Desk", sub: "Atendimento", ic: "ticket", inicio: "caixa",
-    nav: [["sec", "Atendimento"], ["caixa", "caixa", "Caixa de entrada"]],
+  desk: { nome: "Desk", sub: "Atendimento", ic: "ticket", inicio: "tickets",
+    nav: [["sec", "Atendimento"], ["tickets", "ticket", "Tickets"], ["caixa", "caixa", "Caixa de entrada"],
+      ["sec", "Clientes"], ["contactos", "pessoa", "Contactos"], ["erp/HD%20Customer", "empresa", "Clientes do Desk"],
+      ["sec", "Conhecimento"], ["erp/HD%20Article", "livro", "Base de conhecimento"], ["erp/HD%20Saved%20Reply", "template", "Respostas-modelo"]],
     modulos: [], defs: ["Atendimento (Desk)", "Correio"] },
   projetos: { nome: "Projetos", sub: "Projetos, tarefas e tempo", ic: "projeto", inicio: "projetos",
     nav: [["sec", "Trabalho"], ["projetos", "projeto", "Projetos"], ["tarefas", "tarefa", "Tarefas"], ["calendario", "cal", "Calendário"], ["sec", "Tempo"], ["tempo", "relogio", "Registo de horas"]],
@@ -2680,7 +2800,7 @@ const abrirApp = (chave, url) => { const w = window.open(url || ("/orbit?app=" +
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -2769,6 +2889,8 @@ const App = {
         <Caixa v-else-if="ecra==='caixa'" :abrir-id="partes[1]"/>
         <Definicoes v-else-if="ecra==='definicoes' && !partes[1]" :grupos-app="APP.defs" :nome-app="APP.nome"/>
         <DefCampos v-else-if="ecra==='definicoes' && partes[1]==='campos'" key="campos"/>
+        <DeskTickets v-else-if="ecra==='tickets'" key="tickets"/>
+        <DeskTicket v-else-if="ecra==='ticket'" :nome="partes[1]" :key="'t'+partes[1]"/>
         <DefFluxos v-else-if="ecra==='definicoes' && partes[1]==='fluxos'" key="fluxos"/>
         <DefFormularios v-else-if="ecra==='definicoes' && partes[1]==='formularios'" key="formularios"/>
         <DefConsulta v-else-if="ecra==='definicoes' && ['caixas','utilizadores'].includes(partes[1])" :chave="partes[1]" :key="partes[1]"/>

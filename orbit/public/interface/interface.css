@@ -514,3 +514,21 @@ tr.erp-grupo td{font-weight:600}
 .form-titulo{font-weight:600;max-width:360px}
 .form-campo{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--line-2)}
 .form-campo:hover{background:var(--surface-2)}
+
+/* 23-11-2026: Desk — ficha do ticket */
+.desk-grelha{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;margin-top:14px;align-items:start}
+.desk-conversa{display:flex;flex-direction:column;min-height:60vh;max-height:calc(100dvh - 190px)}
+.desk-linha{flex:1;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.desk-linha .msg.interno{background:#fff8e6;border-color:#f0dca0}
+[data-theme="dark"] .desk-linha .msg.interno{background:#3a3220;border-color:#5a4a20}
+.desk-resposta{border-top:1px solid var(--line);padding:10px 16px 12px}
+.desk-resposta textarea{width:100%;box-sizing:border-box;margin:8px 0;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;background:var(--surface);color:var(--ink)}
+.desk-lado{padding:14px 16px}
+.desk-prop{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink-3);margin-bottom:10px}
+.desk-prop .ed-campo{width:100%}
+div.desk-prop{flex-direction:row;justify-content:space-between;color:var(--ink)}
+@media (max-width:1000px){.desk-grelha{grid-template-columns:1fr}}
+
+/* 23-11-2026: partilha da agenda com a equipa */
+.partilha-cal{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px}
+.partilha-cal select{font:inherit;font-size:12px;padding:3px 6px;border:1px solid var(--linha,#d5dae0);border-radius:6px;background:var(--bg,#fff);color:var(--ink)}

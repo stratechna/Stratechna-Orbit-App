@@ -1089,7 +1089,7 @@ _DEFINICOES = [
              ("Telefonia — Exotel", "CRM Exotel Settings"),
              ("Motor dos fluxos", "Automation Settings")]),
     ("Atendimento (Desk)", [("Equipas", "HD Team"), ("Acordos de nível de serviço", "HD Service Level Agreement"),
-                            ("Respostas-modelo", "HD Canned Response"), ("Definições do Desk", "HD Settings")]),
+                            ("Respostas-modelo", "HD Saved Reply"), ("Definições do Desk", "HD Settings")]),
     ("Marcas e empresa", [("Marcas", "Brand"), ("Empresas (ERP)", "Company"), ("Cabeçalhos de documentos", "Letter Head"),
                           ("Modelos de impressão", "Print Format")]),
     ("Vendas e faturação", [("Artigos", "Item"), ("Listas de preços", "Price List"),
