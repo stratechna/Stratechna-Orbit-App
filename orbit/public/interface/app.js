@@ -2325,7 +2325,7 @@ const App = {
       </header>
       <main class="ecra">
         <Inicio v-if="ecra==='inicio'" :ctx="ctx"/>
-        <Lista v-else-if="['contactos','empresas','negocios','leads'].includes(ecra)" :objeto="ecra"/>
+        <Lista v-else-if="['contactos','empresas','negocios','leads'].includes(ecra)" :objeto="ecra" :key="ecra"/>
         <Ficha v-else-if="ROTAS_DT[ecra]" :doctype="ROTAS_DT[ecra]" :name="partes[1]" :key="ecra+partes[1]"/>
         <Funil v-else-if="ecra==='funil'"/>
         <Caixa v-else-if="ecra==='caixa'" :abrir-id="partes[1]"/>
