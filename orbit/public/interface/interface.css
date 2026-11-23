@@ -532,3 +532,7 @@ div.desk-prop{flex-direction:row;justify-content:space-between;color:var(--ink)}
 /* 23-11-2026: partilha da agenda com a equipa */
 .partilha-cal{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px}
 .partilha-cal select{font:inherit;font-size:12px;padding:3px 6px;border:1px solid var(--linha,#d5dae0);border-radius:6px;background:var(--bg,#fff);color:var(--ink)}
+/* 23-11-2026: caixa — grupo Chat e resposta ao correio (F2/F3) */
+.ponto-ch{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--verde,#16a34a)}
+.compor-mail textarea{width:100%;box-sizing:border-box;resize:vertical}
+.anexos-mail a.etq{text-decoration:none;color:inherit;cursor:pointer}

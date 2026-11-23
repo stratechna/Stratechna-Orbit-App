@@ -1,6 +1,6 @@
 // Stratechna Orbit — interface única (20-11-2026). Vue 3 sem compilação (vendor/vue.esm-browser.prod.js, MIT):
 // não há passo de construção que uma actualização do Frappe possa partir. Fala só com orbit.interface.api.
-import { createApp, reactive, ref, computed, watch, onMounted, nextTick } from "./vendor/vue.esm-browser.prod.js";
+import { createApp, reactive, ref, computed, watch, onMounted, onUnmounted, nextTick } from "./vendor/vue.esm-browser.prod.js";
 
 // ── API ──────────────────────────────────────────────────────────────────────────────────────────────
 async function api(metodo, args = {}, post = false) {
@@ -1789,12 +1789,66 @@ const Caixa = {
     const resposta = ref(""); const para = ref(""); const cc = ref(""); const aEnviar = ref(false); const verCc = ref(false);
     // 23-11-2026 (F1 da caixa única): o correio da pessoa por IMAP — pessoal e partilhadas, «lido» de cada um
     const correio = ref(null); const mail = ref(null); const pwdCaixa = ref(""); const aLigar = ref(false); const imagens = ref(false);
+    // F2 (23-11-2026): pastas da caixa, responder/reencaminhar, arquivar, mover, apagar, anexos
+    const pastaSel = ref(c0.grupo === "correio" ? (c0.pasta || c0.conta) : ""); const pastasCaixa = ref([]);
+    const compor = ref(null); const aEnviarMail = ref(false);
+    const carregarPastas = async () => { if (canal.value.grupo !== "correio") { pastasCaixa.value = []; return; }
+      try { pastasCaixa.value = (await api("correio.pastas_da_caixa", { pasta: canal.value.conta })).pastas || []; } catch (e) { pastasCaixa.value = []; } };
+    const mudarPasta = (p) => { pastaSel.value = p; carregar(); };
+    const tirarDaLista = (uid) => { itens.value = (itens.value || []).filter((x) => x.id !== uid); mail.value = null; compor.value = null; };
+    const acaoMail = async (acao, extra = {}) => {
+      const uid = mail.value.uid, pasta = mail.value.pasta;
+      await api("correio." + acao, { pasta, uid, ...extra }, true);
+      toast(acao === "arquivar" ? "Arquivada" : acao === "apagar" ? "Enviada para o Lixo" : "Movida");
+      tirarDaLista(uid); carregarCorreio();
+    };
+    const comecar = async (modo) => {
+      const r = await api("correio.destinatarios", { pasta: mail.value.pasta, uid: mail.value.uid, modo });
+      compor.value = { modo, para: r.para || "", cc: r.cc || "", texto: "" };
+      nextTick(() => { const t = document.querySelector(".compor-mail textarea"); if (t) t.focus(); });
+    };
+    const enviarMail = async () => {
+      if (!compor.value || !compor.value.para.trim() || aEnviarMail.value) return;
+      aEnviarMail.value = true;
+      try {
+        const r = await api("correio.enviar", { pasta: mail.value.pasta, uid: mail.value.uid, modo: compor.value.modo, para: compor.value.para, cc: compor.value.cc, texto: compor.value.texto }, true);
+        toast("Enviada de " + r.de); compor.value = null;
+        const it = (itens.value || []).find((x) => x.id === mail.value.uid); if (it) it.respondida = true;
+      } finally { aEnviarMail.value = false; }
+    };
+    const urlAnexo = (i) => "/api/method/orbit.interface.correio.anexo?" + new URLSearchParams({ pasta: mail.value.pasta, uid: mail.value.uid, i });
+    // F3 (23-11-2026): o Chat na caixa — conversas com não lidas e resposta no mesmo sítio
+    const chat = ref(null); const chatSel = ref(null); const chatMsgs = ref(null); const chatTexto = ref("");
+    const carregarChat = async () => { try { chat.value = await apiC("conversas"); } catch (e) { chat.value = { ligado: false }; } };
+    const chatLista = computed(() => {
+      if (!chat.value || !chat.value.ligado) return [];
+      const out = (chat.value.directas || []).map((d) => ({ chave: "d" + d.ids.join(), nome: d.nome, por_ler: d.por_ler, ult: d.ult, sel: { ids: d.ids, nome: d.nome } }));
+      (chat.value.canais || []).forEach((c) => (c.topicos || []).forEach((t) => out.push({ chave: "c" + c.id + t.nome, nome: "# " + c.nome + " › " + t.nome, por_ler: t.por_ler, ult: t.ult, sel: { canal: c.id, nomeCanal: c.nome, topico: t.nome } })));
+      return out.sort((a, b) => (b.por_ler > 0) - (a.por_ler > 0) || b.ult - a.ult).slice(0, 12);
+    });
+    const abrirChat = async (x) => {
+      canal.value = { grupo: "chat", conta: x.chave }; mail.value = null; conv.value = null; chatSel.value = x.sel; chatMsgs.value = null; itens.value = [];
+      if (props.abrirId) location.hash = "#/caixa";
+      const a = x.sel.ids ? { ids: x.sel.ids.join(",") } : { canal: x.sel.canal, topico: x.sel.topico || "" };
+      chatMsgs.value = (await apiC("mensagens", a)).mensagens; x.por_ler = 0; carregarChat();
+      nextTick(() => { const m = document.querySelector(".caixa-chat-msgs"); if (m) m.scrollTop = m.scrollHeight; });
+    };
+    const enviarChat = async () => {
+      if (!chatTexto.value.trim() || !chatSel.value) return;
+      const s0 = chatSel.value; const a = s0.ids ? { ids: s0.ids.join(",") } : { canal: s0.canal, topico: s0.topico || "geral" };
+      await apiC("enviar", { texto: chatTexto.value, ...a }, true); chatTexto.value = "";
+      chatMsgs.value = (await apiC("mensagens", a)).mensagens;
+      nextTick(() => { const m = document.querySelector(".caixa-chat-msgs"); if (m) m.scrollTop = m.scrollHeight; });
+    };
+    const horaChat = (ts) => { const d = new Date(ts * 1000); return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit" }) + " " + d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }); };
     const carregarCorreio = async () => { try { correio.value = await api("correio.pastas"); } catch (e) { correio.value = { ligar: false, pastas: [], erro: true }; } };
     const ligarCaixa = async () => { aLigar.value = true; try { await api("calendario.ligar", { pwd: pwdCaixa.value }, true); pwdCaixa.value = ""; toast("Caixa ligada"); await carregarCorreio(); carregar(); } finally { aLigar.value = false; } };
     const carregar = async () => {
       itens.value = null; mail.value = null;
+      compor.value = null;
+      if (canal.value.grupo === "chat") { itens.value = []; return; }
       if (canal.value.grupo === "correio") {
-        const r = await api("correio.lista", { pasta: canal.value.conta });
+        const r = await api("correio.lista", { pasta: pastaSel.value || canal.value.conta });
         if (r.ligar) { correio.value = { ligar: true, pastas: [] }; itens.value = []; return; }
         itens.value = r.itens; return;
       }
@@ -1827,7 +1881,7 @@ const Caixa = {
         carregar();
       } finally { aAtribuir.value = false; }
     };
-    const escolher = (grupo, conta = "") => { canal.value = { grupo, conta }; try { localStorage.setItem("orbit.caixa.canal", JSON.stringify(canal.value)); } catch (e) {} carregar(); };
+    const escolher = (grupo, conta = "") => { canal.value = { grupo, conta }; pastaSel.value = grupo === "correio" ? conta : ""; chatSel.value = null; try { localStorage.setItem("orbit.caixa.canal", JSON.stringify(canal.value)); } catch (e) {} carregarPastas(); carregar(); };
     const abrirConversa = async (id) => {
       conv.value = null; resposta.value = ""; cc.value = ""; verCc.value = false;
       conv.value = await api("conversa", { nome: id });
@@ -1836,7 +1890,11 @@ const Caixa = {
     };
     const abrir = (i) => { if (i.tipo === "mail") { abrirMail(i); return; } if (i.tipo === "ticket") { window.open(i.url, "_blank"); return; } location.hash = "#/caixa/" + encodeURIComponent(i.id); };
     watch(() => props.abrirId, (id) => { if (id) abrirConversa(id); });
-    onMounted(async () => { canais.value = await api("canais"); carregarCorreio(); carregar(); if (props.abrirId) abrirConversa(props.abrirId); equipa.value = await api("equipa_atribuir"); });
+    let relChat;
+    onMounted(async () => { if (canal.value.grupo === "chat") canal.value = { grupo: "equipa", conta: "" };
+      canais.value = await api("canais"); carregarCorreio(); carregarPastas(); carregar(); carregarChat(); if (props.abrirId) abrirConversa(props.abrirId); equipa.value = await api("equipa_atribuir");
+      relChat = setInterval(() => { if (!document.hidden) carregarChat(); }, 30000); });
+    onUnmounted(() => clearInterval(relChat));
     const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const enviar = async () => {
       if (!resposta.value.trim() || aEnviar.value) return;
@@ -1851,16 +1909,19 @@ const Caixa = {
     const ativo = (g, c = "") => canal.value.grupo === g && (canal.value.conta || "") === c;
     const nomeCanal = computed(() => {
       const c = canal.value; if (c.grupo === "tickets") return "Tickets do Desk";
+      if (c.grupo === "chat") return chatSel.value ? (chatSel.value.ids ? chatSel.value.nome : "# " + chatSel.value.nomeCanal + " › " + chatSel.value.topico) : "Chat";
       if (c.grupo === "correio") { const p = (correio.value?.pastas || []).find((x) => x.pasta === c.conta); return p ? (p.pessoal ? "Entrada · " + p.email : p.email) : "Correio"; }
       if (c.conta === "minhas") return "Atribuídas a mim";
       if (c.conta) return c.conta.replace("Orbit CRM · ", "");
       return c.grupo === "privado" ? "As minhas conversas" : "Todas as caixas de equipa";
     });
     return { canal, canais, itens, conv, abrir, data, cor, ini, link, resposta, para, cc, verCc, enviar, aEnviar, escolher, ativo, nomeCanal, equipa, atribuir, aAtribuir,
-      correio, mail, pwdCaixa, aLigar, ligarCaixa, naoLida, htmlMail, imagens, tamanho };
+      correio, mail, pwdCaixa, aLigar, ligarCaixa, naoLida, htmlMail, imagens, tamanho,
+      pastaSel, pastasCaixa, mudarPasta, acaoMail, compor, comecar, enviarMail, aEnviarMail, urlAnexo,
+      chat, chatLista, chatSel, chatMsgs, chatTexto, abrirChat, enviarChat, horaChat, textoChat };
   },
   template: `
-  <div class="caixa caixa3" :class="{'com-conv': !!abrirId}">
+  <div class="caixa caixa3" :class="{'com-conv': !!abrirId || (!!mail && !mail.aCarregar) || (canal.grupo==='chat' && !!chatSel)}">
     <aside class="canais">
       <h6><span class="ponto-co"></span>Correio <small>como no Orbit Mail</small></h6>
       <template v-if="correio && !correio.ligar">
@@ -1872,6 +1933,10 @@ const Caixa = {
         <button class="btn sm prim" style="margin-top:6px" :disabled="!pwdCaixa || aLigar">{{ aLigar ? 'A ligar…' : 'Ligar a caixa' }}</button>
       </form>
       <div v-else class="sub" style="font-size:12px;padding:4px 10px">A carregar…</div>
+      <h6><span class="ponto-ch"></span>Chat <small v-if="chat && chat.ligado"><a href="#/chat" style="color:inherit">abrir</a></small></h6>
+      <template v-if="chat && chat.ligado"><button v-for="x in chatLista" :key="x.chave" :class="{ativo:ativo('chat',x.chave)}" @click="abrirChat(x)"><span class="txt">{{ x.nome }}</span><span class="n" v-if="x.por_ler">{{ x.por_ler }}</span></button>
+        <p class="sub" v-if="!chatLista.length" style="font-size:12px;padding:0 10px">Sem conversas recentes.</p></template>
+      <p class="sub" v-else-if="chat" style="font-size:12px;padding:0 10px">O Chat ainda não está ligado: <a href="#/chat">ligar</a>.</p>
       <h6><span class="ponto-eq"></span>Equipa</h6>
       <button :class="{ativo:ativo('equipa')}" @click="escolher('equipa')">Todas as caixas de equipa</button>
       <button v-for="c in canais?.equipa||[]" :key="c.conta" :class="{ativo:ativo('equipa',c.conta)}" @click="escolher('equipa',c.conta)"><span class="txt">{{ c.email }}</span><span class="n" v-if="c.n">{{ c.n }}</span></button>
@@ -1883,8 +1948,10 @@ const Caixa = {
       <p class="sub" v-if="canais && !canais.privado.length" style="font-size:12px;padding:0 10px">A sua caixa pessoal ainda não está ligada ao CRM («só para mim»): liga-se no portal, em Stratechna Orbit.</p>
     </aside>
     <div class="lista-conv">
-      <header><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2 style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ nomeCanal }}</h2><span class="sub" v-if="itens">{{ itens.length }}</span></div>
-        <div class="sub" style="font-size:12px;margin-top:4px">{{ canal.grupo==='privado' ? 'Conversas da sua caixa com clientes do CRM — só você as vê.' : canal.grupo==='tickets' ? 'Pedidos de suporte em aberto.' : 'Conversas partilhadas — toda a equipa as vê.' }}</div></header>
+      <header><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2 style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ nomeCanal }}</h2><span class="sub" v-if="itens && canal.grupo!=='chat'">{{ itens.length }}</span></div>
+        <select v-if="canal.grupo==='correio' && pastasCaixa.length" class="filtro" style="border-style:solid;margin-top:6px;width:100%" :value="pastaSel" @change="mudarPasta($event.target.value)">
+          <option v-for="p in pastasCaixa" :key="p.pasta" :value="p.pasta">{{ p.nome }}</option></select>
+        <div class="sub" style="font-size:12px;margin-top:4px">{{ canal.grupo==='chat' ? 'Stratechna Chat — o que lê aqui fica lido no Chat.' : canal.grupo==='correio' ? 'Como no Orbit Mail: o que faz aqui fica feito lá.' : canal.grupo==='privado' ? 'Conversas da sua caixa com clientes do CRM — só você as vê.' : canal.grupo==='tickets' ? 'Pedidos de suporte em aberto.' : 'Conversas partilhadas — toda a equipa as vê.' }}</div></header>
       <div v-if="!itens" class="carregar">A carregar…</div>
       <div v-else-if="!itens.length" class="vazio">Nada por aqui.</div>
       <div v-for="i in itens || []" :key="i.tipo+i.id" class="conv" :class="{ativo: abrirId===i.id || (mail && mail.uid===i.id), nova: i.por_responder}" @click="abrir(i)">
@@ -1899,18 +1966,49 @@ const Caixa = {
     <div class="fio">
       <template v-if="mail && !mail.aCarregar && mail.html !== undefined">
         <header><a class="voltar-conv" href="#" @click.prevent="mail=null">← Mensagens</a><div style="min-width:0"><h2>{{ mail.assunto }}</h2><div class="sub">{{ data(mail.data) }}</div></div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button class="btn sm" @click="naoLida">Marcar como não lida</button></div></header>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <button class="btn sm prim" @click="comecar('responder')">Responder</button>
+            <button class="btn sm" @click="comecar('todos')">Responder a todos</button>
+            <button class="btn sm" @click="comecar('reencaminhar')">Reencaminhar</button>
+            <button class="btn sm" @click="acaoMail('arquivar')">Arquivar</button>
+            <select class="btn sm" style="padding:4px 6px" @change="$event.target.value && acaoMail('mover', { destino: $event.target.value })">
+              <option value="">Mover para…</option><option v-for="p in pastasCaixa.filter(x => x.pasta !== mail.pasta)" :key="p.pasta" :value="p.pasta">{{ p.nome }}</option></select>
+            <button class="btn sm" @click="acaoMail('apagar')" title="Para o Lixo desta caixa">Apagar</button>
+            <button class="btn sm" @click="naoLida">Marcar como não lida</button></div></header>
         <div class="msgs">
           <div class="cartao msg">
             <header><span style="display:flex;align-items:center;gap:8px"><AvFoto :email="mail.email" :nome="mail.de" :tam="28"/><b>{{ mail.de }}</b> <span class="sub" style="font-size:12px">{{ mail.email }}</span></span><span>{{ data(mail.data) }}</span></header>
             <div class="sub" style="font-size:12px;margin-bottom:8px">Para {{ mail.para }}<template v-if="mail.cc"> · cc {{ mail.cc }}</template></div>
             <div v-if="mail.imagens_externas && !imagens" class="aviso-img"><span class="sub">As imagens externas estão bloqueadas.</span> <button class="btn sm" @click="imagens=true">Mostrar imagens</button></div>
             <EmailCorpo :html="htmlMail"/>
-            <div v-if="mail.anexos.length" class="anexos-mail"><span class="sub">Anexos (abrem no Orbit Mail):</span> <span v-for="a in mail.anexos" :key="a.nome" class="etq">📎 {{ a.nome }} · {{ tamanho(a.tamanho) }}</span></div>
+            <div v-if="mail.anexos.length" class="anexos-mail"><span class="sub">Anexos:</span> <a v-for="(a, k) in mail.anexos" :key="k" class="etq" :href="urlAnexo(k)" target="_blank">📎 {{ a.nome }} · {{ tamanho(a.tamanho) }}</a></div>
           </div>
+        </div>
+        <div class="cartao resposta compor-mail" v-if="compor">
+          <div class="tabs" style="flex-wrap:wrap;align-items:center"><span class="sub">{{ compor.modo==='reencaminhar' ? 'Reencaminhar para' : 'Para' }}</span>
+            <input v-model="compor.para" style="flex:1;min-width:180px;border:0;background:none;font:inherit;color:var(--ink);outline:none"></div>
+          <div class="tabs"><span class="sub">Cc</span><input v-model="compor.cc" style="flex:1;border:0;background:none;font:inherit;color:var(--ink);outline:none"></div>
+          <textarea v-model="compor.texto" rows="6" placeholder="Escrever a resposta…" @keydown.meta.enter.prevent="enviarMail" @keydown.ctrl.enter.prevent="enviarMail"></textarea>
+          <footer><span class="sub">Sai da caixa da mensagem e fica nos Enviados dela · a mensagem original vai citada<template v-if="compor.modo==='reencaminhar'"> com os anexos</template> · ⌘↵ envia</span>
+            <span style="display:flex;gap:6px"><button class="btn sm" @click="compor=null">Cancelar</button><button class="btn prim sm" @click="enviarMail" :disabled="!compor.para.trim() || aEnviarMail">{{ aEnviarMail ? 'A enviar…' : 'Enviar' }}</button></span></footer>
         </div>
       </template>
       <div v-else-if="mail && mail.aCarregar" class="carregar">A carregar…</div>
+      <template v-else-if="canal.grupo==='chat' && chatSel">
+        <header><a class="voltar-conv" href="#" @click.prevent="chatSel=null">← Voltar</a><div><h2>{{ nomeCanal }}</h2><div class="sub">Stratechna Chat</div></div><a class="btn sm" href="#/chat">Abrir o Chat</a></header>
+        <div class="msgs chat-msgs caixa-chat-msgs">
+          <div v-if="!chatMsgs" class="carregar">A carregar…</div>
+          <div v-for="m in chatMsgs||[]" :key="m.id" class="chat-msg" :class="{meu:m.meu}">
+            <AvFoto :email="m.email" :nome="m.quem" :tam="28"/>
+            <div><div class="chat-cab"><b>{{ m.quem }}</b><span class="sub">{{ horaChat(m.quando) }}</span></div>
+              <div class="chat-txt" v-html="textoChat(m.texto)"></div></div>
+          </div>
+        </div>
+        <div class="cartao resposta">
+          <textarea v-model="chatTexto" rows="2" placeholder="Escrever uma mensagem…" @keydown.enter.exact.prevent="enviarChat"></textarea>
+          <footer><span class="sub">↵ envia · ⇧↵ nova linha</span><button class="btn prim sm" @click="enviarChat" :disabled="!chatTexto.trim()">Enviar</button></footer>
+        </div>
+      </template>
       <template v-else-if="conv">
         <header><a class="voltar-conv" href="#/caixa">← Conversas</a><div style="min-width:0"><h2>{{ conv.assunto }}</h2><div class="sub">{{ conv.mensagens.length }} mensagens<template v-if="conv.de"> · caixa {{ conv.de }}</template></div></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
