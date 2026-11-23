@@ -1159,7 +1159,7 @@ const Lista = {
   <div>
     <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <div><h1>{{ TITULOS[objeto] }}</h1><div class="sub">{{ total }} registos</div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" @click="importar=true">Importar</button><button class="btn" @click="exportar(false)">Exportar</button><a v-if="objeto==='contactos'||objeto==='empresas'" class="btn" :href="'#/duplicados/'+objeto">Duplicados</a><a class="btn" :href="'/crm/' + ({contactos:'contacts',empresas:'organizations',negocios:'deals',leads:'leads'})[objeto]">CRM clássico</a></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" @click="importar=true">Importar</button><button class="btn" @click="exportar(false)">Exportar</button><a v-if="objeto==='contactos'||objeto==='empresas'" class="btn" :href="'#/duplicados/'+objeto">Duplicados</a></div>
     </div>
     <div class="vistas marcas-sep" v-if="(meta?.marcas||[]).length > 1">
       <button :class="{ativo: !marca}" @click="escolherMarca('')">Todas as marcas</button>
@@ -1427,7 +1427,7 @@ const Ficha = {
   template: `
   <div class="ficha" v-if="f">
     <aside class="col-esq">
-      <div style="font-size:13px;display:flex;justify-content:space-between"><a href="javascript:history.back()">← Voltar</a><a :href="f.classico">Abrir no CRM clássico</a></div>
+      <div style="font-size:13px;display:flex;justify-content:space-between"><a href="javascript:history.back()">← Voltar</a></div>
       <div class="cabeca">
         <AvFoto :email="f.email_principal || emailDoSite((f.props.find(p=>p.campo==='website') || {}).valor)" :nome="f.titulo" :tam="56"/>
         <h1>{{ f.titulo }}</h1><div class="sub">{{ f.sub }}</div>
@@ -1837,37 +1837,35 @@ async function apiDef(metodo, args = {}, post = false) {
 }
 const Definicoes = {
   // 22-11-2026: cada app mostra só as definições dela (gruposApp = null → todas, na Administração).
+  // 23-11-2026 (Vítor): uma só lista, sem repetidos, tudo dentro da interface nova (nada abre no ecrã antigo).
   props: ["gruposApp", "nomeApp"],
   setup(props) {
     const d0 = ref(null); const nat = ref(null);
     onMounted(async () => { [nat.value, d0.value] = await Promise.all([apiDef("indice"), api("definicoes")]); });
     const daApp = (g) => !props.gruposApp || props.gruposApp.includes(g);
-    const grupos = computed(() => { const g = {}; (nat.value || []).filter((x) => daApp(x.grupo)).forEach((x) => (g[x.grupo] = g[x.grupo] || []).push(x)); return g; });
-    const d = computed(() => d0.value && d0.value.filter((g) => daApp(g.grupo)));
-    return { d, nat, grupos };
+    const ORDEM = ["CRM", "Correio", "Atendimento (Desk)", "Marcas e empresa", "Vendas e faturação", "Pessoas e tempo", "Conta e utilizadores", "Avançado"];
+    const cartoes = computed(() => {
+      if (!nat.value || !d0.value) return null;
+      const g = {};
+      const junta = (grupo, item) => { (g[grupo] = g[grupo] || []).push(item); };
+      nat.value.filter((x) => daApp(x.grupo)).forEach((x) => junta(x.grupo, { href: "#/definicoes/" + x.chave, rotulo: x.titulo, n: x.n }));
+      if (daApp("CRM")) { junta("CRM", { href: "#/definicoes/fluxos", rotulo: "Fluxos (automatismos)" }); junta("CRM", { href: "#/definicoes/campos", rotulo: "Campos personalizados" }); }
+      if (daApp("Correio")) junta("Correio", { href: "#/definicoes/caixas", rotulo: "Caixas ligadas ao Orbit" });
+      if (!props.gruposApp) junta("Conta e utilizadores", { href: "#/definicoes/utilizadores", rotulo: "Utilizadores do Orbit" });
+      d0.value.filter((x) => daApp(x.grupo)).forEach((x) => x.itens.forEach((i) => junta(x.grupo, { href: i.url, rotulo: i.rotulo })));
+      return Object.keys(g).sort((a, b) => (ORDEM.indexOf(a) + 99) % 99 - (ORDEM.indexOf(b) + 99) % 99).map((k) => ({ grupo: k, itens: g[k] }));
+    });
+    return { cartoes };
   },
   template: `
   <div class="pad">
     <div class="ola"><div><h1>Definições{{ nomeApp ? ' — ' + nomeApp : '' }}</h1><div class="sub">{{ gruposApp ? 'Só o que é desta app. O resto está na Administração.' : 'Tudo o que se configura no Orbit, num só sítio.' }}</div></div></div>
-    <div v-if="!d" class="carregar">A carregar…</div>
-    <template v-else>
-      <div class="grelha-def" style="margin-bottom:22px">
-        <div class="cartao" v-for="(itens, g) in grupos" :key="g"><header><h2>{{ g }}</h2></header>
-          <a class="linha" v-for="i in itens" :key="i.chave" :href="'#/definicoes/'+i.chave" style="text-decoration:none;color:inherit"><div class="cresce">{{ i.titulo }}</div><span class="sub">{{ i.n }} ›</span></a>
-          <a v-if="g==='CRM'" class="linha" href="#/definicoes/fluxos" style="text-decoration:none;color:inherit"><div class="cresce">Fluxos (automatismos)</div><span class="sub">›</span></a>
-          <a v-if="g==='CRM'" class="linha" href="#/definicoes/campos" style="text-decoration:none;color:inherit"><div class="cresce">Campos personalizados</div><span class="sub">›</span></a>
-          <a v-if="g==='Correio'" class="linha" href="#/definicoes/caixas" style="text-decoration:none;color:inherit"><div class="cresce">Caixas ligadas ao Orbit</div><span class="sub">›</span></a>
-        </div>
-        <div class="cartao" v-if="!gruposApp"><header><h2>Pessoas</h2></header>
-          <a class="linha" href="#/definicoes/utilizadores" style="text-decoration:none;color:inherit"><div class="cresce">Utilizadores do Orbit</div><span class="sub">›</span></a></div>
+    <div v-if="!cartoes" class="carregar">A carregar…</div>
+    <div v-else class="grelha-def">
+      <div class="cartao" v-for="c in cartoes" :key="c.grupo"><header><h2>{{ c.grupo }}</h2></header>
+        <a class="linha" v-for="i in c.itens" :key="i.href" :href="i.href" style="text-decoration:none;color:inherit"><div class="cresce">{{ i.rotulo }}</div><span class="sub">{{ i.n != null ? i.n + ' ' : '' }}›</span></a>
       </div>
-      <h2 style="margin:0 0 10px">Mais definições <span class="sub" style="font-weight:400">— abrem na secretária</span></h2>
-      <div class="grelha-def">
-        <div class="cartao" v-for="g in d" :key="g.grupo"><header><h2>{{ g.grupo }}</h2></header>
-          <a class="linha" v-for="i in g.itens" :key="i.url" :href="i.url" style="text-decoration:none;color:inherit"><div class="cresce">{{ i.rotulo }}</div><span class="sub">↗</span></a>
-        </div>
-      </div>
-    </template>
+    </div>
   </div>`,
 };
 // ── Campos personalizados do CRM (23-11-2026): criar, mudar o nome/opções, esconder, apagar (orbit/interface/campos.py) ──
@@ -1927,81 +1925,70 @@ const DefCampos = {
     </template>
   </div>`,
 };
-// ── Fluxos (23-11-2026): gatilho → condições → ações, sem código (orbit/fluxos.py, orbit/interface/fluxos_api.py) ──
+// ── Fluxos (23-11-2026): os automatismos do motor do Frappe (Automation Flow) em português — orbit/interface/fluxos_api.py ──
 const DefFluxos = {
   setup() {
-    const lista = ref(null); const meta = ref(null); const ed = ref(null); const reg = ref(null); const verReg = ref(false); const aGravar = ref(false);
+    const lista = ref(null); const meta = ref(null); const f = ref(null); const mud = ref({}); const runs = ref(null); const aGravar = ref(false);
+    const ensaio = ref({ registo: "", res: null, a: false }); const verRuns = ref(false);
     const carregar = async () => { lista.value = await api("fluxos_api.listar"); };
     onMounted(async () => { [meta.value] = await Promise.all([api("fluxos_api.metadados"), carregar()]); });
-    const ligar = async (f) => { try { await api("fluxos_api.ligar", { nome: f.name, ativo: f.ativo ? 0 : 1 }, true); toast(f.ativo ? "Fluxo desligado" : "Fluxo ligado"); carregar(); } catch (e) {} };
-    const abrir = async (f) => { ed.value = await api("fluxos_api.obter", { nome: f.name }); verReg.value = false; reg.value = await api("fluxos_api.registo", { nome: f.name }); };
-    const novo = () => { ed.value = { titulo: "", objeto: "CRM Lead", gatilho: "criado", campo: "", valor: "", dias: 0, ativo: 0, condicoes: [], acoes: [{ tipo: "tarefa", titulo: "", dias: 1, para: "responsavel" }] }; reg.value = []; };
-    const gravar = async () => { aGravar.value = true; try { const r = await api("fluxos_api.gravar", { dados: JSON.stringify(ed.value) }, true); toast("Fluxo gravado"); ed.value = null; carregar(); } catch (e) {} finally { aGravar.value = false; } };
-    const apagar = async () => { if (!confirm(`Apagar o fluxo «${ed.value.titulo}»? O registo das execuções também sai.`)) return; await api("fluxos_api.apagar", { nome: ed.value.name }, true); ed.value = null; toast("Fluxo apagado"); carregar(); };
-    const campos = computed(() => (meta.value?.campos || {})[ed.value?.objeto] || []);
-    const campo = (c) => campos.value.find((x) => x.campo === c) || {};
-    const novaAcao = (t) => { const a = { tipo: t }; if (t === "tarefa") Object.assign(a, { titulo: "", dias: 1, para: "responsavel" }); if (t === "aviso") Object.assign(a, { texto: "", para: "responsavel" }); if (t === "atribuir") a.pessoas = []; ed.value.acoes.push(a); };
-    const alternarPessoa = (a, p) => { const i = a.pessoas.indexOf(p); if (i >= 0) a.pessoas.splice(i, 1); else a.pessoas.push(p); };
-    const verTodoRegisto = async () => { verReg.value = true; reg.value = await api("fluxos_api.registo"); ed.value = null; };
-    return { lista, meta, ed, reg, verReg, aGravar, ligar, abrir, novo, gravar, apagar, campos, campo, novaAcao, alternarPessoa, verTodoRegisto, data, link };
+    const ligar = async (x) => { try { await api("fluxos_api.ligar", { nome: x.name, ativo: x.ativo ? 0 : 1 }, true); toast(x.ativo ? "Fluxo desligado" : "Fluxo ligado"); } catch (e) {} carregar(); if (f.value && f.value.name === x.name) abrir(x); };
+    const abrir = async (x) => { mud.value = {}; ensaio.value = { registo: "", res: null, a: false }; f.value = await api("fluxos_api.obter", { nome: x.name }); runs.value = await api("fluxos_api.execucoes", { nome: x.name }); };
+    const valor = (p, c) => (mud.value[p.chave] && c.chave in mud.value[p.chave]) ? mud.value[p.chave][c.chave] : c.valor;
+    const mudar = (p, c, v) => { mud.value[p.chave] = { ...(mud.value[p.chave] || {}), [c.chave]: v }; };
+    const alternarPessoa = (p, c, u) => { const l = [...(valor(p, c) || [])]; const i = l.indexOf(u); if (i >= 0) l.splice(i, 1); else l.push(u); mudar(p, c, l); };
+    const gravar = async () => { aGravar.value = true; try { await api("fluxos_api.gravar", { nome: f.value.name, dados: JSON.stringify({ titulo: f.value.titulo, passos: mud.value }) }, true); toast("Fluxo gravado"); await abrir(f.value); carregar(); } catch (e) {} finally { aGravar.value = false; } };
+    const experimentar = async () => { ensaio.value.a = true; ensaio.value.res = null; try { ensaio.value.res = await api("fluxos_api.experimentar", { nome: f.value.name, registo: ensaio.value.registo }, true); } catch (e) {} finally { ensaio.value.a = false; } };
+    const todosRuns = async () => { f.value = null; verRuns.value = true; runs.value = await api("fluxos_api.execucoes"); };
+    const nivel = (p) => { let n = 0, pai = p.pai; while (pai && n < 6) { n++; const q = f.value.passos.find((x) => x.idx === pai); pai = q ? q.pai : 0; } return n; };
+    const nomePessoa = (u) => (meta.value?.pessoas.find((x) => x.v === u) || {}).r || u;
+    return { lista, meta, f, mud, runs, aGravar, ensaio, verRuns, ligar, abrir, valor, mudar, alternarPessoa, gravar, experimentar, todosRuns, nivel, nomePessoa, data, link };
   },
   template: `
   <div class="pad def-fluxos">
-    <div class="ola"><div><div style="font-size:13px"><a href="#/definicoes">← Definições</a></div><h1>Fluxos</h1>
-      <div class="sub">Automatismos do CRM: quando algo acontece (gatilho), se as condições se cumprirem, o Orbit faz as ações. Os modelos vêm desligados.</div></div>
-      <div style="display:flex;gap:8px"><button class="btn" @click="verTodoRegisto">Registo</button><button class="btn prim" @click="novo">+ Novo fluxo</button></div></div>
+    <div class="ola"><div><div style="font-size:13px"><a href="#/definicoes" v-if="!f && !verRuns">← Definições</a><a href="#" v-else @click.prevent="f=null;verRuns=false">← Fluxos</a></div><h1>{{ f ? f.titulo : 'Fluxos' }}</h1>
+      <div class="sub" v-if="!f">Automatismos do CRM: quando algo acontece, se as condições se cumprirem, o Orbit faz os passos. Vêm desligados — ligue os que quer.</div>
+      <div class="sub" v-else>{{ f.registo }} · {{ f.quando }}</div></div>
+      <button v-if="!f && !verRuns" class="btn" @click="todosRuns">Execuções</button></div>
     <div v-if="!lista || !meta" class="carregar">A carregar…</div>
-    <template v-else-if="ed">
+    <template v-else-if="f">
       <div class="cartao fluxo-ed">
-        <div class="fl-linha"><label>Título<input class="ed-campo" v-model="ed.titulo"></label>
-          <label>Registo<select class="ed-campo" v-model="ed.objeto"><option v-for="o in meta.objetos" :key="o.v" :value="o.v">{{ o.r }}</option></select></label>
-          <label class="fl-ligado"><input type="checkbox" :checked="!!ed.ativo" @change="ed.ativo = $event.target.checked ? 1 : 0"> Ligado</label></div>
-        <p v-if="ed.descricao" class="sub" style="margin:4px 0 0">{{ ed.descricao }}</p>
-        <h3>Quando</h3>
-        <div class="fl-linha"><select class="ed-campo" v-model="ed.gatilho"><option v-for="g in meta.gatilhos" :key="g.v" :value="g.v">{{ g.r }}</option></select>
-          <template v-if="ed.gatilho==='campo_muda'"><select class="ed-campo" v-model="ed.campo"><option value="" disabled>Campo…</option><option v-for="c in campos" :key="c.campo" :value="c.campo">{{ c.rotulo }}</option></select>
-            <span class="sub">passa a</span><select v-if="campo(ed.campo).opcoes" class="ed-campo" v-model="ed.valor"><option value="">qualquer valor</option><option v-for="o in campo(ed.campo).opcoes" :key="o" :value="o">{{ o }}</option></select><input v-else class="ed-campo" v-model="ed.valor" placeholder="qualquer valor"></template>
-          <template v-if="ed.gatilho==='sem_atividade'"><input class="ed-campo" type="number" min="1" v-model.number="ed.dias" style="width:90px"><span class="sub">dias sem atividade</span></template>
-          <template v-if="ed.gatilho==='data'"><input class="ed-campo" type="number" v-model.number="ed.dias" style="width:90px"><span class="sub">dias depois de</span>
-            <select class="ed-campo" v-model="ed.campo"><option v-for="c in campos.filter(x=>['Date','Datetime'].includes(x.tipo))" :key="c.campo" :value="c.campo">{{ c.rotulo }}</option></select></template>
+        <div class="fl-linha"><label>Título<input class="ed-campo" v-model="f.titulo"></label>
+          <label class="fl-ligado"><span class="interruptor"><input type="checkbox" :checked="f.ativo" @change="ligar(f)"><span></span></span> {{ f.ativo ? 'Ligado' : 'Desligado' }}</label></div>
+        <p v-if="f.motivo_desligado" class="sub">Desligado pelo motor: {{ f.motivo_desligado }}</p>
+        <p v-if="f.condicao" class="sub" style="font-size:12px">Só corre quando: <code>{{ f.condicao }}</code></p>
+        <h3>Passos</h3>
+        <div v-for="p in f.passos" :key="p.chave" class="fl-passo" :style="{marginLeft: (nivel(p)*22)+'px'}">
+          <div class="fl-linha" style="margin:0"><span v-if="p.ramo" class="etq" :class="p.ramo==='Se sim'?'verde':'ambar'" style="font-size:11px">{{ p.ramo }}</span>
+            <b>{{ p.idx }}.</b> <span>{{ p.texto }}</span><span v-if="p.alvo" class="sub" style="font-size:12px">· em «{{ p.alvo }}»</span></div>
+          <div v-if="p.tipo==='If' && p.condicao" class="sub" style="font-size:12px;margin-top:2px"><code>{{ p.condicao }}</code></div>
+          <div v-for="c in p.campos" :key="c.chave" class="fl-linha" style="margin:6px 0 0">
+            <span class="sub" style="min-width:110px">{{ c.rotulo }}</span>
+            <div v-if="c.tipo==='pessoas'" class="marcas-chips"><button v-for="u in meta.pessoas" :key="u.v" class="etq" :class="{on:(valor(p,c)||[]).includes(u.v)}" @click="alternarPessoa(p,c,u.v)">{{ u.r }}</button></div>
+            <select v-else-if="c.tipo==='modelo'" class="ed-campo" :value="valor(p,c)" @change="mudar(p,c,$event.target.value)"><option v-for="m in meta.modelos_email" :key="m" :value="m">{{ m }}</option></select>
+            <select v-else-if="c.tipo==='lista'" class="ed-campo" :value="valor(p,c)" @change="mudar(p,c,$event.target.value)"><option v-for="o in c.opcoes" :key="o.v" :value="o.v">{{ o.r }}</option></select>
+            <input v-else class="ed-campo" :type="c.tipo==='numero'?'number':'text'" :value="valor(p,c)" @input="mudar(p,c,$event.target.value)" :style="c.tipo==='numero'?'width:100px':'flex:1'">
+          </div>
         </div>
-        <h3>Se <span class="sub" style="font-weight:400">(todas as condições; sem nenhuma, sempre)</span></h3>
-        <div v-for="(c,i) in ed.condicoes" :key="'c'+i" class="fl-linha">
-          <select class="ed-campo" v-model="c.campo"><option v-for="x in campos" :key="x.campo" :value="x.campo">{{ x.rotulo }}</option></select>
-          <select class="ed-campo" v-model="c.op"><option v-for="o in meta.ops" :key="o.v" :value="o.v">{{ o.r }}</option></select>
-          <template v-if="!['vazio','preenchido'].includes(c.op)"><select v-if="campo(c.campo).opcoes && !['em','nao_em'].includes(c.op)" class="ed-campo" v-model="c.valor"><option v-for="o in campo(c.campo).opcoes" :key="o" :value="o">{{ o }}</option></select>
-            <input v-else class="ed-campo" v-model="c.valor" :placeholder="['em','nao_em'].includes(c.op) ? 'valores separados por vírgulas' : 'valor'"></template>
-          <button class="btn sm" @click="ed.condicoes.splice(i,1)">✕</button></div>
-        <button class="btn sm" @click="ed.condicoes.push({campo:'',op:'igual',valor:''})">+ Condição</button>
-        <h3>Então</h3>
-        <div v-for="(a,i) in ed.acoes" :key="'a'+i" class="cartao fl-acao">
-          <div class="fl-linha"><b>{{ (meta.acoes.find(x=>x.v===a.tipo)||{}).r }}</b><button class="btn sm" style="margin-left:auto" @click="ed.acoes.splice(i,1)">✕</button></div>
-          <div v-if="a.tipo==='atribuir'" class="marcas-chips"><button v-for="p in meta.pessoas" :key="p.v" class="etq" :class="{on:(a.pessoas||[]).includes(p.v)}" @click="alternarPessoa(a,p.v)">{{ p.r }}</button><span class="sub" style="font-size:12px">várias = rotação</span></div>
-          <div v-if="a.tipo==='tarefa'" class="fl-linha"><input class="ed-campo" v-model="a.titulo" placeholder="Título da tarefa"><span class="sub">prazo</span><input class="ed-campo" type="number" min="0" v-model.number="a.dias" style="width:80px"><span class="sub">dias · para</span>
-            <select class="ed-campo" v-model="a.para"><option value="responsavel">o responsável</option><option v-for="p in meta.pessoas" :key="p.v" :value="p.v">{{ p.r }}</option></select></div>
-          <div v-if="a.tipo==='aviso'" class="fl-linha"><input class="ed-campo" v-model="a.texto" placeholder="Texto do aviso"><span class="sub">para</span>
-            <select class="ed-campo" v-model="a.para"><option value="responsavel">o responsável</option><option v-for="p in meta.pessoas" :key="p.v" :value="p.v">{{ p.r }}</option></select></div>
-          <div v-if="a.tipo==='email'" class="fl-linha"><span class="sub">Modelo</span><select class="ed-campo" v-model="a.modelo"><option value="" disabled>Escolher…</option><option v-for="m in meta.modelos_email" :key="m" :value="m">{{ m }}</option></select><span class="sub" style="font-size:12px">não sai para quem pediu para não receber</span></div>
-          <div v-if="a.tipo==='mudar'" class="fl-linha"><select class="ed-campo" v-model="a.campo"><option v-for="x in campos" :key="x.campo" :value="x.campo">{{ x.rotulo }}</option></select><span class="sub">passa a</span>
-            <select v-if="campo(a.campo).opcoes" class="ed-campo" v-model="a.valor"><option v-for="o in campo(a.campo).opcoes" :key="o" :value="o">{{ o }}</option></select><input v-else class="ed-campo" v-model="a.valor"></div>
-        </div>
-        <div class="fl-linha"><span class="sub">+</span><button v-for="t in meta.acoes" :key="t.v" class="btn sm" @click="novaAcao(t.v)">{{ t.r }}</button></div>
-        <div class="fl-linha" style="justify-content:flex-end;margin-top:14px"><button v-if="ed.name" class="btn" @click="apagar">Apagar</button><button class="btn" @click="ed=null">Cancelar</button><button class="btn prim" :disabled="aGravar" @click="gravar">{{ aGravar ? 'A gravar…' : 'Gravar' }}</button></div>
-        <template v-if="ed.name && reg"><h3>Últimas execuções</h3><div v-if="!reg.length" class="sub">Ainda não correu.</div>
-          <div v-for="(r,i) in reg.slice(0,20)" :key="i" class="fl-reg"><span :class="r.ok?'etq verde':'etq ambar'">{{ r.ok ? 'ok' : 'falhou' }}</span> <a :href="link(r.ref_doctype, r.ref_name)">{{ r.ref_name }}</a> <span class="sub">{{ data(r.creation) }} · {{ r.resultado }}</span></div></template>
+        <div class="fl-linha" style="justify-content:flex-end;margin-top:14px"><button class="btn" @click="f=null">Fechar</button><button class="btn prim" :disabled="aGravar" @click="gravar">{{ aGravar ? 'A gravar…' : 'Gravar' }}</button></div>
+        <h3>Experimentar num registo <span class="sub" style="font-weight:400">(corre e desfaz tudo — nada fica gravado nem é enviado)</span></h3>
+        <div class="fl-linha"><input class="ed-campo" v-model="ensaio.registo" :placeholder="'Código do registo (ex.: ' + (f.document_type==='CRM Deal' ? 'CRM-DEAL-2026-00111' : 'CRM-LEAD-2026-00125') + ')'" style="flex:1"><button class="btn" :disabled="!ensaio.registo || ensaio.a" @click="experimentar">{{ ensaio.a ? 'A experimentar…' : 'Experimentar' }}</button></div>
+        <pre v-if="ensaio.res" class="fl-ensaio">{{ JSON.stringify(ensaio.res, null, 2) }}</pre>
+        <h3>Últimas execuções</h3>
+        <div v-if="!runs" class="carregar">A carregar…</div><div v-else-if="!runs.length" class="sub">Ainda não correu.</div>
+        <div v-for="r in (runs||[]).slice(0,20)" :key="r.name" class="fl-reg"><span :class="r.status==='Success'?'etq verde':r.status==='Skipped'?'etq':'etq ambar'">{{ r.estado }}</span>
+          <a :href="link(r.reference_doctype, r.reference_name)">{{ r.reference_name }}</a> <span class="sub">{{ data(r.started_at) }}<template v-if="r.error_summary"> · {{ r.error_summary }}</template></span></div>
       </div>
     </template>
-    <template v-else-if="verReg">
-      <div class="cartao" style="padding:14px 18px"><div class="fl-linha"><h3 style="margin:0">Registo de todos os fluxos</h3><button class="btn sm" style="margin-left:auto" @click="verReg=false">Voltar</button></div>
-        <div v-if="!reg" class="carregar">A carregar…</div><div v-else-if="!reg.length" class="sub">Nenhum fluxo correu ainda.</div>
-        <div v-for="(r,i) in reg||[]" :key="i" class="fl-reg"><span :class="r.ok?'etq verde':'etq ambar'">{{ r.ok ? 'ok' : 'falhou' }}</span> <b>{{ r.fluxo_titulo }}</b> · <a :href="link(r.ref_doctype, r.ref_name)">{{ r.ref_name }}</a> <span class="sub">{{ data(r.creation) }} · {{ r.resultado }}</span></div></div>
+    <template v-else-if="verRuns">
+      <div class="cartao" style="padding:14px 18px"><div v-if="!runs" class="carregar">A carregar…</div><div v-else-if="!runs.length" class="sub">Nenhum fluxo correu ainda.</div>
+        <div v-for="r in runs||[]" :key="r.name" class="fl-reg"><span :class="r.status==='Success'?'etq verde':r.status==='Skipped'?'etq':'etq ambar'">{{ r.estado }}</span> <b>{{ r.automation_title }}</b> · <a :href="link(r.reference_doctype, r.reference_name)">{{ r.reference_name }}</a> <span class="sub">{{ data(r.started_at) }}<template v-if="r.error_summary"> · {{ r.error_summary }}</template></span></div></div>
     </template>
     <div v-else class="tabela-wrap"><table>
-      <thead><tr><th style="width:70px">Ligado</th><th>Fluxo</th><th>Registo</th><th>Quando</th><th>Faz</th><th>Execuções</th></tr></thead>
-      <tbody><tr v-for="f in lista" :key="f.name" @click="abrir(f)" style="cursor:pointer">
-        <td @click.stop><label class="interruptor"><input type="checkbox" :checked="f.ativo" @change="ligar(f)"><span></span></label></td>
-        <td><b>{{ f.titulo }}</b><div class="sub" style="font-size:12px" v-if="f.descricao">{{ f.descricao }}</div></td>
-        <td>{{ f.objeto_nome }}</td><td>{{ f.gatilho }}</td><td>{{ f.acoes.join(' · ') }}</td><td>{{ f.execucoes }}</td></tr></tbody></table>
+      <thead><tr><th style="width:70px">Ligado</th><th>Fluxo</th><th>Registo</th><th>Quando</th><th>Passos</th><th>Execuções</th></tr></thead>
+      <tbody><tr v-for="x in lista" :key="x.name" @click="abrir(x)" style="cursor:pointer">
+        <td @click.stop><label class="interruptor"><input type="checkbox" :checked="x.ativo" @change="ligar(x)"><span></span></label></td>
+        <td><b>{{ x.titulo }}</b></td><td>{{ x.registo }}</td><td>{{ x.quando }}</td><td>{{ x.passos }}</td><td>{{ x.execucoes }}</td></tr></tbody></table>
       <div v-if="!lista.length" class="vazio">Ainda não há fluxos.</div></div>
   </div>`,
 };
@@ -2322,7 +2309,7 @@ const ErpFicha = {
     const secVisivel = (s) => avaliar(s.depends_on, doc.value) && s.colunas.some((col) => col.some(visivel));
     const abaVisivel = (t) => avaliar(t.depends_on, doc.value) && t.secoes.some(secVisivel);
     const abasVis = computed(() => abas.value.filter(abaVisivel));
-    const tituloDoc = computed(() => { const t = meta.value?.titulo; return (t && doc.value?.[t]) || (novo.value ? "Novo — " + meta.value?.rotulo : doc.value?.name); });
+    const tituloDoc = computed(() => { const t = meta.value?.titulo; if (meta.value?.single) return meta.value.rotulo; return (t && doc.value?.[t]) || (novo.value ? "Novo — " + meta.value?.rotulo : doc.value?.name); });
     const precisaNome = computed(() => novo.value && meta.value && (!meta.value.nomeacao || meta.value.nomeacao.toLowerCase() === "prompt"));
     const gravar = async () => {
       const falta = meta.value.campos.filter((c) => !ESTRUTURA.includes(c.fieldtype) && visivel(c) && obrig(c) && vazioV(doc.value[c.fieldname]));
@@ -2611,7 +2598,8 @@ const APPS = {
   crm: { nome: "CRM", sub: "Clientes e atendimento", ic: "pessoa", inicio: "inicio",
     nav: [["inicio", "casa", "Início"], ["sec", "CRM"], ["leads", "lead", "Leads"], ["contactos", "pessoa", "Contactos"], ["empresas", "empresa", "Empresas"],
       ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"],
-      ["sec", "O meu dia"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"], ["app/Booking", "relogio", "Marcar reuniões"],
+      ["sec", "O meu dia"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"],
+      ["erp/FCRM%20Note", "nota", "Notas"], ["erp/CRM%20Call%20Log", "tel", "Chamadas"], ["app/Booking", "relogio", "Marcar reuniões"],
       ["sec", "Documentos"], ["assinaturas", "assin", "Assinaturas"]],
     modulos: [], defs: ["CRM", "Correio"] },
   // 22-11-2026 (Vítor): o Desk separado do CRM — quem só faz atendimento tem a sua app.
@@ -2699,7 +2687,7 @@ const App = {
       </template>
       <template v-if="modulosApp.length"><h6>{{ APP_ATUAL==='admin' ? 'Sistema' : 'Módulos' }}</h6>
       <a v-for="m in modulosApp" :key="m.url" :href="m.barra ? '#/erp-m/'+encodeURIComponent(m.barra) : m.url" :target="m.barra ? null : '_blank'" style="text-decoration:none"><button tabindex="-1" :class="{ativo: ecra==='erp-m' && partes[1]===m.barra}"><Icone n="grelha"/>{{ m.nome }}<span class="fora" v-if="!m.barra">↗</span></button></a></template>
-      <a v-if="APP_ATUAL==='crm'" href="/crm" style="text-decoration:none"><button tabindex="-1"><Icone n="antigo"/>CRM clássico</button></a>
+
       <div class="fim"><div class="av" style="background:#5b6f7a">{{ ctx.iniciais }}</div><div style="min-width:0">{{ ctx.nome }}<br><a href="/?cmd=web_logout" style="color:#7f939d;font-size:12px">Sair</a></div></div>
     </nav>
     <div class="main">

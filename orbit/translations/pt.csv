@@ -5815,3 +5815,271 @@ Search,Pesquisar
 Search...,Pesquisar...
 Edit Sidebar,Editar barra lateral
 On this page,Nesta página
+Asset Request,Pedido de ativo
+Rejection Reason,Motivo da rejeição
+Bank Details Change Request,Pedido de alteração dos dados bancários
+New Bank Details,Novos dados bancários
+Proof,Comprovativo
+Studio App File,Ficheiro de app do Studio
+Studio App,App do Studio
+File Path,Caminho do ficheiro
+Flow Settings,Definições do Flow
+Helper Model,Modelo auxiliar
+Web Search,Pesquisa na web
+Search Provider,Fornecedor de pesquisa
+Search API Key,Chave da API de pesquisa
+CRM Availability Status,Estado de disponibilidade (CRM)
+Attachment Queue,Fila de anexos
+Source File,Ficheiro de origem
+Target Document Type,Tipo de documento de destino
+Created Document,Documento criado
+App Title,Título da app
+App Home,Página inicial da app
+Frappe App (for export),App Frappe (para exportar)
+Flow Skill,Competência do Flow
+Available to All Agents,Disponível para todos os agentes
+User Invocable,Pode ser chamado pelo utilizador
+System Generated,Gerado pelo sistema
+HR Telemetry Milestone,Marco de telemetria de RH
+TP OTP,Código de uso único (telefonia)
+Is Verified,Verificado
+OTP Hash,Código de uso único (cifrado)
+Attempts,Tentativas
+Verified At,Verificado em
+TP SMS Log,Registo de SMS
+Undelivered,Não entregue
+Twilio SID,SID da Twilio
+Sent By,Enviado por
+Sent At,Enviado em
+TP OTP Settings,Definições dos códigos de uso único
+Enable SMS (Twilio),Ativar SMS (Twilio)
+Enable Email OTP,Ativar código por email
+SMS From Number,Número de envio dos SMS
+Send SMS Rate Limit (per hour),Limite de SMS (por hora)
+OTP Length,Tamanho do código
+OTP Expiry (In Seconds),Validade do código (segundos)
+OTP Max Attempts,Máximo de tentativas do código
+OTP Message Template,Modelo da mensagem do código
+Email OTP Subject,Assunto do email com o código
+Flow Agent Memory,Memória do agente
+Source Run,Execução de origem
+Studio AI Message,Mensagem da IA do Studio
+Session,Sessão
+user,utilizador
+assistant,assistente
+chat,conversa
+clarification,esclarecimento
+status,estado
+Task Type,Tipo de tarefa
+Component ID,ID do componente
+Metadata JSON,Metadados (JSON)
+CRM Enrichment Run,Enriquecimento de dados (execução)
+Reverted,Revertido
+Source Website,Site de origem
+Started On,Começou em
+Finished On,Terminou em
+Undone On,Desfeito em
+Undone By,Desfeito por
+Industry Confidence,Confiança no setor
+Emails Found,Emails encontrados
+Phones Found,Telefones encontrados
+Social Profiles,Perfis sociais
+Raw,Em bruto
+Raw JSON,JSON em bruto
+CRM Enrichment Rule,Regra de enriquecimento
+Rule Type,Tipo de regra
+Social,Redes sociais
+Target Value,Valor de destino
+Match Scope,Âmbito da correspondência
+Headline,Título
+Full Text,Texto completo
+Patterns,Padrões
+CRM Enrichment Settings,Definições do enriquecimento de dados
+Crawl,Recolha
+Max Pages,Máximo de páginas
+Max Depth,Profundidade máxima
+Use Sitemap,Usar o mapa do site
+Request Timeout (s),Tempo limite do pedido (s)
+Max Download Bytes,Máximo de bytes a descarregar
+Retry Count,Número de novas tentativas
+Crawl Tuning,Afinação da recolha
+Link Priority Order,Ordem de prioridade das ligações
+Skip Patterns,Padrões a ignorar
+SSRF Guard,Proteção contra pedidos internos (SSRF)
+Allowed Domains,Domínios permitidos
+Blocked Domains,Domínios bloqueados
+CRM Enrichment Field Mapping,Correspondência de campos do enriquecimento
+Source Key,Chave de origem
+company_name,nome da empresa
+logo,logótipo
+industry,setor
+primary_email,email principal
+primary_phone,telefone principal
+secondary_phone,telefone secundário
+Target Doctype,Tipo de registo de destino
+Target Fieldname,Campo de destino
+Write Policy,Regra de escrita
+Fill if empty,Preencher se estiver vazio
+Always refresh,Atualizar sempre
+Override defaults,Substituir os valores por omissão
+Create Missing Link,Criar a ligação em falta
+Default Values,Valores por omissão
+Flow Knowledge Base,Base de conhecimento
+Flow Knowledge Chunk,Fragmento de conhecimento
+Chunk Index,Índice do fragmento
+Flow Knowledge Source,Fonte de conhecimento
+Content Fields,Campos de conteúdo
+Auto Sync,Sincronizar sozinho
+Chunking,Divisão em fragmentos
+Chunk Size,Tamanho do fragmento
+Chunk Overlap,Sobreposição dos fragmentos
+Indexing,Indexação
+Chunk Count,Número de fragmentos
+Flow Knowledge Settings,Definições do conhecimento
+Embedding Model,Modelo de vetores
+Embedding Dimension,Dimensão dos vetores
+Search Type,Tipo de pesquisa
+Hybrid,Híbrida
+Vector,Vetorial
+Flow Provider,Fornecedor de IA
+Studio AI Session,Sessão de IA do Studio
+Selected Model,Modelo escolhido
+Last Task Type,Último tipo de tarefa
+Is Running,Em curso
+Last Interaction On,Última interação em
+Flow Session,Sessão do Flow
+Approval Mode,Modo de aprovação
+Auto-approve,Aprovar sozinho
+General Access,Acesso geral
+Restricted,Restrito
+Last Synced Seq,Última sequência sincronizada
+Transcript,Transcrição
+Flow Agent,Agente de IA
+Max Iterations,Máximo de iterações
+Token Budget,Orçamento de tokens
+Sub-agents,Subagentes
+Knowledge,Conhecimento
+Knowledge Bases,Bases de conhecimento
+Flow Trigger,Gatilho do agente
+When,Quando
+Target DocType,Tipo de registo de destino
+Last Fired At,Último disparo em
+Prompt,Instrução
+Prompt Template,Modelo da instrução
+Flow Run,Execução do agente
+Denied,Recusado
+Iterations,Iterações
+Flow Server Run,Execução no servidor
+On Complete,Ao terminar
+Input → Output,Entrada → saída
+Input,Entrada
+Tool Calls,Chamadas a ferramentas
+Approval Seq,Sequência de aprovação
+Token Usage,Tokens usados
+Up,Gostei
+Down,Não gostei
+Feedback Comment,Comentário
+Flow Tool,Ferramenta do agente
+Function Name,Nome da função
+Server,Servidor
+Requires Confirmation,Precisa de confirmação
+Run in Background,Correr em segundo plano
+Description (LLM-facing),Descrição (para a IA)
+Summary (human-facing),Resumo (para as pessoas)
+Definition,Definição
+Import Path,Caminho de importação
+Flow Model,Modelo de IA
+Embedding model,Modelo de vetores
+Model ID,ID do modelo
+Context Window,Janela de contexto
+Extra Params,Parâmetros extra
+Layout,Disposição
+Employee Company,Empresa do funcionário
+Component Name,Nome do componente
+Studio Component,Componente do Studio
+Is Disabled,Desativado
+Block,Bloco
+Inputs,Entradas
+TP Exotel Settings,Definições da Exotel
+TP Twilio Settings,Definições da Twilio
+TP Call Log,Registo de chamadas
+TP Telephony Agent,Agente de telefonia
+Studio Settings,Definições do Studio
+AI Settings,Definições de IA
+AI API Key,Chave da API de IA
+Payroll Correction,Correção de processamento salarial
+kanban,quadro
+Outdated,Desatualizado
+Setup Completed,Configuração concluída
+Studio Page,Página do Studio
+Tab Title,Título do separador
+Allow Guest Access,Permitir acesso sem sessão
+Draft Blocks,Blocos em rascunho
+Resources,Recursos
+Variables,Variáveis
+Page Script,Script da página
+ERPNext Site URL,Endereço do site ERPNext
+ERPNext Site API's,APIs do site ERPNext
+so_eu,só eu
+Previous Depreciation Schedule,Plano de depreciação anterior
+PWA Notification,Notificação da app
+Pinned By,Fixado por
+Pinned On,Fixado em
+Design View,Vista de design
+Process Payment Reconciliation Log,Registo da reconciliação de pagamentos
+KRAs,Áreas-chave de resultados
+Distribute Additional Costs Based On,Distribuir os custos adicionais com base em
+Profile Sections,Secções do perfil
+Default Work In Progress Warehouse,Armazém de trabalho em curso por omissão
+Insights,Análises
+Compare,Comparar
+Employee Responsible,Funcionário responsável
+Migrate To Wiki,Migrar para o Wiki
+Assets Directory,Pasta dos recursos
+Docs Directory,Pasta da documentação
+Create New Assets,Criar recursos novos
+New Documentation Route,Nova rota da documentação
+Assets Prepend,Prefixo dos recursos
+Rebuild Bins,Reconstruir os saldos de stock
+"Delete Leads, Addresses and Contacts","Apagar leads, moradas e contactos"
+For Designation,Para o cargo
+Current Employer,Empregador atual
+Last YouTube Update,Última atualização do YouTube
+Body,Corpo
+Superseded By,Substituído por
+Email Campaign For,Campanha de email para
+Employee Document Type,Tipo de documento do funcionário
+Required from Every Employee,Obrigatório para todos os funcionários
+Has a Number,Tem número
+Has an Expiry Date,Tem data de validade
+Only Deduct Tax On Excess Amount,Reter imposto só sobre o excedente
+Asset Value Updated,Valor do ativo atualizado
+Driver,Condutor
+Show Ticket Field Permission Notice,Mostrar o aviso de permissões dos campos do ticket
+Current Odometer value,Quilometragem atual
+Last Odometer Value,Última quilometragem
+Payment Term Discounts Calculated,Descontos das condições de pagamento calculados
+Print Format Creation,Criação de modelo de impressão
+Regular,Normal
+title,título
+CRM Published,Publicado no CRM
+CRM Hidden Field Defaults,Valores dos campos escondidos do CRM
+Dynamic Filters label,Rótulo dos filtros dinâmicos
+Work Anniversaries,Aniversários na empresa
+Unlink Payment on Cancellation of Employee Advance,Desligar o pagamento ao cancelar o adiantamento ao funcionário
+Allow multi-currency invoices against single party account,Permitir faturas em várias moedas na mesma conta de terceiro
+Role Allowed to over bill,Função autorizada a faturar a mais
+Frequently Bought HTML,Comprados frequentemente (HTML)
+Party Specific Items HTML,Artigos do terceiro (HTML)
+Select Dispatch Address,Escolher a morada de expedição
+Made from Stock Valuation Comparison,Criado a partir da comparação da valorização de stock
+Lost On,Perdido em
+Blueprint,Modelo
+Open Resume in New Tab,Abrir o currículo num separador novo
+modify_half_day_status,alterar o estado de meio dia
+Assign Condition,Condição de atribuição
+Unassign Condition,Condição para retirar a atribuição
+Close Condition,Condição de fecho
+Condition,Condição
+FCRM Settings,Definições do CRM
+FCRM Note,Nota do CRM

@@ -106,7 +106,8 @@ def _campos(meta) -> list:
         if f.fieldtype in _SEM_UI and f.fieldtype not in _ESTRUTURA:
             continue
         d = {k: f.get(k) for k in _PROPS if f.get(k) not in (None, "", 0) or k in ("fieldname", "fieldtype")}
-        d["label"] = _(f.label) if f.label else ""
+        # 23-11-2026: campo sem rótulo mostrava o nome técnico (ASSIGN_CONDITION) — passa a texto traduzível
+        d["label"] = _(f.label) if f.label else (_(frappe.unscrub(f.fieldname)) if f.fieldtype not in _ESTRUTURA else "")
         if f.fieldtype == "Select" and f.options:
             d["opcoes"] = [{"v": o, "r": _(o) if o else ""} for o in f.options.split("\n")]
         if f.description:
