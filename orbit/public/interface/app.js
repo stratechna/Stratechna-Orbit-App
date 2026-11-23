@@ -1338,6 +1338,7 @@ const Ficha = {
       assocAberta.value = null; toast("Associado"); carregar(); };
     const tirarAssoc = async (dt, r) => { if (!confirm("Tirar esta associação? Nenhum registo é apagado.")) return;
       await api("desassociar", { doctype: props.doctype, name: props.name, outro_doctype: dt, outro_name: r.name }, true); toast("Associação retirada"); carregar(); };
+    const tornarPrincipal = async (r) => { await api("contacto_principal", { negocio: props.name, contacto: r.name }, true); toast(`${r.full_name || r.name} é agora o contacto principal`); carregar(); };
     const tempo = ref(null);
     const registarTempo = () => { window.__tempo_cliente = (tempo.value && tempo.value.cliente) || ""; };
     const assin = ref(null); const assinar = ref(false);
@@ -1399,7 +1400,7 @@ const Ficha = {
     const ic = (t) => IC_EVENTO[t] || IC_EVENTO.nota;
     const marcarEmail = () => { window.__ref_email = (f.value && f.value.email_principal) || ""; };
     const novoEmail = ref(false);
-    return { PAISES_PT, alternarCheck, alternarMarca, edMorada, editarMorada, gravarMorada, novoEmail, conv, convForm, aConverter, abrirConversao, converter, pode, assocAberta, assocQ, assocRes, abrirAssoc, procurarAssoc, ligarAssoc, tirarAssoc, vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
+    return { tornarPrincipal, PAISES_PT, alternarCheck, alternarMarca, edMorada, editarMorada, gravarMorada, novoEmail, conv, convForm, aConverter, abrirConversao, converter, pode, assocAberta, assocQ, assocRes, abrirAssoc, procurarAssoc, ligarAssoc, tirarAssoc, vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
       grupos, mudarFase, NOMES, tit, sub, link, data, eur, ic, cor, ESTADO_COR };
   },
   template: `
@@ -1538,6 +1539,8 @@ const Ficha = {
           <div v-for="r in lista" :key="r.name" class="assoc assoc-linha">
             <a :href="link(dt,r.name)" style="text-decoration:none;color:inherit;min-width:0;flex:1"><b>{{ tit(dt,r) }}</b><small>{{ sub(dt,r) }}</small>
               <div class="barra" v-if="dt==='CRM Deal' && r.probability"><i :style="{width:r.probability+'%'}"></i></div></a>
+            <span v-if="doctype==='CRM Deal' && dt==='Contact' && r.principal" class="etq verde" style="font-size:11px;flex:none">principal</span>
+            <button v-else-if="doctype==='CRM Deal' && dt==='Contact' && lista.length > 1 && pode(dt)" class="btn sm" style="flex:none" @click="tornarPrincipal(r)">Tornar principal</button>
             <button v-if="pode(dt)" class="tirar" title="Tirar a associação" @click="tirarAssoc(dt,r)">×</button>
           </div>
         </template>

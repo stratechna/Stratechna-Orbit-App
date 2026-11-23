@@ -476,6 +476,12 @@ def ficha(doctype: str, name: str):
         for r in linhas:
             if r.get("status"):
                 r.estado = _rotulo_estado(r.status)
+        if doctype == "CRM Deal" and dt == "Contact":
+            # 23-11-2026: qual é o contacto principal do negócio (para «Tornar principal»)
+            prim = {x.contact for x in doc.get("contacts") or [] if x.is_primary}
+            for r in linhas:
+                r.principal = r.name in prim
+            linhas.sort(key=lambda r: not r.principal)
         assoc[dt] = linhas
     tickets = []
     if emails and frappe.db.exists("DocType", "HD Ticket"):
@@ -774,6 +780,19 @@ def mover(negocio: str, estado: str):
         frappe.throw("Fase desconhecida")
     d = frappe.get_doc("CRM Deal", negocio)
     d.status = estado
+    d.save()
+    return {"ok": True}
+
+
+@frappe.whitelist(methods=["POST"])
+def contacto_principal(negocio: str, contacto: str):
+    """«Tornar principal»: o contacto passa a principal do negócio (o CRM actualiza o email e o telemóvel do negócio)."""
+    _guarda()
+    d = frappe.get_doc("CRM Deal", negocio)
+    d.check_permission("write")
+    if not any(x.contact == contacto for x in d.get("contacts") or []):
+        frappe.throw("Esse contacto não está associado a este negócio.")
+    d.set_primary_contact(contacto)
     d.save()
     return {"ok": True}
 
