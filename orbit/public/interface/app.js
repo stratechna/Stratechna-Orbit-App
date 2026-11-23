@@ -27,6 +27,10 @@ async function api(metodo, args = {}, post = false) {
   return j.message;
 }
 
+// Nomes dos países em PT-PT (o Frappe guarda-os em inglês)
+const PAISES_PT = { Portugal: "Portugal", Spain: "Espanha", France: "França", Italy: "Itália", Germany: "Alemanha", Belgium: "Bélgica",
+  Netherlands: "Países Baixos", Luxembourg: "Luxemburgo", "United Kingdom": "Reino Unido", Switzerland: "Suíça", Brazil: "Brasil",
+  Angola: "Angola", Mozambique: "Moçambique", "Cape Verde": "Cabo Verde" };
 // ── Utilitários ──────────────────────────────────────────────────────────────────────────────────────
 const estado = reactive({ toast: "" });
 let _t;
@@ -1083,6 +1087,10 @@ const Lista = {
   setup(props) {
     const importar = ref(false);
     const vista = ref(VISTAS[props.objeto][0][0]); const q = ref(""); const linhas = ref([]); const total = ref(0); const mais = ref(false);
+    // 23-11-2026: separador da marca escolhido, por lista, neste navegador
+    const chaveMarca = "orbit.marca." + props.objeto; let m0 = ""; try { m0 = localStorage.getItem(chaveMarca) || ""; } catch (e) {}
+    const marca = ref(m0);
+    const escolherMarca = (m) => { marca.value = m; try { localStorage.setItem(chaveMarca, m); } catch (e) {} recarregar(); };
     const pagina = ref(0); const ordem = ref("modified desc"); const a = ref(false);
     const meta = ref(null); const salvas = ref([]); const salvaAtiva = ref(null);
     const filtros = ref([]); const colunas = ref(COLUNAS[props.objeto].map((c) => ({ campo: c[0] === "estado" ? "status" : c[0].replace(/_nome$/, ""), rotulo: c[1] })));
@@ -1091,13 +1099,15 @@ const Lista = {
     const carregar = async (junta = false) => {
       a.value = true;
       const r = await api("lista", { objeto: props.objeto, vista: vista.value, q: q.value, pagina: pagina.value, ordem: ordem.value,
-        filtros: JSON.stringify(filtros.value), colunas: JSON.stringify(colunas.value.map((c) => c.campo)) });
+        filtros: JSON.stringify(filtros.value), colunas: JSON.stringify(colunas.value.map((c) => c.campo)), marca: marca.value });
       linhas.value = junta ? linhas.value.concat(r.linhas) : r.linhas; total.value = r.total; mais.value = r.mais; a.value = false;
       if (!junta) sel.value = [];
     };
     const recarregar = () => { pagina.value = 0; carregar(); };
     const carregarSalvas = async () => (salvas.value = await apiVis("vistas", { objeto: props.objeto }));
-    onMounted(async () => { meta.value = await apiVis("metadados", { objeto: props.objeto }); carregarSalvas(); carregar(); });
+    onMounted(async () => { meta.value = await apiVis("metadados", { objeto: props.objeto });
+      if (marca.value && !(meta.value?.marcas || []).includes(marca.value)) marca.value = "";
+      carregarSalvas(); carregar(); });
     watch(q, () => { clearTimeout(tq); tq = setTimeout(recarregar, 300); });
     const escolherFixa = (v) => { salvaAtiva.value = null; vista.value = v; filtros.value = []; recarregar(); };
     const escolherSalva = (v) => { salvaAtiva.value = v.nome + (v.partilhada ? "*" : ""); const c = v.config || {}; vista.value = c.base || "todos";
@@ -1138,13 +1148,17 @@ const Lista = {
       window.location.href = "/api/method/orbit.interface.vistas.exportar?" + p.toString(); };
     return { vista, q, linhas, total, mais, pagina, carregar, ordenar, valor, abrir, a, VISTAS, TITULOS, cor, ini, ordem, meta, salvas, salvaAtiva,
       filtros, colunas, novoF, verCols, sel, massa, escolherFixa, escolherSalva, apagarSalva, guardar, campoMeta, rotuloFiltro, juntarFiltro, tirarFiltro,
-      alternarCol, todos, opsMassa, opcoesMassa, aplicarMassa, exportar, OPS_TIPO, importar };
+      alternarCol, todos, opsMassa, opcoesMassa, aplicarMassa, exportar, OPS_TIPO, importar, marca, escolherMarca };
   },
   template: `
   <div>
     <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <div><h1>{{ TITULOS[objeto] }}</h1><div class="sub">{{ total }} registos</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" @click="importar=true">Importar</button><button class="btn" @click="exportar(false)">Exportar</button><a v-if="objeto==='contactos'||objeto==='empresas'" class="btn" :href="'#/duplicados/'+objeto">Duplicados</a><a class="btn" :href="'/crm/' + ({contactos:'contacts',empresas:'organizations',negocios:'deals',leads:'leads'})[objeto]">CRM clássico</a></div>
+    </div>
+    <div class="vistas marcas-sep" v-if="(meta?.marcas||[]).length > 1">
+      <button :class="{ativo: !marca}" @click="escolherMarca('')">Todas as marcas</button>
+      <button v-for="m in meta.marcas" :key="m" :class="{ativo: marca===m}" @click="escolherMarca(m)">{{ m }}</button>
     </div>
     <div class="vistas">
       <button v-for="v in VISTAS[objeto]" :key="v[0]" :class="{ativo: !salvaAtiva && vista===v[0]}" @click="escolherFixa(v[0])">{{ v[1] }}</button>
@@ -1240,10 +1254,28 @@ const Ficha = {
     onMounted(carregar);
     const editar = (p) => { if (!p.editavel) return; ed.value = p.campo; valorEd.value = p.valor || ""; nextTick(() => document.querySelector(".prop .ed-campo")?.focus()); };
     const gravar = async (p) => {
-      if (valorEd.value === (p.valor || "")) { ed.value = ""; return; }
-      await api("guardar", { doctype: props.doctype, name: props.name, campo: p.campo, valor: valorEd.value }, true);
-      ed.value = ""; toast("Gravado"); carregar();
+      if (String(valorEd.value ?? "") === String(p.valor ?? "")) { ed.value = ""; return; }
+      let r;
+      try { r = await api("guardar", { doctype: props.doctype, name: props.name, campo: p.campo, valor: valorEd.value }, true); }
+      catch (e) { return; }   // o erro (NIF inválido, VIES…) já apareceu; fica a editar
+      ed.value = "";
+      // NIF/NIPC: o que o VIES disse e o que preencheu
+      if (r && r.preenchido && r.preenchido.length) toast("NIPC confirmado no VIES" + (r.nome_vies ? " (" + r.nome_vies + ")" : "") + " — preenchido: " + r.preenchido.join(", ").toLowerCase());
+      else if (r && r.valido_vies) toast("NIPC confirmado no VIES" + (r.nome_vies ? ": " + r.nome_vies : ""));
+      else if (r && r.aviso) toast(r.aviso);
+      else toast("Gravado");
+      carregar();
     };
+    // 23-11-2026: caixa (Sim/Não), marcas do contacto e morada
+    const alternarCheck = async (p) => { if (!p.editavel) return; await api("guardar", { doctype: props.doctype, name: props.name, campo: p.campo, valor: p.valor ? 0 : 1 }, true); toast("Gravado"); carregar(); };
+    const alternarMarca = async (p, m) => {
+      if (!p.editavel) return;
+      const v = p.valor.includes(m) ? p.valor.filter((x) => x !== m) : p.valor.concat([m]);
+      await api("guardar", { doctype: props.doctype, name: props.name, campo: "marcas", valor: JSON.stringify(v) }, true); toast("Gravado"); carregar();
+    };
+    const edMorada = ref(null);
+    const editarMorada = () => { if (!f.value.pode_editar) return; edMorada.value = { ...f.value.morada.valores }; if (!edMorada.value.country) edMorada.value.country = "Portugal"; };
+    const gravarMorada = async () => { await api("fiscal.morada", { doctype: props.doctype, name: props.name, valores: JSON.stringify(edMorada.value) }, true); edMorada.value = null; toast("Morada gravada"); carregar(); };
     const enviarNota = async () => {
       if (!notaTxt.value.trim()) return;
       await api("nota", { doctype: props.doctype, name: props.name, conteudo: notaTxt.value }, true);
@@ -1273,7 +1305,7 @@ const Ficha = {
     const ic = (t) => IC_EVENTO[t] || IC_EVENTO.nota;
     const marcarEmail = () => { window.__ref_email = (f.value && f.value.email_principal) || ""; };
     const novoEmail = ref(false);
-    return { novoEmail, conv, convForm, aConverter, abrirConversao, converter, pode, assocAberta, assocQ, assocRes, abrirAssoc, procurarAssoc, ligarAssoc, tirarAssoc, vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
+    return { PAISES_PT, alternarCheck, alternarMarca, edMorada, editarMorada, gravarMorada, novoEmail, conv, convForm, aConverter, abrirConversao, converter, pode, assocAberta, assocQ, assocRes, abrirAssoc, procurarAssoc, ligarAssoc, tirarAssoc, vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
       grupos, mudarFase, NOMES, tit, sub, link, data, eur, ic, cor, ESTADO_COR };
   },
   template: `
@@ -1302,19 +1334,63 @@ const Ficha = {
         </div>
       </div>
       <div class="bloco-tit">Sobre este registo</div>
-      <div class="prop" v-for="p in f.props" :key="p.campo">
+      <template v-for="(p, i) in f.props" :key="p.campo">
+      <template v-if="f.morada && p.secao && !(f.props[i-1] || {}).secao">
+        <div class="bloco-tit" style="display:flex;justify-content:space-between;align-items:center">Morada
+          <button v-if="f.pode_editar && !edMorada" class="btn sm" @click="editarMorada">Editar</button></div>
+        <template v-if="edMorada">
+          <div class="prop" v-for="c in f.morada.campos" :key="c.campo"><label>{{ c.rotulo }}</label>
+            <select v-if="c.campo==='country'" class="ed-campo" v-model="edMorada.country"><option v-for="pa in f.morada.paises" :key="pa" :value="pa">{{ PAISES_PT[pa] || pa }}</option></select>
+            <input v-else class="ed-campo" v-model="edMorada[c.campo]" :placeholder="c.campo==='pincode' ? '0000-000' : ''" @keyup.enter="gravarMorada" @keyup.esc="edMorada=null"></div>
+          <div style="display:flex;gap:6px;justify-content:flex-end;margin:6px 0 10px"><button class="btn sm" @click="edMorada=null">Cancelar</button><button class="btn sm prim" @click="gravarMorada">Gravar morada</button></div>
+        </template>
+        <div v-else class="prop" :class="{ed:f.pode_editar}" @click="editarMorada" style="cursor:pointer">
+          <div v-if="f.morada.valores.address_line1 || f.morada.valores.city" style="line-height:1.45">
+            <div>{{ f.morada.valores.address_line1 }}</div><div v-if="f.morada.valores.address_line2">{{ f.morada.valores.address_line2 }}</div>
+            <div>{{ [f.morada.valores.pincode, f.morada.valores.city].filter(Boolean).join(' ') }}</div>
+            <div class="sub">{{ PAISES_PT[f.morada.valores.country] || f.morada.valores.country }}</div></div>
+          <div v-else class="sub">Sem morada{{ f.pode_editar ? ' — clique para acrescentar' : '' }}</div>
+        </div>
+      </template>
+      <div v-if="p.secao && p.secao !== (f.props[i-1] || {}).secao" class="bloco-tit">{{ p.secao }}</div>
+      <div class="prop">
         <label>{{ p.rotulo }}</label>
         <template v-if="ed===p.campo">
           <select v-if="p.opcoes" class="ed-campo" v-model="valorEd" @change="gravar(p)" @blur="ed=''"><option v-for="o in p.opcoes" :value="o">{{ p.rotulos[o] || o || '—' }}</option></select>
-          <input v-else class="ed-campo" v-model="valorEd" :type="p.tipo==='Date'?'date':(p.tipo==='Currency'||p.tipo==='Percent')?'number':'text'" @keyup.enter="gravar(p)" @keyup.esc="ed=''" @blur="gravar(p)">
+          <textarea v-else-if="p.tipo==='Text'" class="ed-campo" rows="3" v-model="valorEd" @keyup.esc="ed=''" @blur="gravar(p)" style="width:100%"></textarea>
+          <input v-else class="ed-campo" v-model="valorEd" :type="p.tipo==='Date'?'date':(p.tipo==='Currency'||p.tipo==='Percent'||p.tipo==='Number')?'number':'text'" :placeholder="p.tipo==='Fiscal' ? (doctype==='Contact' ? 'NIF (9 dígitos)' : 'NIPC — confirma no VIES') : ''" @keyup.enter="gravar(p)" @keyup.esc="ed=''" @blur="gravar(p)">
         </template>
+        <div v-else-if="p.tipo==='Marcas'" class="marcas-chips">
+          <button v-for="m in p.opcoes" :key="m" class="etq" :class="{on: p.valor.includes(m)}" :disabled="!p.editavel" @click="alternarMarca(p, m)">{{ m }}</button>
+          <span v-if="!p.opcoes.length" class="sub">Sem marcas definidas</span>
+        </div>
+        <div v-else-if="p.tipo==='Check'" :class="{ed:p.editavel}" @click="alternarCheck(p)">{{ p.valor ? 'Sim' : 'Não' }}</div>
         <div v-else :class="{ed:p.editavel}" @click="editar(p)">
           <span v-if="p.tipo==='Currency'">{{ p.valor ? eur(p.valor) : '—' }}</span>
+          <span v-else-if="p.tipo==='Fiscal'">{{ p.valor || '—' }}<span v-if="p.valor && doctype==='CRM Organization'" class="sub" style="font-size:11px"> · VIES</span></span>
           <span v-else-if="p.tipo==='Datetime'||p.tipo==='Date'">{{ p.valor ? data(p.valor, p.tipo==='Datetime') : '—' }}</span>
           <span v-else-if="p.tipo==='Percent'">{{ p.valor!=null ? p.valor+' %' : '—' }}</span>
           <span v-else>{{ (p.rotulos && p.rotulos[p.valor]) || p.mostra || p.valor || '—' }}</span>
         </div>
       </div>
+      </template>
+      <template v-if="f.morada && !f.props.some(x => x.secao)">
+        <div class="bloco-tit" style="display:flex;justify-content:space-between;align-items:center">Morada
+          <button v-if="f.pode_editar && !edMorada" class="btn sm" @click="editarMorada">Editar</button></div>
+        <template v-if="edMorada">
+          <div class="prop" v-for="c in f.morada.campos" :key="c.campo"><label>{{ c.rotulo }}</label>
+            <select v-if="c.campo==='country'" class="ed-campo" v-model="edMorada.country"><option v-for="pa in f.morada.paises" :key="pa" :value="pa">{{ PAISES_PT[pa] || pa }}</option></select>
+            <input v-else class="ed-campo" v-model="edMorada[c.campo]" :placeholder="c.campo==='pincode' ? '0000-000' : ''" @keyup.enter="gravarMorada" @keyup.esc="edMorada=null"></div>
+          <div style="display:flex;gap:6px;justify-content:flex-end;margin:6px 0 10px"><button class="btn sm" @click="edMorada=null">Cancelar</button><button class="btn sm prim" @click="gravarMorada">Gravar morada</button></div>
+        </template>
+        <div v-else class="prop" :class="{ed:f.pode_editar}" @click="editarMorada" style="cursor:pointer">
+          <div v-if="f.morada.valores.address_line1 || f.morada.valores.city" style="line-height:1.45">
+            <div>{{ f.morada.valores.address_line1 }}</div><div v-if="f.morada.valores.address_line2">{{ f.morada.valores.address_line2 }}</div>
+            <div>{{ [f.morada.valores.pincode, f.morada.valores.city].filter(Boolean).join(' ') }}</div>
+            <div class="sub">{{ PAISES_PT[f.morada.valores.country] || f.morada.valores.country }}</div></div>
+          <div v-else class="sub">Sem morada{{ f.pode_editar ? ' — clique para acrescentar' : '' }}</div>
+        </div>
+      </template>
     </aside>
 
     <div class="col-meio">
@@ -1588,6 +1664,7 @@ const Definicoes = {
       <div class="grelha-def" style="margin-bottom:22px">
         <div class="cartao" v-for="(itens, g) in grupos" :key="g"><header><h2>{{ g }}</h2></header>
           <a class="linha" v-for="i in itens" :key="i.chave" :href="'#/definicoes/'+i.chave" style="text-decoration:none;color:inherit"><div class="cresce">{{ i.titulo }}</div><span class="sub">{{ i.n }} ›</span></a>
+          <a v-if="g==='CRM'" class="linha" href="#/definicoes/campos" style="text-decoration:none;color:inherit"><div class="cresce">Campos personalizados</div><span class="sub">›</span></a>
           <a v-if="g==='Correio'" class="linha" href="#/definicoes/caixas" style="text-decoration:none;color:inherit"><div class="cresce">Caixas ligadas ao Orbit</div><span class="sub">›</span></a>
         </div>
         <div class="cartao" v-if="!gruposApp"><header><h2>Pessoas</h2></header>
@@ -1597,6 +1674,63 @@ const Definicoes = {
       <div class="grelha-def">
         <div class="cartao" v-for="g in d" :key="g.grupo"><header><h2>{{ g.grupo }}</h2></header>
           <a class="linha" v-for="i in g.itens" :key="i.url" :href="i.url" style="text-decoration:none;color:inherit"><div class="cresce">{{ i.rotulo }}</div><span class="sub">↗</span></a>
+        </div>
+      </div>
+    </template>
+  </div>`,
+};
+// ── Campos personalizados do CRM (23-11-2026): criar, mudar o nome/opções, esconder, apagar (orbit/interface/campos.py) ──
+const DefCampos = {
+  setup() {
+    const d = ref(null); const novo = ref(null); const ed = ref(null); const ocupado = ref(false);
+    const carregar = async () => { d.value = await api("campos.listar"); };
+    onMounted(carregar);
+    const porObjeto = computed(() => { const g = {}; (d.value?.objetos || []).forEach((o) => (g[o.v] = [])); (d.value?.campos || []).forEach((c) => (g[c.objeto] = g[c.objeto] || []).push(c)); return g; });
+    const rotObj = (v) => (d.value?.objetos.find((o) => o.v === v) || {}).r || v;
+    const rotTipo = (v) => (d.value?.tipos.find((o) => o.v === v) || {}).r || v;
+    const comecar = (objeto) => { novo.value = { objeto: objeto || "contactos", rotulo: "", tipo: "texto", opcoes: "" }; nextTick(() => document.querySelector(".def-campos input")?.focus()); };
+    const linhas = (t) => (t || "").split("\n").map((x) => x.trim()).filter(Boolean);
+    const criar = async () => {
+      ocupado.value = true;
+      try { await api("campos.criar", { objeto: novo.value.objeto, rotulo: novo.value.rotulo, tipo: novo.value.tipo, opcoes: JSON.stringify(linhas(novo.value.opcoes)) }, true);
+        toast("Campo criado — já aparece na ficha e nas listas"); novo.value = null; carregar(); } catch (e) {} finally { ocupado.value = false; }
+    };
+    const editar = (c) => { ed.value = { nome: c.nome, rotulo: c.rotulo, tipo: c.tipo, opcoes: (c.opcoes || []).join("\n") }; };
+    const gravar = async () => { try { await api("campos.editar", { nome: ed.value.nome, rotulo: ed.value.rotulo, opcoes: ed.value.tipo === "lista" ? JSON.stringify(linhas(ed.value.opcoes)) : undefined }, true); toast("Gravado"); ed.value = null; carregar(); } catch (e) {} };
+    const esconder = async (c) => { await api("campos.editar", { nome: c.nome, oculto: c.oculto ? 0 : 1 }, true); toast(c.oculto ? "Campo visível" : "Campo escondido (os dados ficam)"); carregar(); };
+    const apagar = async (c) => { if (!confirm(`Apagar o campo «${c.rotulo}»? Só é possível se nenhum registo o tiver preenchido.`)) return; try { await api("campos.apagar", { nome: c.nome }, true); toast("Apagado"); carregar(); } catch (e) {} };
+    return { d, novo, ed, ocupado, porObjeto, rotObj, rotTipo, comecar, criar, editar, gravar, esconder, apagar };
+  },
+  template: `
+  <div class="pad def-campos">
+    <div class="ola"><div><div style="font-size:13px"><a href="#/definicoes">← Definições</a></div><h1>Campos personalizados</h1>
+      <div class="sub">Campos novos nas Leads, Contactos, Empresas e Negócios. Aparecem na ficha («Sobre este registo») e como colunas e filtros nas listas. Só neste Orbit.</div></div>
+      <button class="btn prim" @click="comecar()" v-if="!novo">+ Novo campo</button></div>
+    <div v-if="!d" class="carregar">A carregar…</div>
+    <template v-else>
+      <div class="cartao" v-if="novo" style="margin-bottom:18px;padding:16px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+          <label class="sub">Em<br><select class="btn" style="width:100%" v-model="novo.objeto"><option v-for="o in d.objetos" :key="o.v" :value="o.v">{{ o.r }}</option></select></label>
+          <label class="sub">Nome do campo<br><input class="btn" style="width:100%" v-model="novo.rotulo" placeholder="Ex.: Data de aniversário" @keyup.enter="criar"></label>
+          <label class="sub">Tipo<br><select class="btn" style="width:100%" v-model="novo.tipo"><option v-for="t in d.tipos" :key="t.v" :value="t.v">{{ t.r }}</option></select></label>
+        </div>
+        <label v-if="novo.tipo==='lista'" class="sub" style="display:block;margin-top:12px">Opções (uma por linha)<br><textarea rows="4" style="width:100%" v-model="novo.opcoes"></textarea></label>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" @click="novo=null">Cancelar</button><button class="btn prim" :disabled="ocupado || !novo.rotulo.trim()" @click="criar">{{ ocupado ? 'A criar…' : 'Criar campo' }}</button></div>
+      </div>
+      <div class="grelha-def">
+        <div class="cartao" v-for="(lista, obj) in porObjeto" :key="obj"><header style="display:flex;justify-content:space-between;align-items:center"><h2>{{ rotObj(obj) }}</h2><button class="btn sm" @click="comecar(obj)">+ Campo</button></header>
+          <div v-if="!lista.length" class="linha sub">Sem campos personalizados.</div>
+          <div v-for="c in lista" :key="c.nome" class="linha" style="flex-wrap:wrap;gap:6px">
+            <template v-if="ed && ed.nome===c.nome">
+              <input class="btn sm" style="flex:1;min-width:140px" v-model="ed.rotulo" @keyup.enter="gravar">
+              <textarea v-if="ed.tipo==='lista'" rows="3" style="width:100%" v-model="ed.opcoes"></textarea>
+              <button class="btn sm" @click="ed=null">Cancelar</button><button class="btn sm prim" @click="gravar">Gravar</button>
+            </template>
+            <template v-else>
+              <div class="cresce" :style="{opacity: c.oculto ? .5 : 1}">{{ c.rotulo }} <span class="sub">· {{ rotTipo(c.tipo) }}<template v-if="c.opcoes.length"> ({{ c.opcoes.join(', ') }})</template><template v-if="c.oculto"> · escondido</template></span></div>
+              <button class="btn sm" @click="editar(c)">Mudar</button><button class="btn sm" @click="esconder(c)">{{ c.oculto ? 'Mostrar' : 'Esconder' }}</button><button class="btn sm" @click="apagar(c)">Apagar</button>
+            </template>
+          </div>
         </div>
       </div>
     </template>
@@ -2242,7 +2376,7 @@ const abrirApp = (chave, url) => { const w = window.open(url || ("/orbit?app=" +
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Calendario, DefLista, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Calendario, DefLista, DefCampos, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -2330,6 +2464,7 @@ const App = {
         <Funil v-else-if="ecra==='funil'"/>
         <Caixa v-else-if="ecra==='caixa'" :abrir-id="partes[1]"/>
         <Definicoes v-else-if="ecra==='definicoes' && !partes[1]" :grupos-app="APP.defs" :nome-app="APP.nome"/>
+        <DefCampos v-else-if="ecra==='definicoes' && partes[1]==='campos'" key="campos"/>
         <DefConsulta v-else-if="ecra==='definicoes' && ['caixas','utilizadores'].includes(partes[1])" :chave="partes[1]" :key="partes[1]"/>
         <DefLista v-else-if="ecra==='definicoes'" :chave="partes[1]" :key="partes[1]"/>
         <Tarefas v-else-if="ecra==='tarefas'"/>

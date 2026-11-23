@@ -41,11 +41,11 @@ FILTRAVEIS = {
               ("creation", "Criado", "data", None)],
 }
 COLUNAS = {
-    "contactos": [("full_name", "Nome"), ("company_name", "Empresa"), ("email_id", "Email"), ("mobile_no", "Telemóvel"),
-                  ("phone", "Telefone"), ("designation", "Cargo"), ("orbit_ciclo", "Fase"), ("orbit_responsavel", "Responsável"),
+    "contactos": [("full_name", "Nome"), ("company_name", "Empresa"), ("marcas", "Marcas"), ("email_id", "Email"), ("mobile_no", "Telemóvel"),
+                  ("phone", "Telefone"), ("designation", "Cargo"), ("nif", "NIF"), ("orbit_ciclo", "Fase"), ("orbit_responsavel", "Responsável"),
                   ("origem", "Origem"), ("mkt_estado", "Marketing"), ("orbit_ultima_atividade", "Última atividade"), ("creation", "Criado")],
     "empresas": [("organization_name", "Empresa"), ("website", "Site"), ("telefone", "Telefone"), ("email_geral", "Email"),
-                 ("nipc", "NIPC"), ("industry", "Setor"), ("territory", "Território"), ("orbit_ciclo", "Fase"),
+                 ("nipc", "NIPC"), ("marca", "Marca"), ("industry", "Setor"), ("territory", "Território"), ("orbit_ciclo", "Fase"),
                  ("orbit_responsavel", "Responsável"), ("tipo_conta", "Tipo"), ("estado_conta", "Estado"),
                  ("orbit_ultima_atividade", "Última atividade"), ("creation", "Criado")],
     "negocios": [("titulo", "Negócio"), ("organization", "Empresa"), ("status", "Fase"), ("deal_value", "Valor"),
@@ -63,6 +63,25 @@ def _guarda():
     g()
 
 
+def colunas_personalizadas(objeto) -> list:
+    """Os campos criados em Definições › Campos personalizados (orbit/interface/campos.py) — colunas e filtros."""
+    from orbit.interface.campos import OBJETOS, personalizados
+    dt = OBJETOS.get(objeto)
+    if not dt or not frappe.db.exists("DocType", dt):
+        return []
+    out = []
+    for f in personalizados(dt):
+        tipo = {"Date": "data", "Float": "numero", "Int": "numero", "Currency": "numero", "Select": "select",
+                "Check": "select"}.get(f.fieldtype, "texto")
+        opcoes = None
+        if f.fieldtype == "Select":
+            opcoes = [{"v": o, "r": o} for o in (f.options or "").split("\n") if o]
+        elif f.fieldtype == "Check":
+            opcoes = [{"v": "1", "r": "Sim"}, {"v": "0", "r": "Não"}]
+        out.append({"campo": f.fieldname, "rotulo": f.label, "tipo": tipo, "opcoes": opcoes})
+    return out
+
+
 def _dt(objeto):
     from orbit.interface.api import _LISTAS
     if objeto not in _LISTAS:
@@ -75,7 +94,7 @@ def traduzir(objeto: str, filtros) -> list:
     if isinstance(filtros, str):
         filtros = json.loads(filtros or "[]")
     meta = frappe.get_meta(_dt(objeto))
-    ok = {c for c, *_ in FILTRAVEIS.get(objeto, [])}
+    ok = {c for c, *_ in FILTRAVEIS.get(objeto, [])} | {c["campo"] for c in colunas_personalizadas(objeto)}
     out = []
     for f in (filtros or [])[:12]:
         if not isinstance(f, (list, tuple)) or len(f) < 2:
@@ -115,8 +134,13 @@ def metadados(objeto: str):
         elif tipo == "link" and origem and frappe.db.exists("DocType", origem):
             opcoes = [{"v": o, "r": _rotulo_estado(o)} for o in frappe.get_all(origem, pluck="name", limit=300)]
         campos.append({"campo": campo, "rotulo": rot, "tipo": tipo, "opcoes": opcoes})
+    pers = colunas_personalizadas(objeto)
+    campos += pers
     colunas = [{"campo": c, "rotulo": r} for c, r in COLUNAS.get(objeto, []) if meta.has_field(c) or c == "creation"]
-    return {"filtraveis": campos, "colunas": colunas, "pode_partilhar": frappe.has_permission(dt, "write"),
+    colunas += [{"campo": c["campo"], "rotulo": c["rotulo"]} for c in pers]
+    from orbit.interface.marcas import lista as _marcas
+    tem_marca = meta.has_field("marcas" if objeto == "contactos" else "marca")
+    return {"filtraveis": campos, "colunas": colunas, "marcas": _marcas() if tem_marca else [], "pode_partilhar": frappe.has_permission(dt, "write"),
             "pode_apagar": frappe.has_permission(dt, "delete"), "pode_editar": frappe.has_permission(dt, "write")}
 
 

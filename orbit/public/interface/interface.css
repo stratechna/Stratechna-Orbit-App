@@ -433,3 +433,11 @@ tr.erp-grupo td{font-weight:600}
 .seletor-app .q svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .seletor-app.atual .q{background:var(--acao)}
 .nav .marca .logo svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* 23-11-2026: marcas — separadores no topo das listas e escolha no contacto */
+.vistas.marcas-sep { padding-bottom: 0; }
+.vistas.marcas-sep button { font-weight: 600; }
+.marcas-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.marcas-chips .etq { cursor: pointer; border: 1px solid var(--line); background: transparent; color: var(--ink-2); }
+.marcas-chips .etq.on { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.marcas-chips .etq:disabled { cursor: default; }

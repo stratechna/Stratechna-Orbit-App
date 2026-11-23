@@ -238,7 +238,7 @@ _LISTAS = {
 
 @frappe.whitelist()
 def lista(objeto: str, vista: str = "todos", q: str = "", pagina: int = 0, ordem: str = "modified desc", estado: str = "",
-          filtros: str = "", colunas: str = ""):
+          filtros: str = "", colunas: str = "", marca: str = ""):
     _guarda()
     filtros_json = filtros
     cfg = _LISTAS.get(objeto)
@@ -261,9 +261,16 @@ def lista(objeto: str, vista: str = "todos", q: str = "", pagina: int = 0, ordem
     # H7: filtros à escolha e colunas da vista (lista branca em orbit/interface/vistas.py)
     from orbit.interface import vistas as _v
     extra = _v.traduzir(objeto, filtros_json) if filtros_json else []
+    # 23-11-2026: separadores de marca no topo da lista (contactos: a tabela «Marcas»)
+    if marca and frappe.db.exists("Brand", marca):
+        if objeto == "contactos":
+            if meta.has_field("marcas"):
+                extra.append(["Marca do Contacto", "marca", "=", marca])
+        elif meta.has_field("marca"):
+            extra.append(["marca", "=", marca])
     if colunas:
-        disp = {c for c, _r in _v.COLUNAS.get(objeto, [])}
-        pedidas = [c for c in json.loads(colunas) if c in disp and (meta.has_field(c) or c == "creation")]
+        disp = {c for c, _r in _v.COLUNAS.get(objeto, [])} | {c["campo"] for c in _v.colunas_personalizadas(objeto)}
+        pedidas = [c for c in json.loads(colunas) if c in disp and (meta.has_field(c) or c == "creation") and c != "marcas"]
         cfg = {**cfg, "campos": list(dict.fromkeys(cfg["campos"] + pedidas))}
     campo_ordem, sentido = (ordem.split() + ["desc"])[:2]
     if campo_ordem not in cfg["campos"] + ["creation", "modified"] or sentido not in ("asc", "desc"):
@@ -283,6 +290,18 @@ def lista(objeto: str, vista: str = "todos", q: str = "", pagina: int = 0, ordem
             r.estado = _rotulo_estado(r.status)
     if objeto == "contactos":
         _ultima_actividade(linhas)
+        if meta.has_field("marcas") and linhas:
+            por = {}
+            for r in frappe.get_all("Marca do Contacto", filters={"parenttype": "Contact", "parentfield": "marcas",
+                                                                  "parent": ["in", [l.name for l in linhas]]},
+                                    fields=["parent", "marca"], order_by="idx asc"):
+                por.setdefault(r.parent, []).append(r.marca)
+            for l in linhas:
+                l.marcas = ", ".join(por.get(l.name, []))
+    for l in linhas:
+        for k, v in list(l.items()):
+            if k.startswith("oc_") and isinstance(v, (int, float)) and meta.get_field(k) and meta.get_field(k).fieldtype == "Check":
+                l[k] = "Sim" if v else "Não"
     return {"linhas": linhas[:50], "mais": len(linhas) > 50, "total": total, "doctype": cfg["dt"]}
 
 
@@ -315,9 +334,11 @@ _PROPS = {
     "CRM Lead": [("lead_owner", "Responsável", "Link", 1), ("orbit_ultima_atividade", "Última atividade", "Datetime", 0),
                  ("status", "Estado", "Link", 1), ("email", "Email", "Data", 1), ("mobile_no", "Telemóvel", "Data", 1),
                  ("organization", "Empresa", "Data", 1), ("job_title", "Cargo", "Data", 1), ("source", "Origem", "Link", 1),
-                 ("mkt_estado", "Marketing por email", "Select", 0),
+                 ("marca", "Marca", "Link", 1), ("nipc", "NIF / NIPC", "Data", 1), ("codigo_postal", "Código postal", "Data", 1),
+                 ("cidade", "Localidade", "Data", 1), ("pais", "País", "Link", 1), ("mkt_estado", "Marketing por email", "Select", 0),
                  ("creation", "Criado", "Datetime", 0)],
     "CRM Organization": [("orbit_responsavel", "Responsável", "Link", 1), ("orbit_ciclo", "Fase do ciclo de vida", "Select", 1),
+                         ("marca", "Marca", "Link", 1),
                          ("orbit_ultima_atividade", "Última atividade", "Datetime", 0), ("website", "Site", "Data", 1), ("telefone", "Telefone", "Data", 1), ("email_geral", "Email geral", "Data", 1),
                          ("nipc", "NIPC", "Data", 1), ("industry", "Setor", "Link", 1), ("territory", "Território", "Link", 1),
                          ("no_of_employees", "Pessoas", "Select", 1), ("tipo_conta", "Tipo de conta", "Select", 1),
@@ -415,6 +436,29 @@ def ficha(doctype: str, name: str):
         props.append({"campo": campo, "rotulo": rotulo, "tipo": tipo, "valor": v, "mostra": mostra,
                       "editavel": bool(editavel and pode_editar), "opcoes": opcoes,
                       "rotulos": {o: (_nome_user(o) if tipo == "Link" and f and f.options == "User" else _rotulo_estado(o)) for o in (opcoes or [])}})
+    # 23-11-2026: NIF/NIPC verificados (fiscal.py), marcas do contacto, campos personalizados (campos.py), morada
+    for p in props:
+        if (doctype, p["campo"]) in (("Contact", "nif"), ("CRM Organization", "nipc")):
+            p["tipo"] = "Fiscal"
+    from orbit.interface import marcas as _M, campos as _C, fiscal as _F
+    if doctype == "Contact" and meta.has_field("marcas"):
+        props.insert(2, {"campo": "marcas", "rotulo": "Marcas", "tipo": "Marcas", "valor": _M.marcas_do_contacto(name),
+                         "mostra": "", "editavel": bool(pode_editar), "opcoes": _M.lista(), "rotulos": {}})
+    for cf in _C.personalizados(doctype):
+        tipo = {"Data": "Data", "Small Text": "Text", "Float": "Number", "Int": "Number", "Currency": "Currency",
+                "Date": "Date", "Check": "Check", "Select": "Select"}.get(cf.fieldtype, "Data")
+        ops = [o for o in (cf.options or "").split("\n")] if cf.fieldtype == "Select" else None
+        props.append({"campo": cf.fieldname, "rotulo": cf.label, "tipo": tipo, "valor": doc.get(cf.fieldname),
+                      "mostra": doc.get(cf.fieldname), "editavel": bool(pode_editar), "opcoes": ops, "rotulos": {},
+                      "personalizado": True})
+    # 23-11-2026 (Vítor: «TODOS os campos»): depois dos principais, todos os outros campos do registo, pelas secções
+    # do formulário, editáveis quando a pessoa pode escrever e o campo não é só de leitura.
+    props += _todos_os_outros(doc, meta, {p["campo"] for p in props} | {"address", "marcas"}, pode_editar)
+    morada = None
+    if doctype in ("Contact", "CRM Organization") and meta.has_field("address"):
+        morada = {"valores": _F.morada_de(doctype, name), "campos": [{"campo": c, "rotulo": r} for c, r in _F.MORADA],
+                  "paises": ["Portugal", "Spain", "France", "Italy", "Germany", "Belgium", "Netherlands", "Luxembourg",
+                             "United Kingdom", "Switzerland", "Brazil", "Angola", "Mozambique", "Cape Verde"]}
     rel, emails = _relacionados(doctype, name)
     assoc = {}
     for dt, nomes in rel.items():
@@ -456,10 +500,49 @@ def ficha(doctype: str, name: str):
         s.rotulo = _rotulo_estado(s.name)
     return {"doctype": doctype, "name": name, "titulo": titulo, "sub": sub, "iniciais": _iniciais(titulo),
             "imagem": doc.get("image") or doc.get("organization_logo"), "props": props, "assoc": assoc, "tickets": tickets,
+            "morada": morada,
             "emails": sorted(emails), "pode_editar": pode_editar, "estados": estados,
             "classico": _url_classico(doctype, name),
             "email_principal": (doc.get("email_id") or doc.get("email") or (sorted(emails)[0] if emails else "")),
             "telefone": doc.get("mobile_no") or doc.get("phone") or doc.get("telefone") or ""}
+
+
+_TIPOS_FICHA = {"Data": "Data", "Small Text": "Text", "Text": "Text", "Long Text": "Text", "Text Editor": "Text",
+                "Select": "Select", "Link": "Link", "Dynamic Link": "Data", "Date": "Date", "Datetime": "Datetime",
+                "Check": "Check", "Int": "Number", "Float": "Number", "Currency": "Currency", "Percent": "Percent",
+                "Phone": "Data", "Read Only": "Data", "Autocomplete": "Data", "Rating": "Number", "Duration": "Number"}
+_NUNCA = {"naming_series", "amended_from", "_user_tags", "_comments", "_assign", "_liked_by", "_seen", "idx", "docstatus",
+          "image", "organization_logo", "sync_with_google_contacts", "google_contacts", "google_contacts_id",
+          "pulled_from_google_contacts", "unsubscribed", "is_primary_contact", "user"}
+
+
+def _todos_os_outros(doc, meta, ja: set, pode_editar: bool) -> list:
+    out, secao = [], ""
+    for f in meta.fields:
+        if f.fieldtype in ("Section Break", "Tab Break"):
+            secao = _(f.label) if f.label else secao
+            continue
+        if f.fieldtype not in _TIPOS_FICHA or f.fieldname in ja or f.fieldname in _NUNCA or f.hidden:
+            continue
+        if f.fieldname.startswith("oc_"):
+            continue
+        tipo = _TIPOS_FICHA[f.fieldtype]
+        v = doc.get(f.fieldname)
+        opcoes = None
+        if f.fieldtype == "Select":
+            opcoes = (f.options or "").split("\n")
+        elif f.fieldtype == "Link" and f.options and f.options not in ("User",) and frappe.db.count(f.options) <= 300:
+            try:
+                opcoes = [""] + frappe.get_all(f.options, pluck="name", order_by="name asc", limit=300)
+            except Exception:
+                opcoes = None
+        if f.fieldtype == "Text Editor" and v:
+            v = _texto(v, 2000)
+        out.append({"campo": f.fieldname, "rotulo": _(f.label or f.fieldname), "tipo": "Data" if tipo == "Link" and not opcoes else tipo,
+                    "valor": v, "mostra": _nome_user(v) if f.fieldtype == "Link" and f.options == "User" else v,
+                    "editavel": bool(pode_editar and not f.read_only and f.fieldtype not in ("Read Only", "Text Editor")),
+                    "opcoes": opcoes, "rotulos": {}, "secao": secao or _("Outros campos")})
+    return out
 
 
 def _url_classico(dt, dn):
@@ -473,10 +556,27 @@ _EDITAVEIS = {dt: {c for c, _r, _t, e in campos if e} for dt, campos in _PROPS.i
 @frappe.whitelist(methods=["POST"])
 def guardar(doctype: str, name: str, campo: str, valor=None):
     _guarda()
-    if campo not in _EDITAVEIS.get(doctype, set()):
+    # 23-11-2026: NIF/NIPC passam pela verificação (dígito de controlo, VIES) e o VIES preenche a morada da empresa
+    if (doctype, campo) in (("Contact", "nif"), ("CRM Organization", "nipc")):
+        from orbit.interface.fiscal import numero_fiscal
+        return {"ok": True, **numero_fiscal(doctype, name, valor or "")}
+    if doctype == "Contact" and campo == "marcas":
+        from orbit.interface.marcas import definir_no_contacto
+        return {"ok": True, "marcas": definir_no_contacto(name, json.loads(valor or "[]") if isinstance(valor, str) else (valor or []))}
+    meta = frappe.get_meta(doctype)
+    fm = meta.get_field(campo)
+    # 23-11-2026: qualquer campo do registo que a ficha mostra como editável (todos os campos), com as permissões do doc
+    outro = (doctype in _PROPS and fm is not None and fm.fieldtype in _TIPOS_FICHA and not fm.read_only and not fm.hidden
+             and fm.fieldtype not in ("Read Only", "Text Editor") and campo not in _NUNCA)
+    if campo not in _EDITAVEIS.get(doctype, set()) and not outro:
         frappe.throw("Campo não editável")
     doc = frappe.get_doc(doctype, name)
-    doc.set(campo, valor or None)
+    f = meta.get_field(campo)
+    if f and f.fieldtype == "Check":
+        valor = 1 if str(valor) in ("1", "true", "True") else 0
+    elif f and f.fieldtype in ("Float", "Int", "Currency"):
+        valor = None if valor in (None, "") else (int(float(valor)) if f.fieldtype == "Int" else float(valor))
+    doc.set(campo, valor if valor not in ("",) else None)
     doc.save()
     return {"ok": True}
 
