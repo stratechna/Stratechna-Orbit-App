@@ -19,7 +19,9 @@ from werkzeug.wrappers import Response
 
 
 def _base() -> str:
-    return frappe.utils.get_url().rstrip("/")
+    # 23-11-2026: atrás do proxy o get_url() pode vir em http:// — o browser recusava o corrector na /desk («Mixed Content»)
+    u = frappe.utils.get_url().rstrip("/")
+    return "https://" + u[7:] if u.startswith("http://") and "localhost" not in u else u
 
 
 def apps_do_tenant() -> list[dict]:
@@ -137,6 +139,10 @@ _GUIAO = r"""
       var a = e.target.closest('a'); if (!a) { return; }
       e.preventDefault(); p.classList.remove('on');
       if (a.getAttribute('data-chave') === atual) { return; }
+      // 23-11-2026: no telemóvel na mesma janela (o separador com nome podia já mostrar outra app)
+      var tel = /iPhone|iPad|Android|Mobile/i.test(navigator.userAgent || '') || window.innerWidth < 760 ||
+        (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || !!navigator.standalone;
+      if (tel) { location.href = a.href; return; }
       var w = window.open(a.href, 'orbit-' + a.getAttribute('data-chave')); if (w) { w.focus(); }
     });
     // Sítios conhecidos: a barra do Wiki e a da secretária do Frappe — o botão entra a seguir à marca.

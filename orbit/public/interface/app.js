@@ -2796,7 +2796,15 @@ const APPS = {
 };
 const APP = APPS[APP_ATUAL] || APPS.crm;
 // Abrir uma app: volta ao separador onde já está (se foi o Orbit a abri-lo), senão abre um novo.
-const abrirApp = (chave, url) => { const w = window.open(url || ("/orbit?app=" + chave), "orbit-" + chave); if (w) w.focus(); };
+// 23-11-2026: no telemóvel (ecrã táctil, estreito ou app instalada) abre-se na MESMA janela, como numa app nativa — os
+// separadores com nome («orbit-mail») eram reaproveitados mesmo depois de já mostrarem outra app (o Mail abria o CRM).
+const NO_TELEMOVEL = () => /iPhone|iPad|Android|Mobile/i.test(navigator.userAgent || "") || window.innerWidth < 760
+  || (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || !!navigator.standalone;
+const abrirApp = (chave, url) => {
+  const destino = url || ("/orbit?app=" + chave);
+  if (NO_TELEMOVEL()) { location.href = destino; return; }
+  const w = window.open(destino, "orbit-" + chave); if (w) w.focus();
+};
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
