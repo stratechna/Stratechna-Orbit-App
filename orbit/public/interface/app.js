@@ -1236,7 +1236,7 @@ const FichaDetalhes = {
     const editarMeios = (s) => { if (!d.value.pode_editar) return; const t = (tp) => (s.tabelas.find((x) => x.tipo === tp)?.linhas || []).map((l) => ({ ...l }));
       meios.value = { emails: t("emails"), telefones: t("telefones") }; if (!meios.value.emails.length) meios.value.emails.push({ valor: "", principal: true }); };
     const principal = (lista, i) => lista.forEach((l, j) => (l.principal = j === i));
-    const gravarMeios = async () => { try { await api("detalhes.contacto_meios", { name: props.name, emails: JSON.stringify(meios.value.emails), telefones: JSON.stringify(meios.value.telefones) }, true); } catch (e) { return; }
+    const gravarMeios = async () => { try { await api("detalhes.meios", { doctype: props.doctype, name: props.name, emails: JSON.stringify(meios.value.emails), telefones: JSON.stringify(meios.value.telefones) }, true); } catch (e) { return; }
       meios.value = null; feito("Emails e telefones gravados"); };
     const mostra = (p) => {
       if (p.valor === null || p.valor === undefined || p.valor === "") return "—";

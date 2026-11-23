@@ -586,6 +586,16 @@ def guardar(doctype: str, name: str, campo: str, valor=None):
     elif f and f.fieldtype in ("Float", "Int", "Currency"):
         valor = None if valor in (None, "") else (int(float(valor)) if f.fieldtype == "Int" else float(valor))
     doc.set(campo, valor if valor not in ("",) else None)
+    # lead: o email/telemóvel/telefone da coluna lateral é o principal da tabela «Emails e telefones»
+    if doctype == "CRM Lead" and campo in ("email", "mobile_no", "phone") and doc.get("orbit_meios"):
+        tipo = {"email": "Email", "mobile_no": "Telemóvel", "phone": "Fixo"}[campo]
+        linha = next((r for r in doc.orbit_meios if r.tipo == tipo and r.principal), None)
+        if valor and linha:
+            linha.valor = valor
+        elif valor:
+            doc.append("orbit_meios", {"tipo": tipo, "valor": valor, "principal": 1})
+        elif linha:
+            doc.remove(linha)
     doc.save()
     return {"ok": True}
 
@@ -1179,6 +1189,13 @@ def converter(lead: str, valor: float = None, fase: str = None, contacto: str = 
                            existing_organization=empresa or None)
     if isinstance(nome, dict):
         nome = nome.get("name") or nome.get("deal")
+    # 23-11-2026: os emails e telefones extra da lead passam para o contacto do negócio
+    try:
+        from orbit.interface.detalhes import copiar_para_contacto
+        for ct in frappe.get_all("CRM Contacts", filters={"parent": nome, "parenttype": "CRM Deal"}, pluck="contact"):
+            copiar_para_contacto(lead, ct)
+    except Exception:
+        frappe.log_error(title="Orbit: meios da lead para o contacto")
     return {"ok": True, "negocio": nome}
 
 
