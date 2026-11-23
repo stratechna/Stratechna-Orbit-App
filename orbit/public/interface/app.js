@@ -37,6 +37,11 @@ let _t;
 function toast(m) { estado.toast = m; clearTimeout(_t); _t = setTimeout(() => (estado.toast = ""), 3500); }
 const CORES = ["#8a5a44", "#4b7a5a", "#5b6f7a", "#7a4b6e", "#46607e", "#8a7340", "#4f6b6b", "#7a5048"];
 function cor(s) { let h = 0; for (const c of String(s || "")) h = (h * 31 + c.charCodeAt(0)) >>> 0; return CORES[h % CORES.length]; }
+// 23-11-2026: um endereço «info@dominio» a partir do site, para a fotografia/logótipo de uma empresa sem email
+function emailDoSite(site) {
+  const d = String(site || "").trim().toLowerCase().split("//").pop().split("/")[0].replace(/^www\./, "");
+  return d && d.includes(".") ? "info@" + d : "";
+}
 function ini(n) { const p = String(n || "?").trim().split(/\s+/); return ((p[0] || "?")[0] + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase(); }
 const eur = (v) => new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v || 0);
 function data(d, comHora = true) {
@@ -1196,7 +1201,7 @@ const Lista = {
         <tr v-for="l in linhas" :key="l.name">
           <td @click.stop><input type="checkbox" :value="l.name" v-model="sel"></td>
           <td v-for="(c,i) in colunas" :key="c.campo" @click="abrir(l)">
-            <div v-if="i===0" class="pessoa"><AvFoto :email="l.email_id || l.email || l.email_geral || (l.website ? 'info@' + String(l.website).replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0] : '')" :nome="valor(l,c.campo)||l.name" :tam="28"/><a href="#" @click.prevent>{{ valor(l,c.campo) || l.name }}</a></div>
+            <div v-if="i===0" class="pessoa"><AvFoto :email="l.email_id || l.email || l.email_geral || emailDoSite(l.website)" :nome="valor(l,c.campo)||l.name" :tam="28"/><a href="#" @click.prevent>{{ valor(l,c.campo) || l.name }}</a></div>
             <span v-else-if="c.campo==='status'" class="etq">{{ valor(l,c.campo) }}</span>
             <span v-else-if="c.campo==='orbit_ciclo' && l.orbit_ciclo" class="etq" :class="{Cliente:'verde',Oportunidade:'roxo',Promotor:'verde','Lead qualificada (vendas)':'azul','Lead qualificada (marketing)':'azul'}[l.orbit_ciclo]">{{ l.orbit_ciclo }}</span>
             <span v-else>{{ valor(l,c.campo) }}</span>
@@ -1221,10 +1226,12 @@ const AvFoto = {
     const mail = computed(() => { const m = String(props.email || "").match(/[^\s<>"',;]+@[^\s<>"',;]+\.[a-z]{2,}/i); return m ? m[0].toLowerCase() : ""; });
     const src = computed(() => mail.value && !_semFoto.has(mail.value) && !falhou.value ? "/api/method/orbit.avatares.foto?email=" + encodeURIComponent(mail.value) : "");
     const erro = () => { _semFoto.add(mail.value); falhou.value = true; };
+    const pronta = ref(false);
     const estilo = computed(() => { const t = props.tam || 32; return { width: t + "px", height: t + "px", minWidth: t + "px", fontSize: Math.round(t * 0.36) + "px", background: cor(props.nome || mail.value || "?") }; });
-    return { src, erro, estilo, ini };
+    return { src, erro, estilo, ini, pronta };
   },
-  template: `<span class="av av-foto" :style="estilo"><img v-if="src" :src="src" loading="lazy" alt="" @error="erro"><template v-else>{{ ini(nome || email || '?') }}</template></span>`,
+  // as iniciais ficam sempre por baixo; a fotografia aparece por cima só depois de carregada
+  template: `<span class="av av-foto" :style="estilo">{{ ini(nome || email || '?') }}<img v-if="src" :src="src" alt="" :class="{pronta}" @load="pronta=true" @error="erro"></span>`,
 };
 const FichaDetalhes = {
   props: ["doctype", "name"], emits: ["mudou"],
@@ -1422,7 +1429,7 @@ const Ficha = {
     <aside class="col-esq">
       <div style="font-size:13px;display:flex;justify-content:space-between"><a href="javascript:history.back()">← Voltar</a><a :href="f.classico">Abrir no CRM clássico</a></div>
       <div class="cabeca">
-        <AvFoto :email="f.email_principal || (f.props.find(p=>p.campo==='website')?.valor ? 'info@' + String(f.props.find(p=>p.campo==='website').valor).replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0] : '')" :nome="f.titulo" :tam="56"/>
+        <AvFoto :email="f.email_principal || emailDoSite((f.props.find(p=>p.campo==='website') || {}).valor)" :nome="f.titulo" :tam="56"/>
         <h1>{{ f.titulo }}</h1><div class="sub">{{ f.sub }}</div>
         <div class="acoes-rap">
           <button @click="modo='nota'"><span><Icone n="nota"/></span>Nota</button>
@@ -2624,4 +2631,6 @@ const App = {
   <div v-else class="arranque">Stratechna Orbit</div>`,
 };
 
-createApp(App).component("AvFoto", AvFoto).mount("#app");
+const _app = createApp(App).component("AvFoto", AvFoto);
+_app.config.globalProperties.emailDoSite = emailDoSite;
+_app.mount("#app");

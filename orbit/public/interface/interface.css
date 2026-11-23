@@ -471,8 +471,9 @@ tr.erp-grupo td{font-weight:600}
 .seg .btn:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
 
 /* 23-11-2026: fotografia de quem escreve (por cima das iniciais) */
-.av.av-foto { overflow: hidden; flex: none; }
-.av.av-foto img { width: 100%; height: 100%; object-fit: cover; display: block; background: #fff; }
+.av.av-foto { overflow: hidden; flex: none; position: relative; }
+.av.av-foto img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; background: #fff; opacity: 0; }
+.av.av-foto img.pronta { opacity: 1; }
 
 /* 23-11-2026 (Vítor): barra lateral e cabeçalho sempre à vista — só a zona central desliza.
    A coluna central crescia com o conteúdo (item de grelha sem min-height:0) e a página inteira deslizava. */

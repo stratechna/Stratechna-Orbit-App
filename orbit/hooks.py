@@ -172,3 +172,8 @@ has_permission = {
     "Communication": "orbit.emails_crm.pode",
     "FCRM Note": "orbit.emails_crm.pode",
 }
+
+# 23-11-2026: os emails enviados pelas caixas ligadas ao CRM entram como «Enviado» (o Frappe deitava-os fora) —
+# remendo aplicado em cada pedido e em cada trabalho de fundo (a recolha do correio corre no agendador).
+before_request = ["orbit.remendo_enviados.aplicar"]
+before_job = ["orbit.remendo_enviados.aplicar"]

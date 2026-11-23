@@ -288,9 +288,10 @@ def filtrar(doc, method=None):
         if p and not principal:
             principal = p
         ligacoes += l + ([p] if p else [])
-    if not principal and not doc.reference_doctype:
+    if not principal and not doc.reference_doctype and doc.sent_or_received != "Sent":
         # 20-11-2026 (Vítor: «devem ser registados todos os emails e criados os respetivos leads; por defeito entram
         # todos»): quem ainda não está no CRM ganha uma lead — salvo robôs e newsletters (ver _robo).
+        # 23-11-2026: só pelos recebidos — um email enviado a quem não está no CRM não cria lead.
         for e in _outros(doc, propria):
             if _excluido(e, lista, propria) or _robo(e, doc):
                 continue

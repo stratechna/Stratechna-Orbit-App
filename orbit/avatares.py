@@ -81,8 +81,8 @@ def _pasta():
     return p
 
 
-def _externa(email: str):
-    """Do portal, com cache em disco (30 dias) e o «não há» na cache do Frappe (7 dias)."""
+def _guardada(email: str):
+    """→ (bytes, tipo) | "nao" | None (ainda não se sabe)."""
     k = hashlib.sha256(email.encode()).hexdigest()
     base = os.path.join(_pasta(), k)
     for ext, tipo in TIPO_DE.items():
@@ -91,7 +91,27 @@ def _externa(email: str):
             with open(p, "rb") as f:
                 return f.read(), tipo
     if frappe.cache().get_value(f"orbit:av:nao:{k}"):
+        return "nao"
+    return None
+
+
+def buscar_fundo(email: str):
+    """Trabalho de fundo: pede a fotografia de fora ao portal e guarda-a (a página seguinte já a mostra)."""
+    try:
+        _externa(email)
+    finally:
+        frappe.cache().delete_value(f"orbit:av:pedido:{hashlib.sha256(email.encode()).hexdigest()}")
+
+
+def _externa(email: str):
+    """Do portal, com cache em disco (30 dias) e o «não há» na cache do Frappe (7 dias)."""
+    k = hashlib.sha256(email.encode()).hexdigest()
+    base = os.path.join(_pasta(), k)
+    g = _guardada(email)
+    if g == "nao":
         return None
+    if g:
+        return g
     url = (frappe.conf.get("orbit_portal_url") or (frappe.conf.get("orbit_portal_tempo_url") or "").split("/api/")[0]).rstrip("/")
     seg = frappe.conf.get("orbit_portal_segredo")
     if not url or not seg:
@@ -133,7 +153,18 @@ def foto(email: str):
     if frappe.session.user == "Guest":
         raise frappe.PermissionError
     email = (email or "").strip().lower()[:200]
-    _responder(local(email) or _externa(email))
+    res = local(email)
+    if not res and "@" in email:
+        g = _guardada(email)
+        if g and g != "nao":
+            res = g
+        elif g is None:
+            # 1.ª vez: a busca de fora (Gravatar, site…) demora — vai para o fundo e o ecrã fica com as iniciais
+            k = hashlib.sha256(email.encode()).hexdigest()
+            if not frappe.cache().get_value(f"orbit:av:pedido:{k}"):
+                frappe.cache().set_value(f"orbit:av:pedido:{k}", 1, expires_in_sec=600)
+                frappe.enqueue("orbit.avatares.buscar_fundo", queue="short", timeout=60, email=email)
+    _responder(res)
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
