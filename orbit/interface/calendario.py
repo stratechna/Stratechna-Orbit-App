@@ -325,6 +325,11 @@ def _ocupado(alvo: str, ini, fim, user, pwd):
         return None
     from zoneinfo import ZoneInfo
     out = []
+    janela = re.search(r"DTSTART:(\d{8}T\d{6}Z)[\s\S]*?DTEND:(\d{8}T\d{6}Z)", r.text)
+    if janela:   # a janela que o SOGo cobriu de facto (ignora sday/eday): fica no atributo da lista
+        _ocupado.janela = tuple(_iso(datetime.strptime(x, "%Y%m%dT%H%M%SZ").replace(tzinfo=ZoneInfo("UTC"))) for x in janela.groups())
+    else:
+        _ocupado.janela = None
     for linha in r.text.replace("\r\n ", "").splitlines():
         if not linha.startswith("FREEBUSY"):
             continue
@@ -395,20 +400,32 @@ def _marcacoes_de(alvo: str, ini, fim, user, pwd):
     corpo = ('<?xml version="1.0"?><c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">'
              '<d:prop><c:calendar-data/></d:prop><c:filter><c:comp-filter name="VCALENDAR">'
              f'<c:comp-filter name="VEVENT">{faixa}</c:comp-filter></c:comp-filter></c:filter></c:calendar-query>')
-    r = _pedido("REPORT", _base(alvo) + "personal/", user, pwd, corpo, {"Depth": "1"}, timeout=30)
-    if r.status_code != 207:
-        return None
-    out = []
-    for resp in ET.fromstring(r.content).findall("d:response", NS):
-        dados = resp.findtext("d:propstat/d:prop/c:calendar-data", namespaces=NS)
-        if not dados:
+    # Todos os calendários próprios do colega (o pessoal e os de fora, ex.: «MBontime»), não só o pessoal.
+    pf = _pedido("PROPFIND", _base(alvo), user, pwd, '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop>'
+                 '<d:resourcetype/></d:prop></d:propfind>', {"Depth": "1"})
+    hrefs = []
+    if pf.status_code == 207:
+        for resp in ET.fromstring(pf.content).findall("d:response", NS):
+            if resp.find("d:propstat/d:prop/d:resourcetype/c:calendar", NS) is not None:
+                hrefs.append(_abs(resp.findtext("d:href", namespaces=NS) or ""))
+    if not hrefs:
+        hrefs = [_base(alvo) + "personal/"]
+    out, lidos = [], 0
+    for h in hrefs:
+        r = _pedido("REPORT", h, user, pwd, corpo, {"Depth": "1"}, timeout=30)
+        if r.status_code != 207:
             continue
-        for ev in _ics_eventos(dados, a, b):
-            if ev["dia_todo"]:
+        lidos += 1
+        for resp in ET.fromstring(r.content).findall("d:response", NS):
+            dados = resp.findtext("d:propstat/d:prop/c:calendar-data", namespaces=NS)
+            if not dados:
                 continue
-            out.append({"inicio": ev["inicio"], "fim": ev["fim"], "tentativo": False, "titulo": ev["titulo"],
-                        "local": ev["local"]})
-    return out
+            for ev in _ics_eventos(dados, a, b):
+                if ev["dia_todo"]:
+                    continue
+                out.append({"inicio": ev["inicio"], "fim": ev["fim"], "tentativo": False, "titulo": ev["titulo"],
+                            "local": ev["local"]})
+    return out if lidos else None
 
 
 @frappe.whitelist()
@@ -430,13 +447,34 @@ def disponibilidade(pessoas: str, inicio: str, fim: str):
         if modos[e] == "nenhum":
             out[e] = []
             continue
-        blocos = None
+        # Lê-se a agenda do colega pelas datas pedidas (o freebusy.ifb do SOGo ignora as datas e devolve sempre a
+        # mesma janela de ±7 dias — as semanas seguintes ficavam vazias). Em «livre» o SOGo já esconde o assunto
+        # («(Evento Público)») e aqui tira-se de vez; o freebusy fica só de recurso.
+        # Duas leituras (23-11-2026): o livre/ocupado do SOGo é o que a pessoa vê no Orbit Mail (o SOGo interpreta as
+        # séries com exceções editadas à sua maneira — a Margot vê 14:30 onde a regra diz 09:30), mas só cobre uma
+        # janela fixa de ±2 semanas e ignora as datas pedidas; fora dela lê-se a agenda pelas datas (CalDAV). Em
+        # «tudo» o assunto vem da agenda; em «livre» o SOGo já o esconde e aqui tira-se de vez.
+        fb = _ocupado(e, ini, fi, user, pwd)
+        jan = getattr(_ocupado, "janela", None) if fb is not None else None
+        try:
+            agenda = _marcacoes_de(e, ini, fi, user, pwd)
+        except Exception:  # noqa: BLE001
+            agenda = None
+        if agenda is None:
+            out[e] = [x for x in (fb or []) if x["inicio"] < _iso(fi) and x["fim"] > _iso(ini)]
+            continue
+        dentro = (lambda x: jan[0] <= x["inicio"] < jan[1]) if jan else (lambda x: False)
+        a_iso, b_iso = _iso(ini), _iso(fi)
+        blocos = [x for x in (fb or []) if dentro(x)] + [x for x in agenda if not dentro(x)]
+        blocos = [x for x in blocos if x["inicio"] < b_iso and x["fim"] > a_iso]
         if modos[e] == "tudo":
-            try:
-                blocos = _marcacoes_de(e, ini, fi, user, pwd)
-            except Exception:  # noqa: BLE001
-                blocos = None
-        out[e] = blocos if blocos is not None else _ocupado(e, ini, fi, user, pwd)
+            for x in blocos:
+                if "titulo" not in x:
+                    igual = [y for y in agenda if y["inicio"][:10] == x["inicio"][:10] and y["inicio"] < x["fim"] and y["fim"] > x["inicio"]]
+                    x["titulo"] = igual[0]["titulo"] if igual else ""
+        else:
+            blocos = [{"inicio": x["inicio"], "fim": x["fim"], "tentativo": x.get("tentativo", False)} for x in blocos]
+        out[e] = blocos
     return {"ligado": True, "ocupado": out, "modos": modos}
 
 

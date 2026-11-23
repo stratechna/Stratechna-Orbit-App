@@ -149,7 +149,9 @@ const Calendario = {
       return [...Array(7)].map((_, i) => { const x = new Date(semana.value); x.setDate(x.getDate() + i); return x; });
     });
     const minutos = (iso) => { const t = iso.slice(11, 16).split(":"); return +t[0] * 60 + +t[1]; };
-    const equipa = ref([]); let sel0 = []; try { sel0 = JSON.parse(localStorage.getItem("orbit.cal.equipa") || "[]"); } catch (e) {}
+    const equipa = ref([]); let sel0 = null; try { const g = localStorage.getItem("orbit.cal.equipa"); if (g) sel0 = JSON.parse(g); } catch (e) {}
+    // 23-11-2026: sem escolha guardada, vêem-se todos os colegas (antes não se via ninguém até tocar nos nomes)
+    const semEscolha = !sel0 || !sel0.length; if (semEscolha) sel0 = [];
     const verEquipa = ref(sel0); const ocupado = ref({}); const modos = ref({}); const partilha = ref("livre");
     // 23-11-2026: como a equipa vê a MINHA agenda (sem partilha · livre/ocupado · tudo) — o vigia do servidor aplica-o no Orbit Mail.
     const mudarPartilha = async () => { const r = await apiCal("definir_partilha", { modo: partilha.value }, true); toast(r.aviso || "Guardado"); };
@@ -178,7 +180,7 @@ const Calendario = {
       return out;
     };
     watch([semana, diaMovel, estreito], carregar);
-    onMounted(async () => { await carregar(); equipa.value = await apiCal("equipa"); try { partilha.value = (await apiCal("minha_partilha")).modo || "livre"; } catch (e) {} if (props.nova) abrirNova(); });
+    onMounted(async () => { await carregar(); equipa.value = await apiCal("equipa"); if (semEscolha && !verEquipa.value.length) verEquipa.value = equipa.value.map((p) => p.email); try { partilha.value = (await apiCal("minha_partilha")).modo || "livre"; } catch (e) {} if (props.nova) abrirNova(); });
     const mover = (n) => { if (estreito.value) { const x = new Date(diaMovel.value); x.setDate(x.getDate() + n); diaMovel.value = x; } else { const x = new Date(semana.value); x.setDate(x.getDate() + 7 * n); semana.value = x; } };
     const hoje = () => { semana.value = segunda(new Date()); diaMovel.value = new Date(); };
     const titulo = computed(() => {
