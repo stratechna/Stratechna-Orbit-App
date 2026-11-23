@@ -2206,7 +2206,7 @@ const ErpDesk = {
 const APP_ATUAL = (new URLSearchParams(location.search).get("app") || "crm").toLowerCase();
 const APPS = {
   crm: { nome: "CRM", sub: "Clientes e atendimento", ic: "pessoa", inicio: "inicio",
-    nav: [["inicio", "casa", "Início"], ["sec", "CRM"], ["contactos", "pessoa", "Contactos"], ["empresas", "empresa", "Empresas"], ["leads", "lead", "Leads"],
+    nav: [["inicio", "casa", "Início"], ["sec", "CRM"], ["leads", "lead", "Leads"], ["contactos", "pessoa", "Contactos"], ["empresas", "empresa", "Empresas"],
       ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"],
       ["sec", "O meu dia"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"], ["app/Booking", "relogio", "Marcar reuniões"],
       ["sec", "Documentos"], ["assinaturas", "assin", "Assinaturas"]],
