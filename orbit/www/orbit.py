@@ -16,5 +16,5 @@ def get_context(context):
         raise frappe.Redirect
     context.no_cache = 1
     context.csrf_token = frappe.sessions.get_csrf_token()
-    context.versao = "45"
+    context.versao = "46"
     return context

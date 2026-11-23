@@ -473,3 +473,11 @@ tr.erp-grupo td{font-weight:600}
 /* 23-11-2026: fotografia de quem escreve (por cima das iniciais) */
 .av.av-foto { overflow: hidden; flex: none; }
 .av.av-foto img { width: 100%; height: 100%; object-fit: cover; display: block; background: #fff; }
+
+/* 23-11-2026 (Vítor): barra lateral e cabeçalho sempre à vista — só a zona central desliza.
+   A coluna central crescia com o conteúdo (item de grelha sem min-height:0) e a página inteira deslizava. */
+.app{height:100vh;height:100dvh;overflow:hidden;grid-template-rows:minmax(0,1fr)}
+.main{min-height:0;overflow:hidden}
+.nav{overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
+.topo{flex:none}
+.ecra{min-height:0;overscroll-behavior:contain}
