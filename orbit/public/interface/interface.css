@@ -482,3 +482,25 @@ tr.erp-grupo td{font-weight:600}
 .nav{overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
 .topo{flex:none}
 .ecra{min-height:0;overscroll-behavior:contain}
+
+/* 23-11-2026: correio por IMAP na caixa de entrada (F1) */
+.ponto-co{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--acao);margin-right:6px}
+.ligar-caixa{padding:4px 10px 10px}
+.aviso-img{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:13px}
+.anexos-mail{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid var(--line-2)}
+
+/* 23-11-2026: Fluxos */
+.fluxo-ed{padding:16px 20px}
+.fluxo-ed h3{margin:18px 0 8px;font-size:14px}
+.fl-linha{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.fl-linha label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink-3);flex:1;min-width:180px}
+.fl-linha label.fl-ligado{flex-direction:row;align-items:center;flex:none;min-width:0;color:var(--ink);font-size:14px}
+.fl-linha .ed-campo{min-width:140px}
+.fl-acao{padding:10px 14px;margin-bottom:8px;background:var(--surface-2)}
+.fl-reg{padding:6px 0;border-bottom:1px solid var(--line-2);font-size:13px}
+.interruptor{position:relative;display:inline-block;width:36px;height:20px;cursor:pointer}
+.interruptor input{opacity:0;width:0;height:0}
+.interruptor span{position:absolute;inset:0;background:var(--line);border-radius:20px;transition:.15s}
+.interruptor span::before{content:"";position:absolute;width:16px;height:16px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.15s}
+.interruptor input:checked+span{background:var(--verde)}
+.interruptor input:checked+span::before{transform:translateX(16px)}

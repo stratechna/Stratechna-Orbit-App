@@ -1,0 +1,94 @@
+{
+ "doctype": "DocType",
+ "name": "Fluxo",
+ "module": "Orbit",
+ "custom": 0,
+ "engine": "InnoDB",
+ "track_changes": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "creation": "2026-11-23 14:00:00.000000",
+ "modified": "2026-11-23 14:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "fields": [
+  {
+   "fieldname": "titulo",
+   "fieldtype": "Data",
+   "label": "Título",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "ativo",
+   "fieldtype": "Check",
+   "label": "Ligado",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "objeto",
+   "fieldtype": "Select",
+   "label": "Registo",
+   "options": "CRM Lead\nCRM Deal\nContact\nCRM Organization\nHD Ticket",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "gatilho",
+   "fieldtype": "Select",
+   "label": "Gatilho",
+   "options": "criado\ncampo_muda\nsem_atividade\ndata\nemail_recebido",
+   "reqd": 1
+  },
+  {
+   "fieldname": "campo",
+   "fieldtype": "Data",
+   "label": "Campo do gatilho"
+  },
+  {
+   "fieldname": "valor",
+   "fieldtype": "Data",
+   "label": "Valor do gatilho"
+  },
+  {
+   "fieldname": "dias",
+   "fieldtype": "Int",
+   "label": "Dias"
+  },
+  {
+   "fieldname": "condicoes",
+   "fieldtype": "Long Text",
+   "label": "Condições (JSON)"
+  },
+  {
+   "fieldname": "acoes",
+   "fieldtype": "Long Text",
+   "label": "Ações (JSON)"
+  },
+  {
+   "fieldname": "modelo",
+   "fieldtype": "Data",
+   "label": "Modelo de origem",
+   "read_only": 1
+  },
+  {
+   "fieldname": "descricao",
+   "fieldtype": "Small Text",
+   "label": "Descrição"
+  }
+ ],
+ "autoname": "hash",
+ "naming_rule": "Random",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  }
+ ],
+ "title_field": "titulo"
+}

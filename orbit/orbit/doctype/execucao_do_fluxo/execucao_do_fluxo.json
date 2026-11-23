@@ -1,0 +1,65 @@
+{
+ "doctype": "DocType",
+ "name": "Execucao do Fluxo",
+ "module": "Orbit",
+ "custom": 0,
+ "engine": "InnoDB",
+ "track_changes": 0,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "creation": "2026-11-23 14:00:00.000000",
+ "modified": "2026-11-23 14:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "fields": [
+  {
+   "fieldname": "fluxo",
+   "fieldtype": "Link",
+   "label": "Fluxo",
+   "options": "Fluxo",
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "ref_doctype",
+   "fieldtype": "Data",
+   "label": "Registo (tipo)",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "ref_name",
+   "fieldtype": "Data",
+   "label": "Registo",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "chave",
+   "fieldtype": "Data",
+   "label": "Chave",
+   "search_index": 1
+  },
+  {
+   "fieldname": "ok",
+   "fieldtype": "Check",
+   "label": "Correu bem"
+  },
+  {
+   "fieldname": "resultado",
+   "fieldtype": "Small Text",
+   "label": "Resultado"
+  }
+ ],
+ "autoname": "hash",
+ "naming_rule": "Random",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  }
+ ]
+}

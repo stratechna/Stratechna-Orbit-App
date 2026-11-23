@@ -81,7 +81,7 @@ _LINGUA = ["orbit.lingua.garantir"]
 # 05-11-2026: os emails no CRM (orbit/emails_crm.py; docs/PLANO-EMAILS-NO-CRM.md) — campos próprios
 _EMAILS_CRM = ["orbit.emails_crm.instalar"]
 # 20-11-2026: campos da interface /orbit (Responsável em contactos e empresas)
-_INTERFACE = ["orbit.interface.instalar.instalar", "orbit.interface.ciclo.instalar", "orbit.interface.marcas.instalar", "orbit.interface.detalhes.instalar"]
+_INTERFACE = ["orbit.interface.instalar.instalar", "orbit.interface.ciclo.instalar", "orbit.interface.marcas.instalar", "orbit.interface.detalhes.instalar", "orbit.fluxos.instalar"]
 _FATURACAO = ["orbit.faturacao.instalar.garantir"]   # DP8, 05-11-2026
 _BOOKING = ["orbit.booking.garantir"]   # O1/I1, 06-11-2026: negócio do CRM ligado à marcação do Booking
 # 10-11-2026: propostas comerciais por cima do Orçamento (orbit/propostas; docs/PLANO-PROPOSTAS-ORBIT.md)
@@ -98,7 +98,7 @@ scheduler_events = {
         # 05-11-2026 (DP8): faturação certificada — repetir o que ficou por emitir e ler anulações do programa
         "*/15 * * * *": ["orbit.faturacao.emissao.periodico", "orbit.interface.trabalho.lembretes"],
     },
-    "hourly": ["orbit.marketing.envio.contagens_do_dia", "orbit.marketing.automacoes.correr"],
+    "hourly": ["orbit.marketing.envio.contagens_do_dia", "orbit.marketing.automacoes.correr", "orbit.fluxos.correr_tempo"],
 }
 
 # Esta app não tem nada que valha a pena mostrar no ecrã de apps: é marca e
@@ -115,25 +115,31 @@ doc_events = {
     "User": {"validate": ["orbit.utilizadores.guarda", "orbit.palavra_passe.validar"],
              "on_update": "orbit.palavra_passe.gravado"},
     # 17-10-2026: cada bilhete nasce na equipa da sua marca (formulário, destinatário) ou em Triagem
-    "HD Ticket": {"before_insert": "orbit.organizacao.ticket_equipa"},
+    # 23-11-2026: Fluxos (orbit/fluxos.py) — gatilhos «criado» e «campo muda»; a cache dos fluxos limpa-se ao gravar um
+    "Fluxo": {"on_update": "orbit.fluxos.limpar_cache", "on_trash": "orbit.fluxos.limpar_cache"},
+    "HD Ticket": {"before_insert": "orbit.organizacao.ticket_equipa", "after_insert": "orbit.fluxos.ao_criar",
+                  "on_update": "orbit.fluxos.ao_gravar"},
     "Communication": {"after_insert": ["orbit.organizacao.ticket_por_destinatario", "orbit.emails_crm.filtrar",
-                                       "orbit.interface.ciclo.atividade", "orbit.interface.marcas.de_email"]},
+                                       "orbit.interface.ciclo.atividade", "orbit.interface.marcas.de_email",
+                                       "orbit.fluxos.email_recebido"]},
     # 20-11-2026 (H4): fase do ciclo de vida e última actividade (orbit/interface/ciclo.py)
     "FCRM Note": {"after_insert": "orbit.interface.ciclo.atividade"},
     "CRM Task": {"after_insert": "orbit.interface.ciclo.atividade"},
     "CRM Call Log": {"after_insert": "orbit.interface.ciclo.atividade"},
     "Event": {"after_insert": "orbit.interface.ciclo.atividade"},
-    "CRM Organization": {"after_insert": "orbit.interface.ciclo.empresa_gravada", "on_update": "orbit.interface.ciclo.empresa_gravada"},
+    "CRM Organization": {"after_insert": ["orbit.interface.ciclo.empresa_gravada", "orbit.fluxos.ao_criar"],
+                         "on_update": ["orbit.interface.ciclo.empresa_gravada", "orbit.fluxos.ao_gravar"]},
     # 20-11-2026: um endereço novo no CRM vai buscar às caixas ligadas o que já se trocou com ele (emails_crm.py)
-    "Contact": {"after_insert": ["orbit.emails_crm.ao_gravar_registo", "orbit.interface.ciclo.contacto_gravado"],
-                "on_update": "orbit.emails_crm.ao_gravar_registo"},
-    "CRM Lead": {"after_insert": "orbit.emails_crm.ao_gravar_registo", "on_trash": "orbit.emails_crm.lead_apagada"},
+    "Contact": {"after_insert": ["orbit.emails_crm.ao_gravar_registo", "orbit.interface.ciclo.contacto_gravado", "orbit.fluxos.ao_criar"],
+                "on_update": ["orbit.emails_crm.ao_gravar_registo", "orbit.fluxos.ao_gravar"]},
+    "CRM Lead": {"after_insert": ["orbit.emails_crm.ao_gravar_registo", "orbit.fluxos.ao_criar"],
+                 "on_update": "orbit.fluxos.ao_gravar", "on_trash": "orbit.emails_crm.lead_apagada"},
     # 23-11-2026: marca herdada da lead/empresa e passada à empresa e aos contactos (orbit/interface/marcas.py)
     "CRM Deal": {"before_insert": "orbit.interface.marcas.negocio_antes",
                  "after_insert": ["orbit.emails_crm.ao_gravar_registo", "orbit.interface.ciclo.negocio_gravado",
-                                  "orbit.interface.marcas.negocio_gravado"],
+                                  "orbit.interface.marcas.negocio_gravado", "orbit.fluxos.ao_criar"],
                  "on_update": ["orbit.emails_crm.ao_gravar_registo", "orbit.interface.ciclo.negocio_gravado",
-                               "orbit.interface.marcas.negocio_gravado"]},
+                               "orbit.interface.marcas.negocio_gravado", "orbit.fluxos.ao_gravar"]},
     # 17-10-2026 (corte do Zoho): o tempo registado no Orbit vai para o livro de horas do portal
     "Timesheet": {"on_submit": "orbit.portal.tempo_submetido", "on_cancel": "orbit.portal.tempo_cancelado"},
     # 17-10-2026: a conta de saída por omissão é o remetente dos avisos — chama-se «Stratechna Orbit»
