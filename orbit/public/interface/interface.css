@@ -571,3 +571,8 @@ div.desk-prop{flex-direction:row;justify-content:space-between;color:var(--ink)}
 .fd-cartoes{display:flex;flex-direction:column;gap:8px}
 .fd-cartao{padding:10px 12px;cursor:pointer}.fd-cartao b{display:block;font-size:13px;margin-top:4px}
 .fd-cartao.atrasado{box-shadow:inset 3px 0 0 var(--ambar)}
+
+/* 23-11-2026: ícones próprios do Orbit no logótipo da app e no seletor de apps */
+.marca .logo.logo-app{background:none!important;padding:0;overflow:hidden;border-radius:10px}
+.marca .logo.logo-app img,.seletor-app .q-app img{width:100%;height:100%;display:block;border-radius:inherit}
+.seletor-app .q.q-app{background:none!important;padding:0;overflow:hidden}

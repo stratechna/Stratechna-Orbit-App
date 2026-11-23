@@ -3157,6 +3157,11 @@ const APPS = {
     modulos: ["ERPNext Settings", "Users", "Website", "Integrations", "Automation", "Data", "Email", "Printing", "System"], defs: null },
 };
 const APP = APPS[APP_ATUAL] || APPS.crm;
+// 23-11-2026 (Vítor): os ícones de cada app são os do Orbit (os da grelha), nunca símbolos genéricos
+const ICONE_APP = { crm: "crm", desk: "desk", projetos: "erp", rh: "rh", gestao: "erp", operacoes: "erp", marketing: "marketing", admin: "orbit",
+  mail: "mail", meet: "meet", chat: "chat", docs: "docs", sign: "sign", booking: "booking", wiki: "wiki", propostas: "propostas",
+  events: "events", social: "social", "secretária": "orbit" };
+const srcApp = (chave) => "/assets/orbit/icons/apps/" + (ICONE_APP[(chave || "").toLowerCase()] || "orbit") + ".svg";
 // Abrir uma app: volta ao separador onde já está (se foi o Orbit a abri-lo), senão abre um novo.
 // 23-11-2026: no telemóvel (ecrã táctil, estreito ou app instalada) abre-se na MESMA janela, como numa app nativa — os
 // separadores com nome («orbit-mail») eram reaproveitados mesmo depois de já mostrarem outra app (o Mail abria o CRM).
@@ -3217,16 +3222,16 @@ const App = {
     const LISTA_APPS = computed(() => [
       ...Object.entries(APPS).filter(([k]) => k !== "admin" || ctx.value?.admin !== false).map(([k, a]) => ({ chave: k, nome: a.nome, ic: a.ic })),
       ...((ctx.value?.apps) || []).map((a) => ({ chave: a.nome.toLowerCase(), nome: a.nome, ic: a.icone, url: a.url })),
-    ]);
+    ].filter((a, i, l) => l.findIndex((b) => b.chave === a.chave) === i));   // sem repetidos (o Marketing vinha duas vezes)
     const irApp = (a) => { seletor.value = false; if (a.chave === APP_ATUAL) return; abrirApp(a.chave, a.url); };
     const ativoNav = (n) => { const e = ecra.value; const r = partes.value.join("/"); return n[0] === r || decodeURIComponent(n[0]) === r || e === n[0] || (n[0]==='contactos'&&e==='contacto') || (n[0]==='negocios'&&e==='negocio') || (n[0]==='empresas'&&e==='empresa') || (n[0]==='leads'&&e==='lead') || (n[0]==='projetos'&&e==='projeto') || (n[0]==='tarefas'&&e==='fila'); };
     const rotaCal = computed(() => partes.value.join("/"));
-    return { ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal, APP, APP_ATUAL, modulosApp, seletor, LISTA_APPS, irApp, ativoNav };
+    return { ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal, APP, APP_ATUAL, modulosApp, seletor, LISTA_APPS, irApp, ativoNav, srcApp };
   },
   template: `
   <div class="app" v-if="ctx">
     <nav class="nav" aria-label="Navegação principal">
-      <div class="marca"><div class="logo"><Icone :n="APP.ic"/></div><div>{{ APP.nome }}<small>{{ APP.sub }}</small></div></div>
+      <div class="marca"><div class="logo logo-app"><img :src="srcApp(APP_ATUAL)" alt=""></div><div>{{ APP.nome }}<small>{{ APP.sub }}</small></div></div>
       <template v-for="(n,i) in NAV" :key="i">
         <h6 v-if="n[0]==='sec'">{{ n[1] }}</h6>
         <a v-else :href="'#/'+n[0]" style="text-decoration:none"><button :class="{ativo: ativoNav(n)}" tabindex="-1"><Icone :n="n[1]"/>{{ n[2] }}<span class="conta" v-if="n[0]==='caixa' && ctx.contadores.tickets">{{ ctx.contadores.tickets }}</span><span class="conta" v-if="n[0]==='chat' && estado.chat" title="Mensagens por ler no Chat">{{ estado.chat }}</span></button></a>
@@ -3243,7 +3248,7 @@ const App = {
           <div class="cartao seletor-apps" v-if="seletor" @click.self="seletor=false">
             <h6>As suas apps</h6>
             <div class="seletor-grelha">
-              <button v-for="a in LISTA_APPS" :key="a.chave" class="seletor-app" :class="{atual: a.chave===APP_ATUAL}" @click="irApp(a)"><span class="q"><Icone :n="a.ic"/></span>{{ a.nome }}</button>
+              <button v-for="a in LISTA_APPS" :key="a.chave" class="seletor-app" :class="{atual: a.chave===APP_ATUAL}" @click="irApp(a)"><span class="q q-app"><img :src="srcApp(a.chave)" alt=""></span>{{ a.nome }}</button>
             </div>
             <div class="sub" style="font-size:12px;margin-top:8px">Cada app abre no seu separador; se já estiver aberta, volta a ele.</div>
           </div>

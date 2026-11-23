@@ -172,9 +172,9 @@ def manifesto(app: str = "crm"):
     m = {"id": f"/orbit?app={app}", "name": f"Orbit {nome}", "short_name": nome if len(nome) <= 12 else nome[:12],
          "start_url": f"/orbit?app={app}", "scope": "/orbit", "display": "standalone", "lang": "pt-PT",
          "background_color": "#161a1d", "theme_color": "#161a1d",
-         "icons": [{"src": f"/assets/orbit/pwa/{app}-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
-                   {"src": f"/assets/orbit/pwa/{app}-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
-                   {"src": f"/assets/orbit/pwa/{app}-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}
+         "icons": [{"src": f"/assets/orbit/pwa/{app}-192.png?v=2", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+                   {"src": f"/assets/orbit/pwa/{app}-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+                   {"src": f"/assets/orbit/pwa/{app}-maskable-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}
     frappe.response["type"] = "download"
     frappe.response["filename"] = f"orbit-{app}.webmanifest"
     frappe.response["content_type"] = "application/manifest+json"
