@@ -7,7 +7,7 @@ import path from "path";
 const fonte = process.argv[2] || "orbit/public/interface/app.js";
 let src = fs.readFileSync(fonte, "utf8");
 src = src.replace(/^import .*?from "\.\/vendor\/vue\.esm-browser\.prod\.js";/m,
-  "const createApp=()=>({mount(){}}),reactive=(x)=>x,ref=(x)=>({value:x}),computed=()=>({}),watch=()=>{},onMounted=()=>{},nextTick=()=>{};");
+  "const createApp=()=>{const a={mount(){},component(){return a},config:{globalProperties:{}}};return a},reactive=(x)=>x,ref=(x)=>({value:x}),computed=()=>({}),watch=()=>{},onMounted=()=>{},nextTick=()=>{};");
 globalThis.window = { addEventListener() {}, innerWidth: 1400 };
 globalThis.document = { documentElement: { dataset: {} }, querySelector() {} };
 globalThis.localStorage = { getItem() { return null; }, setItem() {} };
