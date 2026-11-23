@@ -98,12 +98,41 @@ def _ocupado_no_sogo(email: str, de: datetime.datetime, ate: datetime.datetime) 
         raise frappe.ValidationError(
             "Não consegui ler a agenda do Mail — a disponibilidade não pode ser calculada.")
 
+    # 23-11-2026 («quando alguém da equipa é acrescentado tem de haver uma análise de todas as agendas»): todos os
+    # calendários próprios da pessoa (não só o 1.º — o «MBontime» da Margot ficava de fora) e os eventos repetidos
+    # desdobrados data a data (a tabela «_quick» só guarda a 1.ª ocorrência: as terças da Margot e o «Trabalho na
+    # Arnox» do Vítor não contavam). Eventos marcados como livres (c_isopaque = 0) e cancelados não ocupam.
+    ocupados = []
     try:
         with ligacao, ligacao.cursor() as cur:
-            tabela = agenda._tabela(cur, email)
-            if not tabela:
-                return []
-            linhas = agenda._eventos(cur, tabela, int(de.timestamp()), int(ate.timestamp()))
+            cur.execute("SELECT c_location FROM sogo_folder_info WHERE c_path2 = %s AND c_folder_type = 'Appointment'",
+                        (email,))
+            tabelas = []
+            for (loc,) in cur.fetchall():
+                t = (loc or "").rstrip("/").rsplit("/", 1)[-1]
+                if t and t.replace("_", "").isalnum():
+                    tabelas.append(t)
+            a_ep, b_ep = int(de.timestamp()), int(ate.timestamp())
+            for tabela in tabelas:
+                cur.execute(
+                    f'SELECT c_startdate, c_enddate, c_isallday FROM "{tabela}_quick" '  # noqa: S608
+                    "WHERE COALESCE(c_iscycle, 0) = 0 AND c_startdate < %s AND COALESCE(c_enddate, c_startdate) >= %s "
+                    "AND COALESCE(c_status, 0) <> 3 AND COALESCE(c_isopaque, 1) <> 0", (b_ep, a_ep))
+                for inicio, fim, dia_inteiro in cur.fetchall():
+                    if not inicio:
+                        continue
+                    i = hora_local(inicio)
+                    f = hora_local(fim) if fim else i + datetime.timedelta(hours=1)
+                    if dia_inteiro:
+                        i = datetime.datetime.combine(i.date(), datetime.time.min)
+                        f = i + datetime.timedelta(days=1)
+                    ocupados.append({"inicio": i.isoformat(timespec="minutes"), "fim": f.isoformat(timespec="minutes")})
+                cur.execute(
+                    f'SELECT c.c_content FROM "{tabela}_quick" q JOIN "{tabela}" c ON c.c_name = q.c_name '  # noqa: S608
+                    "WHERE q.c_iscycle = 1 AND q.c_startdate < %s AND (q.c_cycleenddate IS NULL OR q.c_cycleenddate >= %s) "
+                    "AND COALESCE(q.c_status, 0) <> 3 AND c.c_deleted IS DISTINCT FROM 1", (b_ep, a_ep))
+                for (conteudo,) in cur.fetchall():
+                    ocupados += _repetidos(conteudo, de, ate)
     except Exception as e:
         frappe.log_error(f"Marcação: falhou a leitura do Mail: {e}", "Orbit Marcação")
         raise
@@ -112,23 +141,35 @@ def _ocupado_no_sogo(email: str, de: datetime.datetime, ate: datetime.datetime) 
             ligacao.close()
         except Exception:
             pass
-
-    ocupados = []
-    for titulo, inicio, fim, dia_inteiro, local in linhas:
-        if not inicio:
-            continue
-        i = hora_local(inicio)
-        # Sem fim marcado, assume-se uma hora: é melhor reservar a mais do que
-        # oferecer uma hora que afinal está tomada.
-        f = hora_local(fim) if fim else i + datetime.timedelta(hours=1)
-        if dia_inteiro:
-            # O dia inteiro ocupa o dia inteiro. Não se adivinha o horário de
-            # expediente aqui — quem o conhece é o portal.
-            i = datetime.datetime.combine(i.date(), datetime.time.min)
-            f = i + datetime.timedelta(days=1)
-        ocupados.append({"inicio": i.isoformat(timespec="minutes"),
-                         "fim": f.isoformat(timespec="minutes")})
     return ocupados
+
+
+def _repetidos(conteudo: str, de: datetime.datetime, ate: datetime.datetime) -> list:
+    """As ocorrências de um evento repetido dentro da janela (com as excepções editadas e as datas tiradas)."""
+    import icalendar
+    import recurring_ical_events
+    out = []
+    try:
+        cal = icalendar.Calendar.from_ical(conteudo)
+        a = de.replace(tzinfo=FUSO) if de.tzinfo is None else de
+        b = ate.replace(tzinfo=FUSO) if ate.tzinfo is None else ate
+        for ev in recurring_ical_events.of(cal).between(a, b):
+            if str(ev.get("STATUS") or "").upper() == "CANCELLED" or str(ev.get("TRANSP") or "").upper() == "TRANSPARENT":
+                continue
+            i = ev.get("DTSTART").dt if ev.get("DTSTART") else None
+            if i is None:
+                continue
+            f = ev.get("DTEND").dt if ev.get("DTEND") else None
+            if not isinstance(i, datetime.datetime):      # dia inteiro
+                i = datetime.datetime.combine(i, datetime.time.min)
+                f = datetime.datetime.combine(f, datetime.time.min) if f else i + datetime.timedelta(days=1)
+            else:
+                i = i.astimezone(FUSO).replace(tzinfo=None) if i.tzinfo else i
+                f = (f.astimezone(FUSO).replace(tzinfo=None) if f.tzinfo else f) if f else i + datetime.timedelta(hours=1)
+            out.append({"inicio": i.isoformat(timespec="minutes"), "fim": f.isoformat(timespec="minutes")})
+    except Exception as e:  # noqa: BLE001
+        frappe.log_error(f"Marcação: evento repetido ilegível: {e}", "Orbit Marcação")
+    return out
 
 
 def _ocupado_no_frappe(email: str, de: datetime.datetime, ate: datetime.datetime) -> list:
