@@ -451,9 +451,7 @@ def ficha(doctype: str, name: str):
         props.append({"campo": cf.fieldname, "rotulo": cf.label, "tipo": tipo, "valor": doc.get(cf.fieldname),
                       "mostra": doc.get(cf.fieldname), "editavel": bool(pode_editar), "opcoes": ops, "rotulos": {},
                       "personalizado": True})
-    # 23-11-2026 (Vítor: «TODOS os campos»): depois dos principais, todos os outros campos do registo, pelas secções
-    # do formulário, editáveis quando a pessoa pode escrever e o campo não é só de leitura.
-    props += _todos_os_outros(doc, meta, {p["campo"] for p in props} | {"address", "marcas"}, pode_editar)
+    # Todos os campos, por secções e em colunas, estão no separador «Detalhes» (orbit/interface/detalhes.py).
     morada = None
     if doctype in ("Contact", "CRM Organization") and meta.has_field("address"):
         morada = {"valores": _F.morada_de(doctype, name), "campos": [{"campo": c, "rotulo": r} for c, r in _F.MORADA],
@@ -516,33 +514,44 @@ _NUNCA = {"naming_series", "amended_from", "_user_tags", "_comments", "_assign",
           "pulled_from_google_contacts", "unsubscribed", "is_primary_contact", "user"}
 
 
-def _todos_os_outros(doc, meta, ja: set, pode_editar: bool) -> list:
-    out, secao = [], ""
-    for f in meta.fields:
-        if f.fieldtype in ("Section Break", "Tab Break"):
-            secao = _(f.label) if f.label else secao
-            continue
-        if f.fieldtype not in _TIPOS_FICHA or f.fieldname in ja or f.fieldname in _NUNCA or f.hidden:
-            continue
-        if f.fieldname.startswith("oc_"):
-            continue
-        tipo = _TIPOS_FICHA[f.fieldtype]
-        v = doc.get(f.fieldname)
-        opcoes = None
-        if f.fieldtype == "Select":
-            opcoes = (f.options or "").split("\n")
-        elif f.fieldtype == "Link" and f.options and f.options not in ("User",) and frappe.db.count(f.options) <= 300:
-            try:
+_PT_VALORES = {"Passive": "Passivo", "Open": "Aberto", "Replied": "Respondeu", "Male": "Masculino", "Female": "Feminino",
+               "Other": "Outro", "Prefer not to say": "Prefiro não dizer", "Mr": "Sr.", "Ms": "Sr.ª", "Mrs": "Sr.ª",
+               "Dr": "Dr.", "Prof": "Prof.", "Hot": "Quente", "Warm": "Morna", "Cold": "Fria", "Fulfilled": "Cumprido",
+               "Failed": "Falhou", "First Response Due": "1.ª resposta em prazo", "Rolling Response Due": "Resposta em prazo"}
+
+
+def _prop_campo(doc, meta, f, pode_editar: bool) -> dict:
+    """Um campo do registo pronto para a ficha (tipo, valor, opções, se é editável)."""
+    tipo = _TIPOS_FICHA.get(f.fieldtype, "Data")
+    v = doc.get(f.fieldname)
+    opcoes = None
+    if f.fieldtype == "Select":
+        opcoes = (f.options or "").split("\n")
+    elif f.fieldtype == "Link" and f.options and f.options != "User":
+        try:
+            if frappe.db.count(f.options) <= 300:
                 opcoes = [""] + frappe.get_all(f.options, pluck="name", order_by="name asc", limit=300)
-            except Exception:
-                opcoes = None
-        if f.fieldtype == "Text Editor" and v:
-            v = _texto(v, 2000)
-        out.append({"campo": f.fieldname, "rotulo": _(f.label or f.fieldname), "tipo": "Data" if tipo == "Link" and not opcoes else tipo,
-                    "valor": v, "mostra": _nome_user(v) if f.fieldtype == "Link" and f.options == "User" else v,
-                    "editavel": bool(pode_editar and not f.read_only and f.fieldtype not in ("Read Only", "Text Editor")),
-                    "opcoes": opcoes, "rotulos": {}, "secao": secao or _("Outros campos")})
-    return out
+        except Exception:
+            opcoes = None
+    elif f.fieldtype == "Link" and f.options == "User":
+        opcoes = [""] + frappe.get_all("User", filters={"enabled": 1, "user_type": "System User",
+                                                        "name": ["not in", ["Administrator", "Guest"]]}, pluck="name", limit=200)
+    if f.fieldtype == "Text Editor" and v:
+        v = _texto(v, 2000)
+    rotulos = {}
+    if f.fieldtype == "Link" and f.options == "User":
+        rotulos = {o: _nome_user(o) for o in (opcoes or [])}
+    elif f.fieldtype == "Link" and f.options in ("CRM Deal Status", "CRM Lead Status"):
+        rotulos = {o: _rotulo_estado(o) for o in (opcoes or [])}
+    elif f.fieldtype in ("Select", "Link") and opcoes:
+        # valores de origem em inglês (Passive, Male, Mr…) mostrados pelas traduções do Orbit
+        rotulos = {o: (_PT_VALORES.get(o) or _(o)) for o in opcoes if o}
+    return {"campo": f.fieldname, "rotulo": _(f.label or f.fieldname),
+            "tipo": "Data" if tipo == "Link" and not opcoes else tipo, "valor": v,
+            "mostra": _nome_user(v) if f.fieldtype == "Link" and f.options == "User" else v,
+            "editavel": bool(pode_editar and not f.read_only and f.fieldtype not in ("Read Only", "Text Editor")
+                             and f.fieldname not in _NUNCA),
+            "opcoes": opcoes, "rotulos": rotulos}
 
 
 def _url_classico(dt, dn):

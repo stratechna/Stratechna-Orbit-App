@@ -441,3 +441,27 @@ tr.erp-grupo td{font-weight:600}
 .marcas-chips .etq { cursor: pointer; border: 1px solid var(--line); background: transparent; color: var(--ink-2); }
 .marcas-chips .etq.on { background: var(--ink); border-color: var(--ink); color: var(--surface); }
 .marcas-chips .etq:disabled { cursor: default; }
+
+/* 23-11-2026: separador «Detalhes» da ficha — secções em cartões, campos em 2–3 colunas */
+.det { display: flex; flex-direction: column; gap: 14px; }
+.det-sec { padding: 14px 18px 16px; }
+.det-sec > header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.det-sec > header h2 { margin: 0; font-size: 14px; font-weight: 600; }
+.det-grelha { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px 22px; }
+.det-campo { min-width: 0; }
+.det-campo.largo { grid-column: 1 / -1; }
+.det-campo > label { display: block; font-size: 11.5px; color: var(--ink-3); margin-bottom: 3px; }
+.det-valor { min-height: 22px; padding: 2px 0; overflow-wrap: anywhere; white-space: pre-line; }
+.det-valor.det-vazio { color: var(--ink-3); }
+.det-valor.ed { cursor: pointer; border-radius: 6px; margin: 0 -6px; padding: 2px 6px; }
+.det-valor.ed:hover { background: var(--surface-2); }
+.det .ed-campo { width: 100%; box-sizing: border-box; }
+.det-check { display: flex; align-items: center; gap: 6px; font-size: inherit !important; color: inherit !important; cursor: pointer; }
+.det-tab { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 4px; }
+.det-tab th { text-align: left; font-weight: 500; color: var(--ink-3); font-size: 11.5px; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line); }
+.det-tab td { padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line-2); }
+.det-meios { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+.det-meios + .det-meios { margin-top: 12px; }
+.det-meios-ed { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.det-meio-ed { display: flex; gap: 8px; align-items: center; }
+.det-meio-ed .ed-campo { flex: 1; }

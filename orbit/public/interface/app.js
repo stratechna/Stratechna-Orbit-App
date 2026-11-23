@@ -1211,8 +1211,102 @@ const Lista = {
   </div>`,
 };
 
+// ── Separador «Detalhes» da ficha (23-11-2026): todos os campos por secções, em colunas (orbit/interface/detalhes.py) ──
+const FichaDetalhes = {
+  props: ["doctype", "name"], emits: ["mudou"],
+  setup(props, { emit }) {
+    const d = ref(null); const ed = ref(""); const valorEd = ref(""); const edMorada = ref(null); const meios = ref(null);
+    const carregar = async () => { d.value = await api("detalhes.detalhes", { doctype: props.doctype, name: props.name }); };
+    onMounted(carregar);
+    const feito = (msg) => { toast(msg || "Gravado"); carregar(); emit("mudou"); };
+    const editar = (p) => { if (!p.editavel) return; ed.value = p.campo; valorEd.value = p.valor ?? ""; nextTick(() => document.querySelector(".det .ed-campo")?.focus()); };
+    const gravar = async (p) => {
+      if (String(valorEd.value ?? "") === String(p.valor ?? "")) { ed.value = ""; return; }
+      let r; try { r = await api("guardar", { doctype: props.doctype, name: props.name, campo: p.campo, valor: valorEd.value }, true); } catch (e) { return; }
+      ed.value = "";
+      if (r && r.preenchido && r.preenchido.length) feito("NIPC confirmado no VIES" + (r.nome_vies ? " (" + r.nome_vies + ")" : "") + " — preenchido: " + r.preenchido.join(", ").toLowerCase());
+      else if (r && r.valido_vies) feito("NIPC confirmado no VIES" + (r.nome_vies ? ": " + r.nome_vies : ""));
+      else feito(r && r.aviso);
+    };
+    const alternarCheck = async (p) => { if (!p.editavel) return; await api("guardar", { doctype: props.doctype, name: props.name, campo: p.campo, valor: p.valor ? 0 : 1 }, true); feito(); };
+    const alternarMarca = async (p, m) => { if (!p.editavel) return; const v = p.valor.includes(m) ? p.valor.filter((x) => x !== m) : p.valor.concat([m]);
+      await api("guardar", { doctype: props.doctype, name: props.name, campo: "marcas", valor: JSON.stringify(v) }, true); feito(); };
+    const editarMorada = (s) => { if (!d.value.pode_editar) return; edMorada.value = { ...s.morada.valores }; if (!edMorada.value.country) edMorada.value.country = "Portugal"; };
+    const gravarMorada = async () => { await api("fiscal.morada", { doctype: props.doctype, name: props.name, valores: JSON.stringify(edMorada.value) }, true); edMorada.value = null; feito("Morada gravada"); };
+    const editarMeios = (s) => { if (!d.value.pode_editar) return; const t = (tp) => (s.tabelas.find((x) => x.tipo === tp)?.linhas || []).map((l) => ({ ...l }));
+      meios.value = { emails: t("emails"), telefones: t("telefones") }; if (!meios.value.emails.length) meios.value.emails.push({ valor: "", principal: true }); };
+    const principal = (lista, i) => lista.forEach((l, j) => (l.principal = j === i));
+    const gravarMeios = async () => { try { await api("detalhes.contacto_meios", { name: props.name, emails: JSON.stringify(meios.value.emails), telefones: JSON.stringify(meios.value.telefones) }, true); } catch (e) { return; }
+      meios.value = null; feito("Emails e telefones gravados"); };
+    const mostra = (p) => {
+      if (p.valor === null || p.valor === undefined || p.valor === "") return "—";
+      if (p.tipo === "Currency") return eur(p.valor);
+      if (p.tipo === "Date" || p.tipo === "Datetime") return data(p.valor, p.tipo === "Datetime");
+      if (p.tipo === "Percent") return p.valor + " %";
+      return (p.rotulos && p.rotulos[p.valor]) || p.mostra || p.valor;
+    };
+    return { d, ed, valorEd, edMorada, meios, editar, gravar, alternarCheck, alternarMarca, editarMorada, gravarMorada, editarMeios, principal, gravarMeios, mostra, eur, PAISES_PT };
+  },
+  template: `
+  <div class="det">
+    <div v-if="!d" class="carregar">A carregar…</div>
+    <section v-else v-for="s in d.secoes" :key="s.titulo" class="cartao det-sec">
+      <header><h2>{{ s.titulo }}</h2>
+        <button v-if="s.morada && d.pode_editar && !edMorada" class="btn sm" @click="editarMorada(s)">Editar</button>
+        <button v-if="s.tabelas.some(t=>t.tipo==='emails') && d.pode_editar && !meios" class="btn sm" @click="editarMeios(s)">Editar</button></header>
+      <div class="det-grelha">
+        <div v-for="p in s.campos" :key="p.campo" class="det-campo" :class="{largo: p.largo}">
+          <label>{{ p.rotulo }}</label>
+          <div v-if="p.tipo==='Marcas'" class="marcas-chips"><button v-for="m in p.opcoes" :key="m" class="etq" :class="{on: p.valor.includes(m)}" :disabled="!p.editavel" @click="alternarMarca(p, m)">{{ m }}</button></div>
+          <label v-else-if="p.tipo==='Check'" class="det-check"><input type="checkbox" :checked="!!p.valor" :disabled="!p.editavel" @change="alternarCheck(p)"> {{ p.valor ? 'Sim' : 'Não' }}</label>
+          <template v-else-if="ed===p.campo">
+            <select v-if="p.opcoes" class="ed-campo" v-model="valorEd" @change="gravar(p)" @blur="ed=''"><option v-for="o in p.opcoes" :key="o" :value="o">{{ (p.rotulos && p.rotulos[o]) || o || '—' }}</option></select>
+            <textarea v-else-if="p.tipo==='Text'" class="ed-campo" rows="3" v-model="valorEd" @keyup.esc="ed=''" @blur="gravar(p)"></textarea>
+            <input v-else class="ed-campo" v-model="valorEd" :type="p.tipo==='Date'?'date':['Currency','Percent','Number'].includes(p.tipo)?'number':'text'" :placeholder="p.tipo==='Fiscal' ? (doctype==='Contact' ? 'NIF (9 dígitos)' : 'NIPC — confirma no VIES') : ''" @keyup.enter="gravar(p)" @keyup.esc="ed=''" @blur="gravar(p)">
+          </template>
+          <div v-else class="det-valor" :class="{ed: p.editavel, 'det-vazio': mostra(p)==='—'}" @click="editar(p)">{{ mostra(p) }}<span v-if="p.tipo==='Fiscal' && p.valor && doctype==='CRM Organization'" class="sub" style="font-size:11px"> · VIES</span></div>
+        </div>
+        <template v-if="s.morada">
+          <template v-if="edMorada">
+            <div v-for="c in s.morada.campos" :key="c.campo" class="det-campo"><label>{{ c.rotulo }}</label>
+              <select v-if="c.campo==='country'" class="ed-campo" v-model="edMorada.country"><option v-for="pa in d.paises" :key="pa" :value="pa">{{ PAISES_PT[pa] || pa }}</option></select>
+              <input v-else class="ed-campo" v-model="edMorada[c.campo]" :placeholder="c.campo==='pincode' ? '0000-000' : ''" @keyup.enter="gravarMorada" @keyup.esc="edMorada=null"></div>
+            <div class="det-campo largo" style="display:flex;gap:6px;justify-content:flex-end"><button class="btn sm" @click="edMorada=null">Cancelar</button><button class="btn sm prim" @click="gravarMorada">Gravar morada</button></div>
+          </template>
+          <template v-else>
+            <div v-for="c in s.morada.campos" :key="c.campo" class="det-campo" :class="{largo: c.campo==='address_line1'}"><label>{{ c.rotulo }}</label>
+              <div class="det-valor" :class="{ed: d.pode_editar, 'det-vazio': !s.morada.valores[c.campo]}" @click="editarMorada(s)">{{ c.campo==='country' ? (PAISES_PT[s.morada.valores.country] || s.morada.valores.country || '—') : (s.morada.valores[c.campo] || '—') }}</div></div>
+          </template>
+        </template>
+      </div>
+      <template v-for="t in s.tabelas" :key="t.tipo">
+        <template v-if="t.tipo==='produtos'">
+          <div v-if="!t.linhas.length" class="sub" style="padding:4px 0 8px">Sem produtos.</div>
+          <table v-else class="det-tab"><thead><tr><th>Artigo</th><th>Qtd.</th><th>Preço</th><th>Desconto</th><th>Total</th></tr></thead>
+            <tbody><tr v-for="(l,i) in t.linhas" :key="i"><td>{{ l.artigo }}</td><td>{{ l.qtd }}</td><td>{{ eur(l.preco||0) }}</td><td>{{ l.desconto ? l.desconto + ' %' : '—' }}</td><td>{{ eur(l.total||0) }}</td></tr></tbody></table>
+        </template>
+        <div v-else-if="!meios" class="det-meios"><b>{{ t.tipo==='emails' ? 'Emails' : 'Telefones' }}</b>
+          <div v-if="!t.linhas.length" class="sub">—</div>
+          <div v-for="(l,i) in t.linhas" :key="i" class="det-meio">{{ l.valor }} <span v-if="l.principal" class="etq verde" style="font-size:11px">principal</span><span v-if="t.tipo==='telefones'" class="sub" style="font-size:11px"> · {{ l.movel ? 'telemóvel' : 'fixo' }}</span></div>
+        </div>
+      </template>
+      <div v-if="meios && s.tabelas.some(t=>t.tipo==='emails')" class="det-meios-ed">
+        <b>Emails</b>
+        <div v-for="(l,i) in meios.emails" :key="'e'+i" class="det-meio-ed"><input class="ed-campo" v-model="l.valor" type="email" placeholder="nome@dominio.pt">
+          <label class="sub"><input type="radio" :checked="l.principal" @change="principal(meios.emails, i)"> principal</label><button class="btn sm" @click="meios.emails.splice(i,1)">✕</button></div>
+        <button class="btn sm" @click="meios.emails.push({valor:'',principal:!meios.emails.length})">+ Email</button>
+        <b style="margin-top:10px">Telefones</b>
+        <div v-for="(l,i) in meios.telefones" :key="'t'+i" class="det-meio-ed"><input class="ed-campo" v-model="l.valor" placeholder="+351 …">
+          <select class="ed-campo" style="flex:none;width:120px" v-model="l.movel"><option :value="true">Telemóvel</option><option :value="false">Fixo</option></select>
+          <label class="sub"><input type="checkbox" v-model="l.principal"> principal</label><button class="btn sm" @click="meios.telefones.splice(i,1)">✕</button></div>
+        <button class="btn sm" @click="meios.telefones.push({valor:'',principal:false,movel:true})">+ Telefone</button>
+        <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:10px"><button class="btn sm" @click="meios=null">Cancelar</button><button class="btn sm prim" @click="gravarMeios">Gravar</button></div>
+      </div>
+    </section>
+  </div>`,
+};
 const Ficha = {
-  components: { Icone, EmailCorpo, VerDocumento, EnviarAssinatura, NovoEmail },
+  components: { FichaDetalhes, Icone, EmailCorpo, VerDocumento, EnviarAssinatura, NovoEmail },
   props: ["doctype", "name"],
   setup(props) {
     const f = ref(null); const cron = ref(null); const filtro = ref(""); const ed = ref(""); const valorEd = ref("");
@@ -1248,7 +1342,7 @@ const Ficha = {
     const registarTempo = () => { window.__tempo_cliente = (tempo.value && tempo.value.cliente) || ""; };
     const assin = ref(null); const assinar = ref(false);
     const carregarAssin = () => apiS("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (assin.value = r)).catch(() => (assin.value = { itens: [] }));
-    const carregarCron = async () => (cron.value = await api("cronologia", { doctype: props.doctype, name: props.name, tipo: filtro.value }));
+    const carregarCron = async () => { if (filtro.value === "detalhes") return; cron.value = await api("cronologia", { doctype: props.doctype, name: props.name, tipo: filtro.value }); };
     watch(() => [props.doctype, props.name], () => { f.value = null; cron.value = null; carregar(); });
     watch(filtro, carregarCron);
     onMounted(carregar);
@@ -1396,6 +1490,7 @@ const Ficha = {
     <div class="col-meio">
       <div class="separ">
         <button :class="{ativo:filtro===''}" @click="filtro=''">Atividade</button>
+        <button :class="{ativo:filtro==='detalhes'}" @click="filtro='detalhes'">Detalhes</button>
         <button :class="{ativo:filtro==='emails'}" @click="filtro='emails'">Emails <span class="sub">{{ cron?.contagem?.email || '' }}</span></button>
         <button :class="{ativo:filtro==='notas'}" @click="filtro='notas'">Notas</button>
         <button :class="{ativo:filtro==='chamadas'}" @click="filtro='chamadas'">Chamadas</button>
@@ -1403,6 +1498,8 @@ const Ficha = {
         <button :class="{ativo:filtro==='reunioes'}" @click="filtro='reunioes'">Reuniões</button>
         <button :class="{ativo:filtro==='tickets'}" @click="filtro='tickets'">Tickets</button>
       </div>
+      <FichaDetalhes v-if="filtro==='detalhes'" :doctype="doctype" :name="name" :key="doctype+name" @mudou="carregar"/>
+      <template v-else>
       <div class="cartao compor" v-if="modo==='nota'"><textarea v-model="notaTxt" rows="1" :placeholder="'Escrever uma nota sobre ' + f.titulo + '…'" @keydown.meta.enter="enviarNota" @keydown.ctrl.enter="enviarNota"></textarea><button class="btn sm prim" @click="enviarNota" :disabled="!notaTxt.trim()">Gravar nota</button></div>
       <div class="cartao compor" v-else><input v-model="tarefaTxt" placeholder="Nova tarefa…" @keyup.enter="enviarTarefa"><input type="date" v-model="tarefaData" style="flex:none;width:150px"><button class="btn sm prim" @click="enviarTarefa" :disabled="!tarefaTxt.trim()">Criar tarefa</button></div>
       <div v-if="!cron" class="carregar">A carregar…</div>
@@ -1424,6 +1521,7 @@ const Ficha = {
             </div></div>
         </template>
         <div v-if="grupos.length" style="text-align:center;margin:16px 0"><button class="btn sm" @click="procurar">Procurar emails antigos nas caixas ligadas</button></div>
+      </template>
       </template>
     </div>
 
