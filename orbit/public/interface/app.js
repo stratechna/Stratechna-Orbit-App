@@ -1589,26 +1589,32 @@ const Ficha = {
 const Funil = {
   setup() {
     const d = ref(null); const resp = ref(""); const arrastar = ref(null); const alvo = ref("");
-    // 23-11-2026: separador da marca — o mesmo que o da lista dos negócios (partilham a escolha)
-    let m0 = ""; try { m0 = localStorage.getItem("orbit.marca.negocios") || ""; } catch (e) {}
-    const marca = ref(m0);
-    const carregar = async () => (d.value = await api("funil", { responsavel: resp.value, marca: marca.value }));
-    const escolherMarca = (m) => { marca.value = m; try { localStorage.setItem("orbit.marca.negocios", m); } catch (e) {} carregar(); };
+    // 23-11-2026: funil dos negócios ou das leads, cada um com o separador da marca da sua lista (partilham a escolha)
+    const ler = (k, v) => { try { return localStorage.getItem(k) || v; } catch (e) { return v; } };
+    const gravarLS = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+    const tipo = ref(ler("orbit.funil.tipo", "negocios"));
+    const marca = ref(ler("orbit.marca." + tipo.value, ""));
+    const carregar = async () => (d.value = await api(tipo.value === "leads" ? "funil_leads" : "funil", { responsavel: resp.value, marca: marca.value }));
+    const escolherMarca = (m) => { marca.value = m; gravarLS("orbit.marca." + tipo.value, m); carregar(); };
+    const escolherTipo = (t) => { if (t === tipo.value) return; tipo.value = t; gravarLS("orbit.funil.tipo", t); marca.value = ler("orbit.marca." + t, ""); d.value = null; carregar(); };
     watch(resp, carregar); onMounted(carregar);
     const largar = async (col) => {
       const n = arrastar.value; alvo.value = ""; arrastar.value = null;
       if (!n || n.estado === col.estado) return;
-      await api("mover", { negocio: n.name, estado: col.estado }, true); toast(`Passou a «${col.rotulo}»`); carregar();
+      if (tipo.value === "leads") await api("mover_lead", { lead: n.name, estado: col.estado }, true);
+      else await api("mover", { negocio: n.name, estado: col.estado }, true);
+      toast(`Passou a «${col.rotulo}»`); carregar();
     };
-    const total = computed(() => d.value ? d.value.colunas.filter((c) => c.tipo !== "Won").reduce((a, c) => a + c.total, 0) : 0);
-    const n = computed(() => d.value ? d.value.colunas.filter((c) => c.tipo !== "Won").reduce((a, c) => a + c.cartoes.length, 0) : 0);
-    return { d, resp, arrastar, alvo, largar, total, n, eur, link, data, FAIXA, marca, escolherMarca };
+    const total = computed(() => d.value && tipo.value !== "leads" ? d.value.colunas.filter((c) => c.tipo !== "Won").reduce((a, c) => a + c.total, 0) : 0);
+    const n = computed(() => d.value ? d.value.colunas.filter((c) => !["Won", "Lost"].includes(c.tipo)).reduce((a, c) => a + c.cartoes.length, 0) : 0);
+    return { d, resp, arrastar, alvo, largar, total, n, eur, link, data, FAIXA, marca, escolherMarca, tipo, escolherTipo };
   },
   template: `
   <div>
     <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-      <div><h1>Funil de negócios</h1><div class="sub">{{ n }} em curso · {{ eur(total) }} · ganhos dos últimos 30 dias</div></div>
-      <div style="display:flex;gap:8px"><select class="btn" v-model="resp"><option value="">Todos os responsáveis</option><option value="eu">Só os meus</option></select><a class="btn" href="#/negocios">Lista</a></div>
+      <div><h1>{{ tipo==='leads' ? 'Funil das leads' : 'Funil de negócios' }}</h1><div class="sub" v-if="tipo==='leads'">{{ n }} leads por converter</div><div class="sub" v-else>{{ n }} em curso · {{ eur(total) }} · ganhos dos últimos 30 dias</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><div class="seg"><button class="btn" :class="{prim: tipo==='leads'}" @click="escolherTipo('leads')">Leads</button><button class="btn" :class="{prim: tipo==='negocios'}" @click="escolherTipo('negocios')">Negócios</button></div>
+        <select class="btn" v-model="resp"><option value="">Todos os responsáveis</option><option value="eu">Só os meus</option></select><a class="btn" :href="tipo==='leads' ? '#/leads' : '#/negocios'">Lista</a></div>
     </div>
     <div class="vistas marcas-sep" v-if="d && (d.marcas||[]).length > 1">
       <button :class="{ativo: !marca}" @click="escolherMarca('')">Todas as marcas</button>
@@ -1618,12 +1624,12 @@ const Funil = {
     <div class="funil" v-else :style="{gridTemplateColumns:'repeat('+d.colunas.length+',minmax(230px,1fr))'}">
       <div class="coluna" v-for="c in d.colunas" :key="c.estado" :class="{alvo: alvo===c.estado}"
            @dragover.prevent="alvo=c.estado" @dragleave="alvo=''" @drop.prevent="largar(c)">
-        <header><b>{{ c.rotulo }} <span class="sub" style="font-weight:500">{{ c.cartoes.length }}</span></b><small>{{ eur(c.total) }}</small><div class="faixa" :style="{background:FAIXA[c.cor]||'#94a3b8'}"></div></header>
-        <a class="cartao negocio" v-for="x in c.cartoes" :key="x.name" :href="link('CRM Deal',x.name)" draggable="true" @dragstart="arrastar={...x, estado:c.estado}" style="display:block;text-decoration:none;color:inherit">
+        <header><b>{{ c.rotulo }} <span class="sub" style="font-weight:500">{{ c.cartoes.length }}</span></b><small v-if="tipo!=='leads'">{{ eur(c.total) }}</small><div class="faixa" :style="{background:FAIXA[c.cor]||'#94a3b8'}"></div></header>
+        <a class="cartao negocio" v-for="x in c.cartoes" :key="x.name" :href="link(tipo==='leads' ? 'CRM Lead' : 'CRM Deal', x.name)" draggable="true" @dragstart="arrastar={...x, estado:c.estado}" style="display:block;text-decoration:none;color:inherit">
           <h3>{{ x.titulo }}</h3><div class="sub">{{ x.org }}</div>
-          <div class="val">{{ eur(x.valor) }}<span class="av" style="width:22px;height:22px;font-size:10px;background:#5b6f7a" :title="x.dono_nome">{{ x.dono }}</span></div>
+          <div class="val"><template v-if="tipo!=='leads'">{{ eur(x.valor) }}</template><span v-else class="sub" style="font-size:12px">{{ x.origem }}</span><span class="av" style="width:22px;height:22px;font-size:10px;background:#5b6f7a" :title="x.dono_nome">{{ x.dono }}</span></div>
           <div class="prox" :class="{atraso:x.atraso}" v-if="x.prox">◷ {{ x.prox }}<template v-if="x.prox_data"> · {{ data(x.prox_data,false) }}</template></div>
-          <div class="prox" v-else-if="c.tipo!=='Won'">Sem próxima tarefa<template v-if="x.parado>7"> · {{ x.parado }} dias parado</template></div>
+          <div class="prox" v-else-if="c.tipo!=='Won' && c.tipo!=='Converted'">Sem próxima tarefa<template v-if="x.parado>7"> · {{ x.parado }} dias parado</template></div>
         </a>
       </div>
     </div>

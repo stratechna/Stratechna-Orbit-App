@@ -765,6 +765,54 @@ def mover(negocio: str, estado: str):
     return {"ok": True}
 
 
+# ── Funil das leads (23-11-2026): colunas pelos estados das leads, separadores de marca ─────────────────
+@frappe.whitelist()
+def funil_leads(responsavel: str = "", marca: str = ""):
+    _guarda()
+    from orbit.interface.marcas import lista as _marcas
+    estados = frappe.get_all("CRM Lead Status", fields=["name", "type", "color", "position"], order_by="position asc")
+    filtros = {"converted": 0}
+    if responsavel == "eu":
+        filtros["lead_owner"] = frappe.session.user
+    tem_marca = frappe.get_meta("CRM Lead").has_field("marca")
+    if marca and tem_marca and frappe.db.exists("Brand", marca):
+        filtros["marca"] = marca
+    leads = frappe.get_list("CRM Lead", filters=filtros, fields=["name", "lead_name", "organization", "status", "lead_owner",
+                                                                 "email", "modified", "source"], order_by="modified desc", limit=1000)
+    proximas = {}
+    for t in frappe.get_list("CRM Task", filters={"reference_doctype": "CRM Lead", "status": ["not in", ["Done", "Canceled"]]},
+                             fields=["reference_docname", "title", "due_date"], order_by="due_date asc", limit=2000):
+        proximas.setdefault(t.reference_docname, t)
+    agora = now_datetime()
+    colunas = []
+    for s in estados:
+        cartoes = []
+        for l in leads:
+            if l.status != s.name:
+                continue
+            t = proximas.get(l.name)
+            cartoes.append({"name": l.name, "titulo": l.lead_name or l.organization or l.email or l.name,
+                            "org": l.organization or l.email or "", "origem": l.source or "",
+                            "dono": _iniciais(_nome_user(l.lead_owner)), "dono_nome": _nome_user(l.lead_owner),
+                            "prox": (t.title if t else ""), "prox_data": (t.due_date if t else None),
+                            "atraso": bool(t and t.due_date and t.due_date < agora),
+                            "parado": (agora - l.modified).days if not t else 0})
+        colunas.append({"estado": s.name, "rotulo": _rotulo_estado(s.name), "tipo": s.type, "cor": s.color,
+                        "total": len(cartoes), "cartoes": cartoes})
+    return {"colunas": colunas, "marcas": _marcas() if tem_marca else []}
+
+
+@frappe.whitelist(methods=["POST"])
+def mover_lead(lead: str, estado: str):
+    _guarda()
+    if not frappe.db.exists("CRM Lead Status", estado):
+        frappe.throw("Estado desconhecido")
+    d = frappe.get_doc("CRM Lead", lead)
+    d.status = estado
+    d.save()
+    return {"ok": True}
+
+
 # ── Caixa de entrada (como a do HubSpot: conversas, não a caixa de correio inteira) ───────────────────────
 # «Equipa» = caixas partilhadas ligadas ao CRM e tickets do Desk; «Privado» = as conversas da minha caixa pessoal
 # com contactos do CRM («só para mim», orbit_privado_de = eu). O resto do correio fica no Orbit Mail (SOGo).

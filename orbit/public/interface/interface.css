@@ -465,3 +465,7 @@ tr.erp-grupo td{font-weight:600}
 .det-meios-ed { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
 .det-meio-ed { display: flex; gap: 8px; align-items: center; }
 .det-meio-ed .ed-campo { flex: 1; }
+.seg { display: inline-flex; }
+.seg .btn { border-radius: 0; }
+.seg .btn:first-child { border-radius: 8px 0 0 8px; }
+.seg .btn:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
