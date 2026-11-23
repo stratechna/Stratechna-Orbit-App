@@ -51,7 +51,8 @@ SECOES = {
     "CRM Organization": [
         ("Empresa", ["organization_name", "nipc", "industry", "territory", "no_of_employees", "annual_revenue",
                      "currency", "exchange_rate", "company_description"]),
-        ("Contactos e redes", ["telefone", "email_geral", "email_contabilidade"] + _REDES),
+        ("Emails e telefones", ["@emails", "@telefones", "email_contabilidade"]),
+        ("Site e redes sociais", _REDES),
         ("Morada", ["@morada"]),
         ("Relação com o cliente", ["orbit_responsavel", "orbit_ciclo", "marca", "tipo_conta", "estado_conta",
                                    "orbit_ultima_atividade"]),
@@ -157,7 +158,8 @@ def detalhes(doctype: str, name: str):
         if f.fieldname in usados or f.fieldname in _NUNCA or f.hidden or f.fieldtype not in A._TIPOS_FICHA:
             continue
         if (doctype == "Contact" and f.fieldname in ("mobile_no", "phone")) or \
-                (doctype == "CRM Lead" and f.fieldname in ("email", "mobile_no", "phone")):
+                (doctype == "CRM Lead" and f.fieldname in ("email", "mobile_no", "phone")) or \
+                (doctype == "CRM Organization" and f.fieldname in ("email_geral", "telefone")):
             continue   # são os principais da tabela de telefones, que está em «Emails e telefones»
         (pers if f.fieldname.startswith("oc_") else extra).append(prop(f))
     if pers:
@@ -172,10 +174,12 @@ def detalhes(doctype: str, name: str):
 def instalar():
     """after_migrate: a tabela de emails e telefones nas leads (o Frappe só tem um de cada)."""
     from frappe.custom.doctype.custom_field.custom_field import create_custom_field
-    if frappe.db.exists("DocType", "Meio de Contacto da Lead") and frappe.db.exists("DocType", "CRM Lead") \
-            and not frappe.get_meta("CRM Lead").has_field("orbit_meios"):
-        create_custom_field("CRM Lead", {"fieldname": "orbit_meios", "label": "Emails e telefones", "fieldtype": "Table",
-                                         "options": "Meio de Contacto da Lead", "insert_after": "phone"})
+    # a mesma tabela (o nome do doctype ficou o da 1.ª vez) serve as leads e as empresas
+    for dt, depois in (("CRM Lead", "phone"), ("CRM Organization", "telefone")):
+        if frappe.db.exists("DocType", "Meio de Contacto da Lead") and frappe.db.exists("DocType", dt) \
+                and not frappe.get_meta(dt).has_field("orbit_meios"):
+            create_custom_field(dt, {"fieldname": "orbit_meios", "label": "Emails e telefones", "fieldtype": "Table",
+                                     "options": "Meio de Contacto da Lead", "insert_after": depois})
 
 
 def meios_de(doc) -> tuple[list, list]:
@@ -191,7 +195,13 @@ def meios_de(doc) -> tuple[list, list]:
             em.append({"valor": r.valor, "principal": bool(r.principal)})
         else:
             tl.append({"valor": r.valor, "principal": bool(r.principal), "movel": r.tipo == "Telemóvel"})
-    # lead antiga, sem tabela: os três campos de origem
+    # registo antigo, sem tabela: os campos de origem
+    if doc.doctype == "CRM Organization":
+        if not em and doc.get("email_geral"):
+            em.append({"valor": doc.email_geral, "principal": True})
+        if not tl and doc.get("telefone"):
+            tl.append({"valor": doc.telefone, "principal": True, "movel": str(doc.telefone).replace(" ", "").lstrip("+351")[:1] == "9"})
+        return em, tl
     if not em and doc.get("email"):
         em.append({"valor": doc.email, "principal": True})
     if not tl:
@@ -231,9 +241,9 @@ def meios(doctype: str, name: str, emails: str = "[]", telefones: str = "[]"):
         return contacto_meios(name, emails, telefones)
     from orbit.interface.api import _guarda
     _guarda()
-    if doctype != "CRM Lead":
+    if doctype not in ("CRM Lead", "CRM Organization"):
         frappe.throw("Este registo não tem emails e telefones.")
-    doc = frappe.get_doc("CRM Lead", name)
+    doc = frappe.get_doc(doctype, name)
     doc.check_permission("write")
     em, tl = _limpar(json.loads(emails or "[]"), json.loads(telefones or "[]"))
     if doc.meta.has_field("orbit_meios"):
@@ -243,9 +253,14 @@ def meios(doctype: str, name: str, emails: str = "[]", telefones: str = "[]"):
         for t in tl:
             doc.append("orbit_meios", {"tipo": "Telemóvel" if t["movel"] else "Fixo", "valor": t["valor"], "principal": 1 if t["principal"] else 0})
     # o principal de cada um fica nos campos de origem (o resto do CRM lê-os daí)
-    doc.email = next((e["valor"] for e in em if e["principal"]), None)
-    doc.mobile_no = next((t["valor"] for t in tl if t["movel"] and t["principal"]), None)
-    doc.phone = next((t["valor"] for t in tl if not t["movel"] and t["principal"]), None)
+    principal_email = next((e["valor"] for e in em if e["principal"]), None)
+    movel = next((t["valor"] for t in tl if t["movel"] and t["principal"]), None)
+    fixo = next((t["valor"] for t in tl if not t["movel"] and t["principal"]), None)
+    if doctype == "CRM Organization":
+        doc.email_geral = principal_email
+        doc.telefone = fixo or movel
+    else:
+        doc.email, doc.mobile_no, doc.phone = principal_email, movel, fixo
     doc.save()
     return {"ok": True}
 

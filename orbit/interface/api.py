@@ -587,9 +587,12 @@ def guardar(doctype: str, name: str, campo: str, valor=None):
         valor = None if valor in (None, "") else (int(float(valor)) if f.fieldtype == "Int" else float(valor))
     doc.set(campo, valor if valor not in ("",) else None)
     # lead: o email/telemóvel/telefone da coluna lateral é o principal da tabela «Emails e telefones»
-    if doctype == "CRM Lead" and campo in ("email", "mobile_no", "phone") and doc.get("orbit_meios"):
-        tipo = {"email": "Email", "mobile_no": "Telemóvel", "phone": "Fixo"}[campo]
-        linha = next((r for r in doc.orbit_meios if r.tipo == tipo and r.principal), None)
+    _SINC = {("CRM Lead", "email"): "Email", ("CRM Lead", "mobile_no"): "Telemóvel", ("CRM Lead", "phone"): "Fixo",
+             ("CRM Organization", "email_geral"): "Email", ("CRM Organization", "telefone"): "Fixo"}
+    if (doctype, campo) in _SINC and doc.get("orbit_meios"):
+        tipo = _SINC[(doctype, campo)]
+        linha = next((r for r in doc.orbit_meios if (r.tipo == tipo or (tipo == "Fixo" and doctype == "CRM Organization" and r.tipo != "Email"))
+                      and r.principal), None)
         if valor and linha:
             linha.valor = valor
         elif valor:
