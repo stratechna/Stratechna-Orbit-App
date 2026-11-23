@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex"><title>Como correu?</title>
+<style>
+body{margin:0;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f4f6f8;color:#161a1d}
+.c{max-width:520px;margin:40px auto;padding:28px;background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+h1{font-size:22px;margin:0 0 6px}.s{color:#5b6670;font-size:14px;margin:0 0 20px}
+.n{display:flex;gap:10px;margin:0 0 16px}.n button{flex:1;padding:14px 10px;border-radius:10px;border:2px solid #e3e7eb;background:#fff;font:600 15px system-ui;cursor:pointer}
+.n button.on{border-color:#b20009;background:#fff5f5}textarea{width:100%;box-sizing:border-box;min-height:90px;border:1px solid #d5dae0;border-radius:10px;padding:10px;font:inherit}
+.b{margin-top:14px;padding:12px 18px;border:0;border-radius:10px;background:#b20009;color:#fff;font:600 15px system-ui;cursor:pointer;width:100%}
+.l{display:flex;gap:8px;align-items:center;margin-top:14px;font-size:14px}.ok{color:#1f6b3a;font-weight:600}
+@media (prefers-color-scheme: dark){body{background:#111417;color:#e8ecef}.c{background:#1b2025}.n button{background:#1b2025;color:#e8ecef;border-color:#2c343b}textarea{background:#111417;color:#e8ecef;border-color:#2c343b}.s{color:#9aa6b0}}
+</style></head><body><div class="c">
+{% if not valido %}<h1>Ligação inválida</h1><p class="s">Esta ligação já não é válida. Se precisar, responda ao último email do pedido.</p>
+{% else %}
+<h1>Como correu?</h1><p class="s">Pedido #{{ t }} — {{ assunto }}</p>
+<form id="f">
+{% if not respondido %}<div class="n">{% for k2, r in notas %}<button type="button" data-n="{{ k2 }}" class="{{ 'on' if nota == k2 else '' }}">{{ r }}</button>{% endfor %}</div>
+<textarea name="c" placeholder="Quer acrescentar alguma coisa? (opcional)"></textarea>{% else %}<p class="s">Obrigado — já tínhamos a sua avaliação.</p>{% endif %}
+<label class="l"><input type="checkbox" name="r" {{ 'checked' if reabrir else '' }}> O problema não ficou resolvido — reabrir o pedido</label>
+<button class="b" type="submit">Enviar</button><p id="m" class="ok"></p></form>
+<script>
+var nota = "{{ nota }}";
+document.querySelectorAll('.n button').forEach(function (b) { b.onclick = function () { nota = b.dataset.n; document.querySelectorAll('.n button').forEach(function (x) { x.classList.toggle('on', x === b); }); }; });
+document.getElementById('f').onsubmit = function (e) {
+  e.preventDefault(); var f = e.target;
+  var d = new URLSearchParams({ t: "{{ t }}", k: "{{ k }}", nota: nota, comentario: f.c ? f.c.value : "", reabrir: f.r.checked ? 1 : 0 });
+  fetch('/api/method/orbit.interface.desk.responder_inquerito', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: d })
+    .then(function (r) { document.getElementById('m').textContent = r.ok ? (f.r.checked || nota === 'mau' ? 'Obrigado. O pedido foi reaberto e vamos voltar a ele.' : 'Obrigado pela sua avaliação.') : 'Não foi possível enviar. Tente outra vez.'; if (r.ok) f.querySelector('.b').disabled = true; });
+};
+</script>{% endif %}
+</div></body></html>

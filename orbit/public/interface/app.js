@@ -1284,12 +1284,30 @@ const DeskTickets = {
     watch(f, () => { pagina.value = 0; carregar(); }, { deep: true });
     const VISTAS_D = [["abertos", "Abertos"], ["meus", "Os meus"], ["sem_resposta", "Sem resposta"], ["fora_prazo", "Fora do prazo"], ["resolvidos", "Resolvidos"], ["todos", "Todos"]];
     const abrir = (t) => { location.hash = "#/ticket/" + encodeURIComponent(t.name); };
-    return { vista, q, f, d, meta, pagina, carregar, escolher, VISTAS_D, data, abrir };
+    // 23-11-2026 (K1): funil por estado, com arrastar; para Resolvido/Fechado pede-se a resolução
+    let m0 = "lista"; try { m0 = localStorage.getItem("orbit.desk.modo") || m0; } catch (e) {}
+    const modo = ref(m0); const fn = ref(null); const arr = ref(null); const resolver = ref(null);
+    const carregarFunil = async () => { fn.value = await api("desk.funil", { q: q.value, ...f.value, meus: vista.value === "meus" ? 1 : 0 }); };
+    const mudarModo = (m) => { modo.value = m; try { localStorage.setItem("orbit.desk.modo", m); } catch (e) {} if (m === "funil") carregarFunil(); };
+    if (m0 === "funil") onMounted(carregarFunil);
+    watch([q, f], () => { if (modo.value === "funil") carregarFunil(); }, { deep: true });
+    const largar = async (col) => {
+      const t = arr.value; arr.value = null; if (!t || t.estado === col.v) return;
+      if (col.cat === "Resolved") { resolver.value = { t, estado: col.v, r: col.r, nota: "" }; return; }
+      await api("desk.mudar_estado", { nome: t.name, estado: col.v }, true); toast("#" + t.name + " → " + col.r); carregarFunil();
+    };
+    const confirmar = async () => {
+      if (!resolver.value.nota.trim()) return;
+      await api("desk.mudar_estado", { nome: resolver.value.t.name, estado: resolver.value.estado, nota: resolver.value.nota }, true);
+      toast("#" + resolver.value.t.name + " → " + resolver.value.r); resolver.value = null; carregarFunil();
+    };
+    return { vista, q, f, d, meta, pagina, carregar, escolher, VISTAS_D, data, abrir, modo, mudarModo, fn, arr, largar, resolver, confirmar };
   },
   template: `
   <div>
-    <div class="pad" style="padding-bottom:12px"><h1>Tickets</h1><div class="sub">Pedidos de atendimento do Desk.</div></div>
-    <div class="vistas">
+    <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap"><div><h1>Tickets</h1><div class="sub">Pedidos de atendimento do Desk.</div></div>
+      <div class="vistas" style="padding:0;margin:0"><button :class="{ativo: modo==='lista'}" @click="mudarModo('lista')">Lista</button><button :class="{ativo: modo==='funil'}" @click="mudarModo('funil')">Funil</button></div></div>
+    <div class="vistas" v-if="modo==='lista'">
       <button v-for="v in VISTAS_D" :key="v[0]" :class="{ativo: vista===v[0]}" @click="escolher(v[0])">{{ v[1] }}<span v-if="d && d.contagens[v[0]] != null" class="sub"> {{ d.contagens[v[0]] }}</span></button>
     </div>
     <div class="filtros" v-if="meta">
@@ -1299,7 +1317,26 @@ const DeskTickets = {
       <select class="filtro" v-model="f.estado"><option value="">Todos os estados</option><option v-for="e in meta.estados" :key="e.v" :value="e.v">{{ e.r }}</option></select>
       <select class="filtro" v-model="f.prioridade"><option value="">Todas as prioridades</option><option v-for="e in meta.prioridades" :key="e.v" :value="e.v">{{ e.r }}</option></select>
     </div>
-    <div class="tabela-wrap"><table>
+    <div v-if="modo==='funil'" class="funil-desk">
+      <div v-if="!fn" class="carregar">A carregar…</div>
+      <div v-for="c in fn?.colunas||[]" :key="c.v" class="fd-col" @dragover.prevent @drop="largar(c)">
+        <header><b>{{ c.r }}</b><span class="sub">{{ c.tickets.length }}</span></header>
+        <div class="fd-cartoes">
+          <div v-for="t in c.tickets" :key="t.name" class="cartao fd-cartao" draggable="true" @dragstart="arr = t" @click="abrir(t)" :class="{atrasado: t.atrasado}">
+            <div class="sub" style="font-size:11px;display:flex;justify-content:space-between"><span>#{{ t.name }}<template v-if="t.marca"> · {{ t.marca }}</template></span><span :class="{Urgent:'etq ambar',High:'etq ambar'}[t.prioridade] || ''">{{ t.prioridade_pt }}</span></div>
+            <b>{{ t.assunto }}</b>
+            <div class="sub" style="font-size:12px;display:flex;justify-content:space-between;gap:6px;margin-top:4px"><span class="pessoa"><AvFoto :email="t.email" :nome="t.cliente" :tam="18"/>{{ t.cliente }}</span><span>{{ t.responsavel_nome }}</span></div>
+            <div v-if="t.prazo && c.cat !== 'Resolved'" class="sub" style="font-size:11px;margin-top:2px" :style="t.atrasado ? {color:'var(--ambar)'} : {}">{{ t.atrasado ? 'Fora do prazo · ' : 'Prazo ' }}{{ data(t.prazo) }}</div>
+          </div>
+          <div v-if="!c.tickets.length" class="sub" style="font-size:12px;padding:8px">Vazio</div>
+        </div>
+      </div>
+      <div class="modal-fundo" v-if="resolver" @click.self="resolver=null"><div class="modal" style="max-width:480px"><header><b>#{{ resolver.t.name }} → {{ resolver.r }}</b><button class="btn sm" @click="resolver=null">Cancelar</button></header>
+        <div style="padding:16px 20px"><p class="sub" style="font-size:13px;margin:0 0 8px">Descreva a resolução. O cliente recebe o inquérito de satisfação em dia útil.</p>
+          <textarea class="ed-campo" v-model="resolver.nota" rows="4" style="width:100%;box-sizing:border-box"></textarea>
+          <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn prim" :disabled="!resolver.nota.trim()" @click="confirmar">Confirmar</button></div></div></div></div>
+    </div>
+    <div class="tabela-wrap" v-else><table>
       <thead><tr><th style="width:70px">N.º</th><th>Assunto</th><th>Cliente</th><th>Estado</th><th>Prioridade</th><th>Equipa</th><th>Responsável</th><th>Prazo</th><th>Última atividade</th></tr></thead>
       <tbody><tr v-for="t in d?.linhas||[]" :key="t.name" @click="abrir(t)" style="cursor:pointer">
         <td class="sub">#{{ t.name }}</td><td><b>{{ t.assunto }}</b><div class="sub" style="font-size:12px" v-if="t.marca">{{ t.marca }}</div></td>
@@ -1399,33 +1436,108 @@ const ConversaRegisto = {
   </div>`,
 };
 
+// ── Modelos de checklist do Desk (23-11-2026, K4) ─────────────────────────────────────────────────────────────────
+const DeskModelos = {
+  setup() {
+    const d = ref(null); const aGravar = ref(false);
+    onMounted(async () => { const r = await api("desk.modelos_checklist"); d.value = { tipos: r.tipos, modelos: r.modelos.map((m) => ({ ...m, texto: m.itens.join("\n") })) }; });
+    const novo = () => d.value.modelos.push({ nome: "", tipo: "", texto: "" });
+    const gravar = async () => {
+      aGravar.value = true;
+      try { await api("desk.gravar_modelos_checklist", { modelos: JSON.stringify(d.value.modelos.map((m) => ({ nome: m.nome, tipo: m.tipo, itens: m.texto.split("\n") }))) }, true); toast("Modelos gravados"); }
+      finally { aGravar.value = false; }
+    };
+    return { d, novo, gravar, aGravar };
+  },
+  template: `<div class="pad" style="max-width:820px"><h1>Modelos de checklist</h1>
+    <div class="sub" style="margin-bottom:14px">Listas de pontos a resolver prontas a inserir num ticket. Com um <b>tipo</b>, o modelo entra sozinho nos tickets desse tipo.</div>
+    <div v-if="!d" class="carregar">A carregar…</div>
+    <template v-else>
+      <div v-for="(m, k) in d.modelos" :key="k" class="cartao" style="padding:14px 16px;margin-bottom:12px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><input class="ed-campo" v-model="m.nome" placeholder="Nome do modelo" style="flex:1;min-width:200px">
+          <select class="ed-campo" v-model="m.tipo"><option value="">Sem tipo (só a pedido)</option><option v-for="t in d.tipos" :key="t" :value="t">Automático: {{ t }}</option></select>
+          <button class="btn sm" @click="d.modelos.splice(k,1)">Tirar</button></div>
+        <textarea class="ed-campo" v-model="m.texto" rows="5" placeholder="Um ponto por linha" style="width:100%;box-sizing:border-box;margin-top:8px"></textarea>
+      </div>
+      <div style="display:flex;gap:8px"><button class="btn" @click="novo">+ Novo modelo</button><button class="btn prim" @click="gravar" :disabled="aGravar">{{ aGravar ? 'A gravar…' : 'Gravar' }}</button></div>
+    </template></div>`,
+};
 const DeskTicket = {
-  components: { EmailCorpo },
+  // 23-11-2026 (plano do Desk D1–D4): ecrã arrumado como as fichas do CRM — cabeçalho com estado e ações, conversa ao
+  // centro, barra direita com propriedades, checklist, tempo, prazos, cliente e avaliação.
+  components: { EmailCorpo, ConversaRegisto, Icone },
   props: ["nome"],
   setup(props) {
     const t = ref(null); const meta = ref(null); const modo = ref("responder"); const texto = ref(""); const cc = ref(""); const aEnviar = ref(false);
+    const ck = ref({ itens: [], modelos: [] }); const novoPonto = ref(""); const tm = ref({ total: 0, linhas: [] });
+    const resolver = ref(null); const parar = ref(null); const agora = ref(Date.now()); let rel;
     const carregar = async () => { t.value = await api("desk.ticket", { nome: props.nome }); nextTick(() => { const m = document.querySelector(".desk-linha"); if (m) m.scrollTop = m.scrollHeight; }); };
-    onMounted(async () => { meta.value = await api("desk.metadados"); carregar(); });
+    const carregarCk = async () => { ck.value = await api("desk.checklist", { nome: props.nome }); };
+    const carregarTm = async () => { tm.value = await api("desk.tempo", { nome: props.nome }); };
+    onMounted(async () => { meta.value = await api("desk.metadados"); carregar(); carregarCk(); carregarTm(); rel = setInterval(() => (agora.value = Date.now()), 1000); });
+    onUnmounted(() => clearInterval(rel));
     const esc = (x) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const html = () => texto.value.trim().split(/\n{2,}/).map((p) => "<p>" + esc(p).replace(/\n/g, "<br>") + "</p>").join("");
     const enviar = async () => {
       if (!texto.value.trim() || aEnviar.value) return; aEnviar.value = true;
-      try {
-        if (modo.value === "responder") { await api("desk.responder", { nome: props.nome, html: html(), cc: cc.value }, true); toast("Resposta enviada ao cliente"); }
-        else { await api("desk.comentar", { nome: props.nome, html: html() }, true); toast("Comentário interno gravado"); }
-        texto.value = ""; cc.value = ""; carregar();
-      } catch (e) {} finally { aEnviar.value = false; }
+      try { await api("desk.responder", { nome: props.nome, html: html(), cc: cc.value }, true); toast("Resposta enviada ao cliente"); texto.value = ""; cc.value = ""; carregar(); }
+      catch (e) {} finally { aEnviar.value = false; }
     };
-    const mudar = async (campo, valor) => { await api("desk.mudar", { nome: props.nome, campo, valor }, true); toast("Gravado"); carregar(); };
+    const mudar = async (campo, valor) => { await api("desk.mudar", { nome: props.nome, campo, valor }, true); toast("Gravado"); carregar(); if (campo === "ticket_type") carregarCk(); };
+    const catDe = (e) => ((meta.value?.estados || []).find((x) => x.v === e) || {}).cat;
+    const mudarEstado = async (e, ev) => {
+      if (catDe(e) === "Resolved") { resolver.value = { estado: e, nota: t.value.resolucao ? t.value.resolucao.replace(/<br>/g, "\n").replace(/<[^>]+>/g, "") : "" }; if (ev) ev.target.value = t.value.estado; return; }
+      await api("desk.mudar_estado", { nome: props.nome, estado: e }, true); toast("Estado alterado"); carregar();
+    };
+    const confirmarResolver = async () => {
+      if (!resolver.value.nota.trim()) { toast("Descreva a resolução"); return; }
+      await api("desk.mudar_estado", { nome: props.nome, estado: resolver.value.estado, nota: resolver.value.nota }, true);
+      resolver.value = null; toast("Ticket resolvido — o cliente recebe o inquérito em dia útil"); carregar();
+    };
     const atribuir = async (agente) => { await api("desk.atribuir", { nome: props.nome, agente }, true); toast(agente ? "Atribuído" : "Sem responsável"); carregar(); };
     const modelo = async (r) => { if (!r) return; const x = await api("desk.resposta_modelo", { nome: r, ticket: props.nome }); const tmp = document.createElement("div"); tmp.innerHTML = (x && (x.message || x.response || x)) || ""; texto.value = (texto.value ? texto.value + "\n\n" : "") + (tmp.innerText || "").trim(); };
-    return { t, meta, modo, texto, cc, aEnviar, enviar, mudar, atribuir, modelo, data, link };
+    // checklist
+    const gravarCk = async () => { ck.value.itens = (await api("desk.gravar_checklist", { nome: props.nome, itens: JSON.stringify(ck.value.itens) }, true)).itens; };
+    const marcarPonto = (i) => { i.feito = !i.feito; i.por = i.feito ? (window.__ctx?.utilizador || "") : ""; i.em = i.feito ? new Date().toISOString() : ""; gravarCk(); };
+    const juntarPonto = () => { if (!novoPonto.value.trim()) return; ck.value.itens.push({ t: novoPonto.value.trim(), feito: false }); novoPonto.value = ""; gravarCk(); };
+    const tirarPonto = (k) => { ck.value.itens.splice(k, 1); gravarCk(); };
+    const aplicarModelo = async (m) => { if (!m) return; ck.value.itens = (await api("desk.aplicar_modelo", { nome: props.nome, modelo: m }, true)).itens; toast("Modelo inserido"); };
+    const feitos = computed(() => ck.value.itens.filter((i) => i.feito).length);
+    // cronómetro (continua se a página fechar: o início fica guardado neste aparelho)
+    const chaveCron = () => "orbit.cron." + props.nome;
+    const inicio = ref(null); try { inicio.value = Number(localStorage.getItem(chaveCron())) || null; } catch (e) {}
+    const decorrido = computed(() => { if (!inicio.value) return ""; const s = Math.max(0, Math.floor((agora.value - inicio.value) / 1000)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ":" : "") + String(m).padStart(h ? 2 : 1, "0") + ":" + String(x).padStart(2, "0"); });
+    const iniciar = () => { inicio.value = Date.now(); try { localStorage.setItem(chaveCron(), String(inicio.value)); } catch (e) {} };
+    const pararCron = () => { const h = Math.max(0.05, Math.round((Date.now() - inicio.value) / 36e5 * 20) / 20); parar.value = { horas: h, descricao: "" }; };
+    const registar = async (manual) => {
+      const p = parar.value; if (!p.descricao.trim()) { toast("Descreva o que foi feito"); return; }
+      await api("desk.registar_tempo", { nome: props.nome, horas: p.horas, descricao: p.descricao }, true);
+      if (!manual) { inicio.value = null; try { localStorage.removeItem(chaveCron()); } catch (e) {} }
+      parar.value = null; toast("Tempo registado"); carregarTm();
+    };
+    const fmtH = (h) => { const m = Math.round(Number(h || 0) * 60); return Math.floor(m / 60) + " h " + String(m % 60).padStart(2, "0"); };
+    const corEstado = (e) => ({ Open: "azul", Replied: "roxo", Paused: "ambar", Resolved: "verde", Closed: "" })[e] || "";
+    const estrelas = (r) => r == null ? "" : r >= 0.9 ? "Bom" : r >= 0.5 ? "Razoável" : "Mau";
+    return { t, meta, modo, texto, cc, aEnviar, enviar, mudar, mudarEstado, resolver, confirmarResolver, atribuir, modelo, data, link,
+      ck, novoPonto, marcarPonto, juntarPonto, tirarPonto, aplicarModelo, feitos, inicio, decorrido, iniciar, pararCron, parar, registar, tm, fmtH, corEstado, estrelas, catDe };
   },
   template: `
   <div class="pad desk-ticket" v-if="t && meta">
-    <div style="font-size:13px;display:flex;justify-content:space-between;align-items:center"><a href="#/tickets">← Tickets</a></div>
-    <div class="ola" style="margin-top:4px"><div><h1>{{ t.assunto }}</h1><div class="sub">#{{ t.name }} · aberto {{ data(t.aberto) }} · {{ t.email }}</div></div>
-      <span :class="t.atrasado ? 'etq ambar' : 'etq'">{{ t.sla || 'Sem SLA' }}</span></div>
+    <div style="font-size:13px"><a href="#/tickets">← Tickets</a></div>
+    <div class="desk-cab">
+      <div style="min-width:0"><div class="sub" style="font-size:13px">#{{ t.name }} · aberto {{ data(t.aberto) }} · {{ t.email }}</div>
+        <h1>{{ t.assunto }}</h1>
+        <div class="desk-chips"><span class="etq" :class="corEstado(t.estado)">{{ (meta.estados.find(e=>e.v===t.estado)||{}).r || t.estado }}</span>
+          <span class="etq" :class="{Urgent:'ambar',High:'ambar'}[t.prioridade]">{{ (meta.prioridades.find(e=>e.v===t.prioridade)||{}).r || t.prioridade }}</span>
+          <span :class="t.atrasado ? 'etq ambar' : 'etq'">{{ t.sla || 'Sem SLA' }}</span>
+          <span v-if="t.avaliacao != null" class="etq" :class="t.avaliacao >= .9 ? 'verde' : t.avaliacao >= .5 ? '' : 'ambar'">Avaliação: {{ estrelas(t.avaliacao) }}</span></div></div>
+      <div class="desk-acoes" v-if="t.pode_editar">
+        <button v-if="!inicio" class="btn" @click="iniciar"><Icone n="relogio"/> Iniciar cronómetro</button>
+        <button v-else class="btn cron-a-correr" @click="pararCron">⏹ {{ decorrido }} · Parar</button>
+        <button v-if="t.categoria !== 'Resolved'" class="btn prim" @click="mudarEstado('Resolved')">Resolver</button>
+        <button v-else class="btn" @click="mudarEstado('Open')">Reabrir</button>
+      </div>
+    </div>
     <div class="desk-grelha">
       <div class="cartao desk-conversa">
         <div class="desk-linha">
@@ -1436,34 +1548,63 @@ const DeskTicket = {
             <EmailCorpo :html="m.html"/>
             <div v-if="m.anexos && m.anexos.length" class="anexos-mail"><a v-for="a in m.anexos" :key="a.url" class="etq" :href="a.url" target="_blank">📎 {{ a.nome }}</a></div>
           </div>
+          <div v-if="t.resolucao" class="cartao msg interno"><header><b>✓ Resolução</b></header><div v-html="t.resolucao"></div></div>
         </div>
         <div class="desk-resposta" v-if="t.pode_editar">
-          <div class="vistas" style="padding:0"><button :class="{ativo: modo==='responder'}" @click="modo='responder'">Responder ao cliente</button><button :class="{ativo: modo==='comentar'}" @click="modo='comentar'">Comentário interno</button>
+          <div class="vistas" style="padding:0"><button :class="{ativo: modo==='responder'}" @click="modo='responder'">Responder ao cliente</button><button :class="{ativo: modo==='comentar'}" @click="modo='comentar'">Conversa interna</button>
             <select v-if="modo==='responder' && meta.respostas.length" class="btn sm" style="margin-left:auto" @change="modelo($event.target.value); $event.target.value=''"><option value="">Resposta-modelo…</option><option v-for="r in meta.respostas" :key="r.name" :value="r.name">{{ r.title || r.name }}</option></select></div>
-          <input v-if="modo==='responder'" class="ed-campo" v-model="cc" placeholder="Cc (opcional)" style="width:100%;margin:8px 0 0">
-          <textarea v-model="texto" rows="5" :placeholder="modo==='responder' ? 'Escreva a resposta ao cliente…' : 'Nota só para a equipa (o cliente não vê)…'" @keydown.meta.enter="enviar" @keydown.ctrl.enter="enviar"></textarea>
-          <div class="fl-linha" style="justify-content:flex-end"><span class="sub" style="font-size:12px;margin-right:auto">{{ modo==='responder' ? 'Sai por email e fica no ticket · ⌘↵ envia' : 'Só a equipa vê · ⌘↵ grava' }}</span>
-            <button class="btn prim" :disabled="!texto.trim() || aEnviar" @click="enviar">{{ aEnviar ? 'A enviar…' : (modo==='responder' ? 'Enviar resposta' : 'Gravar comentário') }}</button></div>
+          <template v-if="modo==='responder'">
+            <input class="ed-campo" v-model="cc" placeholder="Cc (opcional)" style="width:100%;margin:8px 0 0">
+            <textarea v-model="texto" rows="5" placeholder="Escreva a resposta ao cliente…" @keydown.meta.enter="enviar" @keydown.ctrl.enter="enviar"></textarea>
+            <div class="fl-linha" style="justify-content:flex-end"><span class="sub" style="font-size:12px;margin-right:auto">Sai por email e fica no ticket · ⌘↵ envia</span>
+              <button class="btn prim" :disabled="!texto.trim() || aEnviar" @click="enviar">{{ aEnviar ? 'A enviar…' : 'Enviar resposta' }}</button></div>
+          </template>
+          <ConversaRegisto v-else doctype="HD Ticket" :nome="t.name" :key="'cv'+t.name" :compacto="true"/>
         </div>
       </div>
-      <aside class="cartao desk-lado">
-        <div class="bloco-tit" style="margin-top:0">Ticket</div>
-        <label class="desk-prop">Estado<select class="ed-campo" :value="t.estado" :disabled="!t.pode_editar" @change="mudar('status',$event.target.value)"><option v-for="e in meta.estados" :key="e.v" :value="e.v">{{ e.r }}</option></select></label>
-        <label class="desk-prop">Prioridade<select class="ed-campo" :value="t.prioridade" :disabled="!t.pode_editar" @change="mudar('priority',$event.target.value)"><option v-for="e in meta.prioridades" :key="e.v" :value="e.v">{{ e.r }}</option></select></label>
-        <label class="desk-prop">Tipo<select class="ed-campo" :value="t.tipo" :disabled="!t.pode_editar" @change="mudar('ticket_type',$event.target.value)"><option value=""></option><option v-for="e in meta.tipos" :key="e.v" :value="e.v">{{ e.r }}</option></select></label>
-        <label class="desk-prop">Equipa<select class="ed-campo" :value="t.equipa" :disabled="!t.pode_editar" @change="mudar('agent_group',$event.target.value)"><option value=""></option><option v-for="e in meta.equipas" :key="e" :value="e">{{ e }}</option></select></label>
-        <label class="desk-prop" v-if="meta.marcas.length">Marca<select class="ed-campo" :value="t.marca" :disabled="!t.pode_editar" @change="mudar('orbit_marca',$event.target.value)"><option value=""></option><option v-for="m in meta.marcas" :key="m" :value="m">{{ m }}</option></select></label>
-        <label class="desk-prop">Responsável<select class="ed-campo" :value="(t.responsaveis[0]||{}).v || ''" :disabled="!t.pode_editar" @change="atribuir($event.target.value)"><option value="">— ninguém —</option><option v-for="a in meta.agentes" :key="a.v" :value="a.v">{{ a.r }}</option></select></label>
-        <div class="bloco-tit">Prazos</div>
-        <div class="desk-prop"><span class="sub">1.ª resposta</span><span>{{ t.primeira_resposta ? 'feita ' + data(t.primeira_resposta) : (t.resposta_ate ? 'até ' + data(t.resposta_ate) : '—') }}</span></div>
-        <div class="desk-prop"><span class="sub">Resolução</span><span>{{ t.resolucao_ate ? 'até ' + data(t.resolucao_ate) : '—' }}</span></div>
-        <div class="bloco-tit">Cliente</div>
-        <template v-if="t.contacto"><a :href="link('Contact', t.contacto.name)" class="pessoa"><AvFoto :email="t.contacto.email_id || t.email" :nome="t.contacto.full_name" :tam="28"/><b>{{ t.contacto.full_name }}</b></a>
-          <div class="sub" style="font-size:12px;margin-top:4px">{{ [t.contacto.email_id, t.contacto.mobile_no || t.contacto.phone, t.contacto.company_name].filter(Boolean).join(' · ') }}</div></template>
-        <div v-else class="sub">{{ t.email }}</div>
-        <div v-if="t.cliente" class="sub" style="margin-top:4px">Cliente: {{ t.cliente }}</div>
+      <aside class="desk-lado">
+        <div class="cartao desk-bloco"><div class="bloco-tit" style="margin-top:0">Ticket</div>
+          <label class="desk-prop">Estado<select class="ed-campo" :value="t.estado" :disabled="!t.pode_editar" @change="mudarEstado($event.target.value, $event)"><option v-for="e in meta.estados" :key="e.v" :value="e.v">{{ e.r }}</option></select></label>
+          <label class="desk-prop">Prioridade<select class="ed-campo" :value="t.prioridade" :disabled="!t.pode_editar" @change="mudar('priority',$event.target.value)"><option v-for="e in meta.prioridades" :key="e.v" :value="e.v">{{ e.r }}</option></select></label>
+          <label class="desk-prop">Tipo<select class="ed-campo" :value="t.tipo" :disabled="!t.pode_editar" @change="mudar('ticket_type',$event.target.value)"><option value="">—</option><option v-for="e in meta.tipos" :key="e.v" :value="e.v">{{ e.r }}</option></select></label>
+          <label class="desk-prop">Equipa<select class="ed-campo" :value="t.equipa" :disabled="!t.pode_editar" @change="mudar('agent_group',$event.target.value)"><option value="">—</option><option v-for="e in meta.equipas" :key="e" :value="e">{{ e }}</option></select></label>
+          <label class="desk-prop" v-if="meta.marcas.length">Marca<select class="ed-campo" :value="t.marca" :disabled="!t.pode_editar" @change="mudar('orbit_marca',$event.target.value)"><option value="">—</option><option v-for="m in meta.marcas" :key="m" :value="m">{{ m }}</option></select></label>
+          <label class="desk-prop">Responsável<select class="ed-campo" :value="(t.responsaveis[0]||{}).v || ''" :disabled="!t.pode_editar" @change="atribuir($event.target.value)"><option value="">— ninguém —</option><option v-for="a in meta.agentes" :key="a.v" :value="a.v">{{ a.r }}</option></select></label>
+        </div>
+        <div class="cartao desk-bloco"><div class="bloco-tit" style="margin-top:0;display:flex;justify-content:space-between">Pontos a resolver <span class="sub" v-if="ck.itens.length">{{ feitos }}/{{ ck.itens.length }}</span></div>
+          <div v-if="ck.itens.length" class="ck-barra"><i :style="{width: (100*feitos/ck.itens.length)+'%'}"></i></div>
+          <div v-for="(i, k) in ck.itens" :key="k" class="ck-linha" :class="{feito:i.feito}"><label><input type="checkbox" :checked="i.feito" :disabled="!t.pode_editar" @change="marcarPonto(i)"> <span>{{ i.t }}</span></label>
+            <button v-if="t.pode_editar" class="ck-x" title="Tirar" @click="tirarPonto(k)">×</button></div>
+          <div v-if="t.pode_editar" style="display:flex;gap:6px;margin-top:6px"><input class="ed-campo" v-model="novoPonto" placeholder="Novo ponto…" @keyup.enter="juntarPonto" style="flex:1"><button class="btn sm" @click="juntarPonto" :disabled="!novoPonto.trim()">Juntar</button></div>
+          <select v-if="t.pode_editar && ck.modelos.length" class="ed-campo" style="margin-top:6px;width:100%" @change="aplicarModelo($event.target.value); $event.target.value=''"><option value="">Inserir modelo…</option><option v-for="m in ck.modelos" :key="m.nome" :value="m.nome">{{ m.nome }} ({{ m.n }})</option></select>
+        </div>
+        <div class="cartao desk-bloco"><div class="bloco-tit" style="margin-top:0;display:flex;justify-content:space-between">Tempo <span class="sub">{{ fmtH(tm.total) }}</span></div>
+          <div v-for="l in tm.linhas.slice(0,4)" :key="l.ts" class="desk-prop" style="font-size:12px"><span class="sub">{{ data(l.from_time,false) }} · {{ l.quem }}</span><span>{{ fmtH(l.hours) }}</span></div>
+          <button v-if="t.pode_editar" class="btn sm" style="margin-top:6px" @click="parar = { horas: 0.25, descricao: '', manual: true }">Registar tempo à mão</button>
+        </div>
+        <div class="cartao desk-bloco"><div class="bloco-tit" style="margin-top:0">Prazos</div>
+          <div class="desk-prop"><span class="sub">1.ª resposta</span><span>{{ t.primeira_resposta ? 'feita ' + data(t.primeira_resposta) : (t.resposta_ate ? 'até ' + data(t.resposta_ate) : '—') }}</span></div>
+          <div class="desk-prop"><span class="sub">Resolução</span><span>{{ t.resolucao_ate ? 'até ' + data(t.resolucao_ate) : '—' }}</span></div>
+          <div class="desk-prop" v-if="t.inquerito"><span class="sub">Inquérito</span><span>{{ {pendente:'por enviar (dia útil)', enviado:'enviado', respondido:'respondido', 'sem-destino':'sem destinatário'}[t.inquerito] || t.inquerito }}</span></div>
+          <div v-if="t.avaliacao_texto" class="sub" style="font-size:12px;margin-top:4px">«{{ t.avaliacao_texto }}»</div>
+        </div>
+        <div class="cartao desk-bloco"><div class="bloco-tit" style="margin-top:0">Cliente</div>
+          <template v-if="t.contacto"><a :href="link('Contact', t.contacto.name)" class="pessoa"><AvFoto :email="t.contacto.email_id || t.email" :nome="t.contacto.full_name" :tam="28"/><b>{{ t.contacto.full_name }}</b></a>
+            <div class="sub" style="font-size:12px;margin-top:4px">{{ [t.contacto.email_id, t.contacto.mobile_no || t.contacto.phone, t.contacto.company_name].filter(Boolean).join(' · ') }}</div></template>
+          <div v-else class="sub">{{ t.email }}</div>
+          <div v-if="t.cliente" class="sub" style="margin-top:4px">Cliente: {{ t.cliente }}</div>
+        </div>
       </aside>
     </div>
+    <div class="modal-fundo" v-if="resolver" @click.self="resolver=null"><div class="modal" style="max-width:520px"><header><b>Resolver o ticket #{{ t.name }}</b><button class="btn sm" @click="resolver=null">Cancelar</button></header>
+      <div style="padding:16px 20px"><p class="sub" style="margin:0 0 8px;font-size:13px">Descreva a resolução (fica no ticket). O cliente recebe depois o inquérito de satisfação, em dia útil, com a opção de reabrir.</p>
+        <textarea class="ed-campo" v-model="resolver.nota" rows="5" style="width:100%;box-sizing:border-box" placeholder="O que foi feito para resolver…"></textarea>
+        <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn prim" @click="confirmarResolver" :disabled="!resolver.nota.trim()">Marcar como {{ (meta.estados.find(e=>e.v===resolver.estado)||{}).r || 'resolvido' }}</button></div></div></div></div>
+    <div class="modal-fundo" v-if="parar" @click.self="parar=null"><div class="modal" style="max-width:460px"><header><b>{{ parar.manual ? 'Registar tempo' : 'Parar o cronómetro' }}</b><button class="btn sm" @click="parar=null">Cancelar</button></header>
+      <div style="padding:16px 20px"><label class="desk-prop">Horas<input class="ed-campo" type="number" step="0.05" min="0.05" max="16" v-model.number="parar.horas" style="width:110px"></label>
+        <textarea class="ed-campo" v-model="parar.descricao" rows="3" style="width:100%;box-sizing:border-box;margin-top:8px" placeholder="O que foi feito…"></textarea>
+        <p class="sub" style="font-size:12px;margin:6px 0 0">Fica no Tempo do Orbit, ligado a este ticket e ao cliente.</p>
+        <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn prim" @click="registar(parar.manual)" :disabled="!parar.descricao.trim()">Registar</button></div></div></div></div>
   </div>
   <div v-else class="carregar">A carregar…</div>`,
 };
@@ -2991,7 +3132,8 @@ const APPS = {
   desk: { nome: "Desk", sub: "Atendimento", ic: "ticket", inicio: "tickets",
     nav: [["sec", "Atendimento"], ["tickets", "ticket", "Tickets"], ["caixa", "caixa", "Caixa de entrada"],
       ["sec", "Clientes"], ["contactos", "pessoa", "Contactos"], ["erp/HD%20Customer", "empresa", "Clientes do Desk"],
-      ["sec", "Conhecimento"], ["erp/HD%20Article", "livro", "Base de conhecimento"], ["erp/HD%20Saved%20Reply", "template", "Respostas-modelo"]],
+      ["sec", "Conhecimento"], ["erp/HD%20Article", "livro", "Base de conhecimento"], ["erp/HD%20Saved%20Reply", "template", "Respostas-modelo"],
+      ["desk-checklists", "tarefa", "Modelos de checklist"]],
     modulos: [], defs: ["Atendimento (Desk)", "Correio"] },
   projetos: { nome: "Projetos", sub: "Projetos, tarefas e tempo", ic: "projeto", inicio: "projetos",
     nav: [["sec", "Trabalho"], ["projetos", "projeto", "Projetos"], ["tarefas", "tarefa", "Tarefas"], ["calendario", "cal", "Calendário"], ["sec", "Tempo"], ["tempo", "relogio", "Registo de horas"]],
@@ -3028,7 +3170,7 @@ const abrirApp = (chave, url) => {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -3128,6 +3270,7 @@ const App = {
         <DefCampos v-else-if="ecra==='definicoes' && partes[1]==='campos'" key="campos"/>
         <DeskTickets v-else-if="ecra==='tickets'" key="tickets"/>
         <DeskTicket v-else-if="ecra==='ticket'" :nome="partes[1]" :key="'t'+partes[1]"/>
+        <DeskModelos v-else-if="ecra==='desk-checklists'"/>
         <DefFluxos v-else-if="ecra==='definicoes' && partes[1]==='fluxos'" key="fluxos"/>
         <DefFormularios v-else-if="ecra==='definicoes' && partes[1]==='formularios'" key="formularios"/>
         <DefConsulta v-else-if="ecra==='definicoes' && ['caixas','utilizadores'].includes(partes[1])" :chave="partes[1]" :key="partes[1]"/>

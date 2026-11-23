@@ -548,3 +548,26 @@ div.desk-prop{flex-direction:row;justify-content:space-between;color:var(--ink)}
 .mencao-sug button{all:unset;display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:13px}
 .mencao-sug button.ativo,.mencao-sug button:hover{background:var(--azul-bg,#eff6ff)}
 .conversa-reg textarea{width:100%;box-sizing:border-box;resize:vertical;border:0;background:none;font:inherit;color:var(--ink);outline:none}
+
+/* 23-11-2026: Desk arrumado — cabeçalho, barra direita em cartões, checklist, cronómetro e funil */
+.desk-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin:6px 0 14px;flex-wrap:wrap}
+.desk-cab h1{margin:2px 0 6px}
+.desk-chips{display:flex;gap:6px;flex-wrap:wrap}
+.desk-acoes{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.desk-acoes .btn svg{width:16px;height:16px;vertical-align:-3px;fill:none;stroke:currentColor;stroke-width:1.8}
+.cron-a-correr{border-color:var(--verde,#16a34a)!important;color:var(--verde,#16a34a)!important;font-variant-numeric:tabular-nums}
+.desk-lado{display:flex;flex-direction:column;gap:12px;align-self:start;position:sticky;top:12px}
+.desk-lado.cartao{padding:0;background:none;border:0;box-shadow:none}
+.desk-bloco{padding:14px 16px}
+.desk-bloco .desk-prop{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:6px 0;font-size:13px}
+.desk-bloco .desk-prop select,.desk-bloco .desk-prop input{max-width:60%;flex:1;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--surface);color:var(--ink);font:inherit}
+.ck-barra{height:4px;border-radius:4px;background:var(--line);overflow:hidden;margin:2px 0 8px}.ck-barra i{display:block;height:100%;background:var(--verde,#16a34a)}
+.ck-linha{display:flex;align-items:flex-start;gap:6px;padding:4px 0;font-size:13px}.ck-linha label{display:flex;gap:8px;align-items:flex-start;flex:1;cursor:pointer}
+.ck-linha.feito span{text-decoration:line-through;color:var(--ink-3)}
+.ck-x{all:unset;cursor:pointer;color:var(--ink-3);padding:0 4px}.ck-x:hover{color:var(--ambar)}
+.funil-desk{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(260px,1fr);gap:12px;overflow-x:auto;padding:0 24px 24px}
+.fd-col{background:var(--surface-2);border-radius:12px;padding:10px;min-height:200px}
+.fd-col header{display:flex;justify-content:space-between;align-items:center;padding:2px 4px 8px}
+.fd-cartoes{display:flex;flex-direction:column;gap:8px}
+.fd-cartao{padding:10px 12px;cursor:pointer}.fd-cartao b{display:block;font-size:13px;margin-top:4px}
+.fd-cartao.atrasado{box-shadow:inset 3px 0 0 var(--ambar)}
