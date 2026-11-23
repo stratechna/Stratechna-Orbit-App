@@ -1196,7 +1196,7 @@ const Lista = {
         <tr v-for="l in linhas" :key="l.name">
           <td @click.stop><input type="checkbox" :value="l.name" v-model="sel"></td>
           <td v-for="(c,i) in colunas" :key="c.campo" @click="abrir(l)">
-            <div v-if="i===0" class="pessoa"><span class="av" :style="{background:cor(l.name)}">{{ ini(valor(l,c.campo)||l.name) }}</span><a href="#" @click.prevent>{{ valor(l,c.campo) || l.name }}</a></div>
+            <div v-if="i===0" class="pessoa"><AvFoto :email="l.email_id || l.email || l.email_geral || (l.website ? 'info@' + String(l.website).replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0] : '')" :nome="valor(l,c.campo)||l.name" :tam="28"/><a href="#" @click.prevent>{{ valor(l,c.campo) || l.name }}</a></div>
             <span v-else-if="c.campo==='status'" class="etq">{{ valor(l,c.campo) }}</span>
             <span v-else-if="c.campo==='orbit_ciclo' && l.orbit_ciclo" class="etq" :class="{Cliente:'verde',Oportunidade:'roxo',Promotor:'verde','Lead qualificada (vendas)':'azul','Lead qualificada (marketing)':'azul'}[l.orbit_ciclo]">{{ l.orbit_ciclo }}</span>
             <span v-else>{{ valor(l,c.campo) }}</span>
@@ -1212,6 +1212,20 @@ const Lista = {
 };
 
 // ── Separador «Detalhes» da ficha (23-11-2026): todos os campos por secções, em colunas (orbit/interface/detalhes.py) ──
+// ── Fotografia de quem escreve (23-11-2026): CRM → equipa → Gravatar/BIMI/site (orbit/avatares.py); senão as iniciais ──
+const _semFoto = new Set();
+const AvFoto = {
+  props: ["email", "nome", "tam"],
+  setup(props) {
+    const falhou = ref(false);
+    const mail = computed(() => { const m = String(props.email || "").match(/[^\s<>"',;]+@[^\s<>"',;]+\.[a-z]{2,}/i); return m ? m[0].toLowerCase() : ""; });
+    const src = computed(() => mail.value && !_semFoto.has(mail.value) && !falhou.value ? "/api/method/orbit.avatares.foto?email=" + encodeURIComponent(mail.value) : "");
+    const erro = () => { _semFoto.add(mail.value); falhou.value = true; };
+    const estilo = computed(() => { const t = props.tam || 32; return { width: t + "px", height: t + "px", minWidth: t + "px", fontSize: Math.round(t * 0.36) + "px", background: cor(props.nome || mail.value || "?") }; });
+    return { src, erro, estilo, ini };
+  },
+  template: `<span class="av av-foto" :style="estilo"><img v-if="src" :src="src" loading="lazy" alt="" @error="erro"><template v-else>{{ ini(nome || email || '?') }}</template></span>`,
+};
 const FichaDetalhes = {
   props: ["doctype", "name"], emits: ["mudou"],
   setup(props, { emit }) {
@@ -1408,7 +1422,7 @@ const Ficha = {
     <aside class="col-esq">
       <div style="font-size:13px;display:flex;justify-content:space-between"><a href="javascript:history.back()">← Voltar</a><a :href="f.classico">Abrir no CRM clássico</a></div>
       <div class="cabeca">
-        <div class="av" :style="{background:cor(f.titulo)}">{{ f.iniciais }}</div>
+        <AvFoto :email="f.email_principal || (f.props.find(p=>p.campo==='website')?.valor ? 'info@' + String(f.props.find(p=>p.campo==='website').valor).replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0] : '')" :nome="f.titulo" :tam="56"/>
         <h1>{{ f.titulo }}</h1><div class="sub">{{ f.sub }}</div>
         <div class="acoes-rap">
           <button @click="modo='nota'"><span><Icone n="nota"/></span>Nota</button>
@@ -1708,7 +1722,7 @@ const Caixa = {
       <div v-if="!itens" class="carregar">A carregar…</div>
       <div v-else-if="!itens.length" class="vazio">Nada por aqui.</div>
       <div v-for="i in itens || []" :key="i.tipo+i.id" class="conv" :class="{ativo: abrirId===i.id, nova: i.por_responder}" @click="abrir(i)">
-        <span class="av" style="width:30px;height:30px;font-size:11px" :style="{background:cor(i.quem)}">{{ ini(i.quem) }}</span>
+        <AvFoto :email="i.email" :nome="i.quem" :tam="30"/>
         <div style="min-width:0"><div class="linha1"><b>{{ i.quem }}</b><time>{{ data(i.data,false) }}</time></div><p>{{ i.titulo }}</p>
           <div class="meta"><span class="etq" :class="i.tipo==='ticket'?'ambar':i.grupo==='privado'?'roxo':'azul'">{{ i.tipo==='ticket' ? 'Ticket · ' + i.estado : i.grupo==='privado' ? 'Privado' : 'Equipa' }}</span>
             <span class="sub" style="font-size:12px" v-if="i.ref_titulo">{{ i.ref_titulo }}</span><span class="sub" style="font-size:12px" v-if="i.n>1">· {{ i.n }}</span>
@@ -2610,4 +2624,4 @@ const App = {
   <div v-else class="arranque">Stratechna Orbit</div>`,
 };
 
-createApp(App).mount("#app");
+createApp(App).component("AvFoto", AvFoto).mount("#app");

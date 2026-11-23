@@ -870,7 +870,7 @@ def caixa(grupo: str = "todos", conta: str = "", minhas: int = 0):
         for t in frappe.get_list("HD Ticket", filters={"status_category": ["!=", "Resolved"]},
                                  fields=["name", "subject", "raised_by", "status", "modified", "_assign"],
                                  order_by="modified desc", limit=50):
-            out.append({"tipo": "ticket", "grupo": "equipa", "id": t.name, "titulo": t.subject, "quem": t.raised_by,
+            out.append({"tipo": "ticket", "grupo": "equipa", "id": t.name, "titulo": t.subject, "quem": t.raised_by, "email": t.raised_by,
                         "data": t.modified, "estado": _rotulo_estado(t.status), "url": f"/helpdesk/tickets/{t.name}",
                         "atribuido": bool(t._assign and t._assign != "[]"), "responsavel": _resp(t._assign)})
     filtros = {"communication_medium": "Email", "communication_type": "Communication",
@@ -898,6 +898,7 @@ def caixa(grupo: str = "todos", conta: str = "", minhas: int = 0):
             continue
         conversas[chave] = {"tipo": "email", "grupo": "privado" if e.orbit_privado_de else "equipa", "id": e.name,
                             "titulo": e.subject or "(sem assunto)", "quem": e.sender_full_name or e.sender, "data": e.communication_date,
+                            "email": (e.sender if e.sent_or_received == "Received" else (e.recipients or "").split(",")[0]).strip(),
                             "por_responder": e.sent_or_received == "Received", "n": 1,
                             "conta": (e.email_account or "").replace("Orbit CRM · ", ""),
                             "ref": [e.reference_doctype, e.reference_name], "ref_titulo": _titulo(e.reference_doctype, e.reference_name),

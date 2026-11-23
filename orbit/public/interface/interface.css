@@ -469,3 +469,7 @@ tr.erp-grupo td{font-weight:600}
 .seg .btn { border-radius: 0; }
 .seg .btn:first-child { border-radius: 8px 0 0 8px; }
 .seg .btn:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
+
+/* 23-11-2026: fotografia de quem escreve (por cima das iniciais) */
+.av.av-foto { overflow: hidden; flex: none; }
+.av.av-foto img { width: 100%; height: 100%; object-fit: cover; display: block; background: #fff; }
