@@ -20,6 +20,17 @@ import frappe
 _FEITO = False
 
 
+def dominios_da_casa() -> set:
+    """Os domínios de correio deste Orbit (Email Domain) e os das marcas no Desk — 10 min na cache."""
+    c = frappe.cache().get_value("orbit:dominios_casa")
+    if c is not None:
+        return set(c)
+    d = {x.lower() for x in frappe.get_all("Email Domain", pluck="name")}
+    d |= {k.lower() for k in (frappe.conf.get("orbit_desk_dominios") or {})}
+    frappe.cache().set_value("orbit:dominios_casa", sorted(d), expires_in_sec=600)
+    return d
+
+
 def aplicar():
     global _FEITO
     if _FEITO:
@@ -32,8 +43,19 @@ def aplicar():
     original_as_dict = R.InboundMail.as_dict
 
     def _proprio(self) -> bool:
+        """Enviado por nós: o remetente é a própria caixa, ou outra identidade da casa (info@, outra marca…) num email
+        que não é dirigido à própria caixa (assim um email interno da Margot para o Vítor continua «recebido»)."""
         try:
-            return bool(self.from_email) and (self.from_email or "").lower() == (self.email_account.email_id or "").lower()
+            de = (self.from_email or "").lower()
+            propria = (self.email_account.email_id or "").lower()
+            if not de:
+                return False
+            if de == propria:
+                return True
+            if de.split("@")[-1] not in dominios_da_casa():
+                return False
+            destinos = (str(self.mail.get("To") or "") + "," + str(self.mail.get("Cc") or "")).lower()
+            return propria not in destinos
         except Exception:
             return False
 
