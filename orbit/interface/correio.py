@@ -420,11 +420,36 @@ def marcar(pasta: str, uid: str, lida: int = 1):
 # é a caixa partilhada (o servidor só o deixa a quem tem acesso a ela — `sender_login_partilhas`). A cópia fica nos
 # Enviados da caixa e a original fica marcada como respondida (ou reencaminhada) — tudo visível no Orbit Mail.
 
+def _identidade(user: str, end: str) -> dict:
+    """A identidade desta caixa no Orbit Mail da pessoa (nome e assinatura, `SOGoMailIdentities`) — a mesma que o Orbit
+    Mail usa ao responder dali. Vazia se não houver."""
+    import json
+    try:
+        from orbit import agenda
+        lig = agenda._ligar()
+        if lig is None:
+            return {}
+        with lig, lig.cursor() as cur:
+            cur.execute("SELECT c_defaults FROM sogo_user_profile WHERE c_uid = %s", (user,))
+            r = cur.fetchone()
+        lig.close()
+        ids = (json.loads(r[0]) if r and r[0] else {}).get("SOGoMailIdentities") or []
+        for i in ids:
+            if (i.get("email") or "").lower() == end.lower():
+                return {"nome": i.get("fullName") or "", "assinatura": i.get("signature") or ""}
+    except Exception:  # noqa: BLE001
+        frappe.log_error(title="Orbit correio: identidade do Orbit Mail")
+    return {}
+
+
 def _remetente(pasta: str, user: str) -> tuple[str, str]:
     if not _caixa(pasta):
-        return frappe.db.get_value("User", user, "full_name") or "", user
-    end, nome = _rotulo(_caixa(pasta), user)
-    return "", end
+        end = user
+        omissao = frappe.db.get_value("User", user, "full_name") or ""
+    else:
+        end, _n = _rotulo(_caixa(pasta), user)
+        omissao = ""
+    return (_identidade(user, end).get("nome") or omissao), end
 
 
 @frappe.whitelist(methods=["POST"])
@@ -477,9 +502,14 @@ def enviar(pasta: str, uid: str, modo: str = "responder", para: str = "", cc: st
             else f"<p>Em {_html.escape(quando)}, {_html.escape(quem)} escreveu:</p>"
         novo = "".join("<p>" + _html.escape(p).replace("\n", "<br>") + "</p>" for p in re.split(r"\n{2,}", (texto or "").strip()) if p)
         html_orig = html_orig.replace("data-orbit-src=", "src=")
-        corpo_html = (f"<div>{novo}</div><br>{cab}"
+        # 23-11-2026 (Vítor): a assinatura da caixa, por cima da citação (como no Orbit Mail, «above»)
+        assinatura = _identidade(user, de).get("assinatura") or ""
+        bloco_ass = f"<br><div class='orbit-assinatura'>{assinatura}</div>" if assinatura.strip() else ""
+        corpo_html = (f"<div>{novo}</div>{bloco_ass}<br>{cab}"
                       f"<blockquote style='margin:0 0 0 .8ex;border-left:1px solid #ccc;padding-left:1ex'>{html_orig}</blockquote>")
-        msg.set_content((texto or "").strip() + "\n\n" + re.sub(r"<[^>]+>", "", cab).strip())
+        ass_txt = re.sub(r"\n{3,}", "\n\n", re.sub(r"<[^>]+>", "", re.sub(r"<br\s*/?>|</p>|</div>", "\n", assinatura, flags=re.I))).strip()
+        msg.set_content((texto or "").strip() + ("\n\n-- \n" + _html.unescape(ass_txt) if ass_txt else "") + "\n\n"
+                        + re.sub(r"<[^>]+>", "", cab).strip())
         msg.add_alternative(corpo_html, subtype="html")
         if modo == "reencaminhar":
             for p in orig.walk():
