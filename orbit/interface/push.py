@@ -195,7 +195,10 @@ def contexto_web(context):
     """update_website_context: as páginas do site do tenant (entrada, página inicial, …) também gravam como «Orbit»
     com o ícone do Orbit — sem isto o iPhone desenhava um «L» (de «Login») sobre azul."""
     try:
-        context["head_include"] = (context.get("head_include") or "") + CABECA_APP
+        # `head_html` (templates/includes/head.html) e não `head_include`: a página de entrada do Frappe
+        # (www/login.html) substitui o bloco head_include e o ícone não chegava lá
+        if CABECA_APP not in (context.get("head_html") or ""):
+            context["head_html"] = (context.get("head_html") or "") + CABECA_APP
     except Exception:  # noqa: BLE001
         pass
     return context
