@@ -51,7 +51,9 @@ def _nome_user(u, _cache={}):
     return _cache[u]
 
 
-_PT = {"Qualification": "Qualificação", "Demo/Making": "Demonstração", "Proposal/Quotation": "Proposta",
+_PT = {"Urgent": "Urgente", "High": "Alta", "Medium": "Média", "Low": "Baixa", "Incident": "Incidente",
+       "Bug": "Erro", "Question": "Pergunta", "Unspecified": "Não especificado",
+       "Qualification": "Qualificação", "Demo/Making": "Demonstração", "Proposal/Quotation": "Proposta",
        "Negotiation": "Negociação", "Ready to Close": "Pronto a fechar", "Won": "Ganho", "Lost": "Perdido",
        "New": "Nova", "Contacted": "Contactada", "Nurture": "Em acompanhamento", "Qualified": "Qualificada",
        "Unqualified": "Não qualificada", "Junk": "Descartada", "Open": "Aberto", "Replied": "Respondido",

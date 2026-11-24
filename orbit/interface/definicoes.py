@@ -38,7 +38,7 @@ CONF = {
 }
 
 
-_NOME_FIXO = ("fases", "estados-leads")   # Won/Lost/Ready to Close… são usados pelo código (loja → CRM, funil)
+_NOME_FIXO = ("fases", "estados-leads", "tipos-ticket", "prioridades")   # o Desk usa os nomes ingleses; Won/Lost/Ready to Close… são usados pelo código (loja → CRM, funil)
 
 
 def _guarda():
@@ -88,7 +88,7 @@ def lista(chave: str):
             "campos": [{"campo": x[0], "rotulo": x[1], "tipo": x[2], "opcoes": _opcoes(meta, x[0], x[2])} for x in campos],
             "linhas": linhas, "pode_criar": frappe.has_permission(c["dt"], "create"),
             "pode_editar": frappe.has_permission(c["dt"], "write"), "pode_apagar": frappe.has_permission(c["dt"], "delete"),
-            "rotulos": {l.name: _rotulo_estado(l.name) for l in linhas} if chave in ("fases", "estados-leads") else {}}
+            "rotulos": {l.name: _rotulo_estado(l.name) for l in linhas} if chave in _NOME_FIXO else {}}
 
 
 def _aplicar(doc, c, valores):
