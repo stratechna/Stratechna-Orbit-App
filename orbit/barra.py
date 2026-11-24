@@ -60,7 +60,7 @@ def apps_do_tenant() -> list[dict]:
             continue
         if a.get("precisa") and not frappe.db.exists("DocType", a["precisa"]):
             continue
-        if not ok(chave):
+        if not a.get("sempre") and not ok(chave):
             continue
         try:
             url = a["url"].format(**valores)

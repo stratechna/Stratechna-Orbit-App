@@ -141,7 +141,7 @@ def _apps():
     except Exception:  # noqa: BLE001
         return []
     icones = {"Mail": "mail", "Meet": "video", "Chat": "chat", "Docs": "livro", "Sign": "nota", "Booking": "cal",
-              "Marketing": "negocio", "Propostas": "nota"}
+              "Marketing": "negocio", "Propostas": "nota", "Portal": "grelha"}
     out = []
     for a in sorted(marca.ATALHOS, key=lambda x: x["ordem"]):
         if a.get("precisa") and not frappe.db.exists("DocType", a["precisa"]):

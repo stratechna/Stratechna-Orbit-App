@@ -141,6 +141,9 @@ ATALHOS = [
     # 10-11-2026 (pedido do Vítor): as propostas comerciais (orbit/propostas) com ícone próprio na grelha, ao
     # lado do CRM — abrem na lista de Orçamentos. Só onde há ERPNext (`precisa`).
     {"nome": "Propostas", "url": "/app/quotation", "simbolo": "propostas", "ordem": 10, "precisa": "Quotation"},
+    # 24-11-2026 (pedido do Vítor): o portal da Stratechna em todos os tenants e para todas as pessoas — cada
+    # utilizador do Orbit é contado (e faturado) no portal; lá dentro cada um vê o que as permissões lhe dão.
+    {"nome": "Portal", "url": "https://portal.stratechna.com", "simbolo": "portal", "ordem": 11, "sempre": True},
 ]
 
 
