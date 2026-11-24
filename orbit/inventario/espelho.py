@@ -212,6 +212,12 @@ def _oferta(p: dict, item_code: str, caches: dict, agora) -> None:
         frappe.db.set_value("Oferta do Fornecedor", nome, valores, update_modified=False)
     else:
         frappe.get_doc({"doctype": "Oferta do Fornecedor", "chave": chave, **valores}).insert(ignore_permissions=True)
+    # referência do fornecedor ↔ artigo para as faturas de compra do Docs (F0, docs/PLANO-DOCS-FATURA-COMPRA-ERP.md)
+    from orbit.compras.preparar import ligar_oferta
+    if "item_supplier" not in caches:
+        caches["item_supplier"] = {(r[0], r[1]) for r in frappe.db.sql(
+            "select parent, supplier from `tabItem Supplier` where parenttype='Item' and ifnull(supplier_part_no,'')!=''")}
+    ligar_oferta(item_code, sup, valores["ref_fornecedor"], caches["item_supplier"])
 
 
 # ── entrada ────────────────────────────────────────────────────────────────────────────────────────────────
