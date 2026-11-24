@@ -27,6 +27,12 @@ async function api(metodo, args = {}, post = false) {
   return j.message;
 }
 
+// Nomes das listas de configuração do ERP/RH/Desk em PT-PT (24-11-2026, orbit/configuracao_pt.py): os nomes
+// internos ficam em inglês (o código das apps usa-os) e aqui mostra-se a tradução.
+const TR = reactive({});
+api("erp.traducoes").then((m) => Object.assign(TR, m || {})).catch(() => {});
+const tr = (dt, v) => (v && dt && TR[dt] && TR[dt][v]) || v;
+
 // Nomes dos países em PT-PT (o Frappe guarda-os em inglês)
 const PAISES_PT = { Portugal: "Portugal", Spain: "Espanha", France: "França", Italy: "Itália", Germany: "Alemanha", Belgium: "Bélgica",
   Netherlands: "Países Baixos", Luxembourg: "Luxemburgo", "United Kingdom": "Reino Unido", Switzerland: "Suíça", Brazil: "Brasil",
@@ -2607,6 +2613,7 @@ function textoValor(c, v) {
   if (c.fieldtype === "Currency") return new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(v);
   if (c.fieldtype === "Date") return new Date(v).toLocaleDateString("pt-PT");
   if (c.fieldtype === "Datetime") return data(v);
+  if (c.fieldtype === "Link") return tr(c.options, String(v));
   return String(v);
 }
 const ESTADO_DOC = { 0: ["Rascunho", "ambar"], 1: ["Submetido", "verde"], 2: ["Cancelado", ""] };
@@ -2648,7 +2655,7 @@ const ErpLista = {
     const ordenar = (f) => { ordem.value = ordem.value === f + " desc" ? f + " asc" : f + " desc"; pagina.value = 0; carregar(); };
     const maisLinhas = () => { pagina.value++; carregar(true); };
     const abrir = (n) => { location.hash = irErp(props.doctype, n); };
-    return { meta, linhas, mais, q, colunas, titulo, a, campo, textoValor, ordenar, ordem, maisLinhas, abrir, irErp, ESTADO_DOC, cor, ini };
+    return { meta, linhas, mais, q, colunas, titulo, a, campo, textoValor, ordenar, ordem, maisLinhas, abrir, irErp, ESTADO_DOC, cor, ini, tr };
   },
   template: `<div v-if="meta">
     <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
@@ -2662,7 +2669,7 @@ const ErpLista = {
         <th v-if="meta.submetivel">Estado</th></tr></thead>
       <tbody>
         <tr v-for="l in linhas" :key="l.name" @click="abrir(l.name)">
-          <td><div class="pessoa"><span class="av" :style="{background:cor(l.name)}">{{ ini(l[titulo]||l.name) }}</span><a :href="irErp(doctype,l.name)" @click.stop>{{ l[titulo] || l.name }}</a></div><small v-if="titulo && l[titulo] && l[titulo]!==l.name" style="color:var(--ink-3)">{{ l.name }}</small></td>
+          <td><div class="pessoa"><span class="av" :style="{background:cor(l.name)}">{{ ini(l[titulo]||l.name) }}</span><a :href="irErp(doctype,l.name)" @click.stop>{{ tr(doctype, l[titulo] || l.name) }}</a></div><small v-if="titulo && l[titulo] && l[titulo]!==l.name" style="color:var(--ink-3)">{{ tr(doctype, l.name) }}</small></td>
           <td v-for="c in colunas" :key="c">{{ textoValor(campo(c), l[c]) }}</td>
           <td v-if="meta.submetivel"><span class="etq" :class="ESTADO_DOC[l.docstatus||0][1]">{{ l.status || ESTADO_DOC[l.docstatus||0][0] }}</span></td>
         </tr>
@@ -2684,10 +2691,11 @@ const ErpLigacao = {
     const procurar = () => { clearTimeout(tq); tq = setTimeout(async () => { if (!props.alvo) return; ops.value = await api("erp.procurar", { doctype: props.alvo, txt: txt.value }); posicionar(); aberto.value = true; }, 200); };
     const escolher = (o) => { txt.value = o.v; emit("update:modelValue", o.v); aberto.value = false; };
     const sair = () => setTimeout(() => { aberto.value = false; if (txt.value !== (props.modelValue || "")) emit("update:modelValue", txt.value || null); }, 150);
-    return { txt, ops, aberto, procurar, escolher, sair, irErp, campo, pos };
+    const foco = ref(false);
+    return { txt, ops, aberto, procurar, escolher, sair, irErp, campo, pos, foco, tr };
   },
   template: `<div class="erp-ligacao">
-    <input ref="campo" v-model="txt" :disabled="ro" @focus="procurar" @input="procurar" @blur="sair" autocomplete="off">
+    <input ref="campo" :value="foco ? txt : tr(alvo, txt)" :disabled="ro" @focus="foco=true; procurar()" @input="txt=$event.target.value; procurar()" @blur="foco=false; sair()" autocomplete="off">
     <a v-if="modelValue && alvo" class="ir" :href="irErp(alvo, modelValue)" title="Abrir">↗</a>
     <div v-if="aberto && ops.length" class="cartao erp-ops" :style="pos"><div v-for="o in ops" :key="o.v" class="linha" @mousedown.prevent="escolher(o)"><div class="cresce">{{ o.r }}<small v-if="o.d || o.r!==o.v">{{ o.r!==o.v ? o.v : '' }} {{ o.d }}</small></div></div></div>
   </div>`,
@@ -3059,6 +3067,8 @@ const ErpRelatorio = {
       if (["Float", "Int", "Percent"].includes(c.fieldtype)) return new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 2 }).format(x) + (c.fieldtype === "Percent" ? " %" : "");
       if (c.fieldtype === "Date") return new Date(x).toLocaleDateString("pt-PT");
       if (c.fieldtype === "Check") return x ? "✓" : "";
+      if (c.fieldtype === "Link") return tr(c.options, String(x));
+      if (/^(account|parent_account)$/.test(c.fieldname || "")) return tr("Account", String(x).replace(/<[^>]+>/g, ""));
       return String(x).replace(/<[^>]+>/g, ""); };
     const numerica = (c) => ["Currency", "Float", "Int", "Percent"].includes(c.fieldtype);
     const ligacao = (c, x) => (c.fieldtype === "Link" && c.options && x ? irErp(c.options, x) : null);

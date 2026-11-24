@@ -257,6 +257,14 @@ def cancelar(doctype: str, name: str):
 
 
 @frappe.whitelist()
+def traducoes():
+    """Os nomes das listas de configuração em PT-PT (orbit/configuracao_pt.py), para a interface mostrar."""
+    _guarda()
+    from orbit.configuracao_pt import mapa
+    return mapa()
+
+
+@frappe.whitelist()
 def procurar(doctype: str, txt: str = "", filtros: str = None):
     """A pesquisa de um campo de ligação, a mesma do ERPNext (respeita as permissões e os filtros por omissão)."""
     _guarda()
