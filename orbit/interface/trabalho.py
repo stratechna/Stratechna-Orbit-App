@@ -262,8 +262,13 @@ def notificacoes():
     ns = frappe.get_all("Notification Log", filters={"for_user": frappe.session.user}, fields=["name", "subject", "email_content",
                         "document_type", "document_name", "read", "creation", "type"], order_by="creation desc", limit=30)
     from frappe.utils import strip_html
+    nomes = {"CRM Deal": "Negócio", "CRM Lead": "Lead", "Bilhete HD": "Ticket", "HD Ticket": "Ticket",
+             "CRM Task": "Tarefa", "CRM Note": "Nota", "CRM Organization": "Empresa", "Contact": "Contacto",
+             "ToDo": "Tarefa", "Event": "Evento"}
     for n in ns:
         n.subject = strip_html(n.subject or "")
+        for en, pt in nomes.items():   # o Frappe põe o nome técnico do tipo de documento no texto
+            n.subject = n.subject.replace(f" {en} ", f" {pt} ")
         n.email_content = strip_html(n.email_content or "")[:200]
     return {"por_ler": sum(1 for n in ns if not n.read), "itens": ns}
 

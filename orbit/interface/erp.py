@@ -146,7 +146,8 @@ def lista(doctype: str, q: str = None, filtros: str = None, pagina: int = 0, ord
     _ler(doctype)
     m = frappe.get_meta(doctype)
     titulo = m.title_field if m.title_field and m.has_field(m.title_field) else None
-    colunas = [f.fieldname for f in m.fields if f.in_list_view and f.fieldtype not in _ESTRUTURA and f.fieldtype != "Table"][:6]
+    colunas = [f.fieldname for f in m.fields if f.in_list_view and f.fieldtype not in _ESTRUTURA and f.fieldtype != "Table"
+               and f.fieldname != titulo][:6]   # o título não se repete como coluna
     campos = ["name", "modified"] + ([titulo] if titulo else []) + colunas
     if m.is_submittable:
         campos.append("docstatus")
