@@ -43,7 +43,7 @@
   .op-specs tr.z td { background: #f6f7f8; }
   .op-extras { margin-top: 8px; }
   .op-extras td { padding: 0 6px 0 0; border: 0; }
-  .op-chip { display: inline-block; padding: 3px 8px; border-radius: 4px; background: #f6f7f8; font-size: 9.5px; margin: 0 5px 3px 0; }
+  .op-chip { display: inline-block; white-space: nowrap; padding: 3px 8px; border-radius: 4px; background: #f6f7f8; font-size: 9.5px; margin: 0 5px 3px 0; }
   .op-nota { display: inline-block; padding: 3px 8px; border-radius: 4px; border: 1px dashed #b8bec4; font-size: 9.5px; color: #2b3238; }
   .op-serv { margin-top: 14px; border-top: 3px solid {{ m.cor }}; page-break-inside: avoid; }
   .op-serv td { padding-top: 10px; vertical-align: top; }
@@ -53,8 +53,8 @@
   .op-totais td.v { text-align: right; white-space: nowrap; }
   .op-totais tr.sub td { color: #4a535c; }
   .op-totais tr.sem td { border-top: 1px solid #dfe3e6; font-weight: bold; padding-top: 7px; }
-  .op-final { background: #1d2125; color: #fff !important; border-radius: 6px; padding: 9px 12px; margin-top: 6px; }
-  .op-final td { color: #fff !important; padding: 0 !important; }
+  .op-final { background: #1d2125; color: #fff !important; border-radius: 6px; margin-top: 6px; }
+  .op-final td { color: #fff !important; padding: 9px 12px !important; vertical-align: middle; font-weight: bold; }
   .op-final .v { font-size: 15px; font-weight: bold; }
   .op-cond { margin-top: 22px; page-break-inside: avoid; }
   .op-cond td.c { width: 49%; vertical-align: top; padding: 2px 0 2px 10px; border-left: 3px solid {{ m.cor }}; }
@@ -92,7 +92,7 @@
       <div class="op-rot">PARA</div>
       <div class="op-quem">{{ doc.customer_name or doc.party_name or "" }}</div>
       <div class="op-mais">
-        {%- if doc.contact_display %}Ao cuidado de {{ doc.contact_display }}<br>{% endif -%}
+        {%- if doc.contact_display and doc.contact_display != (doc.customer_name or doc.party_name) %}Ao cuidado de {{ doc.contact_display }}<br>{% endif -%}
         {%- if doc.contact_email %}{{ doc.contact_email }}{% endif %}{% if doc.contact_mobile %} · {{ doc.contact_mobile }}{% endif -%}
         {%- if doc.address_display %}<br>{{ doc.address_display | replace("<br>\n", ", ") | replace("<br>", ", ") | striptags | truncate(150) }}{% endif %}
       </div>

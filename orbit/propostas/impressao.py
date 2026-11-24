@@ -36,6 +36,19 @@ def _caracteristicas(texto):
     return linhas
 
 
+def _resumo(html, nome, maximo=350):
+    """A descrição da loja é longa (e repete as características): na proposta só o princípio, até ao fim de uma
+    frase perto dos 350 caracteres."""
+    t = " ".join(frappe.utils.strip_html(html or "").split())
+    if not t or t == (nome or "").strip():
+        return ""
+    if len(t) <= maximo:
+        return t
+    corte = t[:maximo]
+    fim = max(corte.rfind(". "), corte.rfind("; "))
+    return (corte[:fim + 1] if fim > 120 else corte.rsplit(" ", 1)[0] + "…")
+
+
 def _imagem(url):
     if not url:
         return None
@@ -107,8 +120,7 @@ def proposta(doc):
         linhas.append(frappe._dict({
             "numero": numero, "alternativa": bool(l.is_alternative), "de": str(n),
             "imagem": _imagem(l.image), "referencia": l.item_code, "nome": l.item_name,
-            "descricao": l.description if l.description and frappe.utils.strip_html(l.description).strip()
-            not in ("", (l.item_name or "").strip()) else "",
+            "descricao": _resumo(l.description, l.item_name),
             "caracteristicas": _caracteristicas(l.get("orbit_caracteristicas")),
             "qtd": (f"{flt(l.qty):g}".replace(".", ",")), "unidade": l.uom,
             "preco": _eur(l.rate), "total": _eur(l.amount), "iva": _taxa(taxa),

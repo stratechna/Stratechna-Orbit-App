@@ -19,7 +19,7 @@ _PALAVRAS = {
     "espessura": "espessura", "construcao": "construção", "instalacao": "instalação", "ligacao": "ligação",
     "regulacao": "regulação", "exposicao": "exposição", "conservacao": "conservação", "climatica": "climática",
     "termostato": "termóstato", "graus": "graus", "aco": "aço", "pressao": "pressão", "valvula": "válvula",
-    "tabuleiros": "tabuleiros", "nivel": "nível", "ruido": "ruído", "area": "área", "util": "útil",
+    "tabuleiros": "tabuleiros", "nivel": "nível", "ruido": "ruído", "area": "área", "ip": "IP", "gn": "GN",
 }
 _UNIDADES = {"w": "W", "kw": "kW", "kg": "kg", "g": "g", "mm": "mm", "cm": "cm", "m": "m", "l": "l", "v": "V",
              "hz": "Hz", "rpm": "rpm", "m3": "m³", "m2": "m²", "c": "°C", "a": "A", "kwh": "kWh", "h": "h", "db": "dB"}
