@@ -1,0 +1,259 @@
+{
+ "doctype": "DocType",
+ "name": "Fatura do Docs",
+ "module": "Compras",
+ "custom": 0,
+ "engine": "InnoDB",
+ "track_changes": 1,
+ "autoname": "format:DOCS-{docs_id}",
+ "naming_rule": "Expression",
+ "title_field": "fornecedor_nome",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "creation": "2026-11-24 14:00:00.000000",
+ "modified": "2026-11-24 14:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "description": "Faturas de compra que chegaram ao Docs, lidas pela IA do cliente e conferidas (F1: ainda não criam nada no ERP).",
+ "fields": [
+  {
+   "fieldname": "docs_id",
+   "fieldtype": "Int",
+   "label": "N.º no Docs",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "titulo",
+   "fieldtype": "Data",
+   "label": "Título no Docs",
+   "read_only": 1
+  },
+  {
+   "fieldname": "estado",
+   "fieldtype": "Select",
+   "label": "Estado",
+   "options": "Por ler\nA ler\nLida\nPor rever\nNão é compra\nSem créditos\nErro",
+   "default": "Por ler",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "motivo",
+   "fieldtype": "Small Text",
+   "label": "O que falta ver",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_a",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tipo_documento",
+   "fieldtype": "Data",
+   "label": "Tipo",
+   "read_only": 1
+  },
+  {
+   "fieldname": "contas_certas",
+   "fieldtype": "Check",
+   "label": "Contas certas",
+   "read_only": 1
+  },
+  {
+   "fieldname": "nif_valido",
+   "fieldtype": "Check",
+   "label": "NIF válido",
+   "read_only": 1
+  },
+  {
+   "fieldname": "duplicada_de",
+   "fieldtype": "Link",
+   "label": "Repetida de",
+   "options": "Fatura do Docs",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_fornecedor",
+   "fieldtype": "Section Break",
+   "label": "Fornecedor"
+  },
+  {
+   "fieldname": "fornecedor_nome",
+   "fieldtype": "Data",
+   "label": "Nome",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "fornecedor_nif",
+   "fieldtype": "Data",
+   "label": "NIF",
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "fornecedor_pais",
+   "fieldtype": "Data",
+   "label": "País",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_b",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "fornecedor",
+   "fieldtype": "Link",
+   "label": "Fornecedor no ERP",
+   "options": "Supplier"
+  },
+  {
+   "fieldname": "destinatario_nif",
+   "fieldtype": "Data",
+   "label": "NIF do destinatário",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_doc",
+   "fieldtype": "Section Break",
+   "label": "Documento"
+  },
+  {
+   "fieldname": "numero",
+   "fieldtype": "Data",
+   "label": "N.º da fatura",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "data_fatura",
+   "fieldtype": "Date",
+   "label": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "vencimento",
+   "fieldtype": "Date",
+   "label": "Vencimento",
+   "read_only": 1
+  },
+  {
+   "fieldname": "atcud",
+   "fieldtype": "Data",
+   "label": "ATCUD",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_c",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "moeda",
+   "fieldtype": "Data",
+   "label": "Moeda",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_sem_iva",
+   "fieldtype": "Currency",
+   "label": "Total sem IVA",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_iva",
+   "fieldtype": "Currency",
+   "label": "IVA",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total",
+   "fieldtype": "Currency",
+   "label": "Total",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_linhas",
+   "fieldtype": "Section Break",
+   "label": "Linhas lidas"
+  },
+  {
+   "fieldname": "linhas",
+   "fieldtype": "Code",
+   "label": "Linhas (JSON)",
+   "options": "JSON",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_tec",
+   "fieldtype": "Section Break",
+   "label": "Leitura",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "lida_em",
+   "fieldtype": "Datetime",
+   "label": "Lida em",
+   "read_only": 1
+  },
+  {
+   "fieldname": "area",
+   "fieldtype": "Data",
+   "label": "Área no Docs",
+   "read_only": 1
+  },
+  {
+   "fieldname": "resposta",
+   "fieldtype": "Code",
+   "label": "Resposta da IA (JSON)",
+   "options": "JSON",
+   "read_only": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Accounts User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Purchase Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Purchase User",
+   "read": 1,
+   "report": 1
+  }
+ ]
+}
