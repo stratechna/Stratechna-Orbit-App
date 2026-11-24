@@ -145,6 +145,12 @@ def artigo(linha: dict, supplier: str | None) -> tuple[str | None, str, str | No
     return None, "Por ligar", None
 
 
+def compravel(item_code: str) -> None:
+    """Um artigo que aparece numa fatura de fornecedor é comprado: o ERP recusa-o se não estiver marcado (VELA, 24-11)."""
+    if item_code and not frappe.db.get_value("Item", item_code, "is_purchase_item"):
+        frappe.db.set_value("Item", item_code, "is_purchase_item", 1)
+
+
 def _real(w):
     return w and frappe.db.get_value("Warehouse", w, "is_group") == 0 and not any(v in w for v in _VIRTUAIS)
 
@@ -258,6 +264,7 @@ def criar(f, etiquetas=None, dados=None, ignorar=False) -> dict:
             item, lig, sug = None, "Custo", None
         else:
             item, lig, sug = artigo(l, supplier)
+            compravel(item)
         linha = {"item_code": item or F0.ARTIGO_GASTO, "item_name": desc[:140], "description": desc, "qty": qty,
                  "rate": rate, "orbit_ligacao": lig, "orbit_sugestao": sug, "orbit_ref_lida": ref,
                  "item_tax_template": _modelo_artigo(23 if autoliq else l.get("taxa_iva"), abbr)}

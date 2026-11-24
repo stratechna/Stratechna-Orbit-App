@@ -217,6 +217,7 @@ def _ligar(l, item_code, pi, como):
         frappe.throw(f"O artigo «{item_code}» não existe.")
     if it.disabled:
         frappe.throw(f"O artigo «{item_code}» está desactivado.")
+    R.compravel(it.name)
     _limpar(l)
     l.item_code, l.item_name = it.name, it.item_name[:140]
     l.uom = l.stock_uom = it.stock_uom
