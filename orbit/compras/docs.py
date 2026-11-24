@@ -234,8 +234,8 @@ def _data(v):
 # ── o trabalho ───────────────────────────────────────────────────────────────
 def processar(docs_id: int, forcar: int = 0):
     nome = frappe.db.get_value("Fatura do Docs", {"docs_id": docs_id})
-    if nome and not forcar and frappe.db.get_value("Fatura do Docs", nome, "estado") not in ("Por ler", "Erro", "Sem créditos"):
-        return   # já lida: só a pedido
+    if nome and not forcar and frappe.db.get_value("Fatura do Docs", nome, "estado") not in ("Por ler", "Erro", "Sem créditos", "Devolvida"):
+        return   # já lida: só a pedido (a devolvida ao Docs volta a ler-se quando o documento muda lá — F3)
     doc = frappe.get_doc("Fatura do Docs", nome) if nome else frappe.new_doc("Fatura do Docs")
     doc.docs_id = docs_id
     try:

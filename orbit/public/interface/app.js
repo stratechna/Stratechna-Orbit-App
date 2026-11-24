@@ -3331,6 +3331,140 @@ const ErpDesk = {
   template: `<div class="embutida"><iframe :src="url" title="ERPNext"></iframe></div>`,
 };
 
+// ── Faturas de compra (F3, 24-11-2026; docs/PLANO-DOCS-FATURA-COMPRA-ERP.md) ─────────────────────────────
+// As faturas do Docs que a F2 deixou em rascunho: o PDF de um lado, as linhas do outro; ligar cada linha (artigo, sugestão,
+// artigo novo ou custo) e Confirmar (submete, aprende a referência do fornecedor e devolve ao Docs), Devolver ao Docs ou
+// «Não é uma compra». Fala com orbit.compras.rever.
+const apiCo = (m, a = {}, post = false) => api("orbit.compras.rever." + m, a, post);
+const COR_ESTADO = { "Em rascunho": "azul", "Por rever": "ambar", "Confirmada": "verde", "Devolvida": "roxo", "Erro": "ambar", "Sem créditos": "ambar" };
+const COR_LIGACAO = { "Referência do fornecedor": "verde", "EAN": "verde", "Referência do importador": "verde", "Escolhido": "verde", "Criado": "verde",
+  "Custo": "azul", "Sugerido": "ambar", "Por ligar": "ambar" };
+const Compras = {
+  components: { ErpLigacao },
+  props: ["nome"],
+  setup(props) {
+    const filtro = ref("abertas"); const lista = ref(null); const d = ref(null); const a = ref(false);
+    const escolha = reactive({}); const criar = ref(null); const fechar = ref(null);
+    const eur = (v) => new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(v || 0);
+    const num = (v) => new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 3 }).format(v || 0);
+    const carregarLista = async () => { lista.value = await apiCo("lista", { filtro: filtro.value }); };
+    const carregar = async () => { if (props.nome) d.value = await apiCo("detalhe", { nome: props.nome }); };
+    onMounted(() => { if (props.nome) carregar(); else carregarLista(); });
+    watch(filtro, carregarLista);
+    const fazer = async (fn, ok) => {
+      a.value = true;
+      try { const r = await fn(); if (r && r.registo) d.value = r; if (ok) toast(ok); return r; } finally { a.value = false; }
+    };
+    const linha = (l, acao, extra = {}) => fazer(() => apiCo("linha", { nome: props.nome, linha: l.name, acao, ...extra }, true));
+    const escolher = (l) => { if (!escolha[l.name]) { toast("Escolha primeiro o artigo."); return; } linha(l, "artigo", { item_code: escolha[l.name] }); };
+    const abrirCriar = (l) => { criar.value = { l, nome: l.item_name || l.description, stock: true, marca: "" }; };
+    const gravarCriar = async () => {
+      const c = criar.value; await linha(c.l, "criar", { novo: JSON.stringify({ nome: c.nome, stock: c.stock ? 1 : 0, marca: c.marca || "" }) }); criar.value = null;
+    };
+    const pendentes = computed(() => (d.value?.linhas || []).filter((l) => ["Por ligar", "Sugerido"].includes(l.ligacao)).length);
+    const confirmar = () => fazer(() => apiCo("confirmar", { nome: props.nome }, true), "Confirmada e lançada no ERP.");
+    const fecharFatura = async () => {
+      const f = fechar.value;
+      await fazer(() => apiCo(f.acao, { nome: props.nome, motivo: f.motivo }, true), f.acao === "devolver" ? "Devolvida ao Docs." : "Fechada: não é uma compra.");
+      fechar.value = null;
+    };
+    const forcar = () => fazer(() => apiCo("preparar_mesmo_assim", { nome: props.nome }, true), "Rascunho preparado.");
+    const lerDeNovo = () => fazer(async () => { await api("orbit.compras.docs.ler", { docs_id: d.value.registo.docs_id, forcar: 1 }, true); return apiCo("detalhe", { nome: props.nome }); }, "Lida de novo.");
+    const repetirDocs = () => fazer(() => apiCo("repetir_docs", { nome: props.nome }, true), "Docs actualizado.");
+    const pdf = computed(() => props.nome ? "/api/method/orbit.compras.rever.pdf?nome=" + encodeURIComponent(props.nome) : "");
+    const aberta = computed(() => d.value?.fatura && d.value.fatura.docstatus === 0);
+    const notas = computed(() => (d.value?.registo.motivo || "").split("\n").filter((x) => x.trim()));
+    const abrir = (f) => { location.hash = "#/compras/" + encodeURIComponent(f.name); };
+    return { abrir, filtro, lista, d, a, escolha, criar, fechar, eur, num, data, irErp, COR_ESTADO, COR_LIGACAO, linha, escolher, abrirCriar, gravarCriar,
+      pendentes, confirmar, fecharFatura, forcar, lerDeNovo, repetirDocs, pdf, aberta, notas };
+  },
+  template: `<div class="pad" v-if="!nome">
+    <div style="margin-bottom:16px"><h1>Faturas de compra</h1><div class="sub">Do Docs para o ERP: rever as linhas, confirmar e devolver ao Docs o processo e o vencimento</div></div>
+    <div class="vistas" style="padding:0;margin-bottom:12px" v-if="lista">
+      <button v-for="v in [['abertas','Por rever'],['confirmadas','Confirmadas'],['outras','Outras']]" :key="v[0]" :class="{ativo: filtro===v[0]}" @click="filtro=v[0]">{{ v[1] }} <span class="sub">{{ lista.contagens[v[0]] }}</span></button>
+    </div>
+    <div class="tabela-wrap" style="margin:0" v-if="lista"><table>
+      <thead><tr><th>Fornecedor</th><th>N.º</th><th>Data</th><th>Vencimento</th><th style="text-align:right">Total</th><th>Linhas ligadas</th><th>Estado</th></tr></thead>
+      <tbody><tr v-for="f in lista.linhas" :key="f.name" @click="abrir(f)">
+        <td><b>{{ f.fornecedor || f.fornecedor_nome || '—' }}</b><small class="sub" style="display:block">{{ f.tipo_documento }} · Docs n.º {{ f.docs_id }}</small></td>
+        <td>{{ f.numero || '—' }}</td><td>{{ f.data_fatura ? data(f.data_fatura, false) : '—' }}</td><td>{{ f.vencimento ? data(f.vencimento, false) : '—' }}</td>
+        <td style="text-align:right">{{ eur(f.total) }}</td>
+        <td>{{ f.linhas_total ? f.linhas_ligadas + ' / ' + f.linhas_total : '—' }}</td>
+        <td><span class="etq" :class="COR_ESTADO[f.estado]">{{ f.estado }}</span></td></tr></tbody></table>
+      <div v-if="!lista.linhas.length" class="vazio">{{ filtro==='abertas' ? 'Nenhuma fatura de compra por rever.' : 'Nada aqui.' }}</div></div>
+    <div v-else class="vazio">A carregar…</div>
+  </div>
+  <div class="compras-rever" v-else-if="d">
+    <div class="compras-pdf"><iframe :src="pdf" title="Documento do Docs"></iframe><a class="sub" :href="pdf" target="_blank">Abrir o documento noutro separador ↗</a></div>
+    <div class="compras-dados">
+      <a href="#/compras" class="sub" style="text-decoration:none">← Faturas de compra</a>
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin:6px 0 12px;flex-wrap:wrap">
+        <div><h1 style="margin:0">{{ d.fatura?.supplier_name || d.registo.fornecedor_nome || 'Fornecedor por ler' }}</h1>
+          <div class="sub">{{ d.registo.tipo_documento }} {{ d.registo.numero }} · {{ d.registo.data_fatura ? data(d.registo.data_fatura, false) : 'sem data' }}
+            · NIF {{ d.registo.fornecedor_nif || '—' }}<template v-if="d.fatura && !d.fatura.supplier_nif && d.registo.fornecedor_nif"> (grava-se no fornecedor ao confirmar)</template></div></div>
+        <span class="etq" :class="COR_ESTADO[d.registo.estado]">{{ d.registo.estado }}</span>
+      </div>
+      <div class="erp-totais cartao" style="margin:0 0 12px">
+        <div><small>Total da fatura</small><b>{{ eur(d.registo.total) }}</b></div>
+        <div v-if="d.fatura"><small>Total no ERP</small><b :style="{color: Math.abs((d.fatura.grand_total||0)-(d.registo.total||0))>0.05 ? 'var(--acao)' : 'inherit'}">{{ eur(d.fatura.grand_total) }}</b></div>
+        <div><small>Vencimento</small><b>{{ (d.fatura?.due_date || d.registo.vencimento) ? data(d.fatura?.due_date || d.registo.vencimento, false) : '—' }}</b></div>
+        <div v-if="d.fatura"><small>Stock</small><b>{{ d.fatura.update_stock ? 'Entra em armazém' : 'Sem entrada' }}</b></div>
+      </div>
+      <div v-if="notas.length" class="cartao compras-notas"><div v-for="(n,i) in notas" :key="i">{{ n }}</div></div>
+
+      <template v-if="d.fatura">
+        <div class="compras-linha cartao" v-for="l in d.linhas" :key="l.name" :class="{pendente: ['Por ligar','Sugerido'].includes(l.ligacao)}">
+          <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+            <div style="min-width:0"><b>{{ l.description || l.item_name }}</b>
+              <div class="sub">{{ l.ref ? 'Ref. ' + l.ref + ' · ' : '' }}{{ num(l.qty) }} {{ l.uom }} × {{ eur(l.rate) }} = <b>{{ eur(l.amount) }}</b></div></div>
+            <span class="etq" :class="COR_LIGACAO[l.ligacao]">{{ l.ligacao || '—' }}</span>
+          </div>
+          <div class="sub" style="margin-top:4px" v-if="l.item_code">Artigo: <a :href="irErp('Item', l.item_code)">{{ l.item_code }}</a> {{ l.item_name !== l.item_code ? '— ' + l.item_name : '' }}
+            <template v-if="l.warehouse"> · {{ l.warehouse }}</template><template v-if="l.purchase_order"> · encomenda <a :href="irErp('Purchase Order', l.purchase_order)">{{ l.purchase_order }}</a></template></div>
+          <div class="sub" style="margin-top:4px" v-else-if="l.ligacao==='Custo'">Custo: {{ l.expense_account }}</div>
+          <div class="compras-acoes" v-if="aberta">
+            <button v-if="l.sugestao" class="btn" :disabled="a" @click="linha(l,'sugestao')">Usar a sugestão: {{ l.sugestao_nome || l.sugestao }}</button>
+            <div class="erp-campo" style="margin:0;min-width:220px;flex:1"><ErpLigacao v-model="escolha[l.name]" alvo="Item"/></div>
+            <button class="btn" :disabled="a" @click="escolher(l)">Escolher artigo</button>
+            <button class="btn" :disabled="a" @click="abrirCriar(l)">Criar artigo</button>
+            <button class="btn" :disabled="a || l.ligacao==='Custo'" @click="linha(l,'custo')">É um custo</button>
+          </div>
+          <div v-if="criar && criar.l.name===l.name" class="compras-criar">
+            <div class="erp-campo" style="margin:0;flex:1;min-width:220px"><label>Nome do artigo novo</label><input v-model="criar.nome"></div>
+            <div class="erp-campo" style="margin:0;min-width:160px"><label>Marca (opcional)</label><ErpLigacao v-model="criar.marca" alvo="Brand"/></div>
+            <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" v-model="criar.stock"> Artigo de stock</label>
+            <button class="btn prim" :disabled="a || !criar.nome" @click="gravarCriar">Criar e ligar</button><button class="btn" @click="criar=null">Cancelar</button>
+          </div>
+        </div>
+      </template>
+      <div v-else-if="d.lidas.length" class="tabela-wrap" style="margin:0 0 12px"><table>
+        <thead><tr><th>Ref.</th><th>Descrição</th><th>Qtd.</th><th style="text-align:right">Total s/ IVA</th><th>IVA</th></tr></thead>
+        <tbody><tr v-for="(l,i) in d.lidas" :key="i" style="cursor:default"><td>{{ l.referencia || '—' }}</td><td>{{ l.descricao }}</td><td>{{ num(l.quantidade) }}</td><td style="text-align:right">{{ eur(l.total_sem_iva) }}</td><td>{{ l.taxa_iva ?? '—' }} %</td></tr></tbody></table></div>
+
+      <div v-if="fechar" class="cartao compras-criar" style="margin-top:12px">
+        <div class="erp-campo" style="margin:0;flex:1;min-width:260px"><label>{{ fechar.acao==='devolver' ? 'O que está mal (fica como nota no Docs)' : 'Porquê (opcional, fica como nota no Docs)' }}</label><input v-model="fechar.motivo"></div>
+        <button class="btn prim" :disabled="a || (fechar.acao==='devolver' && !fechar.motivo)" @click="fecharFatura">{{ fechar.acao==='devolver' ? 'Devolver ao Docs' : 'Não é uma compra' }}</button><button class="btn" @click="fechar=null">Cancelar</button>
+      </div>
+      <div class="compras-botoes">
+        <template v-if="aberta">
+          <button class="btn prim" :disabled="a || pendentes>0 || !d.pode_submeter" @click="confirmar" :title="pendentes ? 'Faltam ' + pendentes + ' linha(s) por ligar' : ''">{{ a ? 'A gravar…' : 'Confirmar' }}</button>
+          <span v-if="pendentes" class="sub">Faltam {{ pendentes }} linha(s) por ligar.</span>
+          <span v-else-if="!d.pode_submeter" class="sub">Sem permissão para submeter faturas de compra.</span>
+        </template>
+        <button v-if="!d.fatura && d.pode_forcar" class="btn prim" :disabled="a" @click="forcar">Preparar rascunho mesmo assim</button>
+        <button v-if="['Erro','Sem créditos','Devolvida'].includes(d.registo.estado)" class="btn" :disabled="a" @click="lerDeNovo">Ler de novo</button>
+        <template v-if="d.registo.estado!=='Confirmada' && d.registo.estado!=='Não é compra'">
+          <button class="btn" :disabled="a" @click="fechar={acao:'devolver', motivo:''}">Devolver ao Docs</button>
+          <button class="btn" :disabled="a" @click="fechar={acao:'nao_compra', motivo:''}">Não é uma compra</button>
+        </template>
+        <button v-if="d.registo.estado==='Confirmada' && !d.registo.docs_actualizado" class="btn" :disabled="a" @click="repetirDocs">Escrever de novo no Docs</button>
+        <a v-if="d.fatura" class="btn" :href="irErp('Purchase Invoice', d.fatura.name)">Fatura de compra {{ d.fatura.name }}</a>
+      </div>
+    </div>
+  </div>
+  <div v-else class="vazio">A carregar…</div>`,
+};
+
 // ── As apps do Orbit (22-11-2026, maqueta docs/orbit-interface/apps/) ────────────────────────────────────────
 // Uma app por área, cada uma no seu separador (/orbit?app=<chave>), com a mesma barra de cima: seletor de apps, nome da
 // app, pesquisa, sino, claro/escuro e a roda dentada só com as definições dessa app. Os ecrãs são os mesmos de sempre.
@@ -3360,7 +3494,7 @@ const APPS = {
   gestao: { nome: "Gestão", sub: "Dinheiro e obrigações", ic: "euro", inicio: "",
     nav: [], modulos: ["Invoicing", "Payments", "Banking", "Accounting", "Financial Reports", "Subscription"], defs: ["Vendas e faturação", "Marcas e empresa"] },
   operacoes: { nome: "Operações", sub: "Comprar, produzir, vender", ic: "cubo", inicio: "",
-    nav: [["sec", "Stock"], ["erp-stock", "cubo", "Inventário"]],
+    nav: [["sec", "Compras"], ["compras", "euro", "Faturas de compra"], ["sec", "Stock"], ["erp-stock", "cubo", "Inventário"]],
     modulos: ["Selling", "Buying", "Stock", "Assets", "Manufacturing", "Subcontracting", "Quality"], defs: ["Vendas e faturação"] },
   // 22-11-2026: o Marketing com o mesmo aspecto das outras apps (os ecrãs dele são da secretária, mostrados cá dentro).
   marketing: { nome: "Marketing", sub: "Campanhas e envios", ic: "megafone", inicio: "erp-desk/%2Fdesk%2Fcampanha-de-marketing",
@@ -3391,7 +3525,7 @@ const abrirApp = (chave, url) => {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpProposta, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpProposta, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -3450,7 +3584,7 @@ const App = {
       <div class="marca"><div class="logo logo-app"><img :src="srcApp(APP_ATUAL)" alt=""></div><div>{{ APP.nome }}<small>{{ APP.sub }}</small></div></div>
       <template v-for="(n,i) in NAV" :key="i">
         <h6 v-if="n[0]==='sec'">{{ n[1] }}</h6>
-        <a v-else :href="'#/'+n[0]" style="text-decoration:none"><button :class="{ativo: ativoNav(n)}" tabindex="-1"><Icone :n="n[1]"/>{{ n[2] }}<span class="conta" v-if="n[0]==='caixa' && ctx.contadores.tickets">{{ ctx.contadores.tickets }}</span><span class="conta" v-if="n[0]==='chat' && estado.chat" title="Mensagens por ler no Chat">{{ estado.chat }}</span></button></a>
+        <a v-else :href="'#/'+n[0]" style="text-decoration:none"><button :class="{ativo: ativoNav(n)}" tabindex="-1"><Icone :n="n[1]"/>{{ n[2] }}<span class="conta" v-if="n[0]==='caixa' && ctx.contadores.tickets">{{ ctx.contadores.tickets }}</span><span class="conta" v-if="n[0]==='compras' && ctx.contadores.compras" title="Faturas de compra por rever">{{ ctx.contadores.compras }}</span><span class="conta" v-if="n[0]==='chat' && estado.chat" title="Mensagens por ler no Chat">{{ estado.chat }}</span></button></a>
       </template>
       <template v-if="modulosApp.length"><h6>{{ APP_ATUAL==='admin' ? 'Sistema' : 'Módulos' }}</h6>
       <a v-for="m in modulosApp" :key="m.url" :href="m.barra ? '#/erp-m/'+encodeURIComponent(m.barra) : m.url" :target="m.barra ? null : '_blank'" style="text-decoration:none"><button tabindex="-1" :class="{ativo: ecra==='erp-m' && partes[1]===m.barra}"><Icone n="grelha"/>{{ m.nome }}<span class="fora" v-if="!m.barra">↗</span></button></a></template>
@@ -3512,6 +3646,7 @@ const App = {
         <ErpFicha v-else-if="ecra==='erp'" :doctype="partes[1]" :name="partes[2]" :key="'f'+partes[1]+'/'+partes[2]"/>
         <ErpStock v-else-if="ecra==='erp-stock'" :artigo="partes[1]" :key="'s'+(partes[1]||'')"/>
         <ErpPessoas v-else-if="ecra==='pessoas'"/>
+        <Compras v-else-if="ecra==='compras'" :nome="partes[1]" :key="'c'+(partes[1]||'')"/>
         <ErpRelatorio v-else-if="ecra==='erp-rel'" :nome="partes[1]" :key="'r'+partes[1]"/>
         <ErpDesk v-else-if="ecra==='erp-desk'" :url="partes.slice(1).join('/')" :key="'d'+partes.slice(1).join('/')"/>
         <div v-else class="vazio">Página desconhecida. <a href="#/inicio">Início</a></div>

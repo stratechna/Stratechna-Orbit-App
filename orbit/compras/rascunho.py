@@ -25,14 +25,17 @@ from orbit.compras import preparar as F0
 
 UE = {"AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GR", "EL", "HR", "HU", "IE", "IT", "LT",
       "LU", "LV", "MT", "NL", "PL", "RO", "SE", "SI", "SK"}
-LIGACOES = ["Referência do fornecedor", "EAN", "Referência do importador", "Sugerido", "Por ligar", "Custo"]
+LIGACOES = ["Referência do fornecedor", "EAN", "Referência do importador", "Sugerido", "Por ligar", "Custo",
+            "Escolhido", "Criado"]   # as duas últimas: escolha de quem revê (F3, rever.py)
 _VIRTUAIS = ("(fornecedor)", "Goods In Transit", "Work In Progress", "Finished Goods")
 _SOCIEDADE = re.compile(r"\b(lda|limitada|sa|s a|unipessoal|sl|s l|slu|gmbh|srl|spa|bv|sas|sarl|ltd|inc|e filhos)\b")
 
 
 # ── campos ───────────────────────────────────────────────────────────────────
 def garantir_campos(forcar=False):
-    if not forcar and frappe.get_meta("Purchase Invoice Item").has_field("orbit_ref_lida") \
+    campo = frappe.get_meta("Purchase Invoice Item").get_field("orbit_ligacao")
+    if not forcar and campo and "Escolhido" in (campo.options or "") \
+            and frappe.get_meta("Purchase Invoice Item").has_field("orbit_ref_lida") \
             and frappe.get_meta("Purchase Invoice").has_field("orbit_docs_id"):
         return
     from frappe.custom.doctype.custom_field.custom_field import create_custom_fields

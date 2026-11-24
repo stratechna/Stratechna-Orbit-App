@@ -69,6 +69,14 @@ def _rotulo_estado(s):
     return t
 
 
+def _compras_por_rever():
+    try:
+        from orbit.compras.rever import contar
+        return contar()
+    except Exception:  # noqa: BLE001
+        return 0
+
+
 # ── Contexto e pesquisa ─────────────────────────────────────────────────────────────────────────────────
 @frappe.whitelist()
 def contexto():
@@ -80,7 +88,7 @@ def contexto():
     return {
         "utilizador": u, "nome": nome, "iniciais": _iniciais(nome),
         "tenant": frappe.db.get_single_value("Website Settings", "app_name") or frappe.local.site,
-        "contadores": {"tickets": len(abertos)},
+        "contadores": {"tickets": len(abertos), "compras": _compras_por_rever()},
         "apps": _apps(),
         "classico": {"crm": "/crm", "desk": "/helpdesk"},
         "modulos": _modulos(),
