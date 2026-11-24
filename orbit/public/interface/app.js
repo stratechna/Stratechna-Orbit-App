@@ -2842,7 +2842,7 @@ const ErpFicha = {
     const secVisivel = (s) => avaliar(s.depends_on, doc.value) && s.colunas.some((col) => col.some(visivel));
     const abaVisivel = (t) => avaliar(t.depends_on, doc.value) && t.secoes.some(secVisivel);
     const abasVis = computed(() => abas.value.filter(abaVisivel));
-    const tituloDoc = computed(() => { const t = meta.value?.titulo; if (meta.value?.single) return meta.value.rotulo; return (t && doc.value?.[t]) || (novo.value ? "Novo — " + meta.value?.rotulo : doc.value?.name); });
+    const tituloDoc = computed(() => { const t = meta.value?.titulo; if (meta.value?.single) return meta.value.rotulo; return tr(props.doctype, (t && doc.value?.[t]) || (novo.value ? "Novo — " + meta.value?.rotulo : doc.value?.name)); });
     const precisaNome = computed(() => novo.value && meta.value && (!meta.value.nomeacao || meta.value.nomeacao.toLowerCase() === "prompt"));
     const gravar = async () => {
       const falta = meta.value.campos.filter((c) => !ESTRUTURA.includes(c.fieldtype) && visivel(c) && obrig(c) && vazioV(doc.value[c.fieldname]));
@@ -2866,13 +2866,13 @@ const ErpFicha = {
     };
     const aberta = (s, i) => !(s.collapsible && !fechadas.value[i + ":" + s.label]);
     const alternar = (s, i) => { fechadas.value[i + ":" + s.label] = !fechadas.value[i + ":" + s.label]; };
-    return { meta, doc, novo, sujo, a, aba, abasVis, visivel, roCampo, obrig, secVisivel, tituloDoc, gravar, accao, docstatus, soLeitura, aberta, alternar, ESTADO_DOC, irErp, precisaNome, nomeNovo, cor, ini, criarOps, criarDe, moeda, pdf, aviso };
+    return { meta, doc, novo, sujo, a, aba, abasVis, visivel, roCampo, obrig, secVisivel, tituloDoc, gravar, accao, docstatus, soLeitura, aberta, alternar, ESTADO_DOC, irErp, precisaNome, nomeNovo, cor, ini, criarOps, criarDe, moeda, pdf, aviso, tr };
   },
   template: `<div v-if="meta && doc" class="erp-ficha">
     <div class="erp-topo">
       <a class="sub" :href="irErp(doctype)" v-if="!meta.single">← {{ meta.rotulo }}</a>
       <div class="erp-tit"><span class="av" :style="{background:cor(doc.name||'n')}">{{ ini(tituloDoc) }}</span>
-        <div class="cresce"><h1>{{ tituloDoc }}</h1><div class="sub">{{ meta.rotulo }}<span v-if="!novo && tituloDoc!==doc.name"> · {{ doc.name }}</span></div></div>
+        <div class="cresce"><h1>{{ tituloDoc }}</h1><div class="sub">{{ meta.rotulo }}<span v-if="!novo && !meta.single && tituloDoc!==tr(doctype, doc.name)"> · {{ tr(doctype, doc.name) }}</span></div></div>
         <span v-if="meta.submetivel && !novo" class="etq" :class="ESTADO_DOC[docstatus][1]">{{ doc.status || ESTADO_DOC[docstatus][0] }}</span>
         <span v-if="sujo" class="etq ambar">Por gravar</span>
         <div class="erp-accoes">

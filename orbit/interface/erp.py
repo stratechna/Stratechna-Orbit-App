@@ -29,7 +29,19 @@ _SECOES = {"Tools": "Ferramentas", "Setup": "Configuração", "Reports": "Relat�
 
 def _tr(t: str) -> str:
     x = _(t or "")
-    return _SECOES.get(x, _SECOES.get(t, x)) if x == t else x
+    return _marca(_SECOES.get(x, _SECOES.get(t, x)) if x == t else x)
+
+
+# O cliente vê «Orbit», nunca os nomes dos programas por baixo (24-11-2026, pedido do Vítor)
+_MARCAS = [(r"ERPNext CRM", "CRM e vendas"), (r"Frappe CRM", "CRM"), (r"Frappe HR", "RH"), (r"Helpdesk", "Desk"),
+           (r"ERPNext", "ERP"), (r"Frappe", "Orbit")]
+
+
+def _marca(t: str) -> str:
+    import re as _re
+    for a, b in _MARCAS:
+        t = _re.sub(a, b, t or "")
+    return t
 
 
 # Tipos de campo que a ficha genérica não desenha (estrutura ou só para o desk).
@@ -84,16 +96,16 @@ def menu(barra: str):
         if i.link_type == "DocType":
             if not frappe.db.exists("DocType", i.link_to) or not frappe.has_permission(i.link_to, "read"):
                 continue
-            atual["itens"].append({"tipo": "doc", "rotulo": _(i.label or i.link_to), "doctype": i.link_to,
+            atual["itens"].append({"tipo": "doc", "rotulo": _marca(_(i.label or i.link_to)), "doctype": i.link_to,
                                    "single": frappe.get_meta(i.link_to).issingle, "icone": i.icon})
         elif i.link_type == "Report":
             # U5 (21-11): os relatórios abrem na interface (#/erp-rel/<nome>)
             if frappe.db.exists("Report", i.link_to) and frappe.has_permission("Report", "read"):
-                atual["itens"].append({"tipo": "rel", "rotulo": _(i.label or i.link_to), "relatorio": i.link_to, "icone": i.icon})
+                atual["itens"].append({"tipo": "rel", "rotulo": _marca(_(i.label or i.link_to)), "relatorio": i.link_to, "icone": i.icon})
         elif i.link_type == "Page":
-            atual["itens"].append({"tipo": "desk", "rotulo": _(i.label or i.link_to), "url": "/desk/" + i.link_to, "icone": i.icon})
+            atual["itens"].append({"tipo": "desk", "rotulo": _marca(_(i.label or i.link_to)), "url": "/desk/" + i.link_to, "icone": i.icon})
         elif i.link_type == "URL" and i.url:
-            atual["itens"].append({"tipo": "desk", "rotulo": _(i.label or i.url), "url": i.url, "icone": i.icon})
+            atual["itens"].append({"tipo": "desk", "rotulo": _marca(_(i.label or i.url)), "url": i.url, "icone": i.icon})
     if atual["itens"]:
         secoes.append(atual)
     return {"titulo": _(s.title or barra), "secoes": secoes}
@@ -107,11 +119,11 @@ def _campos(meta) -> list:
             continue
         d = {k: f.get(k) for k in _PROPS if f.get(k) not in (None, "", 0) or k in ("fieldname", "fieldtype")}
         # 23-11-2026: campo sem rótulo mostrava o nome técnico (ASSIGN_CONDITION) — passa a texto traduzível
-        d["label"] = _(f.label) if f.label else (_(frappe.unscrub(f.fieldname)) if f.fieldtype not in _ESTRUTURA else "")
+        d["label"] = _marca(_(f.label) if f.label else (_(frappe.unscrub(f.fieldname)) if f.fieldtype not in _ESTRUTURA else ""))
         if f.fieldtype == "Select" and f.options:
-            d["opcoes"] = [{"v": o, "r": _(o) if o else ""} for o in f.options.split("\n")]
+            d["opcoes"] = [{"v": o, "r": _marca(_(o)) if o else ""} for o in f.options.split("\n")]
         if f.description:
-            d["descricao"] = _(f.description)
+            d["descricao"] = _marca(_(f.description))
         out.append(d)
     return out
 
@@ -129,7 +141,7 @@ def meta(doctype: str):
     pode = {p: bool(frappe.has_permission(doctype, p)) for p in ("create", "write", "delete")}
     pode.update({p: bool(m.is_submittable and frappe.has_permission(doctype, p)) for p in ("submit", "cancel")})
     return {
-        "doctype": doctype, "rotulo": _(doctype), "single": m.issingle, "submetivel": m.is_submittable,
+        "doctype": doctype, "rotulo": _marca(_(doctype)), "single": m.issingle, "submetivel": m.is_submittable,
         "titulo": m.title_field or ("item_name" if doctype == "Item" else None), "imagem": m.image_field,
         "pesquisa": [c.strip() for c in (m.search_fields or "").split(",") if c.strip()],
         "nomeacao": m.autoname or "", "campos": _campos(m), "filhas": filhas, "pode": pode,
@@ -404,7 +416,7 @@ def recalcular(doctype: str, dados: str):
 @frappe.whitelist()
 def criar_opcoes(doctype: str):
     _guarda()
-    return [{"doctype": dt, "rotulo": _(dt)} for dt, _m in CRIAR.get(doctype, []) if frappe.has_permission(dt, "create")]
+    return [{"doctype": dt, "rotulo": _marca(_(dt))} for dt, _m in CRIAR.get(doctype, []) if frappe.has_permission(dt, "create")]
 
 
 @frappe.whitelist(methods=["POST"])
@@ -531,7 +543,7 @@ def relatorio_meta(nome: str):
     _guarda()
     r = _relatorio_permitido(nome)
     if r.report_type == "Report Builder":
-        return {"tipo": "builder", "doctype": r.ref_doctype, "rotulo": _(r.name)}
+        return {"tipo": "builder", "doctype": r.ref_doctype, "rotulo": _marca(_(r.name))}
     from frappe.desk.query_report import get_script
     sc = get_script(nome) or {}
     script = sc.get("script") or ""
@@ -555,7 +567,7 @@ def relatorio_meta(nome: str):
     textos = set(_re.findall(r'__\(\s*["\']([^"\']{1,120})["\']', script + partilhado))
     for bloco in _re.findall(r'options:\s*\[([^\]]{0,600})\]', script + partilhado):   # escolhas sem __()
         textos.update(_re.findall(r'["\']([^"\']{1,60})["\']', bloco))
-    return {"tipo": r.report_type, "rotulo": _(r.name), "script": script, "partilhado": partilhado,
+    return {"tipo": r.report_type, "rotulo": _marca(_(r.name)), "script": script, "partilhado": partilhado,
             "traducoes": {t: _(t) for t in textos},
             "omissao": {"company": empresa, "fiscal_year": ano, "ano_inicio": ano_ini, "ano_fim": ano_fim,
                         "currency": frappe.db.get_value("Company", empresa, "default_currency") if empresa else "EUR",

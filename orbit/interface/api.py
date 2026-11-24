@@ -1091,7 +1091,7 @@ _DEFINICOES = [
     ("CRM", [("Definições do CRM", "FCRM Settings"), ("Regras de atribuição", "Assignment Rule"),
              ("Acordos de nível de serviço (CRM)", "CRM Service Level Agreement"), ("Feriados (para os prazos)", "CRM Holiday List"),
              ("Hierarquia de vendas", "CRM Sales Hierarchy"), ("Sincronização de leads (Facebook)", "Lead Sync Source"),
-             ("Enriquecimento de dados", "CRM Enrichment Settings"), ("Ligação ao ERPNext", "ERPNext CRM Settings"),
+             ("Enriquecimento de dados", "CRM Enrichment Settings"), ("Ligação do CRM às vendas (orçamentos e clientes)", "ERPNext CRM Settings"),
              ("Telefonia — agentes", "CRM Telephony Agent"), ("Telefonia — Twilio", "CRM Twilio Settings"),
              ("Telefonia — Exotel", "CRM Exotel Settings"),
              ("Motor dos fluxos", "Automation Settings")]),
