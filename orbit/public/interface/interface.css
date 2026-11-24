@@ -644,3 +644,4 @@ div.desk-prop{flex-direction:row;justify-content:space-between;color:var(--ink)}
 .compras-criar{padding:10px;border-radius:8px;background:var(--surface-2)}
 .compras-botoes{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:16px 0 8px}
 @media (max-width:900px){.compras-rever{grid-template-columns:1fr}.compras-pdf{position:static;height:70vh;border-right:0;border-bottom:1px solid var(--line)}.compras-dados{padding:16px}}
+.btn:disabled{opacity:.5;cursor:not-allowed}

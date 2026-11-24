@@ -181,13 +181,22 @@ def pdf(nome):
     _ver()
     from orbit.compras.docs import _docs
     docs_id = int(frappe.db.get_value("Fatura do Docs", nome, "docs_id"))
-    meta = _docs(f"/api/documents/{docs_id}/")
-    mime = (meta.get("mime_type") or "").lower()
-    caminho = f"/api/documents/{docs_id}/download/" + \
-        ("?original=true" if mime == "application/pdf" or mime.startswith("image/") else "")
-    dados, tipo = _docs(caminho, binario=True)
+    try:
+        meta = _docs(f"/api/documents/{docs_id}/")
+        mime = (meta.get("mime_type") or "").lower()
+        caminho = f"/api/documents/{docs_id}/download/" + \
+            ("?original=true" if mime == "application/pdf" or mime.startswith("image/") else "")
+        dados, tipo = _docs(caminho, binario=True)
+    except Exception as e:  # noqa: BLE001 — um aviso legível no lugar do documento, nunca a página de erro
+        from html import escape
+        dados = ("<!doctype html><meta charset=utf-8><body style=\"font:14px system-ui;color:#555;padding:24px\">"
+                 f"<b>O documento n.º {docs_id} não se pôde abrir no Docs.</b><br><small>{escape(str(e)[:200])}</small>"
+                 ).encode()
+        tipo = "text/html"
     if dados[:4] == b"%PDF":
         tipo, ext = "application/pdf", "pdf"
+    elif tipo == "text/html":
+        ext = "html"
     else:
         ext = (tipo or "/bin").split("/")[-1]
     frappe.local.response.update({"type": "raw", "filename": f"fatura-docs-{docs_id}.{ext}", "filecontent": dados,
