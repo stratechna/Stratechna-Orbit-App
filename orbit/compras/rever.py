@@ -41,6 +41,10 @@ def _docs_pedir(metodo: str, caminho: str, corpo=None):
     return r.json() if r.content else {}
 
 
+def _eur(v):
+    return f"{flt(v):,.2f} €".replace(",", " ").replace(".", ",")
+
+
 def _docs_nota(docs_id, texto):
     try:
         _docs_pedir("POST", f"/api/documents/{int(docs_id)}/notes/", {"note": texto[:2000]})
@@ -79,7 +83,7 @@ def devolver_docs(f, pi) -> list:
     _docs_pedir("PATCH", f"/api/documents/{int(f.docs_id)}/", {
         "custom_fields": [{"field": k, "value": v} for k, v in valores.items()], "tags": sorted(etiquetas)})
     quem = frappe.db.get_value("User", frappe.session.user, "full_name") or frappe.session.user
-    if not _docs_nota(f.docs_id, f"Lançada no ERP do Orbit como {pi.name} ({flt(pi.grand_total):.2f} €), "
+    if not _docs_nota(f.docs_id, f"Lançada no ERP do Orbit como {pi.name} ({_eur(pi.grand_total)}), "
                                  f"confirmada por {quem}."):
         falhas.append("a nota no Docs")
     return falhas
@@ -151,8 +155,8 @@ def detalhe(nome):
                                          "bill_no", "net_total", "total_taxes_and_charges", "grand_total",
                                          "update_stock", "taxes_and_charges")}
         fatura["supplier_nif"] = frappe.db.get_value("Supplier", pi.supplier, "tax_id") or ""
-        stock = {r.name for r in frappe.get_all("Item", filters={"name": ["in", [l.item_code for l in pi.items]],
-                                                                  "is_stock_item": 1}, pluck="name")} if pi.items else set()
+        stock = set(frappe.get_all("Item", filters={"name": ["in", [l.item_code for l in pi.items]], "is_stock_item": 1},
+                                   pluck="name")) if pi.items else set()
         for l in pi.items:
             sug = frappe.db.get_value("Item", l.orbit_sugestao, "item_name") if l.orbit_sugestao else None
             linhas.append({
@@ -271,6 +275,11 @@ def _criar_artigo(novo, l, pi):
                            "is_purchase_item": 1, "brand": novo.get("marca") or None})
     if frappe.db.get_default("item_naming_by") != "Naming Series":
         item.item_code = _codigo_livre(novo.get("codigo") or l.orbit_ref_lida or nome)
+    if item.is_stock_item:   # o armazém real das outras linhas da fatura (senão a fatura inteira fica sem entrada em stock)
+        w = next((x for x in (R.armazem(o.item_code, pi.company) for o in pi.items
+                              if o.name != l.name and o.item_code != F0.ARTIGO_GASTO) if x), None)
+        if w:
+            item.append("item_defaults", {"company": pi.company, "default_warehouse": w})
     if l.orbit_ref_lida:
         item.append("supplier_items", {"supplier": pi.supplier, "supplier_part_no": l.orbit_ref_lida[:140]})
     item.insert()
