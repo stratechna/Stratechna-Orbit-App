@@ -25,13 +25,11 @@ _ERRO_EN_PT = [
 REGRAS = {
     "Asset Request Decided": (
         "RH — pedido de equipamento aprovado ou recusado",
-        "{{ ('O seu pedido de equipamento {0} foi aprovado' if doc.status == 'Approved' else "
-        "'O seu pedido de equipamento {0} foi recusado').format(doc.name) }}",
+        "Pedido de equipamento {{ doc.name }} {{ 'aprovado' if doc.status == 'Approved' else 'recusado' }}",
         _MOTIVO),
     "Bank Details Change Request Decided": (
         "RH — alteração dos dados bancários aprovada ou recusada",
-        "{{ 'O seu pedido de alteração dos dados bancários foi aprovado' if doc.status == 'Approved' else "
-        "'O seu pedido de alteração dos dados bancários foi recusado' }}",
+        "Alteração dos dados bancários {{ 'aprovada' if doc.status == 'Approved' else 'recusada' }}",
         _MOTIVO),
     "Error Log": ("Sistema — erro registado (email, desligado)", "[Erro] {{ doc.method }}", None),
     "Integration Request": ("Sistema — erro numa integração (email, desligado)",
@@ -99,7 +97,7 @@ def _campo():
         create_custom_field("Notification", {"fieldname": "orbit_descricao", "label": "Descrição",
                                              "fieldtype": "Data", "insert_after": "name", "bold": 1})
     if frappe.get_meta("Notification").title_field != "orbit_descricao":
-        make_property_setter("Notification", None, "title_field", "orbit_descricao", "Data",
+        make_property_setter("Notification", None, "title_field", "orbit_descricao", "Data", for_doctype=True,
                              validate_fields_for_doctype=False)
     frappe.clear_cache(doctype="Notification")
 
@@ -119,7 +117,10 @@ def acertar():
                 for en, pt in _ERRO_EN_PT:
                     texto = texto.replace(en, pt)
                 valores["message"] = texto
-            frappe.db.set_value("Notification", nome, valores, update_modified=False)
+            try:
+                frappe.db.set_value("Notification", nome, valores, update_modified=False)
+            except Exception as e:  # noqa: BLE001
+                frappe.log_error(f"notificacoes_pt {nome}: {e}", "orbit notificações PT")
         # as que alguém criou sem descrição mostram o próprio nome
         frappe.db.sql("update tabNotification set orbit_descricao=name where ifnull(orbit_descricao,'')=''")
         frappe.db.commit()

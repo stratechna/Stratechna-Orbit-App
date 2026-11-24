@@ -5,7 +5,7 @@ import { createApp, reactive, ref, computed, watch, onMounted, onUnmounted, next
 // ── API ──────────────────────────────────────────────────────────────────────────────────────────────
 async function api(metodo, args = {}, post = false) {
   // «erp.meta» → orbit.interface.erp.meta; sem ponto → orbit.interface.api.<metodo>
-  const url = metodo.includes(".") ? `/api/method/orbit.interface.${metodo}` : `/api/method/orbit.interface.api.${metodo}`;
+  const url = metodo.startsWith("orbit.") ? `/api/method/${metodo}` : metodo.includes(".") ? `/api/method/orbit.interface.${metodo}` : `/api/method/orbit.interface.api.${metodo}`;
   const op = { headers: { "X-Frappe-CSRF-Token": window.csrf_token, Accept: "application/json" } };
   let r;
   if (post) {
@@ -2763,6 +2763,212 @@ const ErpTabela = {
   </div>`,
 };
 
+// ── Proposta (Orçamento) no layout de 24-11-2026: marca, produtos com imagem e características, versões ──
+const apiP = (m, a = {}, post = false) => api("orbit.propostas." + m, a, post);
+const caractPares = (t) => (t || "").split("\n").map((l) => l.trim()).filter((l) => l.includes(":")).map((l) => { const i = l.indexOf(":"); return { k: l.slice(0, i).trim(), v: l.slice(i + 1).trim() }; }).filter((x) => x.v);
+const ErpProposta = {
+  components: { ErpLigacao },
+  props: ["name"],
+  setup(props) {
+    const doc = ref(null); const novo = ref(false); const sujo = ref(false); const a = ref(false); const aviso = ref("");
+    const marcas = ref([]); const versoes = ref([]); const podeGravar = ref(true);
+    const q = ref(""); const sug = ref([]); const procurando = ref(false); let tq;
+    const abertas = ref({}); const envio = ref(null);
+    const carregar = async () => {
+      const [r, ms] = await Promise.all([api("erp.documento", { doctype: "Quotation", name: props.name === "novo" ? undefined : props.name }), apiP("versoes.marcas")]);
+      marcas.value = ms || []; doc.value = r.doc; novo.value = r.novo; podeGravar.value = r.novo ? true : r.pode_gravar;
+      if (novo.value) { doc.value.quotation_to = doc.value.quotation_to || "Customer"; if (doc.value.orbit_imprimir_total == null) doc.value.orbit_imprimir_total = 1; }
+      versoes.value = r.novo ? [] : (await apiP("versoes.versoes", { name: props.name }) || []);
+      await nextTick(); sujo.value = false; ultima = assin();
+    };
+    onMounted(carregar);
+    watch(doc, (n, o) => { if (o) sujo.value = true; }, { deep: true });
+    const linhas = computed(() => (doc.value?.items || []).filter((l) => !l.orbit_de));
+    const docstatus = computed(() => doc.value?.docstatus || 0);
+    const ro = computed(() => !podeGravar.value || docstatus.value !== 0);
+    const moeda = (v) => new Intl.NumberFormat("pt-PT", { style: "currency", currency: doc.value?.currency || "EUR" }).format(v || 0);
+    const soma = (cod) => (doc.value?.items || []).filter((l) => l.orbit_de && l.item_code === cod).reduce((s, l) => s + (l.amount || 0), 0);
+    const totais = computed(() => { const d = doc.value || {}; const t = soma("TRANSPORTE"), m = soma("MONTAGEM");
+      return { equip: (d.total || 0) - t - m, transporte: t, montagem: m, sem: d.net_total || 0, iva: d.total_taxes_and_charges || 0, com: d.rounded_total || d.grand_total || 0 }; });
+    const marcaSel = computed(() => marcas.value.find((m) => m.name === doc.value?.orbit_marca));
+    const corMarca = (m) => m?.orbit_cor || "#5b6470";
+    // recálculo pelo ERP (preço, impostos, transporte/montagem, características) — nada é gravado
+    let ultima = ""; let tr0;
+    const assin = () => { const d = doc.value; if (!d) return ""; return JSON.stringify([d.party_name, d.orbit_marca, d.orbit_transporte_modo, d.orbit_transporte_total, d.orbit_montagem_total, d.taxes_and_charges,
+      (d.items || []).filter((l) => !l.orbit_de).map((l) => [l.item_code, l.qty, l.rate, l.orbit_transporte, l.orbit_montagem])]); };
+    const recalcular = async () => {
+      if (ro.value) return;
+      const r = await api("erp.recalcular", { doctype: "Quotation", dados: JSON.stringify(doc.value) }, true).catch(() => null);
+      if (!r) return; aviso.value = r.aviso || ""; if (!r.doc) return;
+      const nomes = linhas.value.map((l) => l.name);
+      r.doc.items = (r.doc.items || []).map((l, i) => (!l.orbit_de && i < nomes.length && !l.name ? { ...l, name: nomes[i] } : l));
+      Object.assign(doc.value, r.doc); ultima = assin();
+    };
+    watch(() => assin(), (s) => { if (s === ultima) return; ultima = s; clearTimeout(tr0); tr0 = setTimeout(recalcular, 450); });
+    // procurar produtos: ERP primeiro; internet só a pedido
+    watch(q, () => { clearTimeout(tq); if (q.value.trim().length < 2) { sug.value = []; return; } tq = setTimeout(async () => { sug.value = await apiP("versoes.sugestoes", { txt: q.value, marca: doc.value?.orbit_marca }) || []; }, 250); });
+    const acrescentar = (p) => {
+      doc.value.items = doc.value.items || [];
+      const n = linhas.value.length;
+      doc.value.items.splice(n, 0, { name: "novo-" + Math.random().toString(36).slice(2, 9), doctype: "Quotation Item", item_code: p.item_code, item_name: p.item_name, qty: 1,
+        rate: p.preco || 0, image: p.image, uom: p.uom, orbit_caracteristicas: p.caracteristicas || p.orbit_caracteristicas || "", brand: doc.value.orbit_marca, orbit_fonte: p.orbit_fonte || "" });
+      q.value = ""; sug.value = [];
+    };
+    const internet = async () => {
+      if (!q.value.trim()) { toast("Escreva a referência"); return; }
+      if (!confirm("Procurar «" + q.value + "» na internet? Gasta créditos de IA da conta.")) return;
+      procurando.value = true;
+      try {
+        const r = await apiP("referencia.procurar_internet", { referencia: q.value, marca: doc.value?.orbit_marca });
+        const p = r?.produto; if (!p) { toast("Não encontrado na internet"); return; }
+        const g = await apiP("referencia.gravar_artigo", { dados: JSON.stringify({ referencia: q.value, titulo: p.titulo, descricao: p.descricao,
+          caracteristicas: (p.caracteristicas || []).map((x) => (x[0] ? x[0] + ": " : "") + x[1]).join("\n"), imagem: (p.imagens || [])[0], marca: doc.value?.orbit_marca, fonte: p.fonte }) }, true);
+        acrescentar({ ...g, preco: p.preco, caracteristicas: g.orbit_caracteristicas });
+        toast("Acrescentado — reveja as características");
+      } finally { procurando.value = false; }
+    };
+    const remover = (l) => { doc.value.items = doc.value.items.filter((x) => x !== l); };
+    const gravar = async () => {
+      if (!doc.value.party_name) { toast("Escolha o cliente"); return; }
+      if (!linhas.value.length) { toast("Acrescente pelo menos um produto"); return; }
+      a.value = true;
+      try { const r = await api("erp.gravar", { doctype: "Quotation", dados: JSON.stringify(doc.value) }, true); toast("Gravado");
+        if (novo.value || r.doc.name !== props.name) { location.hash = irErp("Quotation", r.doc.name); return; }
+        doc.value = r.doc; await nextTick(); sujo.value = false; ultima = assin(); } finally { a.value = false; }
+    };
+    const alternativa = async () => {
+      if (sujo.value || novo.value) { toast("Grave a proposta primeiro"); return; }
+      const r = await apiP("versoes.criar_alternativa", { name: doc.value.name }, true);
+      toast("Versão nova criada — troque o produto"); location.hash = irErp("Quotation", r.name);
+    };
+    const submeter = async () => { if (!confirm("Fechar esta versão da proposta? Depois de fechada já não se altera (pode criar outra versão).")) return;
+      a.value = true; try { const r = await api("erp.submeter", { doctype: "Quotation", name: doc.value.name }, true); doc.value = r.doc; await nextTick(); sujo.value = false; toast("Proposta fechada"); } finally { a.value = false; } };
+    const encomenda = async () => { const r = await api("erp.criar_de", { doctype: "Quotation", name: doc.value.name, destino: "Sales Order" }, true);
+      try { sessionStorage.setItem("orbit.erp.novo", JSON.stringify(r.doc)); } catch (e) {} location.hash = irErp("Sales Order", "novo"); };
+    const pdf = computed(() => doc.value && !novo.value ? `/api/method/frappe.utils.print_format.download_pdf?doctype=Quotation&name=${encodeURIComponent(doc.value.name)}&format=${encodeURIComponent("Proposta Orbit")}&no_letterhead=1` : "");
+    const abrirEnvio = () => { if (sujo.value) { toast("Grave a proposta primeiro"); return; }
+      const m = marcaSel.value?.name || ""; envio.value = { para: doc.value.contact_email || "", assunto: `Proposta ${doc.value.name}${m ? " — " + m : ""}`,
+        mensagem: `Bom dia,\n\nEnviamos em anexo a nossa proposta ${doc.value.name}.\n\nFicamos ao dispor para qualquer esclarecimento.\n\nCom os melhores cumprimentos,` }; };
+    const enviar = async () => { a.value = true; try { await apiP("versoes.enviar", { name: doc.value.name, ...envio.value }, true); toast("Proposta enviada"); envio.value = null; } finally { a.value = false; } };
+    const titulo = computed(() => doc.value?.customer_name || doc.value?.party_name || "Nova proposta");
+    const curtas = (l) => caractPares(l.orbit_caracteristicas).slice(0, 6);
+    const nCaract = (l) => caractPares(l.orbit_caracteristicas).length;
+    return { doc, novo, sujo, a, aviso, marcas, versoes, ro, linhas, docstatus, moeda, totais, marcaSel, corMarca, q, sug, procurando, acrescentar, internet, remover,
+      gravar, alternativa, submeter, encomenda, pdf, envio, abrirEnvio, enviar, titulo, curtas, nCaract, abertas, irErp, ESTADO_DOC };
+  },
+  template: `<div v-if="doc" class="pad prop">
+    <div class="sub"><a :href="irErp('Quotation')">← Propostas</a> · <a v-if="!novo" :href="irErp('Quotation', doc.name) + '/completa'">ficha completa</a></div>
+    <div class="prop-topo">
+      <div>
+        <div class="prop-tit"><h1>{{ titulo }}</h1><span v-if="!novo" class="etq" :class="ESTADO_DOC[docstatus][1]">{{ docstatus===0 ? 'Rascunho' : (doc.status || ESTADO_DOC[docstatus][0]) }}</span><span v-if="sujo" class="etq ambar">Por gravar</span></div>
+        <div class="sub" v-if="!novo">{{ doc.name }}<template v-if="doc.orbit_versao"> · versão {{ doc.orbit_versao }}</template> · {{ doc.transaction_date }}</div>
+        <div v-if="versoes.length" class="prop-versoes" role="tablist" aria-label="Versões desta proposta">
+          <a v-for="v in versoes" :key="v.name" role="tab" :aria-selected="v.name===doc.name" :class="{ativo: v.name===doc.name}" :href="irErp('Quotation', v.name)">{{ v.versao }} · {{ v.principal || v.name }} — {{ moeda(v.total) }}</a>
+        </div>
+      </div>
+      <div class="prop-accoes">
+        <a v-if="pdf" class="btn" :href="pdf" target="_blank">Pré-visualizar PDF</a>
+        <button v-if="!ro && (novo || sujo)" class="btn prim" :disabled="a" @click="gravar">Gravar</button>
+        <button v-if="!novo && !sujo && docstatus===0 && !ro" class="btn" :disabled="a" @click="submeter">Fechar proposta</button>
+        <button v-if="docstatus===1" class="btn" @click="encomenda">Criar encomenda</button>
+        <button v-if="!novo" class="btn prim" :disabled="a || sujo" @click="abrirEnvio">Enviar ao cliente</button>
+      </div>
+    </div>
+    <div v-if="aviso" class="aviso">{{ aviso }}</div>
+    <div class="prop-corpo">
+      <div class="prop-principal">
+        <section class="cartao prop-dados" aria-label="Dados da proposta">
+          <div class="prop-marcas" v-if="marcas.length"><div class="sub">Marca que envia</div>
+            <div class="prop-chips"><button v-for="m in marcas" :key="m.name" type="button" :disabled="ro" :class="{ativo: doc.orbit_marca===m.name}" :style="doc.orbit_marca===m.name ? {borderColor: corMarca(m)} : {}" @click="doc.orbit_marca=m.name"><span :style="{background: corMarca(m)}"></span>{{ m.name }}</button></div></div>
+          <div class="prop-campos">
+            <label>Proposta para<select v-model="doc.quotation_to" :disabled="ro"><option value="Customer">Cliente</option><option value="Lead">Lead</option><option value="Prospect">Potencial cliente</option></select></label>
+            <label>Cliente<ErpLigacao v-model="doc.party_name" :alvo="doc.quotation_to" :ro="ro"/></label>
+            <label>Ao cuidado de<ErpLigacao v-model="doc.contact_person" alvo="Contact" :ro="ro"/></label>
+            <label>Válida até<input type="date" v-model="doc.valid_till" :disabled="ro"></label>
+            <label class="larga">Introdução<textarea rows="2" v-model="doc.orbit_texto_intro" :disabled="ro" placeholder="Na sequência do seu pedido, apresentamos…"></textarea></label>
+          </div>
+        </section>
+        <section v-if="!ro" class="cartao prop-procura" aria-label="Adicionar produto">
+          <div class="prop-procura-linha">
+            <label class="cresce"><span class="so-leitor">Referência, EAN ou nome</span><input v-model="q" placeholder="Adicionar produto — referência, EAN ou nome…" autocomplete="off"></label>
+            <button type="button" class="btn" :disabled="procurando" @click="internet">{{ procurando ? 'A procurar…' : 'Procurar na internet · créditos de IA' }}</button>
+          </div>
+          <div v-if="sug.length" class="prop-sug">
+            <button v-for="s in sug" :key="s.item_code" type="button" class="prop-sug-item" @click="acrescentar(s)">
+              <span class="prop-sug-img"><img v-if="s.image" :src="s.image" alt=""></span>
+              <span class="cresce"><b>{{ s.item_name }}</b><small>{{ s.item_code }}<template v-if="s.fabricante"> · {{ s.fabricante }}</template><template v-if="s.n_caracteristicas"> · {{ s.n_caracteristicas }} características</template><template v-if="s.inactivo"> · inactivo</template></small></span>
+              <span v-if="s.preco" class="prop-sug-preco">{{ moeda(s.preco) }}</span>
+            </button>
+          </div>
+          <div v-else-if="q.trim().length>=2" class="sub">Nada nos artigos do ERP com «{{ q }}». Pode procurar na internet.</div>
+          <div v-else class="sub">Procura nos artigos do ERP pela referência (nossa ou do fornecedor), EAN ou nome — com a imagem e as características.</div>
+        </section>
+        <article v-for="(l, i) in linhas" :key="l.name || i" class="cartao prop-linha" :aria-label="'Linha ' + (i+1)">
+          <div class="prop-linha-corpo">
+            <div class="prop-n">{{ i + 1 }}</div>
+            <div class="prop-img"><img v-if="l.image" :src="l.image" :alt="l.item_name"><span v-else>Sem imagem</span></div>
+            <div class="prop-info">
+              <div class="prop-ref" :style="{color: corMarca(marcaSel)}">Ref. {{ l.item_code }}<span v-if="l.is_alternative" class="etq ambar" style="margin-left:6px">alternativa antiga</span></div>
+              <input class="prop-nome" v-model="l.item_name" :disabled="ro" aria-label="Designação">
+              <div v-if="curtas(l).length" class="prop-specs"><div v-for="c in curtas(l)" :key="c.k"><small>{{ c.k }}</small><b>{{ c.v }}</b></div></div>
+              <button v-if="nCaract(l) || !ro" type="button" class="link" @click="abertas[i] = !abertas[i]">{{ abertas[i] ? 'Fechar as características' : (nCaract(l) ? 'Ver e editar as ' + nCaract(l) + ' características' : 'Acrescentar características') }}</button>
+              <label v-if="abertas[i]" class="prop-caract">Uma por linha, «Nome: valor»<textarea rows="8" v-model="l.orbit_caracteristicas" :disabled="ro"></textarea></label>
+            </div>
+            <div class="prop-valores">
+              <div class="prop-qp"><label>Qtd.<input type="number" min="0" step="any" v-model.number="l.qty" :disabled="ro"></label><label>Preço unitário<input type="number" min="0" step="0.01" v-model.number="l.rate" :disabled="ro"></label></div>
+              <div class="prop-total"><b>{{ moeda(l.amount != null ? l.amount : (l.qty||0)*(l.rate||0)) }}</b><small v-if="doc.orbit_mostrar_iva">+ IVA</small></div>
+            </div>
+          </div>
+          <div class="prop-linha-pe">
+            <template v-if="(doc.orbit_transporte_modo||'Por produto')==='Por produto'">
+              <label>Transporte<input type="number" min="0" step="0.01" v-model.number="l.orbit_transporte" :disabled="ro"></label>
+              <label>Montagem<input type="number" min="0" step="0.01" v-model.number="l.orbit_montagem" :disabled="ro"></label>
+            </template>
+            <label class="cresce">Observações<input v-model="l.orbit_observacoes" :disabled="ro" placeholder="Ex.: precisa de tomada 230 V a menos de 1,5 m"></label>
+            <button v-if="!novo && i===0 && !ro" type="button" class="btn sm" @click="alternativa">Criar proposta alternativa com outro produto</button>
+            <button v-if="!ro" type="button" class="btn sm" @click="remover(l)">Remover</button>
+          </div>
+        </article>
+        <div v-if="!linhas.length" class="cartao vazio">Ainda sem produtos — procure acima pela referência ou pelo nome.</div>
+      </div>
+      <aside class="prop-lado" aria-label="Resumo">
+        <section class="cartao">
+          <h2>Resumo</h2>
+          <div class="prop-tot"><span>Equipamentos e serviços</span><span>{{ moeda(totais.equip) }}</span></div>
+          <div class="prop-tot" v-if="totais.transporte"><span>Transporte</span><span>{{ moeda(totais.transporte) }}</span></div>
+          <div class="prop-tot" v-if="totais.montagem"><span>Montagem</span><span>{{ moeda(totais.montagem) }}</span></div>
+          <div class="prop-tot forte"><span>Total sem IVA</span><span>{{ moeda(totais.sem) }}</span></div>
+          <div class="prop-tot"><span>IVA</span><span>{{ moeda(totais.iva) }}</span></div>
+          <div class="prop-tot final"><span>Total com IVA</span><b>{{ moeda(totais.com) }}</b></div>
+          <fieldset :disabled="ro"><legend class="sub">Transporte e montagem</legend>
+            <div class="prop-chips"><button v-for="o in ['Por produto','No total','Não incluir']" :key="o" type="button" :class="{ativo: (doc.orbit_transporte_modo||'Por produto')===o}" @click="doc.orbit_transporte_modo=o">{{ o }}</button></div>
+            <div v-if="doc.orbit_transporte_modo==='No total'" class="prop-qp" style="margin-top:8px"><label>Transporte<input type="number" min="0" step="0.01" v-model.number="doc.orbit_transporte_total"></label><label>Montagem<input type="number" min="0" step="0.01" v-model.number="doc.orbit_montagem_total"></label></div>
+          </fieldset>
+          <label class="prop-check"><input type="checkbox" :true-value="1" :false-value="0" v-model="doc.orbit_imprimir_total" :disabled="ro">Imprimir o total na proposta</label>
+          <label class="prop-check"><input type="checkbox" :true-value="1" :false-value="0" v-model="doc.orbit_mostrar_iva" :disabled="ro">Mostrar o IVA</label>
+        </section>
+        <section class="cartao prop-cond">
+          <h2>Condições</h2>
+          <label>Garantia<input v-model="doc.orbit_garantia" :disabled="ro"></label>
+          <label>Pagamento<textarea rows="2" v-model="doc.orbit_pagamento" :disabled="ro"></textarea></label>
+          <label>Prazo de entrega<input v-model="doc.orbit_prazo" :disabled="ro"></label>
+          <label class="prop-check"><input type="checkbox" :true-value="1" :false-value="0" v-model="doc.orbit_anexar_condicoes" :disabled="ro">Anexar as condições comerciais<template v-if="doc.orbit_marca"> da {{ doc.orbit_marca }}</template></label>
+        </section>
+      </aside>
+    </div>
+    <div v-if="envio" class="modal-fundo" @click.self="envio=null"><div class="modal" style="max-width:560px">
+      <header><b>Enviar a proposta {{ doc.name }}</b><button class="btn sm" @click="envio=null">Fechar</button></header>
+      <div class="prop-envio">
+        <label>Para<input v-model="envio.para" placeholder="email do cliente"></label>
+        <label>Assunto<input v-model="envio.assunto"></label>
+        <label>Mensagem<textarea rows="7" v-model="envio.mensagem"></textarea></label>
+        <div class="sub">Segue com o PDF da proposta em anexo e fica registado na cronologia do cliente.</div>
+        <div style="text-align:right"><button class="btn prim" :disabled="a" @click="enviar">Enviar</button></div>
+      </div>
+    </div></div>
+  </div><div v-else class="vazio">A carregar…</div>`,
+};
+
 const ErpFicha = {
   components: { ErpCampo, ErpTabela },
   props: ["doctype", "name"],
@@ -3185,7 +3391,7 @@ const abrirApp = (chave, url) => {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpProposta, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -3302,6 +3508,7 @@ const App = {
         <AppEmbutida v-else-if="ecra==='app'" :nome="partes[1]" :key="partes[1]"/>
         <ErpModulo v-else-if="ecra==='erp-m'" :barra="partes[1]" :key="'m'+partes[1]"/>
         <ErpLista v-else-if="ecra==='erp' && !partes[2]" :doctype="partes[1]" :key="'l'+partes[1]"/>
+        <ErpProposta v-else-if="ecra==='erp' && partes[1]==='Quotation' && partes[3]!=='completa'" :name="partes[2]" :key="'p'+partes[2]"/>
         <ErpFicha v-else-if="ecra==='erp'" :doctype="partes[1]" :name="partes[2]" :key="'f'+partes[1]+'/'+partes[2]"/>
         <ErpStock v-else-if="ecra==='erp-stock'" :artigo="partes[1]" :key="'s'+(partes[1]||'')"/>
         <ErpPessoas v-else-if="ecra==='pessoas'"/>

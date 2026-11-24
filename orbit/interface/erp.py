@@ -399,6 +399,10 @@ def recalcular(doctype: str, dados: str):
         else:
             if hasattr(d, "set_missing_values"):
                 d.set_missing_values(for_validate=True)
+            if doctype == "Quotation":   # propostas: características, transporte e montagem como ao gravar
+                from orbit.propostas.regras import antes_de_validar
+                antes_de_validar(d)
+                d.set_missing_values(for_validate=True)
             if hasattr(d, "calculate_taxes_and_totals"):
                 d.calculate_taxes_and_totals()
     except frappe.ValidationError as e:

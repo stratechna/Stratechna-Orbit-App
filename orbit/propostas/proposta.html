@@ -1,162 +1,191 @@
 {#- Proposta Orbit — modelo de impressão do Orçamento (orbit/propostas). Reposto a cada migração: alterar AQUI.
+    Layout de 24-11-2026 (aprovado pelo Vítor): cada produto num bloco com a imagem grande e as características
+    em tabela; sem resumo no início; totais só no fim e só com «Imprimir o total»; alternativas = outras versões.
     O PDF sai pelo wkhtmltopdf (WebKit antigo): só tabelas e blocos, nada de grid nem flex. -#}
 {%- set p = orbit_proposta(doc) -%}
 {%- set m = p.marca -%}
 <style>
-  .orbit-prop, .orbit-prop td, .orbit-prop th { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: #1d2329; }
-  .orbit-prop { font-size: 10.5px; line-height: 1.45; padding: 0 14mm; }
+  .orbit-prop, .orbit-prop td, .orbit-prop th { font-family: "DM Sans", "Helvetica Neue", Helvetica, Arial, sans-serif; color: #1d2125; }
+  .orbit-prop { font-size: 10.5px; line-height: 1.45; padding: 0 13mm; }
   .orbit-prop table { width: 100%; border-collapse: collapse; }
-  .op-cab td { vertical-align: bottom; padding: 0 0 10px; }
-  .op-cab { border-bottom: 3px solid {{ m.cor }}; margin-bottom: 14px; }
-  .op-logo { max-height: 62px; max-width: 250px; }
-  .op-nome { font-size: 22px; font-weight: bold; color: {{ m.cor_letra }}; letter-spacing: .02em; }
+  .op-barra { height: 7px; background: {{ m.cor }}; margin: 0 -13mm 16px; }
+  .op-cab td { vertical-align: bottom; padding: 0 0 14px; }
+  .op-logo { max-height: 64px; max-width: 260px; }
+  .op-nome { font-size: 26px; font-weight: bold; color: {{ m.cor_letra }}; }
   .op-doc { text-align: right; }
-  .op-doc h1 { font-size: 17px; margin: 0 0 2px; font-weight: bold; color: #1d2329; }
-  .op-num { font-family: "Courier New", monospace; font-size: 10.5px; color: #5b6670; }
-  .op-meta td.bloco { border: 1px solid #d5dbe0; padding: 8px 10px; vertical-align: top; }
-  .op-meta td.sep { width: 14px; border: 0; }
-  .op-rot { font-size: 8.5px; text-transform: uppercase; letter-spacing: .08em; color: #5b6670; font-weight: bold; margin-bottom: 2px; }
-  .op-tipo { font-size: 8.5px; font-weight: bold; padding: 1px 5px; background: #eef1f3; color: {{ m.cor_letra }}; margin-left: 4px; }
-  .op-kv td { padding: 1px 0; border: 0; } .op-kv td.k { color: #5b6670; width: 72px; }
-  .op-intro { margin: 14px 0 6px; }
-  .op-intro p { margin: 0 0 6px; }
-  .op-linhas { margin-top: 8px; table-layout: fixed; }
-  .op-linhas td, .op-linhas th { word-wrap: break-word; }
-  .op-linhas th { font-size: 8px; text-transform: uppercase; letter-spacing: .07em; color: #5b6670; text-align: left;
-                  border-bottom: 1px solid #1d2329; padding: 5px 4px; font-weight: bold; }
-  .op-linhas td { vertical-align: top; padding: 8px 4px; border-bottom: 1px solid #d5dbe0; }
-  .op-linhas tr { page-break-inside: avoid; }
-  .op-n { text-align: right; white-space: nowrap; }
-  .op-pos { font-family: "Courier New", monospace; color: #5b6670; width: 18px; }
-  .op-img { text-align: center; }
-  .op-img div { width: 76px; height: 76px; border: 1px solid #d5dbe0; text-align: center; line-height: 74px; }
-  .op-img img { max-width: 72px !important; max-height: 72px; width: auto; height: auto; vertical-align: middle; }
-  .op-ref { font-family: "Courier New", monospace; font-size: 9.5px; color: {{ m.cor_letra }}; font-weight: bold; }
-  .op-desc { font-weight: bold; font-size: 11.5px; margin: 1px 0 3px; }
-  .op-texto { font-size: 9.5px; color: #3c4650; margin-bottom: 3px; }
+  .op-tipo { font-size: 8.5px; font-weight: bold; letter-spacing: .12em; color: {{ m.cor_letra }}; }
+  .op-num { font-size: 15px; font-weight: bold; margin-top: 2px; }
+  .op-data { font-size: 9.5px; color: #4a535c; }
+  .op-blocos td.b { width: 49%; background: #f6f7f8; border-radius: 6px; padding: 9px 12px; vertical-align: top; }
+  .op-blocos td.s { width: 2%; }
+  .op-rot { font-size: 7.5px; font-weight: bold; letter-spacing: .1em; color: #4a535c; }
+  .op-quem { font-size: 12px; font-weight: bold; margin: 2px 0 1px; }
+  .op-mais { font-size: 9.5px; color: #3d454d; }
+  .op-intro { margin: 14px 0 4px; font-size: 10.5px; color: #2b3238; }
+  .op-intro p { margin: 0 0 5px; }
+  .op-prod { margin-top: 16px; border-top: 3px solid {{ m.cor }}; page-break-inside: avoid; }
+  .op-prod > tbody > tr > td { vertical-align: top; padding-top: 12px; }
+  .op-foto { width: 150px; padding-right: 14px; }
+  .op-foto div { width: 148px; height: 148px; border: 1px solid #e3e6e9; border-radius: 6px; text-align: center; line-height: 146px; background: #fff; }
+  .op-foto img { max-width: 140px !important; max-height: 140px; width: auto; height: auto; vertical-align: middle; }
+  .op-ref { font-size: 8.5px; font-weight: bold; letter-spacing: .04em; color: {{ m.cor_letra }}; text-transform: uppercase; }
+  .op-desig { font-size: 13.5px; font-weight: bold; line-height: 1.25; margin: 2px 0 0; }
+  .op-texto { font-size: 9.5px; color: #3d454d; margin-top: 3px; }
   .op-texto p { margin: 0 0 3px; }
-  .op-specs { table-layout: fixed; margin-top: 3px; }
-  .op-specs td { border: 0 !important; padding: 0 8px 4px 0 !important; font-size: 9.5px; vertical-align: top; width: 50%;
-                 background: transparent !important; }
-  .op-specs .k { display: block; color: #5b6670; font-size: 8px; line-height: 1.3; }
-  .op-iva { display: block; font-size: 8.5px; color: #5b6670; }
-  .op-obs { font-size: 9.5px; color: #3c4650; }
-  tr.op-alt td { background: #fff6e3; }
-  .op-selo { font-size: 8px; font-weight: bold; letter-spacing: .06em; text-transform: uppercase; color: #8a5a00;
-             border: 1px solid #8a5a00; padding: 0 4px; }
-  .op-nao-soma { display: block; font-size: 8.5px; color: #8a5a00; font-weight: bold; }
-  tr.op-extra td { padding: 3px 4px; border-bottom: 1px dashed #d5dbe0; font-size: 9.5px; color: #3c4650; background: #fbfcfd; }
-  tr.op-extra.op-alt td { background: #fffaf0; }
-  .op-totais { width: 46% !important; margin: 12px 0 0 auto; }
-  .op-totais td { padding: 3px 6px; border: 0; }
+  .op-preco { width: 118px; }
+  .op-preco div { background: #f6f7f8; border-radius: 6px; padding: 6px 9px; text-align: right; }
+  .op-preco .q { font-size: 9px; color: #4a535c; }
+  .op-preco .t { font-size: 13px; font-weight: bold; }
+  .op-preco .i { font-size: 8px; color: #4a535c; }
+  .op-specs { margin-top: 9px; table-layout: fixed; }
+  .op-specs td { padding: 3px 6px; font-size: 9.5px; vertical-align: top; border: 0; }
+  .op-specs td.k { color: #4a535c; width: 25%; }
+  .op-specs tr.z td { background: #f6f7f8; }
+  .op-extras { margin-top: 8px; }
+  .op-extras td { padding: 0 6px 0 0; border: 0; }
+  .op-chip { display: inline-block; padding: 3px 8px; border-radius: 4px; background: #f6f7f8; font-size: 9.5px; margin: 0 5px 3px 0; }
+  .op-nota { display: inline-block; padding: 3px 8px; border-radius: 4px; border: 1px dashed #b8bec4; font-size: 9.5px; color: #2b3238; }
+  .op-serv { margin-top: 14px; border-top: 3px solid {{ m.cor }}; page-break-inside: avoid; }
+  .op-serv td { padding-top: 10px; vertical-align: top; }
+  .op-selo { font-size: 7.5px; font-weight: bold; letter-spacing: .06em; text-transform: uppercase; color: #6b4a00; border: 1px solid #6b4a00; padding: 0 4px; }
+  .op-totais { width: 46% !important; margin: 20px 0 0 auto; page-break-inside: avoid; }
+  .op-totais td { padding: 4px 0; border: 0; font-size: 10.5px; }
   .op-totais td.v { text-align: right; white-space: nowrap; }
-  .op-totais tr.sub td { color: #5b6670; }
-  .op-totais tr.fim td { border-top: 2px solid #1d2329; font-weight: bold; font-size: 12.5px; padding-top: 6px; }
-  .op-cond { margin-top: 18px; border-top: 1px solid #d5dbe0; page-break-inside: avoid; }
-  .op-cond td { width: 50%; vertical-align: top; padding: 8px 16px 2px 0; border: 0; }
-  .op-cond h4, .op-anexo h2 { margin: 0 0 2px; font-size: 8.5px; text-transform: uppercase; letter-spacing: .08em; color: {{ m.cor_letra }}; }
-  .op-aceite { margin-top: 26px; page-break-inside: avoid; }
-  .op-aceite td { width: 50%; padding: 0 24px 0 0; border: 0; font-size: 9.5px; color: #5b6670; }
-  .op-aceite div { border-top: 1px solid #9aa6b0; padding-top: 3px; }
+  .op-totais tr.sub td { color: #4a535c; }
+  .op-totais tr.sem td { border-top: 1px solid #dfe3e6; font-weight: bold; padding-top: 7px; }
+  .op-final { background: #1d2125; color: #fff !important; border-radius: 6px; padding: 9px 12px; margin-top: 6px; }
+  .op-final td { color: #fff !important; padding: 0 !important; }
+  .op-final .v { font-size: 15px; font-weight: bold; }
+  .op-cond { margin-top: 22px; page-break-inside: avoid; }
+  .op-cond td.c { width: 49%; vertical-align: top; padding: 2px 0 2px 10px; border-left: 3px solid {{ m.cor }}; }
+  .op-cond td.s { width: 2%; border: 0; }
+  .op-cond tr.e td { height: 10px; border: 0 !important; padding: 0; }
+  .op-cond .op-rot { color: {{ m.cor_letra }}; }
+  .op-anexar { margin-top: 10px; font-size: 9.5px; color: #3d454d; }
+  .op-aceite { margin-top: 34px; page-break-inside: avoid; }
+  .op-aceite td { width: 47%; padding: 0; border: 0; font-size: 9.5px; color: #4a535c; vertical-align: bottom; }
+  .op-aceite td.s { width: 6%; }
+  .op-aceite div { border-top: 1px solid #8a939b; padding-top: 4px; margin-top: 40px; }
   .op-anexo { page-break-before: always; }
-  .op-anexo h2 { font-size: 13px; margin-bottom: 10px; }
+  .op-anexo h2 { font-size: 13px; margin: 0 0 10px; color: {{ m.cor_letra }}; }
   .op-anexo .corpo { font-size: 9.5px; line-height: 1.5; }
-  .op-rodape { background: {{ m.cor }}; padding: 9px 14mm; font-family: Helvetica, Arial, sans-serif; }
+  .op-rodape { background: {{ m.cor }}; padding: 10px 13mm; font-family: "DM Sans", Helvetica, Arial, sans-serif; }
   .op-rodape td { color: {{ m.cor_texto }}; font-size: 8px; line-height: 1.45; vertical-align: top; padding-right: 12px; border: 0; }
   .op-rodape b { font-size: 8.5px; }
-  .op-rodape .pag { text-align: right; white-space: nowrap; vertical-align: bottom; font-family: "Courier New", monospace; padding-right: 0; }
+  .op-rodape .pag { text-align: right; white-space: nowrap; vertical-align: bottom; font-weight: bold; padding-right: 0; }
   .print-format { padding: 0 !important; }
 </style>
 
 <div class="orbit-prop">
+  <div class="op-barra"></div>
   <table class="op-cab"><tr>
     <td>{% if m.logo %}<img class="op-logo" src="{{ m.logo }}">{% else %}<span class="op-nome">{{ m.nome }}</span>{% endif %}</td>
-    <td class="op-doc"><h1>Proposta comercial</h1>
-      <div class="op-num">{{ doc.name }}</div>
-      <div class="op-num">{{ p.data }}</div></td>
-  </tr></table>
-
-  <table class="op-meta"><tr>
-    <td class="bloco" style="width:56%">
-      <div class="op-rot">{{ "Cliente" if doc.quotation_to == "Customer" else "Potencial cliente" }}</div>
-      <b>{{ doc.customer_name or doc.party_name or "" }}</b>
-      {%- if doc.address_display %}<br>{{ doc.address_display | replace("<br>\n", ", ") | replace("<br>", ", ") | striptags | truncate(160) }}{% endif %}
-      {%- if doc.contact_display %}<br>Att. {{ doc.contact_display }}{% endif %}
-      {%- if doc.contact_email %} · {{ doc.contact_email }}{% endif %}
+    <td class="op-doc">
+      <div class="op-tipo">PROPOSTA COMERCIAL</div>
+      <div class="op-num">{{ doc.name }}{% if p.versao %} · versão {{ p.versao }}{% endif %}</div>
+      <div class="op-data">{{ p.data }}{% if p.valido_ate %} · válida até {{ p.valido_ate }}{% endif %}</div>
     </td>
-    <td class="sep"></td>
-    <td class="bloco"><table class="op-kv">
-      <tr><td class="k">Data</td><td>{{ p.data }}</td></tr>
-      {% if p.validade %}<tr><td class="k">Validade</td><td>{{ p.validade }}</td></tr>{% endif %}
-      {% if p.comercial %}<tr><td class="k">Comercial</td><td>{{ p.comercial }}</td></tr>{% endif %}
-    </table></td>
   </tr></table>
 
-  {% if doc.orbit_texto_intro %}<div class="op-intro">{{ doc.orbit_texto_intro }}</div>{% endif %}
+  <table class="op-blocos"><tr>
+    <td class="b">
+      <div class="op-rot">PARA</div>
+      <div class="op-quem">{{ doc.customer_name or doc.party_name or "" }}</div>
+      <div class="op-mais">
+        {%- if doc.contact_display %}Ao cuidado de {{ doc.contact_display }}<br>{% endif -%}
+        {%- if doc.contact_email %}{{ doc.contact_email }}{% endif %}{% if doc.contact_mobile %} · {{ doc.contact_mobile }}{% endif -%}
+        {%- if doc.address_display %}<br>{{ doc.address_display | replace("<br>\n", ", ") | replace("<br>", ", ") | striptags | truncate(150) }}{% endif %}
+      </div>
+    </td>
+    <td class="s"></td>
+    <td class="b">
+      <div class="op-rot">DE</div>
+      <div class="op-quem">{{ p.comercial }}{% if p.comercial %} · {% endif %}{{ m.nome }}</div>
+      <div class="op-mais">
+        {{ p.email_comercial or m.email }}{% if p.telefone_comercial or m.telefones %} · {{ p.telefone_comercial or m.telefones }}{% endif %}
+        {%- if doc.orbit_prazo %}<br>Prazo de entrega: {{ doc.orbit_prazo }}{% endif %}
+      </div>
+    </td>
+  </tr></table>
 
-  <table class="op-linhas">
-    <colgroup><col style="width:24px"><col style="width:84px"><col><col style="width:34px"><col style="width:74px">
-      <col style="width:82px"><col style="width:96px"></colgroup>
-    <thead><tr><th></th><th>Imagem</th><th>Artigo e características</th><th class="op-n">Qtd.</th>
-      <th class="op-n">Preço unit.</th><th class="op-n">Total</th><th>Observações</th></tr></thead>
-    <tbody>
-    {% for l in p.linhas %}
-      <tr class="{{ 'op-alt' if l.alternativa else '' }}">
-        <td class="op-pos">{{ l.numero }}</td>
-        <td class="op-img">{% if l.imagem %}<div><img src="{{ l.imagem }}"></div>{% endif %}</td>
-        <td>
-          {% if l.alternativa %}<span class="op-selo">Alternativa à linha {{ l.de }}</span><br>{% endif %}
-          <span class="op-ref">Ref. {{ l.referencia }}</span>
-          <div class="op-desc">{{ l.nome }}</div>
-          {% if l.descricao %}<div class="op-texto">{{ l.descricao }}</div>{% endif %}
-          {% if l.caracteristicas %}<table class="op-specs">
-            {% for par in l.caracteristicas | batch(2) %}<tr>{% for k, v in par %}<td>{% if k %}<span class="k">{{ k }}</span>{% endif %}{{ v }}</td>{% endfor %}{% if par | length == 1 %}<td></td>{% endif %}</tr>{% endfor %}
-          </table>{% endif %}
-        </td>
-        <td class="op-n">{{ l.qtd }}</td>
-        <td class="op-n">{{ l.preco }}</td>
-        <td class="op-n">{{ l.total }}<span class="op-iva">+ IVA {{ l.iva }}</span>
-          {% if l.alternativa %}<span class="op-nao-soma">não incluída no total</span>{% endif %}</td>
-        <td class="op-obs">{{ l.observacoes }}</td>
-      </tr>
-      {% for e in l.extras %}
-      <tr class="op-extra {{ 'op-alt' if l.alternativa else '' }}">
-        <td></td><td></td><td>{{ e.rotulo }} — linha {{ l.numero }}</td><td></td><td></td>
-        <td class="op-n">{{ e.valor }}<span class="op-iva">+ IVA {{ l.iva }}</span></td><td></td>
-      </tr>
-      {% endfor %}
-    {% endfor %}
-    </tbody>
-  </table>
+  {% if doc.orbit_texto_intro or p.outras %}<div class="op-intro">
+    {{ doc.orbit_texto_intro or "" }}
+    {%- if p.outras %}<p>Segue também {{ "a versão" if p.outras | length == 1 else "as versões" }}
+      {% for o in p.outras %}{{ o.versao }} ({{ o.nome }}){{ ", " if not loop.last else "" }}{% endfor %}, para comparação.</p>{% endif %}
+  </div>{% endif %}
 
+  {% for l in p.linhas %}
+    {% if l.servico %}
+    <table class="op-serv"><tr>
+      <td>
+        <div class="op-ref">{{ l.numero }} · {{ "Serviço" if l.referencia in ("MONTAGEM", "TRANSPORTE") else "Ref. " ~ l.referencia }}</div>
+        <div class="op-desig">{{ l.nome }}</div>
+        {% if l.descricao %}<div class="op-texto">{{ l.descricao }}</div>{% endif %}
+        {% if l.observacoes %}<div style="margin-top:5px"><span class="op-nota">Nota: {{ l.observacoes }}</span></div>{% endif %}
+      </td>
+      <td class="op-preco"><div><span class="q">{{ l.qtd }} × {{ l.preco }}</span><br><span class="t">{{ l.total }}</span>{% if p.mostrar_iva %}<br><span class="i">+ IVA {{ l.iva }}</span>{% endif %}</div></td>
+    </tr></table>
+    {% else %}
+    <table class="op-prod"><tr>
+      <td class="op-foto">{% if l.imagem %}<div><img src="{{ l.imagem }}"></div>{% endif %}</td>
+      <td>
+        <table><tr>
+          <td style="vertical-align:top">
+            {% if l.alternativa %}<span class="op-selo">Alternativa à linha {{ l.de }}</span><br>{% endif %}
+            <div class="op-ref">{{ l.numero }} · Ref. {{ l.referencia }}{% if l.fabricante %} · {{ l.fabricante }}{% endif %}</div>
+            <div class="op-desig">{{ l.nome }}</div>
+            {% if l.descricao %}<div class="op-texto">{{ l.descricao }}</div>{% endif %}
+          </td>
+          <td class="op-preco" style="vertical-align:top"><div><span class="q">{{ l.qtd }} × {{ l.preco }}</span><br><span class="t">{{ l.total }}</span>{% if p.mostrar_iva %}<br><span class="i">+ IVA {{ l.iva }}</span>{% endif %}</div></td>
+        </tr></table>
+        {% if l.caracteristicas %}<table class="op-specs">
+          {% for par in l.caracteristicas | batch(2) %}<tr class="{{ 'z' if loop.index is odd else '' }}">
+            {% for k, v in par %}<td class="k">{{ k }}</td><td>{{ v }}</td>{% endfor %}
+            {% if par | length == 1 %}<td class="k"></td><td></td>{% endif %}
+          </tr>{% endfor %}
+        </table>{% endif %}
+        {% if l.extras or l.observacoes %}<div class="op-extras">
+          {% for e in l.extras %}<span class="op-chip">{{ e.rotulo }} {{ e.valor }}</span>{% endfor %}
+          {% if l.observacoes %}<span class="op-nota">Nota: {{ l.observacoes }}</span>{% endif %}
+        </div>{% endif %}
+      </td>
+    </tr></table>
+    {% endif %}
+  {% endfor %}
+
+  {% if p.imprimir_total %}
   <table class="op-totais">
-    <tr class="sub"><td>Equipamentos</td><td class="v">{{ p.equipamentos }}</td></tr>
+    <tr class="sub"><td>Equipamentos e serviços</td><td class="v">{{ p.equipamentos }}</td></tr>
     {% if p.tem_transporte %}
-      <tr class="sub"><td>Transporte{{ " (soma das linhas)" if p.modo == "Por produto" else "" }}</td><td class="v">{{ p.transporte }}</td></tr>
-      <tr class="sub"><td>Montagem{{ " (soma das linhas)" if p.modo == "Por produto" else "" }}</td><td class="v">{{ p.montagem }}</td></tr>
+      <tr class="sub"><td>Transporte</td><td class="v">{{ p.transporte }}</td></tr>
+      <tr class="sub"><td>Montagem</td><td class="v">{{ p.montagem }}</td></tr>
     {% endif %}
     {% if p.desconto %}<tr class="sub"><td>Desconto</td><td class="v">− {{ p.desconto }}</td></tr>{% endif %}
-    <tr class="{{ '' if p.mostrar_iva else 'fim' }}"><td><b>Total sem IVA</b></td><td class="v"><b>{{ p.sem_iva }}</b></td></tr>
+    <tr class="sem"><td>Total sem IVA</td><td class="v">{{ p.sem_iva }}</td></tr>
     {% if p.mostrar_iva %}
       {% for i in p.ivas %}<tr class="sub"><td>{{ i.rotulo }}</td><td class="v">{{ i.valor }}</td></tr>{% endfor %}
-      <tr class="fim"><td>Total com IVA</td><td class="v">{{ p.com_iva }}</td></tr>
+      <tr><td colspan="2" style="padding:0"><table class="op-final"><tr><td>Total com IVA</td><td class="v" style="text-align:right">{{ p.com_iva }}</td></tr></table></td></tr>
     {% endif %}
     {% if p.modo == "Não incluir" %}<tr class="sub"><td colspan="2" style="font-size:9px">Transporte e montagem não incluídos.</td></tr>{% endif %}
   </table>
+  {% endif %}
 
   <table class="op-cond">
     <tr>
-      <td><h4>Validade da proposta</h4>{{ p.validade or "—" }}</td>
-      <td><h4>Garantia</h4>{{ doc.orbit_garantia or "—" }}</td>
-    </tr><tr>
-      <td><h4>Condições de pagamento</h4>{{ doc.orbit_pagamento or "—" }}</td>
-      <td><h4>Prazo de entrega</h4>{{ doc.orbit_prazo or "—" }}</td>
+      <td class="c"><div class="op-rot">VALIDADE</div>{{ p.validade or "—" }}</td><td class="s"></td>
+      <td class="c"><div class="op-rot">GARANTIA</div>{{ doc.orbit_garantia or "—" }}</td>
     </tr>
-    {% if p.anexar %}<tr><td colspan="2" style="width:100%">Aplicam-se as Condições Comerciais da {{ m.nome }}, em anexo a esta proposta, que dela fazem parte.</td></tr>{% endif %}
+    <tr class="e"><td></td><td></td><td></td></tr>
+    <tr>
+      <td class="c"><div class="op-rot">PAGAMENTO</div>{{ doc.orbit_pagamento or "—" }}</td><td class="s"></td>
+      <td class="c"><div class="op-rot">PRAZO DE ENTREGA</div>{{ doc.orbit_prazo or "—" }}</td>
+    </tr>
   </table>
+  {% if p.anexar %}<div class="op-anexar">Aplicam-se as Condições Comerciais da {{ m.nome }}, em anexo a esta proposta, que dela fazem parte.</div>{% endif %}
 
   <table class="op-aceite"><tr>
-    <td><div>Pela {{ m.nome }}</div></td>
+    <td><div>Pela {{ m.nome }}{% if p.comercial %} — {{ p.comercial }}{% endif %}</div></td>
+    <td class="s"></td>
     <td><div>Aceite pelo cliente (data, nome e assinatura)</div></td>
   </tr></table>
 

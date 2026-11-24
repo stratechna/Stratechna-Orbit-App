@@ -41,7 +41,21 @@ def antes_de_validar(doc, method=None):
     if marca:
         _aplicar_marca(doc, marca)
     _iva_por_omissao(doc)
+    _caracteristicas(doc)
     _linhas_automaticas(doc)
+
+
+def _caracteristicas(doc):
+    """Linha sem características: as do artigo (as revistas, ou os atributos da loja já com nomes legíveis)."""
+    from orbit.propostas.caracteristicas import do_artigo
+    for l in doc.items or []:
+        if l.get("orbit_de") or (l.get("orbit_caracteristicas") or "").strip() or not l.item_code:
+            continue
+        if l.item_code in SERVICOS:
+            continue
+        texto = do_artigo(l.item_code)
+        if texto:
+            l.orbit_caracteristicas = texto
 
 
 def _marca(doc):

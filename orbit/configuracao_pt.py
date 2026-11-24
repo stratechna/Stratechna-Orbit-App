@@ -354,7 +354,8 @@ def acertar():
         feitas = set()
         for dt, d in m.items():
             if not frappe.get_meta(dt).translated_doctype:
-                make_property_setter(dt, None, "translated_doctype", 1, "Check", validate_fields_for_doctype=False)
+                make_property_setter(dt, None, "translated_doctype", 1, "Check", for_doctype=True,
+                                     validate_fields_for_doctype=False)
             for en, pt in d.items():
                 if en == pt or en in SOLTAS or en in feitas:
                     continue

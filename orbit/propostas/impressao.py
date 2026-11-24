@@ -113,6 +113,9 @@ def proposta(doc):
             "qtd": (f"{flt(l.qty):g}".replace(".", ",")), "unidade": l.uom,
             "preco": _eur(l.rate), "total": _eur(l.amount), "iva": _taxa(taxa),
             "observacoes": l.get("orbit_observacoes") or "", "extras": extras,
+            "servico": not l.image and not (l.get("orbit_caracteristicas") or "").strip(),
+            "fabricante": frappe.db.get_value("Item", l.item_code, "orbit_fabricante")
+            if l.item_code and frappe.get_meta("Item").has_field("orbit_fabricante") else "",
         }))
 
     soma = lambda f: sum(flt(l.amount) for l in doc.items or [] if f(l) and not l.is_alternative)
@@ -140,7 +143,30 @@ def proposta(doc):
         "data": formatdate(doc.transaction_date, "dd-MM-yyyy"), "validade": validade,
         "comercial": frappe.db.get_value("User", doc.owner, "full_name") if doc.owner else "",
         "anexar": cint(doc.get("orbit_anexar_condicoes")) == 1 and bool(frappe.utils.strip_html(marca.condicoes).strip()),
+        # 24-11-2026: layout novo
+        "imprimir_total": doc.get("orbit_imprimir_total") is None or cint(doc.get("orbit_imprimir_total")) == 1,
+        "versao": doc.get("orbit_versao") or "",
+        "outras": _outras_versoes(doc),
+        "valido_ate": formatdate(doc.valid_till, "dd-MM-yyyy") if doc.valid_till else "",
+        "telefone_comercial": frappe.db.get_value("User", doc.owner, "mobile_no") if doc.owner else "",
+        "email_comercial": doc.owner if doc.owner and "@" in doc.owner and doc.owner != "Administrator" else "",
     })
+
+
+def _outras_versoes(doc):
+    """As outras versões desta proposta (para a introdução dizer que também seguem, para comparação)."""
+    base = doc.get("orbit_proposta_base") or doc.name
+    if not doc.get("orbit_versao"):
+        return []
+    nomes = [base] + frappe.get_all("Quotation", filters={"orbit_proposta_base": base, "docstatus": ["<", 2]},
+                                    pluck="name", order_by="orbit_versao asc")
+    out = []
+    for n in nomes:
+        if n == doc.name:
+            continue
+        v = frappe.db.get_value("Quotation", n, "orbit_versao") or "A"
+        out.append(frappe._dict(nome=n, versao=v))
+    return out
 
 
 def orbit_proposta(doc):
