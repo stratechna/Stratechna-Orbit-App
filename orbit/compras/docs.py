@@ -1,8 +1,8 @@
 """Faturas de compra do Docs → Orbit, F1: receber, ler com a IA do cliente e conferir (24-11-2026).
 
 docs/PLANO-DOCS-FATURA-COMPRA-ERP.md (D1–D12 aceites a 24-11). Nesta fase nada se cria no ERP: cada fatura fica num
-registo «Fatura do Docs» com o que a IA leu e o resultado da conferência. A F2 liga-o a fornecedor/artigos e faz a
-fatura de compra em rascunho.
+registo «Fatura do Docs» com o que a IA leu e o resultado da conferência. A F2 (rascunho.py) liga-o a fornecedor/artigos e
+faz a fatura de compra em rascunho.
 
 Caminho:
 1. O Docs tem um fluxo «Fatura → ERP do Orbit» que, ao entrar ou mudar um documento do tipo Fatura / Fatura-recibo /
@@ -287,6 +287,10 @@ def processar(docs_id: int, forcar: int = 0):
                 doc.duplicada_de = outra
                 doc.estado = "Por rever"
                 doc.motivo = ((doc.motivo + "\n") if doc.motivo else "") + f"Repetida: a mesma fatura já está em {outra}."
+        if doc.estado in ("Lida", "Por rever"):
+            # F2: fornecedor, artigos, encomenda e fatura de compra em rascunho (orbit/compras/rascunho.py)
+            from orbit.compras.rascunho import para_registo
+            para_registo(doc, etiquetas, dados)
     except SemCreditos:
         doc.estado, doc.motivo = "Sem créditos", "A conta não tem créditos de IA. Volta a ler quando houver créditos."
     except Exception as e:  # noqa: BLE001

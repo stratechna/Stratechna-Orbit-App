@@ -11,7 +11,7 @@
  "sort_field": "modified",
  "sort_order": "DESC",
  "creation": "2026-11-24 14:00:00.000000",
- "modified": "2026-11-24 14:00:00.000000",
+ "modified": "2026-11-24 16:08:58.000000",
  "owner": "Administrator",
  "modified_by": "Administrator",
  "description": "Faturas de compra que chegaram ao Docs, lidas pela IA do cliente e conferidas (F1: ainda não criam nada no ERP).",
@@ -35,7 +35,7 @@
    "fieldname": "estado",
    "fieldtype": "Select",
    "label": "Estado",
-   "options": "Por ler\nA ler\nLida\nPor rever\nNão é compra\nSem créditos\nErro",
+   "options": "Por ler\nA ler\nLida\nEm rascunho\nPor rever\nNão é compra\nSem créditos\nErro",
    "default": "Por ler",
    "in_list_view": 1,
    "in_standard_filter": 1
@@ -109,6 +109,26 @@
    "fieldtype": "Link",
    "label": "Fornecedor no ERP",
    "options": "Supplier"
+  },
+  {
+   "fieldname": "fatura_compra",
+   "fieldtype": "Link",
+   "options": "Purchase Invoice",
+   "label": "Fatura de compra (rascunho)",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "linhas_ligadas",
+   "fieldtype": "Int",
+   "label": "Linhas ligadas",
+   "read_only": 1
+  },
+  {
+   "fieldname": "linhas_total",
+   "fieldtype": "Int",
+   "label": "Linhas",
+   "read_only": 1
   },
   {
    "fieldname": "destinatario_nif",
