@@ -190,3 +190,5 @@ before_job = ["orbit.remendo_enviados.aplicar"]
 
 # 23-11-2026: o service worker do Orbit (avisos no telemóvel) pode cuidar de /orbit (orbit/interface/push.py)
 after_request = ["orbit.interface.push.cabecalhos"]
+# 24-11-2026: entrada e página inicial do tenant gravam no telemóvel como «Orbit» com o ícone do Orbit
+update_website_context = ["orbit.interface.push.contexto_web"]

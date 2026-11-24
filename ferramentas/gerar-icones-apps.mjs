@@ -2,7 +2,7 @@
 // para cada app») — feitos a partir dos ÍCONES DO ORBIT (orbit/public/icons/apps/<app>.svg, os da grelha de apps), nunca
 // de símbolos genéricos. Correr: node ferramentas/gerar-icones-apps.mjs
 import fs from "fs"; import { execFileSync } from "child_process";
-const APPS = { crm: "crm", desk: "desk", projetos: "erp", rh: "rh", gestao: "erp", operacoes: "erp", marketing: "marketing", admin: "orbit" };
+const APPS = { crm: "crm", desk: "desk", projetos: "erp", rh: "rh", gestao: "erp", operacoes: "erp", marketing: "marketing", admin: "orbit", orbit: "orbit" };
 const FUNDO = "#22303d";
 for (const [app, ic] of Object.entries(APPS)) {
   const fonte = `orbit/public/icons/apps/${ic}.svg`;

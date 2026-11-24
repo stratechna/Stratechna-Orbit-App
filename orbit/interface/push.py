@@ -166,20 +166,39 @@ def sw():
 
 
 @frappe.whitelist(allow_guest=True)
-def manifesto(app: str = "crm"):
-    app = app if app in APPS else "crm"
-    nome, cor = APPS[app]
-    m = {"id": f"/orbit?app={app}", "name": f"Orbit {nome}", "short_name": nome if len(nome) <= 12 else nome[:12],
-         "start_url": f"/orbit?app={app}", "scope": "/orbit", "display": "standalone", "lang": "pt-PT",
+def manifesto(app: str = "orbit"):
+    """24-11-2026 (Vítor): gravado no telemóvel, orbit.<domínio> é sempre «Orbit» com o ícone do Orbit, seja qual for
+    a app aberta (os ícones de cada app ficam só no separador do browser). `app` fica aceite por compatibilidade."""
+    m = {"id": "/orbit", "name": "Stratechna Orbit", "short_name": "Orbit",
+         "start_url": "/orbit", "scope": "/", "display": "standalone", "lang": "pt-PT",
          "background_color": "#161a1d", "theme_color": "#161a1d",
-         "icons": [{"src": f"/assets/orbit/pwa/{app}-192.png?v=2", "sizes": "192x192", "type": "image/png", "purpose": "any"},
-                   {"src": f"/assets/orbit/pwa/{app}-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "any"},
-                   {"src": f"/assets/orbit/pwa/{app}-maskable-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}
+         "icons": [{"src": "/assets/orbit/pwa/orbit-192.png?v=3", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+                   {"src": "/assets/orbit/pwa/orbit-512.png?v=3", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+                   {"src": "/assets/orbit/pwa/orbit-maskable-512.png?v=3", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}
     frappe.response["type"] = "download"
-    frappe.response["filename"] = f"orbit-{app}.webmanifest"
+    frappe.response["filename"] = "orbit.webmanifest"
     frappe.response["content_type"] = "application/manifest+json"
     frappe.response["display_content_as"] = "inline"
     frappe.response["filecontent"] = json.dumps(m, ensure_ascii=False).encode()
+
+
+CABECA_APP = (
+    '<link rel="manifest" href="/api/method/orbit.interface.push.manifesto">'
+    '<link rel="apple-touch-icon" href="/assets/orbit/pwa/orbit-180.png?v=3">'
+    '<meta name="apple-mobile-web-app-title" content="Orbit">'
+    '<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">'
+    '<meta name="theme-color" content="#161a1d">'
+)
+
+
+def contexto_web(context):
+    """update_website_context: as páginas do site do tenant (entrada, página inicial, …) também gravam como «Orbit»
+    com o ícone do Orbit — sem isto o iPhone desenhava um «L» (de «Login») sobre azul."""
+    try:
+        context["head_include"] = (context.get("head_include") or "") + CABECA_APP
+    except Exception:  # noqa: BLE001
+        pass
+    return context
 
 
 def cabecalhos(response=None, request=None):

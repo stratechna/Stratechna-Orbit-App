@@ -9,7 +9,10 @@ def get_context(context):
     from orbit.interface.api import ligada
 
     if frappe.session.user == "Guest":
-        frappe.local.flags.redirect_location = "/login?redirect-to=/orbit"
+        from urllib.parse import quote
+        app = frappe.form_dict.get("app")
+        destino = f"/orbit?app={app}" if app and app.isalnum() else "/orbit"
+        frappe.local.flags.redirect_location = "/login?redirect-to=" + quote(destino, safe="/")
         raise frappe.Redirect
     if not ligada():
         frappe.local.flags.redirect_location = "/crm"
