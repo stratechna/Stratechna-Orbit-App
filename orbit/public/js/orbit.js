@@ -1158,3 +1158,21 @@ try { if (window.self !== window.top && window.top.location.pathname.indexOf("/o
 		var n = 0, t = setInterval(function () { if (aviso() || ++n > 50) { clearInterval(t); } }, 200);
 	}
 })();
+
+/* 24-11-2026 (Vítor: «orbit.stratechna.com não deixa criar app»): a secretária do Frappe (`/app`), onde se cai depois
+ * de entrar, não indica manifesto nem ícone — o Chrome não oferecia «Instalar app» e o iPhone gravava sem o ícone do
+ * Orbit. Pomos aqui o mesmo manifesto e ícone que a entrada, a página inicial e a interface /orbit já levam
+ * (orbit/interface/push.py). */
+(function () {
+	try {
+		var h = document.head;
+		if ( ! h || document.querySelector( 'link[rel="manifest"]' ) ) { return; }
+		var junta = function ( tag, attrs ) { var e = document.createElement( tag ); for ( var k in attrs ) { e.setAttribute( k, attrs[ k ] ); } h.appendChild( e ); };
+		junta( 'link', { rel: 'manifest', href: '/api/method/orbit.interface.push.manifesto' } );
+		if ( ! document.querySelector( 'link[rel="apple-touch-icon"]' ) ) { junta( 'link', { rel: 'apple-touch-icon', href: '/assets/orbit/pwa/orbit-180.png?v=3' } ); }
+		junta( 'meta', { name: 'apple-mobile-web-app-title', content: 'Orbit' } );
+		junta( 'meta', { name: 'apple-mobile-web-app-capable', content: 'yes' } );
+		junta( 'meta', { name: 'mobile-web-app-capable', content: 'yes' } );
+		if ( ! document.querySelector( 'meta[name="theme-color"]' ) ) { junta( 'meta', { name: 'theme-color', content: '#161a1d' } ); }
+	} catch ( e ) {}
+}());
