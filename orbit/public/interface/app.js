@@ -410,7 +410,7 @@ const Projeto = {
     <div class="pad" style="padding-bottom:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
       <div><div style="font-size:13px"><a href="#/projetos">← Projetos</a></div><h1>{{ p.titulo }}</h1>
         <div class="sub">{{ [p.cliente, p.marca].filter(Boolean).join(' · ') }}<template v-if="p.fim"> · até {{ data(p.fim,false) }}</template> · {{ Math.round(p.progresso) }} %<template v-if="p.horas_orcamento"> · {{ p.horas.toFixed(1) }} h de {{ p.horas_orcamento }} h</template><template v-else-if="p.horas"> · {{ p.horas.toFixed(1) }} h registadas</template></div></div>
-      <a class="btn" :href="p.classico">Abrir na secretária</a>
+      <a class="btn" :href="'#/erp/Project/'+encodeURIComponent(String(p.classico||'').split('/').pop())">Todos os campos</a>
     </div>
     <form class="cartao compor" style="margin:0 24px 14px" @submit.prevent="criar"><input v-model="nova" placeholder="Nova tarefa neste projeto…"><input type="date" v-model="novaData" style="flex:none;width:150px"><button class="btn sm prim" :disabled="!nova.trim()">Criar</button></form>
     <div class="funil" :style="{gridTemplateColumns:'repeat('+p.colunas.length+',minmax(220px,1fr))'}">
@@ -2013,7 +2013,7 @@ const Ficha = {
       <EnviarAssinatura v-if="assinar" :doctype="doctype" :name="name" :email-inicial="f.email_principal" :nome-inicial="doctype==='Contact'?f.titulo:''" @fechar="assinar=false" @enviado="carregarAssin(); carregarCron()"/>
       <div class="bloco-tit">Tickets <span class="sub" style="font-weight:400">{{ f.tickets.length }}</span></div>
       <div v-if="!f.tickets.length" class="sub" style="font-size:13px">—</div>
-      <a v-for="t in f.tickets" :key="t.name" class="assoc" :href="'/helpdesk/tickets/'+t.name" style="display:block;text-decoration:none;color:inherit"><b>#{{ t.name }} {{ t.subject }}</b><small>{{ t.status }} · {{ data(t.modified,false) }}</small></a>
+      <a v-for="t in f.tickets" :key="t.name" class="assoc" :href="'#/ticket/'+encodeURIComponent(t.name)" style="display:block;text-decoration:none;color:inherit"><b>#{{ t.name }} {{ t.subject }}</b><small>{{ t.status }} · {{ data(t.modified,false) }}</small></a>
     </aside>
 
     <NovoEmail v-if="novoEmail" :doctype="doctype" :name="name" :para="f.email_principal" @fechar="novoEmail=false" @enviado="carregarCron()"/>
@@ -2839,14 +2839,138 @@ const COR_STATUS = { Paid: "verde", Completed: "verde", Delivered: "verde", Appr
 const statusPt = (v) => STATUS_PT[v] || v;
 const irErp = (dt, dn) => `#/erp/${encodeURIComponent(dt)}` + (dn ? `/${encodeURIComponent(dn)}` : "");
 
+// ── 25-11-2026 (Vítor): nada abre a secretária antiga — gráficos, painéis e contas a receber/pagar com ecrã próprio ──
+const moedaEUR = (v, m) => new Intl.NumberFormat("pt-PT", { style: "currency", currency: m || "EUR" }).format(v || 0);
+const GraficoBarras = {
+  props: ["labels", "series", "moeda"],
+  setup(props) {
+    const CORES = ["var(--acao)", "#5b6f7a", "#8a7340"];
+    const g = computed(() => { const series = (props.series || []).slice(0, 3); const labels = (props.labels || []).slice(-24);
+      const n = labels.length; const corte = (props.labels || []).length - n;
+      const sr = series.map((x) => ({ ...x, values: (x.values || []).slice(corte) }));
+      const max = Math.max(1, ...sr.flatMap((x) => x.values.map((v) => Math.abs(Number(v) || 0)))); return { labels, series: sr, max }; });
+    const fmt = (v) => props.moeda ? moedaEUR(v) : new Intl.NumberFormat("pt-PT").format(v || 0);
+    return { g, CORES, fmt };
+  },
+  template: `<div><svg :viewBox="'0 0 ' + Math.max(g.labels.length*48, 300) + ' 170'" preserveAspectRatio="none" style="width:100%;height:170px;display:block">
+      <template v-for="(l,i) in g.labels" :key="i"><template v-for="(sr,k) in g.series" :key="k">
+        <rect :x="i*48 + 6 + k*(36/g.series.length)" :width="36/g.series.length - 2" :y="140 - Math.abs(Number(sr.values[i])||0)/g.max*130" :height="Math.abs(Number(sr.values[i])||0)/g.max*130" :fill="CORES[k]" rx="2"><title>{{ sr.name ? sr.name + ': ' : '' }}{{ fmt(sr.values[i]) }}</title></rect></template>
+        <text :x="i*48+24" y="160" text-anchor="middle" font-size="10" fill="var(--ink-3)">{{ String(l).slice(0,8) }}</text></template></svg>
+    <div v-if="g.series.length > 1 || (g.series[0] && g.series[0].name)" class="sub" style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px"><span v-for="(sr,k) in g.series" :key="k"><span :style="{display:'inline-block',width:'10px',height:'10px',borderRadius:'2px',background:CORES[k],marginRight:'5px'}"></span>{{ sr.name }}</span></div></div>`,
+};
+
+const ErpPainel = {
+  components: { GraficoBarras },
+  props: ["nome"],
+  setup(props) {
+    const p = ref(null);
+    onMounted(async () => { p.value = await api("contas.painel", { nome: props.nome }); });
+    const valor = (c) => c.tipo === "Currency" ? moedaEUR(c.valor, p.value.moeda) : new Intl.NumberFormat("pt-PT").format(c.valor || 0);
+    return { p, valor, irErp };
+  },
+  template: `<div v-if="p" class="pad">
+    <div style="font-size:13px"><a href="javascript:history.back()">← Voltar</a></div>
+    <h1>{{ p.titulo }}</h1><div class="sub" style="margin-bottom:16px">Painel do módulo, calculado agora.</div>
+    <div v-if="p.cartoes.length" class="erp-numeros"><component :is="c.doctype ? 'a' : 'div'" v-for="c in p.cartoes" :key="c.rotulo" class="cartao" :href="c.doctype ? irErp(c.doctype) : null" style="text-decoration:none;color:inherit"><small>{{ c.rotulo }}</small><b>{{ valor(c) }}</b></component></div>
+    <div class="painel-graficos">
+      <section v-for="g in p.graficos" :key="g.rotulo" class="cartao erp-grafico" :class="{largo: g.largo}">
+        <header style="display:flex;justify-content:space-between;gap:8px;margin-bottom:8px"><b>{{ g.rotulo }}</b>
+          <a v-if="g.relatorio" :href="'#/erp-rel/'+encodeURIComponent(g.relatorio)" class="sub" style="font-size:12px">Relatório →</a>
+          <a v-else-if="g.doctype" :href="irErp(g.doctype)" class="sub" style="font-size:12px">Ver lista →</a></header>
+        <GraficoBarras :labels="g.labels" :series="g.series"/>
+      </section>
+    </div>
+    <div v-if="!p.cartoes.length && !p.graficos.length" class="cartao vazio">Este painel ainda não tem números nem gráficos com dados.</div>
+  </div><div v-else class="vazio">A carregar…</div>`,
+};
+
+// «A receber» / «A pagar»: o que cada cliente deve e o que se deve a cada fornecedor (orbit/interface/contas.py)
+const ErpContas = {
+  props: ["lado"],
+  setup(props) {
+    const r = ref(null), aberto = ref(null), docs = ref({}), q = ref(""), so = ref("todos"), empresa = ref(""), marca = ref("");
+    const carregar = async () => { r.value = await api("contas.resumo", { lado: props.lado, empresa: empresa.value || null, marca: marca.value || null }); };
+    onMounted(carregar);
+    watch([empresa, marca], carregar);
+    const m = (v) => moedaEUR(v, r.value?.moeda);
+    const lista = computed(() => (r.value?.lista || []).filter((x) => (so.value !== "vencidos" || x.vencido > 0)
+      && (!q.value || (x.nome + " " + x.entidade).toLowerCase().includes(q.value.toLowerCase()))));
+    const abrir = async (x) => { if (aberto.value === x.entidade) { aberto.value = null; return; } aberto.value = x.entidade;
+      if (!docs.value[x.entidade]) docs.value[x.entidade] = await api("contas.documentos", { lado: props.lado, entidade: x.entidade }); };
+    const maxFaixa = computed(() => Math.max(1, ...(r.value?.faixas || []).map((f) => f.valor)));
+    const receber = (x, fatura) => { try { sessionStorage.setItem("orbit.recibo", JSON.stringify({ cliente: x.entidade, fatura: fatura || null })); } catch (e) {}
+      location.hash = irErp("Payment Entry", "novo"); };
+    const csv = () => { const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const t = [[r.value.rotulo, "Em dívida", "Vencido", "Faturas", "Dias de atraso", "Vencimento mais antigo"].map(esc).join(";")]
+        .concat(lista.value.map((x) => [x.nome, x.divida, x.vencido, x.documentos, x.atraso, x.mais_antiga].map(esc).join(";"))).join("\n");
+      const b = new Blob(["﻿" + t], { type: "text/csv;charset=utf-8" }); const u = URL.createObjectURL(b);
+      const el = document.createElement("a"); el.href = u; el.download = r.value.titulo + ".csv"; el.click(); URL.revokeObjectURL(u); };
+    return { r, lista, aberto, docs, abrir, m, q, so, empresa, marca, maxFaixa, receber, csv, irErp, data };
+  },
+  template: `<div v-if="r">
+    <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">
+      <div><h1>{{ r.titulo }}</h1><div class="sub">{{ lado==='receber' ? 'O que cada cliente deve, a começar pelo que já venceu.' : 'O que há a pagar a cada fornecedor, a começar pelo que já venceu.' }}</div></div>
+      <div class="acoes-lista"><a v-if="lado==='receber'" class="btn prim" href="javascript:void 0" @click="receber({entidade:''})">+ Receber pagamento</a>
+        <a class="btn" :href="irErp(r.doctype)">{{ lado==='receber' ? 'Faturas de venda' : 'Faturas de compra' }}</a><button class="btn" @click="csv" :disabled="!lista.length">Exportar</button></div>
+    </div>
+    <div class="contas-kpis">
+      <div class="cartao"><small>Em dívida</small><b>{{ m(r.totais.divida) }}</b><span class="sub">{{ r.totais.documentos }} {{ r.totais.documentos===1 ? 'fatura' : 'faturas' }}</span></div>
+      <div class="cartao" :class="{alerta: r.totais.vencido > 0}"><small>Vencido</small><b>{{ m(r.totais.vencido) }}</b><span class="sub">{{ r.totais.divida ? Math.round(r.totais.vencido/r.totais.divida*100) : 0 }} % do total</span></div>
+      <div class="cartao"><small>Vence nos próximos 30 dias</small><b>{{ m(r.totais.a_30) }}</b></div>
+    </div>
+    <div class="cartao contas-faixas">
+      <b style="font-size:13px">Antiguidade</b>
+      <div v-for="f in r.faixas" :key="f.rotulo" class="faixa"><span>{{ f.rotulo }}</span>
+        <div class="barra"><i :style="{width: (f.valor/maxFaixa*100)+'%'}" :class="{tarde: f.rotulo!=='Por vencer'}"></i></div>
+        <b>{{ m(f.valor) }}</b><small class="sub">{{ f.n }}</small></div>
+    </div>
+    <div class="filtros">
+      <input class="filtro" style="border-style:solid;min-width:220px" v-model="q" :placeholder="'Procurar ' + r.rotulo.toLowerCase() + '…'">
+      <select class="filtro" v-model="so"><option value="todos">Tudo em dívida</option><option value="vencidos">Só com valores vencidos</option></select>
+      <select v-if="r.empresas.length > 1" class="filtro" v-model="empresa"><option value="">Todas as empresas</option><option v-for="e in r.empresas" :key="e" :value="e">{{ e }}</option></select>
+      <select v-if="r.marcas.length > 1" class="filtro" v-model="marca"><option value="">Todas as marcas</option><option v-for="x in r.marcas" :key="x" :value="x">{{ x }}</option></select>
+    </div>
+    <div class="tabela-wrap cartoes-movel contas-tab"><table>
+      <thead><tr><th>{{ r.rotulo }}</th><th style="text-align:right">Em dívida</th><th style="text-align:right">Vencido</th><th style="text-align:right">Faturas</th><th>Mais antiga</th><th></th></tr></thead>
+      <tbody><template v-for="x in lista" :key="x.entidade">
+        <tr @click="abrir(x)" :class="{sel: aberto===x.entidade}">
+          <td class="cel-tit"><b>{{ x.nome }}</b><div v-if="x.nome!==x.entidade" class="sub" style="font-size:12px">{{ x.entidade }}</div></td>
+          <td style="text-align:right"><b>{{ m(x.divida) }}</b></td>
+          <td style="text-align:right"><span v-if="x.vencido" class="etq ambar">{{ m(x.vencido) }} · {{ x.atraso }} d</span><span v-else class="sub">—</span></td>
+          <td style="text-align:right">{{ x.documentos }}</td>
+          <td class="sub">{{ x.mais_antiga ? data(x.mais_antiga,false) : '—' }}</td>
+          <td style="text-align:right" @click.stop><button v-if="lado==='receber'" class="btn sm" @click="receber(x)">Receber</button></td>
+        </tr>
+        <tr v-if="aberto===x.entidade" class="contas-docs"><td colspan="6">
+          <div v-if="!docs[x.entidade]" class="sub">A carregar…</div>
+          <div v-else class="contas-docs-lista">
+            <a v-for="d in docs[x.entidade]" :key="d.name" :href="irErp(r.doctype, d.name)" class="contas-doc">
+              <span><b>{{ d.numero }}</b><span v-if="d.devolucao" class="etq">{{ lado==='receber' ? 'Nota de crédito' : 'Nota de débito' }}</span><small class="sub"> · {{ data(d.data,false) }}<template v-if="d.marca"> · {{ d.marca }}</template></small></span>
+              <span class="sub">Vence {{ d.vencimento ? data(d.vencimento,false) : '—' }}<span v-if="d.atraso" class="etq ambar" style="margin-left:6px">{{ d.atraso }} d de atraso</span></span>
+              <span style="text-align:right"><b>{{ m(d.divida) }}</b><small class="sub"> de {{ m(d.total) }}</small></span>
+              <button v-if="lado==='receber' && !d.devolucao" class="btn sm" @click.prevent.stop="receber(x, d.name)">Receber</button>
+            </a>
+            <a :href="irErp(r.entidade_doctype, x.entidade)" class="sub" style="font-size:12px;padding:6px 2px">Ficha de {{ x.nome }} →</a>
+          </div>
+        </td></tr>
+      </template></tbody></table>
+      <div v-if="!lista.length" class="vazio">{{ r.totais.documentos ? 'Nada com estes filtros.' : (lado==='receber' ? 'Nenhum cliente com valores em dívida.' : 'Nada por pagar a fornecedores.') }}</div>
+    </div>
+  </div><div v-else class="vazio">A carregar…</div>`,
+};
+
 const ErpModulo = {
   props: ["barra"],
   setup(props) {
     const m = ref(null); const nums = ref([]);
-    onMounted(async () => { m.value = await api("erp.menu", { barra: props.barra }); nums.value = await api("erp.numeros", { barra: props.barra }).catch(() => []); });
-    const href = (i) => i.tipo === "doc" ? irErp(i.doctype, i.single ? i.doctype : null) : i.tipo === "rel" ? "#/erp-rel/" + encodeURIComponent(i.relatorio) : i.tipo === "mod" ? "#/erp-m/" + encodeURIComponent(i.barra) : "#/erp-desk/" + encodeURIComponent(i.url);
+    const res = ref({});
+    onMounted(async () => { m.value = await api("erp.menu", { barra: props.barra }); nums.value = await api("erp.numeros", { barra: props.barra }).catch(() => []);
+      // 25-11-2026: o bloco «A receber»/«A pagar» diz logo quanto está em dívida e quanto já venceu
+      for (const l of new Set(m.value.secoes.flatMap((s) => s.resumos || []))) api("contas.resumo", { lado: l }).then((r) => { res.value[l] = r.totais; }).catch(() => {}); });
+    const moeda = (v) => moedaEUR(v);
+    const href = (i) => i.tipo === "doc" ? irErp(i.doctype, i.single ? i.doctype : null) : i.tipo === "rel" ? "#/erp-rel/" + encodeURIComponent(i.relatorio) : i.tipo === "mod" ? "#/erp-m/" + encodeURIComponent(i.barra) : i.tipo === "painel" ? "#/erp-painel/" + encodeURIComponent(i.painel) : i.tipo === "nativo" ? "#/" + i.rota : "#/";
     const valorN = (n) => n.tipo === "Currency" ? new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(n.valor || 0) : new Intl.NumberFormat("pt-PT").format(n.valor || 0);
-    return { m, href, nums, valorN };
+    return { m, href, nums, valorN, res, moeda };
   },
   template: `<div v-if="m" class="pad">
     <h1>{{ m.titulo }}</h1><div class="sub" style="margin-bottom:16px">Documentos, configuração e relatórios deste módulo</div>
@@ -2854,7 +2978,11 @@ const ErpModulo = {
     <div class="erp-mod">
       <section v-for="s in m.secoes" :key="s.titulo" class="cartao erp-sec-mod">
         <header v-if="s.titulo"><b>{{ s.titulo.charAt(0).toUpperCase() + s.titulo.slice(1) }}</b></header>
-        <div class="erp-itens"><a v-for="i in s.itens" :key="i.rotulo" :href="href(i)">{{ i.rotulo }}<span v-if="i.tipo==='desk'" class="fora" title="Ainda no ecrã do ERPNext">↗</span></a></div>
+        <a v-for="l in (s.resumos||[])" :key="l" v-show="res[l]" :href="'#/contas/'+l" class="erp-resumo">
+          <span><small>Em dívida</small><b>{{ res[l] && moeda(res[l].divida) }}</b></span>
+          <span :class="{alerta: res[l] && res[l].vencido > 0}"><small>Vencido</small><b>{{ res[l] && moeda(res[l].vencido) }}</b></span>
+          <span><small>{{ l==='receber' ? 'Faturas por receber' : 'Faturas por pagar' }}</small><b>{{ res[l] && res[l].documentos }}</b></span></a>
+        <div class="erp-itens"><a v-for="i in s.itens" :key="i.rotulo" :href="href(i)" :class="{destaque: i.tipo==='nativo'}">{{ i.rotulo }}</a></div>
       </section>
     </div></div><div v-else class="vazio">A carregar…</div>`,
 };
@@ -3973,9 +4101,9 @@ const ErpRelatorio = {
   template: `<div class="pad" v-if="m">
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px">
       <div><h1>{{ m.rotulo }}</h1><div class="sub">Relatório</div></div>
-      <div style="display:flex;gap:8px"><button class="btn prim" :disabled="a" @click="correr">{{ a ? 'A gerar…' : 'Gerar' }}</button><button v-if="r && r.linhas.length" class="btn" @click="csv">Exportar CSV</button><a class="btn" :href="desk">Ecrã do ERPNext</a></div>
+      <div style="display:flex;gap:8px"><button class="btn prim" :disabled="a" @click="correr">{{ a ? 'A gerar…' : 'Gerar' }}</button><button v-if="r && r.linhas.length" class="btn" @click="csv">Exportar CSV</button></div>
     </div>
-    <div v-if="falhou" class="cartao vazio">Este relatório ainda não abre aqui. <a :href="desk">Abri-lo no ecrã do ERPNext</a>.</div>
+    <div v-if="falhou" class="cartao vazio">Este relatório ainda não abre aqui.</div>
     <template v-else>
       <div class="cartao erp-filtros" v-if="filtros.length"><template v-for="f in filtros" :key="f.fieldname">
         <div v-if="visivel(f)" class="erp-campo"><label v-if="f.fieldtype!=='Check'">{{ f.label }}<span v-if="f.reqd" class="obrig">*</span></label><ErpCampo :c="f" :doc="val"/></div></template></div>
@@ -4205,7 +4333,7 @@ const abrirApp = (chave, url) => {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpProposta, ErpEmitir, ErpRecibo, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, DefUtilizadores, DefEmpresas, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpPainel, ErpContas, ErpLista, ErpFicha, ErpProposta, ErpEmitir, ErpRecibo, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, DefUtilizadores, DefEmpresas, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -4242,7 +4370,8 @@ const App = {
     const NAV = APP.nav;
     window.name = window.name || ("orbit-" + APP_ATUAL);
     document.title = APP.nome + " — Stratechna Orbit";
-    const modulosApp = computed(() => (ctx.value?.modulos || []).filter((m) => APP.modulos.includes(m.chave)));
+    // 25-11-2026: só módulos com ecrã na interface (um módulo sem barra abria a secretária antiga)
+    const modulosApp = computed(() => (ctx.value?.modulos || []).filter((m) => APP.modulos.includes(m.chave) && m.barra));
     // Sem rota: a 1.ª secção da app (o Início no CRM; o 1.º módulo na Gestão e nas Operações).
     watch(ctx, (c) => {
       if (!c || (location.hash && location.hash !== "#/")) return;
@@ -4340,6 +4469,8 @@ const App = {
         <Calendario v-else-if="ecra==='calendario'" :nova="partes[1]==='nova'" :ref-dt="partes[2]" :ref-dn="partes[3]" :key="rotaCal"/>
         <AppEmbutida v-else-if="ecra==='app'" :nome="partes[1]" :key="partes[1]"/>
         <ErpModulo v-else-if="ecra==='erp-m'" :barra="partes[1]" :key="'m'+partes[1]"/>
+        <ErpPainel v-else-if="ecra==='erp-painel'" :nome="partes[1]" :key="'pn'+partes[1]"/>
+        <ErpContas v-else-if="ecra==='contas'" :lado="partes[1]==='pagar' ? 'pagar' : 'receber'" :key="'ct'+partes[1]"/>
         <ErpLista v-else-if="ecra==='erp' && !partes[2]" :doctype="partes[1]" :key="'l'+partes[1]"/>
         <ErpProposta v-else-if="ecra==='erp' && partes[1]==='Quotation' && partes[3]!=='completa'" :name="partes[2]" :key="'p'+partes[2]"/>
         <ErpEmitir v-else-if="ecra==='erp' && (partes[1]==='Sales Invoice' || partes[1]==='Delivery Note') && partes[3]!=='completa'" :dt="partes[1]" :name="partes[2]" :key="'e'+partes[1]+'/'+partes[2]"/>

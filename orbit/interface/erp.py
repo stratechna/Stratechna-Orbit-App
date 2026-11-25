@@ -83,6 +83,10 @@ def modulos():
     return out
 
 
+# Relatórios que dão lugar a um ecrã próprio no menu dos módulos (25-11-2026)
+CONTAS_NATIVAS = {"Accounts Receivable": "receber", "Accounts Payable": "pagar"}
+
+
 @frappe.whitelist()
 def menu(barra: str):
     """As entradas de um módulo, por secções. Documentos abrem na interface; o resto (relatórios, páginas,
@@ -110,10 +114,20 @@ def menu(barra: str):
                            or (i.link_type == "Dashboard" and i.link_to in _E.PAINEIS_CONTAB)):
             continue
         # 25-11-2026: o que o ecrã antigo mostra e a interface deixava de fora — painéis e ligações a outro módulo
+        # 25-11-2026 (Vítor): nenhuma entrada abre a secretária antiga — o painel tem ecrã próprio (#/erp-painel/<nome>)
         if i.link_type == "Dashboard":
             if frappe.db.exists("Dashboard", i.link_to):
-                atual["itens"].append({"tipo": "desk", "rotulo": _marca(_(i.label or i.link_to)) if (i.label or "") != "Dashboard" else _("Painel"),
-                                       "url": "/desk/dashboard-view/" + i.link_to, "icone": i.icon})
+                atual["itens"].append({"tipo": "painel", "rotulo": _marca(_(i.label or i.link_to)) if (i.label or "") != "Dashboard" else _("Painel"),
+                                       "painel": i.link_to, "icone": i.icon})
+            continue
+        # «A receber» / «A pagar»: o que cada cliente deve e o que se deve a cada fornecedor (orbit/interface/contas.py),
+        # em vez da lista de clientes e do relatório cru. Funciona com a contabilidade desligada.
+        if i.link_type == "Report" and i.link_to in CONTAS_NATIVAS:
+            lado = CONTAS_NATIVAS[i.link_to]
+            if frappe.has_permission("Sales Invoice" if lado == "receber" else "Purchase Invoice", "read"):
+                atual["itens"].insert(0, {"tipo": "nativo", "rotulo": _("Em dívida por cliente") if lado == "receber" else _("Em dívida a fornecedores"),
+                                          "rota": "contas/" + lado, "icone": i.icon})
+                atual.setdefault("resumos", []).append(lado)
             continue
         if i.link_type == "Workspace":
             if i.link_to != barra and frappe.db.exists("Workspace Sidebar", i.link_to):   # o «Home» é o próprio módulo
@@ -128,10 +142,9 @@ def menu(barra: str):
             # U5 (21-11): os relatórios abrem na interface (#/erp-rel/<nome>)
             if frappe.db.exists("Report", i.link_to) and frappe.has_permission("Report", "read"):
                 atual["itens"].append({"tipo": "rel", "rotulo": _marca(_(i.label or i.link_to)), "relatorio": i.link_to, "icone": i.icon})
-        elif i.link_type == "Page":
-            atual["itens"].append({"tipo": "desk", "rotulo": _marca(_(i.label or i.link_to)), "url": "/desk/" + i.link_to, "icone": i.icon})
-        elif i.link_type == "URL" and i.url:
-            atual["itens"].append({"tipo": "desk", "rotulo": _marca(_(i.label or i.url)), "url": i.url, "icone": i.icon})
+        # Páginas e endereços do /desk (POS, funil de vendas, organograma, gestor de permissões, construtor de
+        # impressão, cópias de segurança…) ficam fora: abriam a secretária antiga. Razões em
+        # docs/PLANO-ORBIT-OPCOES-DOS-ORIGINAIS.md §4 — voltam quando tiverem ecrã próprio.
     if atual["itens"]:
         secoes.append(atual)
     return {"titulo": _(s.title or barra), "secoes": secoes}
