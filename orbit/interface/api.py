@@ -1378,4 +1378,32 @@ def criar_registo(objeto: str, dados: str):
                               "website": t("website")})
         doc.insert()
         return {"doctype": "CRM Organization", "name": doc.name}
+    if objeto == "negocios":
+        # 25-11-2026 (Vítor): negócios também se criam directamente no Orbit (os da Stratechna continuam a nascer das
+        # propostas do portal — `criar_deal_crm`); fase inicial = a primeira do funil
+        if not t("titulo"):
+            frappe.throw("Escreva o nome do negócio.")
+        fase = frappe.get_all("CRM Deal Status", pluck="name", order_by="position asc", limit=1)
+        doc = frappe.get_doc({"doctype": "CRM Deal", "status": fase[0] if fase else "Qualification",
+                              "deal_owner": frappe.session.user,
+                              "organization": t("organization") if t("organization") and frappe.db.exists("CRM Organization", t("organization")) else None})
+        if frappe.get_meta("CRM Deal").has_field("titulo"):
+            doc.titulo = t("titulo")[:140]
+        if t("deal_value"):
+            try:
+                doc.deal_value = float(t("deal_value").replace(",", "."))
+            except ValueError:
+                frappe.throw("O valor tem de ser um número.")
+        if t("expected_closure_date"):
+            doc.expected_closure_date = t("expected_closure_date")
+        if t("marca") and frappe.get_meta("CRM Deal").has_field("marca") and frappe.db.exists("Brand", t("marca")):
+            doc.marca = t("marca")
+        if t("email"):
+            c = frappe.db.get_value("Contact Email", {"email_id": t("email"), "parenttype": "Contact"}, "parent")
+            if c:
+                doc.append("contacts", {"contact": c, "is_primary": 1})
+            else:
+                doc.email = t("email")
+        doc.insert()
+        return {"doctype": "CRM Deal", "name": doc.name}
     frappe.throw("Tipo de registo desconhecido.")

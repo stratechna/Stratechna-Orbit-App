@@ -1197,10 +1197,11 @@ const Lista = {
       leads: [["first_name", "Nome", true], ["last_name", "Apelido"], ["organization", "Empresa"], ["email", "Email", false, "email"], ["mobile_no", "Telemóvel", false, "tel"]],
       contactos: [["first_name", "Nome", true], ["last_name", "Apelido"], ["company_name", "Empresa (já registada)"], ["designation", "Cargo"], ["email", "Email", false, "email"], ["mobile_no", "Telemóvel", false, "tel"]],
       empresas: [["organization_name", "Nome da empresa", true], ["website", "Site", false, "url"]],
+      negocios: [["titulo", "Nome do negócio", true], ["organization", "Empresa (já registada)"], ["email", "Email do contacto", false, "email"], ["deal_value", "Valor (€)", false, "number"], ["expected_closure_date", "Fecho previsto", false, "date"]],
     };
-    const NOME_NOVO = { leads: "lead", contactos: "contacto", empresas: "empresa" };
+    const NOME_NOVO = { leads: "Novo lead", contactos: "Novo contacto", empresas: "Nova empresa", negocios: "Novo negócio" };
     const novoReg = ref(null); const aCriar = ref(false);
-    const abrirNovo = () => { novoReg.value = {}; };
+    const abrirNovo = () => { novoReg.value = props.objeto === "negocios" && marca.value ? { marca: marca.value } : {}; };
     const gravarNovo = async () => {
       aCriar.value = true;
       try { const r = await api("criar_registo", { objeto: props.objeto, dados: JSON.stringify(novoReg.value) }, true);
@@ -1272,7 +1273,7 @@ const Lista = {
     </div>
     <Importar v-if="importar" :objeto="objeto" @fechar="importar=false" @feito="carregar()"/>
     <div v-if="novoReg" class="modal-fundo" @click.self="novoReg=null"><div class="modal" style="max-width:520px">
-      <header><b>Novo {{ NOME_NOVO[objeto] }}</b><button class="btn sm" @click="novoReg=null">Fechar</button></header>
+      <header><b>{{ NOME_NOVO[objeto] }}</b><button class="btn sm" @click="novoReg=null">Fechar</button></header>
       <form @submit.prevent="gravarNovo" style="display:flex;flex-direction:column;gap:10px;padding:14px 16px">
         <label v-for="c in CAMPOS_NOVO[objeto]" :key="c[0]" class="erp-campo"><span>{{ c[1] }}<span v-if="c[2]" class="obrig">*</span></span>
           <input v-model="novoReg[c[0]]" :type="c[3]||'text'" :required="c[2]" :autofocus="c[2]"></label>
