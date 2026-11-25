@@ -3583,16 +3583,39 @@ const ErpTabela = {
       linhas.value.push(l);
     };
     const tirar = (i) => { linhas.value.splice(i, 1); };
-    return { linhas, cols, juntar, tirar, todos, visL, aberta };
+    // lote 5 (25-11): o que a grelha do desk faz — seleccionar, inserir acima/abaixo, duplicar, mover, apagar várias, CSV
+    const sel = ref([]); const menuL = ref(null); const csvIn = ref(null);
+    const nova = () => { const l = { name: "novo-" + Date.now() + "-" + (n++), doctype: props.c.options }; if ((props.filha?.campos || []).some((x) => x.fieldname === "qty")) l.qty = 1; return l; };
+    const inserir = (i, depois) => { linhas.value.splice(depois ? i + 1 : i, 0, nova()); menuL.value = null; };
+    const duplicarL = (i) => { const c = JSON.parse(JSON.stringify(linhas.value[i])); c.name = "novo-" + Date.now() + "-" + (n++); delete c.idx; linhas.value.splice(i + 1, 0, c); menuL.value = null; };
+    const mover = (i, d) => { const j = i + d; if (j < 0 || j >= linhas.value.length) return; const x = linhas.value.splice(i, 1)[0]; linhas.value.splice(j, 0, x); menuL.value = null; };
+    const tirarSel = () => { if (!confirm(`Tirar ${sel.value.length} linha(s)?`)) return; const k = new Set(sel.value); const fic = linhas.value.filter((l, i) => !k.has(i)); linhas.value.splice(0, linhas.value.length, ...fic); sel.value = []; };
+    const csvCampos = computed(() => (props.filha?.campos || []).filter((x) => !ESTRUTURA.includes(x.fieldtype) && !x.hidden && !FILHAS.includes(x.fieldtype) && !SEM_VALOR.includes(x.fieldtype) && !x.read_only));
+    const descarregar = () => { const cs = csvCampos.value; const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const t = [cs.map((x) => esc(x.label)).join(";"), cs.map((x) => esc(x.fieldname)).join(";")].concat(linhas.value.map((l) => cs.map((x) => esc(l[x.fieldname])).join(";"))).join("\n");
+      const b = new Blob(["\ufeff" + t], { type: "text/csv;charset=utf-8" }); const u = URL.createObjectURL(b); const el = document.createElement("a"); el.href = u; el.download = (props.c.label || "linhas") + ".csv"; el.click(); URL.revokeObjectURL(u); };
+    const carregarCsv = async (ev) => { const fi = ev.target.files?.[0]; if (!fi) return; const txt = (await fi.text()).replace(/^\ufeff/, "");
+      const lerLinha = (ln) => { const out = []; let cur = "", q = false; for (let k = 0; k < ln.length; k++) { const ch = ln[k];
+          if (q) { if (ch === '"' && ln[k + 1] === '"') { cur += '"'; k++; } else if (ch === '"') q = false; else cur += ch; }
+          else if (ch === '"') q = true; else if (ch === ";" || ch === ",") { out.push(cur); cur = ""; } else cur += ch; } out.push(cur); return out; };
+      const ls = txt.split(/\r?\n/).filter((x) => x.trim()); if (ls.length < 2) { toast("O ficheiro não tem linhas"); return; }
+      const cab = lerLinha(ls[1]).map((x) => x.trim()); const nomes = csvCampos.value.map((x) => x.fieldname);
+      const usaNomes = cab.some((x) => nomes.includes(x)); const inicio = usaNomes ? 2 : 1;
+      const chaves = (usaNomes ? cab : lerLinha(ls[0]).map((x) => (csvCampos.value.find((c) => c.label === x.trim()) || {}).fieldname));
+      let k = 0; for (const ln of ls.slice(inicio)) { const v = lerLinha(ln); const l = nova(); chaves.forEach((c, j) => { if (c && v[j] !== undefined && v[j] !== "") l[c] = v[j]; }); linhas.value.push(l); k++; }
+      ev.target.value = ""; toast(k + " linha(s) carregada(s)"); };
+    return { linhas, cols, juntar, tirar, todos, visL, aberta, sel, menuL, inserir, duplicarL, mover, tirarSel, descarregar, carregarCsv, csvIn };
   },
   template: `<div class="erp-tabela">
     <div class="tabela-wrap" style="margin:0"><table>
-      <thead><tr><th style="width:34px">#</th><th v-for="x in cols" :key="x.fieldname">{{ x.label }}<span v-if="x.reqd" class="obrig">*</span></th><th style="width:34px"></th><th v-if="!ro" style="width:34px"></th></tr></thead>
+      <thead><tr><th style="width:44px"><span v-if="ro">#</span><input v-else type="checkbox" :checked="linhas.length && sel.length===linhas.length" @change="sel = $event.target.checked ? linhas.map((_,k)=>k) : []"></th><th v-for="x in cols" :key="x.fieldname">{{ x.label }}<span v-if="x.reqd" class="obrig">*</span></th><th style="width:34px"></th><th v-if="!ro" style="width:34px"></th></tr></thead>
       <tbody><template v-for="(l,i) in linhas" :key="l.name||i"><tr style="cursor:default">
-        <td class="sub">{{ i+1 }}</td>
+        <td class="sub"><label v-if="!ro" class="linha-n"><input type="checkbox" :value="i" v-model="sel">{{ i+1 }}</label><template v-else>{{ i+1 }}</template></td>
         <td v-for="x in cols" :key="x.fieldname"><ErpCampo :c="x" :doc="l" :ro="ro || x.read_only" compacto="1"/></td>
         <td><button class="icone-btn" :title="aberta===i ? 'Fechar a linha' : 'Todos os campos da linha'" @click="aberta = aberta===i ? null : i">{{ aberta===i ? '▴' : '⋯' }}</button></td>
-        <td v-if="!ro"><button class="icone-btn" title="Tirar linha" @click="tirar(i)">×</button></td>
+        <td v-if="!ro" class="reg-menu" @click.stop><button class="icone-btn" title="Mais ações da linha" @click="menuL = menuL===i ? null : i">⋮</button>
+          <div v-if="menuL===i" class="cartao reg-menu-lista" @click="menuL=null"><button @click="inserir(i,false)">Inserir acima</button><button @click="inserir(i,true)">Inserir abaixo</button><button @click="duplicarL(i)">Duplicar</button>
+            <button v-if="i>0" @click="mover(i,-1)">Mover para cima</button><button v-if="i<linhas.length-1" @click="mover(i,1)">Mover para baixo</button><button class="perigo" @click="tirar(i)">Tirar a linha</button></div></td>
       </tr>
       <tr v-if="aberta===i" class="erp-linha-aberta"><td :colspan="cols.length + (ro ? 2 : 3)"><div class="erp-linha-campos">
         <template v-for="x in todos" :key="x.fieldname"><div v-if="visL(x, l)" class="erp-campo">
@@ -3602,7 +3625,10 @@ const ErpTabela = {
       </div></td></tr></template></tbody></table>
       <div v-if="!linhas.length" class="vazio" style="padding:12px">Sem linhas.</div>
     </div>
-    <button v-if="!ro" class="btn sm" style="margin-top:8px" @click="juntar">+ Linha</button>
+    <div class="erp-tab-acoes"><button v-if="!ro" class="btn sm" @click="juntar">+ Linha</button>
+      <button v-if="!ro && sel.length" class="btn sm" @click="tirarSel">Tirar {{ sel.length }} linha(s)</button>
+      <span style="margin-left:auto;display:flex;gap:6px"><button v-if="linhas.length" class="btn sm" @click="descarregar" title="Descarregar as linhas em CSV">⤓ CSV</button>
+        <button v-if="!ro" class="btn sm" @click="csvIn.click()" title="Juntar linhas a partir de um CSV (primeira linha: títulos)">⤒ Carregar CSV</button><input ref="csvIn" type="file" accept=".csv" style="display:none" @change="carregarCsv"></span></div>
   </div>`,
 };
 
@@ -4460,6 +4486,21 @@ const ErpFicha = {
     const aba = ref(0); const fechadas = ref({}); const nomeNovo = ref(""); const criarOps = ref([]); const aviso = ref("");
     // lote 1 (25-11): anexos, atribuir, etiquetas, partilhar, histórico, ligações, «⋯», anterior/seguinte
     const ext = ref(null); const viz = ref({}); const separador = ref("conversa");
+    // lote 5 (25-11): «Obter artigos de», estados (Fechar/Em espera/Reabrir/Parar), «Atualizar artigos», fluxo de aprovação
+    const bt = ref({ obter: [], estados: [], atualizar_artigos: false, fluxo: null }); const obterM = ref(null); const atualM = ref(null); const menuObter = ref(false);
+    const carregarBt = async () => { bt.value = await api("documentos_erp.botoes", { doctype: props.doctype, name: props.name === "novo" ? null : props.name }).catch(() => bt.value); };
+    onMounted(carregarBt);
+    const PARTE = { "Sales Invoice": "customer", "Delivery Note": "customer", "Sales Order": "customer", "Purchase Invoice": "supplier", "Purchase Receipt": "supplier", "Purchase Order": "supplier", "Supplier Quotation": "supplier" };
+    const abrirObter = async (o) => { menuObter.value = false; const parte = doc.value[PARTE[props.doctype]] || "";
+      obterM.value = { origem: o.doctype, rotulo: o.rotulo, parte, q: "", lista: null, sel: [] }; obterM.value.lista = await api("documentos_erp.candidatos", { doctype: props.doctype, origem: o.doctype, parte }); };
+    const procurarObter = async () => { obterM.value.lista = await api("documentos_erp.candidatos", { doctype: props.doctype, origem: obterM.value.origem, parte: obterM.value.parte, q: obterM.value.q }); };
+    const fazerObter = async () => { const r = await api("documentos_erp.obter", { doctype: props.doctype, dados: JSON.stringify(doc.value), origem: obterM.value.origem, nomes: JSON.stringify(obterM.value.sel) }, true);
+      doc.value = Object.assign(doc.value, r.doc); obterM.value = null; toast("Artigos acrescentados"); };
+    const mudarEstadoDoc = async (e) => { if (!confirm(e.rotulo + "?")) return; await api("documentos_erp.mudar_estado", { doctype: props.doctype, name: doc.value.name, estado: e.valor }, true); toast("Feito"); carregar(); carregarBt(); };
+    const abrirAtual = () => { atualM.value = (doc.value.items || []).map((l) => ({ name: l.name, item_code: l.item_code, item_name: l.item_name, qty: l.qty, rate: l.rate, uom: l.uom, conversion_factor: l.conversion_factor,
+      data: l.delivery_date || l.schedule_date || "", entregue: l.delivered_qty || l.received_qty || 0, faturado: l.billed_amt || 0 })); };
+    const gravarAtual = async () => { await api("documentos_erp.atualizar_artigos", { doctype: props.doctype, name: doc.value.name, linhas: JSON.stringify(atualM.value) }, true); atualM.value = null; toast("Artigos atualizados"); carregar(); };
+    const fluxo = async (x) => { if (!confirm(x.acao + " → " + x.para + "?")) return; await api("documentos_erp.aplicar_fluxo", { doctype: props.doctype, name: doc.value.name, acao: x.acao }, true); toast(x.para); carregar(); carregarBt(); };
     const carregarExt = async () => { if (props.name === "novo" || !props.name) return;
       ext.value = await apiR("extras", { doctype: props.doctype, name: props.name }).catch(() => null);
       viz.value = await apiR("vizinhos", { doctype: props.doctype, name: props.name }).catch(() => ({})); };
@@ -4474,7 +4515,7 @@ const ErpFicha = {
       doc.value = r.doc; novo.value = r.novo; podeGravar.value = r.novo ? meta.value.pode.create : r.pode_gravar; sujo.value = !!(preparado && r.novo);
       memoItens = Object.fromEntries((doc.value.items || []).map((l) => [l.name, l.item_code]));
       ultimaAss = assinatura();
-      if (!r.novo && meta.value.submetivel && doc.value.docstatus === 1) criarOps.value = await api("erp.criar_opcoes", { doctype: props.doctype });
+      if (!r.novo && meta.value.submetivel && doc.value.docstatus === 1) criarOps.value = await api("erp.criar_opcoes", { doctype: props.doctype, name: props.name });
     };
     onMounted(carregar);
     watch(doc, (n, o) => { if (o) sujo.value = true; }, { deep: true });
@@ -4502,8 +4543,11 @@ const ErpFicha = {
     };
     watch(() => assinatura(), (a) => { if (!meta.value?.transacao || a === ultimaAss) return; ultimaAss = a; clearTimeout(tRec); tRec = setTimeout(recalcular, 500); });
     const criarDe = async (o) => {
-      const r = await api("erp.criar_de", { doctype: props.doctype, name: doc.value.name, destino: o.doctype }, true);
+      // lote 5: pagamento de uma fatura de venda abre o recibo; o resto abre o documento preparado
+      if (o.chave === "pe" && ["Sales Invoice", "Sales Order"].includes(props.doctype)) { try { sessionStorage.setItem("orbit.recibo", JSON.stringify({ cliente: doc.value.customer, fatura: props.doctype === "Sales Invoice" ? doc.value.name : null })); } catch (e) {} location.hash = irErp("Payment Entry", "novo"); return; }
+      const r = await api("erp.criar_de", { doctype: props.doctype, name: doc.value.name, destino: o.chave || o.doctype }, true);
       try { sessionStorage.setItem("orbit.erp.novo", JSON.stringify(r.doc)); } catch (e) {}
+      if (o.doctype === "Payment Entry") { location.hash = irErp("Payment Entry", "novo") + "/completa"; return; }
       location.hash = irErp(o.doctype, "novo");
     };
     const moeda = (v) => new Intl.NumberFormat("pt-PT", { style: "currency", currency: doc.value?.currency || "EUR" }).format(v || 0);
@@ -4591,12 +4635,12 @@ const ErpFicha = {
       a.value = true;
       try { const r = await api("erp." + m, { doctype: props.doctype, name: doc.value.name }, true);
         if (m === "apagar") { toast("Apagado"); location.hash = irErp(props.doctype); return; }
-        carregarExt(); doc.value = r.doc; await nextTick(); sujo.value = false; toast(m === "submeter" ? "Submetido" : "Cancelado");
+        carregarBt(); carregarExt(); doc.value = r.doc; await nextTick(); sujo.value = false; toast(m === "submeter" ? "Submetido" : "Cancelado");
       } finally { a.value = false; }
     };
     const aberta = (s, i) => !(s.collapsible && !fechadas.value[i + ":" + s.label]);
     const alternar = (s, i) => { fechadas.value[i + ":" + s.label] = !fechadas.value[i + ":" + s.label]; };
-    return { ext, viz, separador, carregarExt, statusPt, meta, doc, novo, sujo, a, aba, abasVis, abasBarra, abaVisivel, escolherAba, condTexto, secEscondida, botao, visivel, roCampo, obrig, secVisivel, tituloDoc, gravar, accao, docstatus, soLeitura, aberta, alternar, ESTADO_DOC, irErp, precisaNome, nomeNovo, cor, ini, criarOps, criarDe, moeda, pdf, aviso, tr };
+    return { bt, obterM, atualM, menuObter, abrirObter, procurarObter, fazerObter, mudarEstadoDoc, abrirAtual, gravarAtual, fluxo, ext, viz, separador, carregarExt, statusPt, meta, doc, novo, sujo, a, aba, abasVis, abasBarra, abaVisivel, escolherAba, condTexto, secEscondida, botao, visivel, roCampo, obrig, secVisivel, tituloDoc, gravar, accao, docstatus, soLeitura, aberta, alternar, ESTADO_DOC, irErp, precisaNome, nomeNovo, cor, ini, criarOps, criarDe, moeda, pdf, aviso, tr };
   },
   template: `<div v-if="meta && doc" class="erp-ficha">
     <div class="erp-topo">
@@ -4606,13 +4650,19 @@ const ErpFicha = {
         <div class="cresce"><h1>{{ tituloDoc }}</h1><div class="sub">{{ meta.rotulo }}<span v-if="!novo && !meta.single && tituloDoc!==tr(doctype, doc.name)"> · {{ tr(doctype, doc.name) }}</span></div></div>
         <span v-if="meta.submetivel && !novo" class="etq" :class="ESTADO_DOC[docstatus][1]">{{ doc.status ? statusPt(doc.status) : ESTADO_DOC[docstatus][0] }}</span>
         <span v-if="sujo" class="etq ambar">Por gravar</span>
+        <span v-if="bt.fluxo && bt.fluxo.estado" class="etq azul" title="Estado do fluxo de aprovação">{{ bt.fluxo.estado }}</span>
         <div class="erp-accoes">
           <button v-if="!soLeitura && (novo || sujo)" class="btn prim" :disabled="a" @click="gravar">Gravar</button>
           <button v-if="meta.pode.submit && docstatus===0 && !novo && !sujo" class="btn" :disabled="a" @click="accao('submeter', ['Sales Invoice','Purchase Invoice'].includes(doctype) ? 'Submeter esta fatura? O documento fiscal certificado é emitido pelo programa de faturação ligado (o Orbit nunca o emite). Depois de submetida só se altera cancelando.' : 'Submeter este documento? Depois de submetido só se altera cancelando.')">Submeter</button>
           <button v-if="meta.pode.cancel && docstatus===1" class="btn" :disabled="a" @click="accao('cancelar','Cancelar este documento?')">Cancelar</button>
           <button v-if="meta.pode.delete && !novo && docstatus!==1 && !meta.single" class="btn" :disabled="a" @click="accao('apagar','Apagar definitivamente este registo?')">Apagar</button>
           <a v-if="meta.transacao && pdf" class="btn" :href="pdf" target="_blank">PDF</a>
-          <button v-for="o in criarOps" :key="o.doctype" class="btn" :disabled="a" @click="criarDe(o)">Criar {{ o.rotulo }} →</button>
+          <button v-for="o in criarOps" :key="o.chave||o.doctype" class="btn" :disabled="a" @click="criarDe(o)">{{ o.rotulo }} →</button>
+          <span v-if="bt.obter.length && docstatus===0 && !soLeitura" class="reg-menu" @click.stop><button class="btn" @click="menuObter=!menuObter">Obter artigos de ▾</button>
+            <div v-if="menuObter" class="cartao reg-menu-lista"><button v-for="o in bt.obter" :key="o.doctype" @click="abrirObter(o)">{{ o.rotulo }}</button></div></span>
+          <button v-if="bt.atualizar_artigos" class="btn" @click="abrirAtual">Atualizar artigos</button>
+          <button v-for="e in bt.estados" :key="e.valor" class="btn" @click="mudarEstadoDoc(e)">{{ e.rotulo }}</button>
+          <button v-for="x in (bt.fluxo && bt.fluxo.acoes) || []" :key="x.acao" class="btn prim" @click="fluxo(x)">{{ x.acao }}</button>
           <RegistoMenu v-if="ext && !novo && !meta.single" :doctype="doctype" :name="doc.name" :ext="ext" @recarregar="carregarExt"/>
         </div>
       </div>
@@ -4659,6 +4709,18 @@ const ErpFicha = {
       </div>
       <aside class="cartao"><RegistoLateral :doctype="doctype" :name="doc.name" :ext="ext"/></aside>
     </div>
+    <div v-if="obterM" class="modal-fundo" @click.self="obterM=null"><div class="modal" style="max-width:640px"><header><b>Obter artigos de: {{ obterM.rotulo }}</b><button class="btn sm" @click="obterM=null">Fechar</button></header>
+      <div class="reg-form"><div style="display:flex;gap:8px"><input v-model="obterM.q" placeholder="Procurar n.º ou nome…" @keyup.enter="procurarObter" style="flex:1"><button class="btn" @click="procurarObter">Procurar</button></div>
+        <div v-if="obterM.parte" class="sub" style="font-size:12px">Só os de {{ obterM.parte }} <a href="javascript:void 0" @click="obterM.parte=''; procurarObter()">· ver de todos</a></div>
+        <div v-if="!obterM.lista" class="carregar">A carregar…</div><div v-else-if="!obterM.lista.length" class="vazio">Nada por faturar/entregar.</div>
+        <label v-for="x in obterM.lista||[]" :key="x.name" class="chk-col reg-anexo"><input type="checkbox" :value="x.name" v-model="obterM.sel"> <span><b>{{ x.name }}</b><small class="sub">{{ [x.parte, x.data, x.total ? x.total.toFixed(2)+' €' : '', statusPt(x.estado)].filter(Boolean).join(' · ') }}</small></span></label>
+        <div class="reg-botoes"><button class="btn prim" :disabled="!obterM.sel.length" @click="fazerObter">Acrescentar os artigos</button></div></div></div></div>
+    <div v-if="atualM" class="modal-fundo" @click.self="atualM=null"><div class="modal" style="max-width:760px"><header><b>Atualizar artigos</b><button class="btn sm" @click="atualM=null">Fechar</button></header>
+      <div class="reg-form"><div class="tabela-wrap" style="margin:0"><table><thead><tr><th>Artigo</th><th>Quantidade</th><th>Preço</th><th>Data</th></tr></thead>
+        <tbody><tr v-for="l in atualM" :key="l.name" style="cursor:default"><td style="white-space:normal">{{ l.item_name || l.item_code }}<small v-if="l.entregue" class="sub"> · {{ l.entregue }} já entregue/recebida</small></td>
+          <td><input type="number" step="any" v-model.number="l.qty" style="width:90px"></td><td><input type="number" step="any" v-model.number="l.rate" style="width:100px"></td><td><input type="date" v-model="l.data"></td></tr></tbody></table></div>
+        <p class="sub" style="font-size:12px;margin:0">O ERPNext não deixa baixar abaixo do que já foi entregue, recebido ou faturado.</p>
+        <div class="reg-botoes"><button class="btn prim" @click="gravarAtual">Atualizar</button></div></div></div></div>
   </div><div v-else class="vazio">A carregar…</div>`,
 };
 

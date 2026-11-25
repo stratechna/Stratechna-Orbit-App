@@ -349,6 +349,39 @@ CRIAR = {
     "Material Request": [("Purchase Order", "erpnext.stock.doctype.material_request.material_request.make_purchase_order")],
     "Supplier Quotation": [("Purchase Order", "erpnext.buying.doctype.supplier_quotation.supplier_quotation.make_purchase_order")],
 }
+# 25-11-2026 (lote 5 das opções dos originais): os «Criar →» do ERPNext que faltavam. Cada entrada: (destino, método,
+# rótulo, chave); a chave distingue dois destinos iguais (fatura → nota de crédito também é uma Sales Invoice);
+# «pe» = método com (dt, dn) como o get_payment_entry.
+_PE = "erpnext.accounts.doctype.payment_entry.payment_entry.get_payment_entry"
+CRIAR_MAIS = {
+    "Quotation": [("Sales Invoice", "erpnext.selling.doctype.quotation.quotation.make_sales_invoice", "Fatura", "Sales Invoice")],
+    "Sales Order": [("Payment Entry", _PE, "Pagamento (adiantamento)", "pe"),
+                    ("Material Request", "erpnext.selling.doctype.sales_order.sales_order.make_material_request", "Pedido de material", "Material Request"),
+                    ("Purchase Order", "erpnext.selling.doctype.sales_order.sales_order.make_purchase_order", "Encomenda a fornecedor", "Purchase Order"),
+                    ("Project", "erpnext.selling.doctype.sales_order.sales_order.make_project", "Projeto", "Project"),
+                    ("Work Order", "erpnext.selling.doctype.sales_order.sales_order.make_work_orders", "Ordem de produção", "-")],
+    "Sales Invoice": [("Payment Entry", _PE, "Pagamento", "pe"),
+                      ("Sales Invoice", "erpnext.accounts.doctype.sales_invoice.sales_invoice.make_sales_return", "Nota de crédito", "devolucao"),
+                      ("Delivery Note", "erpnext.accounts.doctype.sales_invoice.sales_invoice.make_delivery_note", "Guia de transporte", "Delivery Note")],
+    "Delivery Note": [("Delivery Note", "erpnext.stock.doctype.delivery_note.delivery_note.make_sales_return", "Devolução", "devolucao")],
+    "Purchase Order": [("Payment Entry", _PE, "Pagamento (adiantamento)", "pe")],
+    "Purchase Invoice": [("Payment Entry", _PE, "Pagamento", "pe"),
+                         ("Purchase Invoice", "erpnext.accounts.doctype.purchase_invoice.purchase_invoice.make_debit_note", "Nota de débito", "devolucao")],
+    "Purchase Receipt": [("Purchase Receipt", "erpnext.stock.doctype.purchase_receipt.purchase_receipt.make_purchase_return", "Devolução ao fornecedor", "devolucao")],
+    "Material Request": [("Request for Quotation", "erpnext.stock.doctype.material_request.material_request.make_request_for_quotation", "Pedido de cotação", "Request for Quotation"),
+                         ("Supplier Quotation", "erpnext.stock.doctype.material_request.material_request.make_supplier_quotation", "Cotação de fornecedor", "Supplier Quotation"),
+                         ("Stock Entry", "erpnext.stock.doctype.material_request.material_request.make_stock_entry", "Movimento de stock", "Stock Entry")],
+    "Request for Quotation": [("Supplier Quotation", "erpnext.buying.doctype.request_for_quotation.request_for_quotation.make_supplier_quotation_from_rfq", "Cotação de fornecedor", "Supplier Quotation")],
+}
+
+
+def _opcoes(doctype):
+    out = [{"doctype": dt, "metodo": m, "rotulo": _marca(_(dt)), "chave": dt} for dt, m in CRIAR.get(doctype, [])]
+    for dt, m, rot, chave in CRIAR_MAIS.get(doctype, []):
+        if chave == "-":
+            continue
+        out.append({"doctype": dt, "metodo": m, "rotulo": _(rot), "chave": chave})
+    return out
 
 
 _TABELAS = ("items", "taxes", "time_logs", "expenses")
@@ -460,24 +493,40 @@ def recalcular(doctype: str, dados: str):
 
 
 @frappe.whitelist()
-def criar_opcoes(doctype: str):
+def criar_opcoes(doctype: str, name: str = None):
     _guarda()
-    return [{"doctype": dt, "rotulo": _marca(_(dt))} for dt, _m in CRIAR.get(doctype, []) if frappe.has_permission(dt, "create")]
+    out = []
+    for o in _opcoes(doctype):
+        if not frappe.has_permission(o["doctype"], "create") or not frappe.db.exists("DocType", o["doctype"]):
+            continue
+        try:
+            frappe.get_attr(o["metodo"])
+        except Exception:  # noqa: BLE001 — método que esta versão do ERPNext não tem
+            continue
+        out.append({"doctype": o["doctype"], "rotulo": o["rotulo"], "chave": o["chave"]})
+    if name and doctype in ("Sales Invoice", "Purchase Invoice"):
+        # sem nada em dívida, «Pagamento» não faz sentido
+        if not frappe.db.get_value(doctype, name, "outstanding_amount"):
+            out = [o for o in out if o["chave"] != "pe"]
+    return out
 
 
 @frappe.whitelist(methods=["POST"])
 def criar_de(doctype: str, name: str, destino: str):
     """O documento seguinte por gravar (ex.: encomenda → fatura), como o botão «Criar» do ERPNext."""
     _guarda()
-    metodo = dict(CRIAR.get(doctype, [])).get(destino)
-    if not metodo:
+    # destino pode ser a chave (lote 5: «devolucao», «pe») ou o doctype (compatível com o que já havia)
+    op = next((o for o in _opcoes(doctype) if o["chave"] == destino), None) or next((o for o in _opcoes(doctype) if o["doctype"] == destino), None)
+    if not op:
         frappe.throw(_("Não se cria {0} a partir de {1}.").format(_(destino), _(doctype)))
     origem = frappe.get_doc(doctype, name)
     origem.check_permission("read")
-    if not frappe.has_permission(destino, "create"):
-        frappe.throw(_("Sem permissão para criar {0}.").format(_(destino)), frappe.PermissionError)
-    novo = frappe.get_attr(metodo)(name)
-    return {"doc": novo.as_dict()}
+    if not frappe.has_permission(op["doctype"], "create"):
+        frappe.throw(_("Sem permissão para criar {0}.").format(_(op["doctype"])), frappe.PermissionError)
+    f = frappe.get_attr(op["metodo"])
+    novo = f(doctype, name) if op["chave"] == "pe" else f(name)
+    d = novo.as_dict() if hasattr(novo, "as_dict") else novo
+    return {"doc": d, "doctype": op["doctype"]}
 
 
 

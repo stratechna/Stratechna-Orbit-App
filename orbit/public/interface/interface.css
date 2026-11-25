@@ -821,3 +821,8 @@ tr.por-ler td b,tr.por-ler td{font-weight:600}
 .erp-mod .erp-sec-mod{break-inside:avoid;display:inline-block;width:100%;margin:0 0 16px;vertical-align:top}
 .erp-sec-mod header{display:flex;justify-content:space-between;align-items:center;gap:8px}
 @media (min-width:1101px){.prop-corpo{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px}.prop-corpo .prop-lado{max-width:none}}
+
+/* ── 25-11-2026, lote 5: tabela-filha e botões dos documentos ── */
+.erp-tab-acoes{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.linha-n{display:flex;align-items:center;gap:4px;cursor:pointer}
+.erp-tabela td.reg-menu{position:relative}.erp-tabela .reg-menu-lista{right:0;min-width:180px}
