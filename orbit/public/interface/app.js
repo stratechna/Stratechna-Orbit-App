@@ -386,7 +386,8 @@ const Projetos = {
   },
   template: `
   <div>
-    <div class="pad" style="padding-bottom:12px"><h1>Projetos</h1><div class="sub" v-if="d">{{ d.length }} projetos</div></div>
+    <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><h1>Projetos</h1><div class="sub" v-if="d">{{ d.length }} projetos</div></div>
+      <div class="acoes-lista"><a class="btn prim" href="#/erp/Project/novo">+ Novo projeto</a><a class="btn" href="#/erp/Task">Todas as tarefas</a></div></div>
     <div class="vistas"><button v-for="e in [['Open','Em curso'],['On hold','Em pausa'],['Completed','Concluídos'],['','Todos']]" :key="e[0]" :class="{ativo:estado===e[0]}" @click="estado=e[0]">{{ e[1] }}</button></div>
     <div class="filtros"><input class="filtro" style="border-style:solid;min-width:220px" v-model="q" placeholder="Procurar projeto ou cliente…"></div>
     <div v-if="!d" class="carregar">A carregar…</div>
@@ -408,7 +409,17 @@ const Projeto = {
     onMounted(carregar);
     const largar = async (col) => { const t = arrastar.value; alvo.value = ""; arrastar.value = null; if (!t || t.estado === col.estado) return; await apiT("mover", { nome: t.id, estado: col.estado }, true); carregar(); };
     const criar = async () => { if (!nova.value.trim()) return; await apiT("criar", { titulo: nova.value, data: novaData.value || null, projeto: props.nome }, true); nova.value = ""; novaData.value = ""; carregar(); };
-    return { p, arrastar, alvo, largar, nova, novaData, criar, data };
+    // lote 6 (25-11): Quadro | Gantt, como as vistas do ecrã antigo; as tarefas abrem na ficha completa
+    let m0 = "quadro"; try { m0 = localStorage.getItem("orbit.projeto.vista") || m0; } catch (e) {}
+    const vista = ref(m0); watch(vista, (v) => { try { localStorage.setItem("orbit.projeto.vista", v); } catch (e) {} });
+    const gantt = computed(() => { if (!p.value) return null; const ts = p.value.colunas.flatMap((c) => c.cartoes.map((t) => ({ ...t, estado: c.estado, rotulo: c.rotulo })));
+      const com = ts.filter((t) => t.inicio || t.data); if (!com.length) return { ts: [], dias: 0 };
+      const ds = com.flatMap((t) => [t.inicio || t.data, t.data || t.inicio]).sort(); const ini = new Date(ds[0]); const fim = new Date(ds[ds.length - 1]);
+      const dias = Math.max(1, Math.round((fim - ini) / 864e5) + 1); const pos = (x) => Math.round((new Date(x) - ini) / 864e5);
+      const meses = []; for (let d = new Date(ini.getFullYear(), ini.getMonth(), 1); d <= fim; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) meses.push({ r: d.toLocaleDateString("pt-PT", { month: "short", year: "2-digit" }), x: Math.max(0, pos(d)) });
+      const hoje = pos(new Date().toISOString().slice(0, 10));
+      return { dias, meses, hoje, ts: com.map((t) => { const a = pos(t.inicio || t.data), b = pos(t.data || t.inicio); return { ...t, x: Math.min(a, b), w: Math.abs(b - a) + 1 }; }).sort((u, v) => u.x - v.x), sem: ts.length - com.length }; });
+    return { p, arrastar, alvo, largar, nova, novaData, criar, data, vista, gantt, irErp };
   },
   template: `
   <div v-if="p">
@@ -418,11 +429,20 @@ const Projeto = {
       <a class="btn" :href="'#/erp/Project/'+encodeURIComponent(String(p.classico||'').split('/').pop())">Todos os campos</a>
     </div>
     <form class="cartao compor" style="margin:0 24px 14px" @submit.prevent="criar"><input v-model="nova" placeholder="Nova tarefa neste projeto…"><input type="date" v-model="novaData" style="flex:none;width:150px"><button class="btn sm prim" :disabled="!nova.trim()">Criar</button></form>
-    <div class="funil" :style="{gridTemplateColumns:'repeat('+p.colunas.length+',minmax(220px,1fr))'}">
+    <div class="vistas"><button :class="{ativo: vista==='quadro'}" @click="vista='quadro'">Quadro</button><button :class="{ativo: vista==='gantt'}" @click="vista='gantt'">Gantt</button></div>
+    <div v-if="vista==='gantt'" class="cartao gantt">
+      <div v-if="!gantt.ts.length" class="vazio">As tarefas ainda não têm datas de início ou de fim.</div>
+      <template v-else><div class="gantt-esc"><span v-for="m in gantt.meses" :key="m.r" :style="{left: (m.x/gantt.dias*100)+'%'}">{{ m.r }}</span></div>
+        <div v-for="t in gantt.ts" :key="t.id" class="gantt-linha"><a class="gantt-nome" :href="irErp('Task', t.id)" :title="t.titulo">{{ t.titulo }}</a>
+          <div class="gantt-pista"><i v-if="gantt.hoje>=0 && gantt.hoje<=gantt.dias" class="gantt-hoje" :style="{left:(gantt.hoje/gantt.dias*100)+'%'}"></i>
+            <a class="gantt-barra" :class="'g-'+t.estado" :href="irErp('Task', t.id)" :style="{left:(t.x/gantt.dias*100)+'%', width:Math.max(t.w/gantt.dias*100, 1.2)+'%'}" :title="t.titulo + ' · ' + t.rotulo + (t.dono ? ' · ' + t.dono : '')"><b :style="{width:(t.progresso||0)+'%'}"></b></a></div></div>
+        <div v-if="gantt.sem" class="sub" style="font-size:12px;margin-top:8px">{{ gantt.sem }} tarefa(s) sem datas não aparecem aqui.</div></template>
+    </div>
+    <div v-else class="funil" :style="{gridTemplateColumns:'repeat('+p.colunas.length+',minmax(220px,1fr))'}">
       <div class="coluna" v-for="c in p.colunas" :key="c.estado" :class="{alvo:alvo===c.estado}" @dragover.prevent="alvo=c.estado" @dragleave="alvo=''" @drop.prevent="largar(c)">
         <header><b>{{ c.rotulo }} <span class="sub" style="font-weight:500">{{ c.cartoes.length }}</span></b></header>
         <div class="cartao negocio" v-for="t in c.cartoes" :key="t.id" :draggable="p.pode_editar" @dragstart="arrastar={...t, estado:c.estado}">
-          <h3 style="font-weight:500">{{ t.titulo }}</h3>
+          <h3 style="font-weight:500"><a :href="irErp('Task', t.id)" style="color:inherit;text-decoration:none" @click.stop>{{ t.titulo }}</a></h3>
           <div class="prox" :class="{atraso:c.estado==='Overdue'}"><template v-if="t.data">◷ {{ data(t.data,false) }}</template><template v-if="t.dono"> · {{ t.dono }}</template><template v-if="t.prioridade && t.prioridade!=='Média'"> · {{ t.prioridade }}</template></div>
         </div>
       </div>
@@ -3238,6 +3258,51 @@ const ErpImportar = {
   </div><div v-else class="vazio">A carregar…</div>`,
 };
 
+// ── Lote 6 (25-11-2026): RH — «Por aprovar» e calendário de ausências (orbit/interface/rh.py) ──
+const RhAprovar = {
+  setup() {
+    const l = ref(null); const a = ref("");
+    const carregar = async () => { l.value = await api("rh.por_aprovar"); }; onMounted(carregar);
+    const decidir = async (x, sim) => { const nota = sim ? null : prompt("Motivo da recusa (opcional)") ; if (!sim && nota === null) return; a.value = x.name;
+      try { await api("rh.decidir", { doctype: x.doctype, name: x.name, aprovar: sim ? 1 : 0, nota }, true); toast(sim ? "Aprovado" : "Recusado"); carregar(); } finally { a.value = ""; } };
+    const eur = (v) => moedaEUR(v);
+    return { l, a, decidir, data, irErp, eur };
+  },
+  template: `<div><div class="pad" style="padding-bottom:12px"><h1>Por aprovar</h1><div class="sub">Pedidos de ausência e despesas à espera da sua decisão.</div></div>
+    <div v-if="!l" class="carregar">A carregar…</div><div v-else-if="!l.length" class="vazio">Nada por aprovar.</div>
+    <div v-else class="tabela-wrap cartoes-movel"><table><thead><tr><th>Pessoa</th><th>Pedido</th><th>Quando</th><th>Nota</th><th></th></tr></thead><tbody>
+      <tr v-for="x in l" :key="x.name" style="cursor:default">
+        <td class="cel-tit"><b>{{ x.pessoa }}</b><div class="sub" style="font-size:12px"><a :href="irErp(x.doctype, x.name)">{{ x.name }}</a></div></td>
+        <td><span class="etq" :class="x.tipo==='Despesa' ? 'roxo' : 'azul'">{{ x.tipo }}</span> {{ x.titulo }}<template v-if="x.valor"> · <b>{{ eur(x.valor) }}</b></template></td>
+        <td>{{ data(x.de,false) }}<template v-if="x.ate && x.ate!==x.de"> → {{ data(x.ate,false) }}</template><span v-if="x.dias" class="sub"> · {{ x.dias }} dia(s){{ x.meio_dia ? ' (meio dia)' : '' }}</span></td>
+        <td class="sub" style="white-space:normal;max-width:280px">{{ x.nota }}</td>
+        <td @click.stop style="text-align:right;white-space:nowrap"><button class="btn sm" :disabled="a===x.name" @click="decidir(x,false)">Recusar</button> <button class="btn sm prim" :disabled="a===x.name" @click="decidir(x,true)">Aprovar</button></td>
+      </tr></tbody></table></div></div>`,
+};
+const RhAusencias = {
+  setup() {
+    const hoje = new Date(); const ano = ref(hoje.getFullYear()); const mes = ref(hoje.getMonth() + 1); const d = ref(null);
+    const carregar = async () => { d.value = null; d.value = await api("rh.ausencias", { ano: ano.value, mes: mes.value }); }; onMounted(carregar);
+    const mudar = (k) => { let m = mes.value + k, a = ano.value; if (m < 1) { m = 12; a--; } if (m > 12) { m = 1; a++; } mes.value = m; ano.value = a; carregar(); };
+    const dias = computed(() => { const n = new Date(ano.value, mes.value, 0).getDate(); return Array.from({ length: n }, (_, i) => { const dt = new Date(ano.value, mes.value - 1, i + 1);
+      return { n: i + 1, iso: `${ano.value}-${String(mes.value).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`, fds: [0, 6].includes(dt.getDay()), sem: "dstqqss"[dt.getDay()] }; }); });
+    const pessoas = computed(() => [...new Set((d.value?.ausencias || []).map((x) => x.pessoa))].sort());
+    const em = (p, dia) => (d.value?.ausencias || []).find((x) => x.pessoa === p && x.de <= dia.iso && x.ate >= dia.iso);
+    const feriado = (dia) => (d.value?.feriados || []).find((f) => f.data === dia.iso);
+    const titulo = computed(() => new Date(ano.value, mes.value - 1, 1).toLocaleDateString("pt-PT", { month: "long", year: "numeric" }));
+    return { ano, mes, d, mudar, dias, pessoas, em, feriado, titulo, irErp };
+  },
+  template: `<div><div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div><h1>Calendário de ausências</h1><div class="sub">Aprovadas a cheio; por aprovar com riscas.</div></div>
+      <div style="display:flex;gap:6px;align-items:center"><button class="btn sm" @click="mudar(-1)">‹</button><b style="min-width:150px;text-align:center;text-transform:capitalize">{{ titulo }}</b><button class="btn sm" @click="mudar(1)">›</button>
+        <a class="btn sm prim" :href="irErp('Leave Application','novo')">+ Pedir ausência</a></div></div>
+    <div v-if="!d" class="carregar">A carregar…</div>
+    <div v-else class="cartao aus-quadro"><table><thead><tr><th class="aus-nome">Pessoa</th><th v-for="x in dias" :key="x.n" :class="{fds:x.fds, fer: feriado(x)}" :title="feriado(x) ? feriado(x).nome : ''"><small>{{ x.sem }}</small><br>{{ x.n }}</th></tr></thead>
+      <tbody><tr v-if="!pessoas.length"><td :colspan="dias.length+1" class="vazio">Ninguém ausente neste mês.</td></tr>
+        <tr v-for="p in pessoas" :key="p"><td class="aus-nome">{{ p }}</td>
+          <td v-for="x in dias" :key="x.n" :class="{fds:x.fds, fer: feriado(x)}"><a v-if="em(p,x)" :href="irErp('Leave Application', em(p,x).name)" class="aus-dia" :class="{pend: !em(p,x).aprovada, meio: em(p,x).meio_dia}" :title="em(p,x).tipo + (em(p,x).aprovada ? '' : ' (por aprovar)')"></a></td></tr></tbody></table></div></div>`,
+};
+
 const ErpModulo = {
   props: ["barra"],
   setup(props) {
@@ -3304,6 +3369,9 @@ const ErpLista = {
       def.value = await apiL("definicao", { doctype: props.doctype }).catch(() => ({ campos: [], pode: {} }));
       vs.value = await apiL("vistas", { doctype: props.doctype }).catch(() => ({ vistas: [], padrao: "" }));
       let g = null; try { g = JSON.parse(localStorage.getItem(chaveLS()) || "null"); } catch (e) {}
+      // lote 6: os atalhos das fichas abrem a lista já filtrada (ex.: faturas deste cliente)
+      let pre = null; try { pre = JSON.parse(sessionStorage.getItem("orbit.erp.filtro") || "null"); sessionStorage.removeItem("orbit.erp.filtro"); } catch (e) {}
+      if (pre && pre.doctype === props.doctype) g = { filtros: pre.filtros, colunas: (g || {}).colunas || [], ordem: "modified desc", vista: "" };
       const pad = vs.value.vistas.find((v) => v.nome === vs.value.padrao);
       if (g) { filtros.value = g.filtros || []; colEscolhidas.value = g.colunas || []; ordem.value = g.ordem || ordem.value; vistaAtiva.value = g.vista || ""; }
       else if (pad) aplicarVista(pad, false);
@@ -4486,6 +4554,16 @@ const ErpFicha = {
     const aba = ref(0); const fechadas = ref({}); const nomeNovo = ref(""); const criarOps = ref([]); const aviso = ref("");
     // lote 1 (25-11): anexos, atribuir, etiquetas, partilhar, histórico, ligações, «⋯», anterior/seguinte
     const ext = ref(null); const viz = ref({}); const separador = ref("conversa");
+    // lote 6 (25-11): atalhos para o que está ligado a este registo (como os «Connections»/«View» do ecrã antigo)
+    const ATALHOS = { Customer: [["Propostas", "Quotation", "party_name"], ["Encomendas", "Sales Order", "customer"], ["Faturas", "Sales Invoice", "customer"], ["Guias", "Delivery Note", "customer"], ["Recibos", "Payment Entry", "party"], ["Em dívida", "#/contas/receber"]],
+      Supplier: [["Encomendas", "Purchase Order", "supplier"], ["Receções", "Purchase Receipt", "supplier"], ["Faturas de compra", "Purchase Invoice", "supplier"], ["Pagamentos", "Payment Entry", "party"], ["Em dívida", "#/contas/pagar"]],
+      Item: [["Stock e movimentos", "#/erp-stock/"], ["Preços", "Item Price", "item_code"]],
+      Employee: [["Ausências", "Leave Application", "employee"], ["Despesas", "Expense Claim", "employee"], ["Assiduidade", "Attendance", "employee"], ["Horas", "Timesheet", "employee"]],
+      Project: [["Quadro e Gantt", "#/projeto/"], ["Tarefas", "Task", "project"], ["Horas", "Timesheet", "parent_project"], ["Encomendas", "Sales Order", "project"]],
+      Warehouse: [["Stock", "#/erp-stock"], ["Movimentos", "Stock Ledger Entry", "warehouse"]] };
+    const atalhos = computed(() => (!doc.value || novo.value ? [] : (ATALHOS[props.doctype] || [])));
+    const irAtalho = (a) => { if (a[1].startsWith("#")) { location.hash = a[1].endsWith("/") ? a[1] + encodeURIComponent(doc.value.name) : a[1]; return; }
+      try { sessionStorage.setItem("orbit.erp.filtro", JSON.stringify({ doctype: a[1], filtros: [[a[2], "=", doc.value.name]] })); } catch (e) {} location.hash = irErp(a[1]); };
     // lote 5 (25-11): «Obter artigos de», estados (Fechar/Em espera/Reabrir/Parar), «Atualizar artigos», fluxo de aprovação
     const bt = ref({ obter: [], estados: [], atualizar_artigos: false, fluxo: null }); const obterM = ref(null); const atualM = ref(null); const menuObter = ref(false);
     const carregarBt = async () => { bt.value = await api("documentos_erp.botoes", { doctype: props.doctype, name: props.name === "novo" ? null : props.name }).catch(() => bt.value); };
@@ -4640,7 +4718,7 @@ const ErpFicha = {
     };
     const aberta = (s, i) => !(s.collapsible && !fechadas.value[i + ":" + s.label]);
     const alternar = (s, i) => { fechadas.value[i + ":" + s.label] = !fechadas.value[i + ":" + s.label]; };
-    return { bt, obterM, atualM, menuObter, abrirObter, procurarObter, fazerObter, mudarEstadoDoc, abrirAtual, gravarAtual, fluxo, ext, viz, separador, carregarExt, statusPt, meta, doc, novo, sujo, a, aba, abasVis, abasBarra, abaVisivel, escolherAba, condTexto, secEscondida, botao, visivel, roCampo, obrig, secVisivel, tituloDoc, gravar, accao, docstatus, soLeitura, aberta, alternar, ESTADO_DOC, irErp, precisaNome, nomeNovo, cor, ini, criarOps, criarDe, moeda, pdf, aviso, tr };
+    return { atalhos, irAtalho, bt, obterM, atualM, menuObter, abrirObter, procurarObter, fazerObter, mudarEstadoDoc, abrirAtual, gravarAtual, fluxo, ext, viz, separador, carregarExt, statusPt, meta, doc, novo, sujo, a, aba, abasVis, abasBarra, abaVisivel, escolherAba, condTexto, secEscondida, botao, visivel, roCampo, obrig, secVisivel, tituloDoc, gravar, accao, docstatus, soLeitura, aberta, alternar, ESTADO_DOC, irErp, precisaNome, nomeNovo, cor, ini, criarOps, criarDe, moeda, pdf, aviso, tr };
   },
   template: `<div v-if="meta && doc" class="erp-ficha">
     <div class="erp-topo">
@@ -4673,6 +4751,7 @@ const ErpFicha = {
         <div class="total"><small>Total</small><b>{{ moeda(doc.rounded_total || doc.grand_total) }}</b></div>
         <div v-if="docstatus===1 && doc.outstanding_amount !== undefined"><small>Em dívida</small><b>{{ moeda(doc.outstanding_amount) }}</b></div>
       </div>
+      <div v-if="atalhos.length" class="erp-atalhos"><button v-for="x in atalhos" :key="x[0]" class="reg-chip" @click="irAtalho(x)">{{ x[0] }} →</button></div>
       <div v-if="aviso" class="aviso" style="margin-top:8px">{{ aviso }}</div>
       <div v-if="precisaNome" class="erp-campo" style="max-width:420px;margin-top:10px"><label>Nome do registo<span class="obrig">*</span></label><input v-model="nomeNovo"></div>
       <div class="vistas" v-if="abasBarra.length>1" style="padding:12px 0 0"><button v-for="(t,i) in abasBarra" :key="t.label+i" :class="{ativo: aba===i, inativo: !abaVisivel(t)}" :title="abaVisivel(t) ? '' : condTexto(t.depends_on)" @click="escolherAba(t,i)">{{ t.label }}</button></div>
@@ -5093,7 +5172,8 @@ const APPS = {
     nav: [["sec", "Trabalho"], ["projetos", "projeto", "Projetos"], ["tarefas", "tarefa", "Tarefas"], ["calendario", "cal", "Calendário"], ["sec", "Tempo"], ["tempo", "relogio", "Registo de horas"]],
     modulos: ["Projects"], defs: ["Pessoas e tempo"] },
   rh: { nome: "RH", sub: "Pessoas e equipa", ic: "pessoas", inicio: "pessoas",
-    nav: [["sec", "Pessoas"], ["pessoas", "pessoas", "Colaboradores"]],
+    nav: [["sec", "Pessoas"], ["pessoas", "pessoas", "Colaboradores"], ["rh-aprovar", "tarefa", "Por aprovar"], ["rh-ausencias", "cal", "Calendário de ausências"],
+      ["erp/Leave Application", "nota", "Ausências"], ["erp/Expense Claim", "euro", "Despesas"]],
     modulos: ["Frappe HR", "Recruitment", "Leaves", "Shift & Attendance", "Performance", "Tenure", "Payroll", "Expenses", "Tax & Benefits"], defs: ["Pessoas e tempo"] },
   gestao: { nome: "Gestão", sub: "Dinheiro e obrigações", ic: "euro", inicio: "",
     nav: [], modulos: ["Invoicing", "Payments", "Banking", "Accounting", "Financial Reports", "Subscription"], defs: ["Vendas e faturação", "Marcas e empresa"] },
@@ -5133,7 +5213,7 @@ const abrirApp = (chave, url) => {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpPainel, ErpContas, ErpImportar, ErpLista, ErpFicha, ErpProposta, ErpEmitir, ErpRecibo, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, DefUtilizadores, DefEmpresas, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpPainel, ErpContas, ErpImportar, RhAprovar, RhAusencias, ErpLista, ErpFicha, ErpProposta, ErpEmitir, ErpRecibo, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, DefUtilizadores, DefEmpresas, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -5279,6 +5359,8 @@ const App = {
         <ErpFicha v-else-if="ecra==='erp'" :doctype="partes[1]" :name="partes[2]" :key="'f'+partes[1]+'/'+partes[2]"/>
         <ErpStock v-else-if="ecra==='erp-stock'" :artigo="partes[1]" :key="'s'+(partes[1]||'')"/>
         <ErpPessoas v-else-if="ecra==='pessoas'"/>
+        <RhAprovar v-else-if="ecra==='rh-aprovar'"/>
+        <RhAusencias v-else-if="ecra==='rh-ausencias'"/>
         <Compras v-else-if="ecra==='compras'" :nome="partes[1]" :key="'c'+(partes[1]||'')"/>
         <ErpRelatorio v-else-if="ecra==='erp-rel'" :nome="partes[1]" :key="'r'+partes[1]"/>
         <ErpDesk v-else-if="ecra==='erp-desk'" :url="partes.slice(1).join('/')" :key="'d'+partes.slice(1).join('/')"/>

@@ -146,12 +146,14 @@ def projeto(nome: str):
     p = frappe.get_doc("Project", nome)
     p.check_permission("read")
     tarefas_ = frappe.get_list("Task", filters={"project": nome, "is_group": 0, "status": ["!=", "Template"]},
-                               fields=["name", "subject", "status", "priority", "exp_end_date", "_assign", "completed_on", "ordem"],
+                               fields=["name", "subject", "status", "priority", "exp_start_date", "exp_end_date", "_assign", "completed_on", "ordem", "progress"],
                                order_by="ordem asc, exp_end_date asc", limit=1000)
     colunas = []
     for est, rot in ESTADOS_PROJ:
         cart = [{"id": t.name, "titulo": t.subject, "prioridade": PRIOR.get(t.priority, t.priority),
-                 "data": str(getdate(t.exp_end_date)) if t.exp_end_date else None, "dono": _nome(_dono(t._assign))}
+                 "data": str(getdate(t.exp_end_date)) if t.exp_end_date else None, "dono": _nome(_dono(t._assign)),
+                 # lote 6 (25-11): início e progresso para o Gantt
+                 "inicio": str(getdate(t.exp_start_date)) if t.exp_start_date else None, "progresso": flt(t.progress)}
                 for t in tarefas_ if t.status == est]
         if est == "Completed":
             cart = cart[-30:]

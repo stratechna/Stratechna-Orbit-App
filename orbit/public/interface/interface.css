@@ -826,3 +826,19 @@ tr.por-ler td b,tr.por-ler td{font-weight:600}
 .erp-tab-acoes{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .linha-n{display:flex;align-items:center;gap:4px;cursor:pointer}
 .erp-tabela td.reg-menu{position:relative}.erp-tabela .reg-menu-lista{right:0;min-width:180px}
+
+/* ── 25-11-2026, lote 6: calendário de ausências e Gantt ── */
+.aus-quadro{margin:0 24px 24px;overflow:auto}.aus-quadro table{border-collapse:collapse;min-width:100%}
+.aus-quadro th,.aus-quadro td{padding:4px 2px;text-align:center;font-size:11.5px;border-bottom:1px solid var(--line-2);min-width:24px}
+.aus-quadro .aus-nome{text-align:left;padding:6px 10px;min-width:160px;position:sticky;left:0;background:var(--surface);font-size:13px;white-space:nowrap;z-index:1}
+.aus-quadro .fds{background:var(--surface-2)}.aus-quadro .fer{background:var(--ambar-bg)}
+.aus-dia{display:block;height:16px;border-radius:4px;background:#5b6f7a}.aus-dia.pend{background:repeating-linear-gradient(45deg,#5b6f7a 0 4px,transparent 4px 8px);outline:1px solid #5b6f7a}.aus-dia.meio{width:50%}
+.gantt{margin:0 24px 24px;padding:14px 16px;overflow:auto}
+.gantt-esc{position:relative;height:20px;margin-left:220px;border-bottom:1px solid var(--line);font-size:11px;color:var(--ink-3)}.gantt-esc span{position:absolute;top:0;text-transform:capitalize}
+.gantt-linha{display:grid;grid-template-columns:220px minmax(300px,1fr);align-items:center;min-height:30px;border-bottom:1px solid var(--line-2)}
+.gantt-nome{font-size:13px;color:var(--ink);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:10px}
+.gantt-pista{position:relative;height:22px}.gantt-hoje{position:absolute;top:-6px;bottom:-6px;width:1px;background:var(--acao)}
+.gantt-barra{position:absolute;top:4px;height:14px;border-radius:4px;background:#5b6f7a;overflow:hidden;display:block}.gantt-barra b{display:block;height:100%;background:rgba(255,255,255,.35)}
+.gantt-barra.g-Completed{background:#4b7a5a}.gantt-barra.g-Overdue{background:var(--acao)}.gantt-barra.g-Working{background:#46607e}.gantt-barra.g-Open{background:#8a7340}
+@media (max-width:760px){.gantt-linha{grid-template-columns:120px minmax(240px,1fr)}.gantt-esc{margin-left:120px}.aus-quadro,.gantt{margin:0 16px 16px}}
+.erp-atalhos{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.erp-atalhos .reg-chip{cursor:pointer;font:inherit;font-size:12.5px}.erp-atalhos .reg-chip:hover{border-color:var(--ink-3)}
