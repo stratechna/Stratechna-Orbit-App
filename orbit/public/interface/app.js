@@ -324,12 +324,13 @@ async function apiT(metodo, args = {}, post = false) {
 const GRUPOS_T = [["atrasadas", "Atrasadas"], ["hoje", "Hoje"], ["semana", "Esta semana"], ["depois", "Mais tarde"], ["sem_data", "Sem data"]];
 const Tarefas = {
   setup() {
-    let v0 = "minhas"; try { v0 = localStorage.getItem("orbit.tarefas.vista") || "minhas"; } catch (e) {}
-    const vista = ref(v0); const itens = ref(null); const q = ref(""); const nova = ref({ titulo: "", data: "", projeto: "" }); const projs = ref([]);
-    let tq;
+    let v0 = null; try { v0 = localStorage.getItem("orbit.tarefas.vista"); } catch (e) {}
+    const vista = ref(v0 || "minhas"); const itens = ref(null); const q = ref(""); const nova = ref({ titulo: "", data: "", projeto: "" }); const projs = ref([]);
+    let tq; let primeira = !v0;   // 25-11-2026 (Margot): só na 1.ª abertura, sem escolha guardada, se passa à Equipa; nunca depois de a pessoa escolher «As minhas»
     const carregar = async () => {
       itens.value = await apiT("tarefas", { vista: vista.value, q: q.value });
-      if (vista.value === "minhas" && !itens.value.length && !q.value) { vista.value = "equipa"; }
+      if (primeira && vista.value === "minhas" && !itens.value.length && !q.value) { primeira = false; vista.value = "equipa"; return; }
+      primeira = false;
     };
     watch(vista, (v) => { try { localStorage.setItem("orbit.tarefas.vista", v); } catch (e) {} carregar(); });
     watch(q, () => { clearTimeout(tq); tq = setTimeout(carregar, 300); });
@@ -354,13 +355,13 @@ const Tarefas = {
     </div>
     <div class="vistas"><button :class="{ativo:vista==='minhas'}" @click="vista='minhas'">As minhas</button><button :class="{ativo:vista==='equipa'}" @click="vista='equipa'">Equipa</button></div>
     <div class="filtros"><input class="filtro" style="border-style:solid;min-width:220px" v-model="q" placeholder="Procurar tarefas…"></div>
-    <form class="cartao compor" style="margin:0 24px 14px" @submit.prevent="criar">
+    <form class="cartao compor compor-tarefa" style="margin:0 24px 14px" @submit.prevent="criar">
       <input v-model="nova.titulo" placeholder="Nova tarefa…"><input type="date" v-model="nova.data" style="flex:none;width:150px">
       <select v-model="nova.projeto" class="btn sm" style="max-width:220px"><option value="">Sem projeto (CRM)</option><option v-for="p in projs" :key="p.name" :value="p.name">{{ p.project_name }}</option></select>
       <button class="btn sm prim" :disabled="!nova.titulo.trim()">Criar</button>
     </form>
     <div v-if="!itens" class="carregar">A carregar…</div>
-    <div v-else-if="!itens.length" class="vazio">Nada por fazer.</div>
+    <div v-else-if="!itens.length" class="vazio">{{ q ? 'Nenhuma tarefa com esse texto.' : vista==='minhas' ? 'Não tem tarefas atribuídas a si. As tarefas sem responsável estão em «Equipa» — abra uma e atribua-a, ou atribua várias de uma vez na lista de tarefas.' : 'Nada por fazer.' }}</div>
     <div v-for="g in grupos" :key="g.g" class="cartao" style="margin:0 24px 14px">
       <header><h2 :style="g.g==='atrasadas'?{color:'var(--acao)'}:{}">{{ g.r }} <span class="sub" style="font-weight:400">{{ g.itens.length }}</span></h2></header>
       <div class="linha" v-for="t in g.itens" :key="t.tipo+t.id">

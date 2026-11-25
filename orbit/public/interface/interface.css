@@ -880,3 +880,6 @@ tr.por-ler td b,tr.por-ler td{font-weight:600}
 @media (max-width:760px){.cal-erp-dia{min-height:58px}.cal-erp-item{font-size:10px;padding:1px 3px}}
 @media print{body.imprimir-rel .nav,body.imprimir-rel .topo,body.imprimir-rel .menu-movel,body.imprimir-rel .erp-filtros,body.imprimir-rel .btn{display:none!important}
   body.imprimir-rel .app{display:block;height:auto}body.imprimir-rel .ecra{overflow:visible}body.imprimir-rel .tabela-wrap{max-height:none!important;overflow:visible}}
+/* 25-11-2026: «Nova tarefa» no telemóvel — em duas linhas, sem sair pela direita */
+@media (max-width:760px){.compor-tarefa{flex-wrap:wrap;margin:0 16px 14px!important}.compor-tarefa input:first-child{flex:1 1 100%}.compor-tarefa input[type=date],.compor-tarefa select{flex:1 1 40%!important;width:auto!important;max-width:none!important;min-width:0}
+  .cartao.compor{flex-wrap:wrap}.cartao.compor input,.cartao.compor textarea{min-width:0}}
