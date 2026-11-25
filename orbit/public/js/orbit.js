@@ -1165,6 +1165,13 @@ try { if (window.self !== window.top && window.top.location.pathname.indexOf("/o
 (function () {
 	try {
 		var h = document.head;
+		// 25-11-2026 (Vítor: barra azul na app instalada): a secretária do Frappe traz `theme-color` azul e o Chrome pinta
+		// com ela a barra da janela — passa sempre ao grafite do Orbit, com ou sem manifesto nosso
+		if ( h ) {
+			var tc = document.querySelectorAll( 'meta[name="theme-color"]' );
+			if ( tc.length ) { tc.forEach( function ( m ) { m.setAttribute( 'content', '#161a1d' ); } ); }
+			else { var m = document.createElement( 'meta' ); m.setAttribute( 'name', 'theme-color' ); m.setAttribute( 'content', '#161a1d' ); h.appendChild( m ); }
+		}
 		if ( ! h || document.querySelector( 'link[rel="manifest"]' ) ) { return; }
 		var junta = function ( tag, attrs ) { var e = document.createElement( tag ); for ( var k in attrs ) { e.setAttribute( k, attrs[ k ] ); } h.appendChild( e ); };
 		junta( 'link', { rel: 'manifest', href: '/api/method/orbit.interface.push.manifesto' } );
