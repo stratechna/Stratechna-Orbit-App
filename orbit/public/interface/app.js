@@ -2299,7 +2299,11 @@ const Funil = {
     };
     const total = computed(() => d.value && tipo.value !== "leads" ? d.value.colunas.filter((c) => c.tipo !== "Won").reduce((a, c) => a + c.total, 0) : 0);
     const n = computed(() => d.value ? d.value.colunas.filter((c) => !["Won", "Lost"].includes(c.tipo)).reduce((a, c) => a + c.cartoes.length, 0) : 0);
-    return { d, resp, arrastar, alvo, largar, total, n, eur, link, data, FAIXA, marca, escolherMarca, tipo, escolherTipo };
+    // lote 7: criar na coluna, já nessa fase
+    const novoNaColuna = async (c) => { const t = prompt(tipo.value === "leads" ? "Nome da lead" : "Nome do negócio"); if (!t) return;
+      const r = await api("criar_registo", { objeto: tipo.value === "leads" ? "leads" : "negocios", dados: JSON.stringify(tipo.value === "leads" ? { first_name: t } : { titulo: t, marca: marca.value || "" }) }, true);
+      await apiA("marcar_estado", { doctype: r.doctype, name: r.name, estado: c.estado }, true).catch(() => {}); toast("Criado em «" + c.rotulo + "»"); carregar(); };
+    return { d, resp, arrastar, alvo, largar, total, n, eur, link, data, FAIXA, marca, escolherMarca, tipo, escolherTipo, novoNaColuna };
   },
   template: `
   <div>
@@ -2316,7 +2320,8 @@ const Funil = {
     <div class="funil" v-else :style="{gridTemplateColumns:'repeat('+d.colunas.length+',minmax(230px,1fr))'}">
       <div class="coluna" v-for="c in d.colunas" :key="c.estado" :class="{alvo: alvo===c.estado}"
            @dragover.prevent="alvo=c.estado" @dragleave="alvo=''" @drop.prevent="largar(c)">
-        <header><b>{{ c.rotulo }} <span class="sub" style="font-weight:500">{{ c.cartoes.length }}</span></b><small v-if="tipo!=='leads'">{{ eur(c.total) }}</small><div class="faixa" :style="{background:FAIXA[c.cor]||'#94a3b8'}"></div></header>
+        <header><b>{{ c.rotulo }} <span class="sub" style="font-weight:500">{{ c.cartoes.length }}</span></b><small v-if="tipo!=='leads'">{{ eur(c.total) }}</small>
+          <button v-if="!['Won','Lost','Converted'].includes(c.tipo)" class="col-mais" :title="tipo==='leads' ? 'Nova lead nesta coluna' : 'Novo negócio nesta fase'" @click="novoNaColuna(c)">+</button><div class="faixa" :style="{background:FAIXA[c.cor]||'#94a3b8'}"></div></header>
         <a class="cartao negocio" v-for="x in c.cartoes" :key="x.name" :href="link(tipo==='leads' ? 'CRM Lead' : 'CRM Deal', x.name)" draggable="true" @dragstart="arrastar={...x, estado:c.estado}" style="display:block;text-decoration:none;color:inherit">
           <h3>{{ x.titulo }}</h3><div class="sub">{{ x.org }}</div>
           <div class="val"><template v-if="tipo!=='leads'">{{ eur(x.valor) }}</template><span v-else class="sub" style="font-size:12px">{{ x.origem }}</span><span class="av" style="width:22px;height:22px;font-size:10px;background:#5b6f7a" :title="x.dono_nome">{{ x.dono }}</span></div>
@@ -3450,6 +3455,126 @@ const MktBaseLegal = {
   </div></section>`,
 };
 
+// ── Lote 7 (25-11-2026): painéis do CRM e do Desk, base de conhecimento; árvore, Kanban e Calendário nas listas ──
+const apiP7 = (m, a = {}, post = false) => api("paineis_mais." + m, a, post);
+const BarrasH = { props: ["itens", "moeda"], setup(p) { const max = computed(() => Math.max(1, ...(p.itens || []).map((x) => x.n || x.valor || 0))); return { max, moedaEUR }; },
+  template: `<div class="barras-h"><div v-for="x in itens" :key="x.r || x.fase" class="bh"><span class="bh-r" :title="x.r || x.fase">{{ x.r || x.fase }}</span><span class="bh-b"><i :style="{width: ((x.n||x.valor||0)/max*100)+'%'}"></i></span><b>{{ moeda ? moedaEUR(x.valor) : x.n }}</b></div><div v-if="!itens || !itens.length" class="sub" style="font-size:13px">Sem dados no período.</div></div>` };
+const CrmPainel = {
+  components: { GraficoBarras, BarrasH },
+  setup() { const per = ref("30"), resp = ref(""), d = ref(null);
+    const carregar = async () => { d.value = null; d.value = await apiP7("crm", { periodo: per.value, responsavel: resp.value }); }; onMounted(carregar); watch([per, resp], carregar);
+    return { per, resp, d, moedaEUR }; },
+  template: `<div class="pad"><div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px"><div><h1>Painel</h1><div class="sub">Vendas e leads no período.</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><select class="btn" v-model="per"><option value="7">7 dias</option><option value="30">30 dias</option><option value="90">90 dias</option><option value="365">12 meses</option></select>
+        <select class="btn" v-model="resp"><option value="">Todos os responsáveis</option><option v-for="r in (d&&d.responsaveis)||[]" :key="r.v" :value="r.v">{{ r.r }}</option></select></div></div>
+    <div v-if="!d" class="carregar">A carregar…</div><template v-else>
+    <div class="erp-numeros"><div class="cartao"><small>Leads novas</small><b>{{ d.kpis.leads }}</b></div><div class="cartao"><small>Conversão das leads</small><b>{{ d.kpis.conversao_leads }} %</b></div>
+      <div class="cartao"><small>Negócios ganhos</small><b>{{ d.kpis.ganhos }}</b></div><div class="cartao"><small>Valor ganho</small><b>{{ moedaEUR(d.kpis.valor_ganho) }}</b></div>
+      <div class="cartao"><small>Taxa de ganho</small><b>{{ d.kpis.taxa_ganho }} %</b></div><div class="cartao"><small>Em aberto</small><b>{{ moedaEUR(d.kpis.em_aberto) }}</b></div><div class="cartao"><small>Previsto (pela probabilidade)</small><b>{{ moedaEUR(d.kpis.previsto) }}</b></div></div>
+    <div class="painel-graficos">
+      <section class="cartao erp-grafico largo"><header><b>Negócios criados e ganhos</b></header><GraficoBarras :labels="d.serie.labels" :series="d.serie.series"/></section>
+      <section class="cartao erp-grafico"><header><b>Funil em aberto (valor por fase)</b></header><BarrasH :itens="d.por_fase" :moeda="true"/></section>
+      <section class="cartao erp-grafico"><header><b>Motivos de perda</b></header><BarrasH :itens="d.motivos"/></section>
+      <section class="cartao erp-grafico"><header><b>Leads por origem</b></header><BarrasH :itens="d.origens"/></section></div></template></div>`,
+};
+const DeskPainel = {
+  components: { GraficoBarras, BarrasH },
+  setup() { const per = ref("30"), eq = ref(""), d = ref(null);
+    const carregar = async () => { d.value = null; d.value = await apiP7("desk", { periodo: per.value, equipa: eq.value }); }; onMounted(carregar); watch([per, eq], carregar);
+    const h = (x) => x == null ? "—" : x < 1 ? Math.round(x * 60) + " min" : x < 48 ? x + " h" : Math.round(x / 24) + " d";
+    return { per, eq, d, h }; },
+  template: `<div class="pad"><div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px"><div><h1>Painel do Desk</h1><div class="sub">Atendimento no período.</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><select class="btn" v-model="per"><option value="7">7 dias</option><option value="30">30 dias</option><option value="90">90 dias</option><option value="365">12 meses</option></select>
+        <select class="btn" v-model="eq"><option value="">Todas as equipas</option><option v-for="e in (d&&d.equipas)||[]" :key="e" :value="e">{{ e }}</option></select><a class="btn prim" href="#/tickets">Tickets</a></div></div>
+    <div v-if="!d" class="carregar">A carregar…</div><template v-else>
+    <div class="erp-numeros"><a class="cartao" href="#/tickets" style="text-decoration:none;color:inherit"><small>Em aberto</small><b>{{ d.kpis.abertos }}</b></a><div class="cartao"><small>Sem resposta</small><b>{{ d.kpis.sem_resposta }}</b></div>
+      <div class="cartao"><small>Fora do prazo</small><b :style="{color: d.kpis.fora_prazo ? 'var(--acao)' : ''}">{{ d.kpis.fora_prazo }}</b></div><div class="cartao"><small>Criados no período</small><b>{{ d.kpis.criados }}</b></div>
+      <div class="cartao"><small>1.ª resposta (média)</small><b>{{ h(d.kpis.resp_media_h) }}</b></div><div class="cartao"><small>Resolução (média)</small><b>{{ h(d.kpis.resol_media_h) }}</b></div>
+      <div class="cartao"><small>SLA cumprido / falhado</small><b>{{ d.kpis.cumpridos }} / {{ d.kpis.falhados }}</b></div><div class="cartao"><small>Avaliação média</small><b>{{ d.kpis.avaliacao == null ? '—' : d.kpis.avaliacao + ' %' }}</b></div></div>
+    <div class="painel-graficos"><section class="cartao erp-grafico largo"><header><b>Tickets por dia</b></header><GraficoBarras :labels="d.serie.labels" :series="d.serie.series"/></section>
+      <section class="cartao erp-grafico"><header><b>Por estado</b></header><BarrasH :itens="d.estados"/></section>
+      <section class="cartao erp-grafico"><header><b>Por responsável</b></header><BarrasH :itens="d.agentes"/></section></div></template></div>`,
+};
+const DeskKb = {
+  setup() {
+    const d = ref(null), cat = ref(""), est = ref(""), q = ref(""), art = ref(null), sel = ref([]), a = ref(false); let tq;
+    const carregar = async () => { d.value = await apiP7("kb", { categoria: cat.value, estado: est.value, q: q.value }); sel.value = []; }; onMounted(carregar);
+    watch([cat, est], carregar); watch(q, () => { clearTimeout(tq); tq = setTimeout(carregar, 300); });
+    const nomeCat = (c) => ((d.value?.categorias || []).find((x) => x.name === c) || {}).nome || c || "Sem categoria";
+    const abrir = async (x) => { art.value = x ? await apiP7("kb_artigo", { name: x.name }) : { titulo: "", html: "", estado: "Draft", categoria: cat.value || "", pode: { escrever: true } }; };
+    const gravar = async (estado) => { a.value = true; try { art.value = await apiP7("kb_gravar", { name: art.value.name || null, titulo: art.value.titulo, html: art.value.html, categoria: art.value.categoria || null, estado: estado || art.value.estado }, true);
+      toast(estado === "Published" ? "Publicado" : "Gravado"); carregar(); } finally { a.value = false; } };
+    const apagar = async () => { if (!confirm("Apagar o artigo?")) return; await apiP7("kb_apagar", { name: art.value.name }, true); art.value = null; carregar(); };
+    const novaCat = async () => { const n = prompt("Nome da categoria"); if (!n) return; await apiP7("kb_categoria", { nome: n }, true); carregar(); };
+    const renomearCat = async (c) => { const n = prompt("Nome da categoria", c.nome); if (!n) return; await apiP7("kb_categoria", { nome: n, name: c.name }, true); carregar(); };
+    const apagarCat = async (c) => { if (!confirm(`Apagar a categoria «${c.nome}»?`)) return; await apiP7("kb_categoria", { nome: "", name: c.name, apagar: 1 }, true); if (cat.value === c.name) cat.value = ""; carregar(); };
+    const mover = async (campo, valor) => { await apiP7("kb_mover", { nomes: JSON.stringify(sel.value), [campo]: valor }, true); toast("Feito"); carregar(); };
+    const EST = { Draft: "Rascunho", Published: "Publicado", Archived: "Arquivado" };
+    return { d, cat, est, q, art, sel, a, nomeCat, abrir, gravar, apagar, novaCat, renomearCat, apagarCat, mover, EST, data };
+  },
+  template: `<div><div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><h1>Base de conhecimento</h1><div class="sub">Artigos de ajuda para a equipa e para os clientes.</div></div>
+      <div class="acoes-lista"><button class="btn prim" @click="abrir(null)">+ Novo artigo</button><button class="btn" @click="novaCat">+ Categoria</button></div></div>
+    <div v-if="!d" class="carregar">A carregar…</div>
+    <div v-else class="kb-grelha"><aside class="cartao kb-cats"><button :class="{ativo:!cat}" @click="cat=''">Todas</button>
+        <div v-for="c in d.categorias" :key="c.name" class="kb-cat" :class="{ativo:cat===c.name}"><button @click="cat=c.name">{{ c.nome }} <span class="sub">{{ c.n }}</span></button>
+          <span class="kb-cat-acoes"><button title="Mudar o nome" @click="renomearCat(c)">✎</button><button title="Apagar" @click="apagarCat(c)">×</button></span></div></aside>
+      <div><div class="vistas" style="padding:0"><button v-for="e in [['','Todos'],['Published','Publicados'],['Draft','Rascunhos'],['Archived','Arquivados']]" :key="e[0]" :class="{ativo:est===e[0]}" @click="est=e[0]">{{ e[1] }}</button></div>
+        <div class="filtros" style="padding-left:0;padding-right:0"><input class="filtro" style="border-style:solid;min-width:220px" v-model="q" placeholder="Procurar no título e no texto…"></div>
+        <div v-if="sel.length" class="selec" style="margin:0 0 0;border-radius:10px 10px 0 0;flex-wrap:wrap">{{ sel.length }} selecionado(s) ·
+          <select class="btn sm" @change="$event.target.value && mover('categoria',$event.target.value); $event.target.value=''"><option value="">Mover para…</option><option v-for="c in d.categorias" :key="c.name" :value="c.name">{{ c.nome }}</option></select>
+          <button class="btn sm" @click="mover('estado','Published')">Publicar</button><button class="btn sm" @click="mover('estado','Archived')">Arquivar</button><button class="btn sm" @click="mover('estado','Draft')">Passar a rascunho</button></div>
+        <div class="tabela-wrap cartoes-movel" style="margin:0"><table><thead><tr><th style="width:34px"></th><th>Artigo</th><th>Categoria</th><th>Estado</th><th>Alterado</th></tr></thead><tbody>
+          <tr v-for="x in d.artigos" :key="x.name" @click="abrir(x)"><td @click.stop class="cel-sel"><input type="checkbox" :value="x.name" v-model="sel"></td><td class="cel-tit"><b>{{ x.titulo }}</b><div v-if="x.autor" class="sub" style="font-size:12px">{{ x.autor }}</div></td>
+            <td>{{ nomeCat(x.categoria) }}</td><td><span class="etq" :class="{Published:'verde',Draft:'ambar'}[x.estado]">{{ EST[x.estado] || x.estado }}</span></td><td class="sub">{{ data(x.quando,false) }}</td></tr></tbody></table>
+          <div v-if="!d.artigos.length" class="vazio">Sem artigos.</div></div></div></div>
+    <div v-if="art" class="modal-fundo" @click.self="art=null"><div class="modal" style="max-width:860px"><header><b>{{ art.name ? 'Artigo' : 'Novo artigo' }}</b><span style="display:flex;gap:6px"><a v-if="art.name && art.estado==='Published'" class="btn sm" :href="art.publico" target="_blank">Ver como o cliente</a><button class="btn sm" @click="art=null">Fechar</button></span></header>
+      <div class="reg-form"><div class="reg-linha3" style="grid-template-columns:2fr 1fr"><label class="erp-campo"><span>Título</span><input v-model="art.titulo" :disabled="!art.pode.escrever"></label>
+          <label class="erp-campo"><span>Categoria</span><select v-model="art.categoria" :disabled="!art.pode.escrever"><option value="">—</option><option v-for="c in d.categorias" :key="c.name" :value="c.name">{{ c.nome }}</option></select></label></div>
+        <div class="erp-campo"><span>Texto</span><EditorRico v-model="art.html" :ro="!art.pode.escrever"/></div>
+        <div class="reg-botoes"><button v-if="art.name && art.pode.apagar" class="btn" style="margin-right:auto" @click="apagar">Apagar</button><span class="etq" style="margin-right:auto" v-if="art.name">{{ EST[art.estado] }}</span>
+          <template v-if="art.pode.escrever"><button class="btn" :disabled="a" @click="gravar(art.estado==='Published' ? 'Published' : 'Draft')">Gravar</button>
+            <button v-if="art.estado!=='Published'" class="btn prim" :disabled="a" @click="gravar('Published')">Publicar</button><button v-else class="btn" :disabled="a" @click="gravar('Archived')">Arquivar</button></template></div></div></div></div>
+  </div>`,
+};
+// Árvore: as tabelas hierárquicas (plano de contas, grupos de artigos, armazéns…) como a «Tree View» do desk
+const ErpArvoreNo = { name: "ErpArvoreNo", props: ["doctype", "no", "nivel"],
+  setup(p) { const aberto = ref(p.nivel === 0), filhos = ref(null);
+    const alternar = async () => { if (!p.no.grupo) return; aberto.value = !aberto.value; if (aberto.value && !filhos.value) filhos.value = await apiP7("arvore", { doctype: p.doctype, pai: p.no.name }); };
+    onMounted(async () => { if (aberto.value && p.no.grupo) filhos.value = await apiP7("arvore", { doctype: p.doctype, pai: p.no.name }); });
+    const novoAqui = () => { try { sessionStorage.setItem("orbit.erp.novo", JSON.stringify({ doctype: p.doctype, ["parent_" + p.doctype.toLowerCase().replace(/ /g, "_")]: p.no.name })); } catch (e) {} location.hash = irErp(p.doctype, "novo"); };
+    return { aberto, filhos, alternar, novoAqui, irErp }; },
+  template: `<div class="arv-no"><div class="arv-linha" :style="{paddingLeft: (nivel*18+8)+'px'}"><button class="arv-seta" @click="alternar" :style="{visibility: no.grupo ? 'visible' : 'hidden'}">{{ aberto ? '▾' : '▸' }}</button>
+      <a :href="irErp(doctype, no.name)">{{ no.titulo }}</a><small class="sub" v-if="no.extra"> · {{ no.extra }}</small><button v-if="no.grupo" class="arv-mais" title="Novo dentro deste" @click="novoAqui">+</button></div>
+    <template v-if="aberto && filhos"><ErpArvoreNo v-for="f in filhos" :key="f.name" :doctype="doctype" :no="f" :nivel="nivel+1"/><div v-if="!filhos.length" class="sub" :style="{paddingLeft: ((nivel+1)*18+30)+'px', fontSize:'12px'}">Vazio</div></template></div>`,
+};
+const ErpArvore = { components: { ErpArvoreNo }, props: ["doctype"], setup(p) { const raiz = ref(null); onMounted(async () => { raiz.value = await apiP7("arvore", { doctype: p.doctype }); }); return { raiz }; },
+  template: `<div class="cartao arv"><div v-if="!raiz" class="carregar">A carregar…</div><ErpArvoreNo v-for="r in raiz||[]" :key="r.name" :doctype="doctype" :no="r" :nivel="0"/></div>` };
+// Kanban por um campo de escolha (como a vista Kanban do desk)
+const ErpKanban = { props: ["doctype", "campo", "def", "linhas", "titulo"], emits: ["mudou"],
+  setup(p, { emit }) { const arr = ref(null), alvo = ref("");
+    const cols = computed(() => { const c = (p.def.campos || []).find((x) => x.campo === p.campo) || {}; const ops = c.opcoes || []; return ops.map((o) => ({ v: o, itens: p.linhas.filter((l) => (l[p.campo] || "") === o) })); });
+    const largar = async (col) => { const x = arr.value; arr.value = null; alvo.value = ""; if (!x || x[p.campo] === col.v) return;
+      const r = await apiL("em_massa", { doctype: p.doctype, nomes: JSON.stringify([x.name]), acao: "editar", campo: p.campo, valor: col.v }, true);
+      if (r.falhas.length) toast(r.falhas[0].erro); else toast("→ " + col.v); emit("mudou"); };
+    return { cols, arr, alvo, largar, irErp, statusPt }; },
+  template: `<div class="funil" :style="{gridTemplateColumns:'repeat('+cols.length+',minmax(220px,1fr))'}"><div v-for="c in cols" :key="c.v" class="coluna" :class="{alvo: alvo===c.v}" @dragover.prevent="alvo=c.v" @dragleave="alvo=''" @drop.prevent="largar(c)">
+      <header><b>{{ statusPt(c.v) || '—' }} <span class="sub" style="font-weight:500">{{ c.itens.length }}</span></b></header>
+      <a v-for="l in c.itens" :key="l.name" class="cartao negocio" :href="irErp(doctype,l.name)" draggable="true" @dragstart="arr=l" style="display:block;text-decoration:none;color:inherit"><h3>{{ l[titulo] || l.name }}</h3><div v-if="l[titulo] && l[titulo]!==l.name" class="sub" style="font-size:12px">{{ l.name }}</div></a></div></div>` };
+// Calendário do mês por um campo de data
+const ErpCalendario = { props: ["doctype", "campo", "titulo"],
+  setup(p) { const hoje = new Date(); const ano = ref(hoje.getFullYear()), mes = ref(hoje.getMonth() + 1), itens = ref([]);
+    const carregar = async () => { const ini = `${ano.value}-${String(mes.value).padStart(2, "0")}-01`; const fim = new Date(ano.value, mes.value, 0); const f = `${ano.value}-${String(mes.value).padStart(2, "0")}-${String(fim.getDate()).padStart(2, "0")}`;
+      itens.value = (await apiL("lista", { doctype: p.doctype, filtros: JSON.stringify([[p.campo, "between", [ini, f + " 23:59:59"]]]), colunas: JSON.stringify([p.campo]), por: 500 })).linhas; };
+    onMounted(carregar); watch(() => p.campo, carregar);
+    const mudar = (k) => { let m = mes.value + k, a = ano.value; if (m < 1) { m = 12; a--; } if (m > 12) { m = 1; a++; } mes.value = m; ano.value = a; carregar(); };
+    const celulas = computed(() => { const p1 = new Date(ano.value, mes.value - 1, 1); const off = (p1.getDay() + 6) % 7; const n = new Date(ano.value, mes.value, 0).getDate(); const out = [];
+      for (let i = 0; i < off; i++) out.push(null); for (let d = 1; d <= n; d++) { const iso = `${ano.value}-${String(mes.value).padStart(2, "0")}-${String(d).padStart(2, "0")}`; out.push({ d, iso, itens: itens.value.filter((x) => String(x[p.campo] || "").slice(0, 10) === iso) }); } return out; });
+    const nomeMes = computed(() => new Date(ano.value, mes.value - 1, 1).toLocaleDateString("pt-PT", { month: "long", year: "numeric" }));
+    return { celulas, mudar, nomeMes, irErp }; },
+  template: `<div class="cartao cal-erp"><div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px"><button class="btn sm" @click="mudar(-1)">‹</button><b style="text-transform:capitalize">{{ nomeMes }}</b><button class="btn sm" @click="mudar(1)">›</button></div>
+    <div class="cal-erp-grelha"><div v-for="s in ['seg','ter','qua','qui','sex','sáb','dom']" :key="s" class="cal-erp-sem">{{ s }}</div>
+      <div v-for="(c,i) in celulas" :key="i" class="cal-erp-dia" :class="{vazio:!c}"><template v-if="c"><small>{{ c.d }}</small><a v-for="x in c.itens.slice(0,4)" :key="x.name" :href="irErp(doctype,x.name)" class="cal-erp-item">{{ x[titulo] || x.name }}</a><small v-if="c.itens.length>4" class="sub">+{{ c.itens.length-4 }}</small></template></div></div></div>` };
+
 const ErpModulo = {
   props: ["barra"],
   setup(props) {
@@ -3503,11 +3628,13 @@ const ErpLista = {
     const meta = ref(null); const def = ref(null); const linhas = ref([]); const mais = ref(false); const q = ref(""); const pagina = ref(0); const total = ref(0);
     const colunas = ref([]); const colEscolhidas = ref([]); const titulo = ref(null); const a = ref(false); const ordem = ref("modified desc"); let tq;
     const filtros = ref([]); const novoF = ref(null); const verCols = ref(false); const sel = ref([]); const massa = ref({ acao: "", campo: "", valor: "" });
+    const modo = ref("lista"); const campoK = ref(""); const campoC = ref("");
     const vs = ref({ vistas: [], padrao: "" }); const vistaAtiva = ref(""); const menuV = ref(false);
     const chaveLS = () => "orbit.erp.lista." + props.doctype;
     const carregar = async (junta = false) => {
       a.value = true;
-      try { const r = await apiL("lista", { doctype: props.doctype, q: q.value, pagina: pagina.value, ordem: ordem.value, filtros: JSON.stringify(filtros.value), colunas: JSON.stringify(colEscolhidas.value) });
+      const colsPedidas = modo && modo.value === "kanban" && campoK.value ? [...new Set((colEscolhidas.value.length ? colEscolhidas.value : colunas.value).concat([campoK.value]))] : colEscolhidas.value;
+      try { const r = await apiL("lista", { doctype: props.doctype, q: q.value, pagina: pagina.value, ordem: ordem.value, filtros: JSON.stringify(filtros.value), colunas: JSON.stringify(colsPedidas), por: modo && modo.value === "kanban" ? 300 : 50 });
         linhas.value = junta ? linhas.value.concat(r.linhas) : r.linhas; mais.value = r.mais; colunas.value = r.colunas; titulo.value = r.titulo; total.value = r.total;
         if (!junta) sel.value = [];
         try { localStorage.setItem(chaveLS(), JSON.stringify({ filtros: filtros.value, colunas: colEscolhidas.value, ordem: ordem.value, vista: vistaAtiva.value })); } catch (e) {}
@@ -3574,10 +3701,16 @@ const ErpLista = {
     const exportar = (soSel) => { const p = new URLSearchParams({ doctype: props.doctype, q: q.value, filtros: JSON.stringify(filtros.value), ordem: ordem.value, colunas: JSON.stringify(colEscolhidas.value), nomes: soSel ? JSON.stringify(sel.value) : "" });
       window.location.href = "/api/method/orbit.interface.erp_listas.exportar?" + p.toString(); };
     const maisAc = ref(false);
+    // lote 6/7: Lista | Árvore | Kanban | Calendário (como as vistas do desk)
+    let mo0 = "lista"; try { mo0 = localStorage.getItem("orbit.erp.modo." + props.doctype) || mo0; } catch (e) {}
+    modo.value = mo0;
+    watch(modo, (v) => { if (v === "kanban") setTimeout(() => carregar(), 0); try { localStorage.setItem("orbit.erp.modo." + props.doctype, v); } catch (e) {} if (v === "kanban" && !campoK.value) campoK.value = (def.value?.kanban || [])[0] || ""; if (v === "calendario" && !campoC.value) campoC.value = (def.value?.calendario || [])[0] || ""; });
+    watch(def, (d) => { if (!d) return; campoK.value = campoK.value || (d.kanban || [])[0] || ""; campoC.value = campoC.value || (d.calendario || [])[0] || "";
+      if ((modo.value === "arvore" && !d.arvore) || (modo.value === "kanban" && !(d.kanban || []).length) || (modo.value === "calendario" && !(d.calendario || []).length)) modo.value = "lista"; });
     const fechar = () => { menuV.value = false; maisAc.value = false; }; onMounted(() => document.addEventListener("click", fechar)); onUnmounted(() => document.removeEventListener("click", fechar));
     // o «Estado» do documento já tem coluna própria (selo); não se repete o campo status
     const colunasVis = computed(() => colunas.value.filter((c) => !(meta.value?.submetivel && c === "status")));
-    return { colunasVis, meta, def, linhas, mais, q, colunas, titulo, a, total, campo, cdef, textoValor, ordenar, ordem, maisLinhas, abrir, irErp, ESTADO_DOC, COR_STATUS, statusPt, cor, ini, tr,
+    return { modo, campoK, campoC, colunasVis, meta, def, linhas, mais, q, colunas, titulo, a, total, campo, cdef, textoValor, ordenar, ordem, maisLinhas, abrir, irErp, ESTADO_DOC, COR_STATUS, statusPt, cor, ini, tr,
       filtros, novoF, abrirFiltro, opsDe, juntarFiltro, tirarFiltro, limpar, rotuloOp, rotuloValor, PERIODOS_ERP, tipoOp, verCols, alternarCol, moverCol, colunasPadrao, colEscolhidas,
       vs, vistaAtiva, menuV, aplicarVista, vistaPorOmissao, gravarVista, vistaAtual, apagarVista, porOmissao, sel, todos, massa, opsMassa, camposEditaveis, pessoasL, aplicarMassa, pdfLote, exportar, maisAc };
   },
@@ -3588,6 +3721,14 @@ const ErpLista = {
         <button class="btn so-movel" @click="maisAc=!maisAc" aria-label="Mais ações">⋯</button>
         <span class="acoes-sec" @click="maisAc=false"><button v-if="def && def.pode.exportar" class="btn" @click="exportar(false)">Exportar</button><a v-if="meta.pode.create" class="btn" :href="'#/importar-erp/'+encodeURIComponent(doctype)">Importar</a></span></div>
     </div>
+    <div v-if="def && (def.arvore || def.kanban.length || def.calendario.length)" class="vistas modos-erp">
+      <button :class="{ativo: modo==='lista'}" @click="modo='lista'">Lista</button><button v-if="def.arvore" :class="{ativo: modo==='arvore'}" @click="modo='arvore'">Árvore</button>
+      <button v-if="def.kanban.length" :class="{ativo: modo==='kanban'}" @click="modo='kanban'">Kanban</button><button v-if="def.calendario.length" :class="{ativo: modo==='calendario'}" @click="modo='calendario'">Calendário</button>
+      <select v-if="modo==='kanban' && def.kanban.length>1" class="btn sm" v-model="campoK" style="margin-left:auto"><option v-for="c in def.kanban" :key="c" :value="c">{{ campo(c).label }}</option></select>
+      <select v-if="modo==='calendario' && def.calendario.length>1" class="btn sm" v-model="campoC" style="margin-left:auto"><option v-for="c in def.calendario" :key="c" :value="c">{{ campo(c).label }}</option></select></div>
+    <div v-if="modo==='arvore'" style="padding:0 24px 24px"><ErpArvore :doctype="doctype"/></div>
+    <div v-else-if="modo==='calendario' && campoC" style="padding:0 24px 24px"><ErpCalendario :doctype="doctype" :campo="campoC" :titulo="titulo" :key="campoC"/></div>
+    <template v-else>
     <div class="vistas">
       <button :class="{ativo: !vistaAtiva}" @click="vistaPorOmissao">Todos</button>
       <button v-for="v in vs.vistas" :key="v.nome+v.equipa" :class="{ativo: vistaAtiva===v.nome+(v.equipa?'*':'')}" @click="aplicarVista(v)">{{ v.equipa ? '👥 ' : '' }}{{ v.nome }}{{ vs.padrao===v.nome && !v.equipa ? ' ★' : '' }}</button>
@@ -3642,7 +3783,8 @@ const ErpLista = {
       <button v-if="def && def.pode.imprimir" class="btn sm" @click="pdfLote">PDF</button>
       <button v-if="def && def.pode.exportar" class="btn sm" @click="exportar(true)">Exportar seleção</button>
     </div>
-    <div class="tabela-wrap cartoes-movel" :style="sel.length?{borderTopLeftRadius:0,borderTopRightRadius:0}:{}"><table>
+    <ErpKanban v-if="modo==='kanban' && campoK" :doctype="doctype" :campo="campoK" :def="def" :linhas="linhas" :titulo="titulo" @mudou="carregar()"/>
+    <div v-else class="tabela-wrap cartoes-movel" :style="sel.length?{borderTopLeftRadius:0,borderTopRightRadius:0}:{}"><table>
       <thead><tr><th style="width:34px"><input type="checkbox" v-model="todos"></th><th @click="ordenar(titulo||'name')" style="cursor:pointer">{{ titulo ? campo(titulo).label : 'Nome' }}</th>
         <th v-for="c in colunasVis" :key="c" @click="ordenar(c)" style="cursor:pointer">{{ campo(c).label }}<span v-if="ordem.startsWith(c+' ')">{{ ordem.endsWith('asc') ? ' ↑' : ' ↓' }}</span></th>
         <th v-if="meta.submetivel">Estado</th></tr></thead>
@@ -3658,6 +3800,7 @@ const ErpLista = {
       <div v-if="a && !linhas.length" class="carregar">A carregar…</div>
     </div>
     <div v-if="mais" style="text-align:center;margin-bottom:24px"><button class="btn" @click="maisLinhas">Carregar mais ({{ linhas.length }} de {{ total }})</button></div>
+    </template>
   </div><div v-else class="vazio">A carregar…</div>`,
 };
 
@@ -4714,8 +4857,16 @@ const ErpFicha = {
       Employee: [["Ausências", "Leave Application", "employee"], ["Despesas", "Expense Claim", "employee"], ["Assiduidade", "Attendance", "employee"], ["Horas", "Timesheet", "employee"]],
       Project: [["Quadro e Gantt", "#/projeto/"], ["Tarefas", "Task", "project"], ["Horas", "Timesheet", "parent_project"], ["Encomendas", "Sales Order", "project"]],
       Warehouse: [["Stock", "#/erp-stock"], ["Movimentos", "Stock Ledger Entry", "warehouse"]] };
-    const atalhos = computed(() => (!doc.value || novo.value ? [] : (ATALHOS[props.doctype] || [])));
-    const irAtalho = (a) => { if (a[1].startsWith("#")) { location.hash = a[1].endsWith("/") ? a[1] + encodeURIComponent(doc.value.name) : a[1]; return; }
+    const STOCK_DOCS = ["Stock Entry", "Delivery Note", "Purchase Receipt", "Stock Reconciliation"];
+    const atalhos = computed(() => { if (!doc.value || novo.value) return []; const out = (ATALHOS[props.doctype] || []).slice();
+      // lote 6: a razão a partir do documento (só submetido), como «Ver → Razão» do ecrã antigo
+      if (doc.value.docstatus === 1 && (STOCK_DOCS.includes(props.doctype) || (["Sales Invoice", "Purchase Invoice"].includes(props.doctype) && doc.value.update_stock))) out.push(["Razão de stock", "rel:Stock Ledger"]);
+      if (doc.value.docstatus === 1 && ["Sales Invoice", "Purchase Invoice", "Payment Entry", "Journal Entry", "Delivery Note", "Purchase Receipt", "Stock Entry"].includes(props.doctype) && window.__ctx?.contabilidade !== false) out.push(["Razão geral", "rel:General Ledger"]);
+      return out; });
+    const irAtalho = (a) => { if (a[1].startsWith("rel:")) { const d = doc.value; const dia = (d.posting_date || d.transaction_date || "").slice(0, 10);
+        try { sessionStorage.setItem("orbit.rel.filtros", JSON.stringify({ nome: a[1].slice(4), v: { voucher_no: d.name, from_date: dia, to_date: dia, company: d.company, group_by: "Group by Voucher (Consolidated)" } })); } catch (e) {}
+        location.hash = "#/erp-rel/" + encodeURIComponent(a[1].slice(4)); return; }
+      if (a[1].startsWith("#")) { location.hash = a[1].endsWith("/") ? a[1] + encodeURIComponent(doc.value.name) : a[1]; return; }
       try { sessionStorage.setItem("orbit.erp.filtro", JSON.stringify({ doctype: a[1], filtros: [[a[2], "=", doc.value.name]] })); } catch (e) {} location.hash = irErp(a[1]); };
     // lote 5 (25-11): «Obter artigos de», estados (Fechar/Em espera/Reabrir/Parar), «Atualizar artigos», fluxo de aprovação
     const bt = ref({ obter: [], estados: [], atualizar_artigos: false, fluxo: null }); const obterM = ref(null); const atualM = ref(null); const menuObter = ref(false);
@@ -5092,6 +5243,9 @@ const ErpRelatorio = {
       if (m.value.tipo === "builder") { location.replace(irErp(m.value.doctype)); return; }
       try { filtros.value = filtrosDoRelatorio(props.nome, m.value); } catch (e) { falhou.value = true; return; }
       const v = {}; for (const f of filtros.value) if (f.default !== undefined && f.default !== null && f.default !== "") v[f.fieldname] = f.default;
+      // lote 6: vindo de um documento, já com o documento e a data (ex.: razão de stock/geral)
+      try { const pre = JSON.parse(sessionStorage.getItem("orbit.rel.filtros") || "null"); if (pre && pre.nome === props.nome) { sessionStorage.removeItem("orbit.rel.filtros");
+        for (const [k, x] of Object.entries(pre.v)) if (x && filtros.value.some((f) => f.fieldname === k)) v[k] = x; } } catch (e) {}
       val.value = v;
       if (filtros.value.every((f) => !f.reqd || !vazioV(v[f.fieldname]))) correr();
     });
@@ -5130,12 +5284,17 @@ const ErpRelatorio = {
       const el = document.createElement("a"); el.href = u; el.download = (m.value.rotulo || props.nome) + ".csv"; el.click(); URL.revokeObjectURL(u);
     };
     const desk = computed(() => "#/erp-desk/" + encodeURIComponent("/desk/query-report/" + props.nome));
-    return { m, filtros, val, r, a, falhou, erro, visivel, correr, fmt, numerica, ligacao, grafico, CORES_G, csv, desk, moedaR };
+    // lote 7: Excel (o exportador do próprio Frappe) e imprimir só o relatório
+    const excel = async () => { const fd = new FormData(); fd.append("report_name", props.nome); fd.append("file_format_type", "Excel"); fd.append("filters", JSON.stringify(val.value)); fd.append("visible_idx", "[]"); fd.append("include_indentation", "0");
+      const rr = await fetch("/api/method/frappe.desk.query_report.export_query", { method: "POST", body: fd, headers: { "X-Frappe-CSRF-Token": window.csrf_token } });
+      if (!rr.ok) { toast("Não foi possível gerar o Excel"); return; } const b = await rr.blob(); const u = URL.createObjectURL(b); const el = document.createElement("a"); el.href = u; el.download = (m.value.rotulo || props.nome) + ".xlsx"; el.click(); URL.revokeObjectURL(u); };
+    const imprimir = () => { document.body.classList.add("imprimir-rel"); window.print(); setTimeout(() => document.body.classList.remove("imprimir-rel"), 500); };
+    return { excel, imprimir, m, filtros, val, r, a, falhou, erro, visivel, correr, fmt, numerica, ligacao, grafico, CORES_G, csv, desk, moedaR };
   },
   template: `<div class="pad" v-if="m">
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px">
       <div><h1>{{ m.rotulo }}</h1><div class="sub">Relatório</div></div>
-      <div style="display:flex;gap:8px"><button class="btn prim" :disabled="a" @click="correr">{{ a ? 'A gerar…' : 'Gerar' }}</button><button v-if="r && r.linhas.length" class="btn" @click="csv">Exportar CSV</button></div>
+      <div style="display:flex;gap:8px"><button class="btn prim" :disabled="a" @click="correr">{{ a ? 'A gerar…' : 'Gerar' }}</button><button v-if="r && r.linhas.length" class="btn" @click="csv">Exportar CSV</button><button v-if="r && r.linhas.length" class="btn" @click="excel">Excel</button><button v-if="r && r.linhas.length" class="btn" @click="imprimir">Imprimir</button></div>
     </div>
     <div v-if="falhou" class="cartao vazio">Este relatório ainda não abre aqui.</div>
     <template v-else>
@@ -5314,17 +5473,19 @@ const APPS = {
   crm: { nome: "CRM", sub: "Clientes e atendimento", ic: "pessoa", inicio: "inicio",
     // 23-11-2026 (Vítor): a caixa de entrada (correio por IMAP, partilhadas, conversas do CRM, tickets) e o Chat na barra
     nav: [["inicio", "casa", "Início"], ["caixa", "caixa", "Caixa de entrada"], ["chat", "chat", "Chat"], ["sec", "CRM"], ["leads", "lead", "Leads"], ["contactos", "pessoa", "Contactos"], ["empresas", "empresa", "Empresas"],
-      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"],
+      ["negocios", "negocio", "Negócios"], ["funil", "negocio", "Funil"], ["crm-painel", "grelha", "Painel"],
       ["sec", "O meu dia"], ["calendario", "cal", "Calendário"], ["tarefas", "tarefa", "Tarefas"],
       ["erp/FCRM%20Note", "nota", "Notas"], ["erp/CRM%20Call%20Log", "tel", "Chamadas"], ["app/Booking", "relogio", "Marcar reuniões"],
       ["sec", "Documentos"], ["assinaturas", "assin", "Assinaturas"]],
     modulos: [], defs: ["CRM", "Correio"] },
   // 22-11-2026 (Vítor): o Desk separado do CRM — quem só faz atendimento tem a sua app.
   desk: { nome: "Desk", sub: "Atendimento", ic: "ticket", inicio: "tickets",
-    nav: [["sec", "Atendimento"], ["tickets", "ticket", "Tickets"], ["caixa", "caixa", "Caixa de entrada"],
+    nav: [["sec", "Atendimento"], ["tickets", "ticket", "Tickets"], ["desk-painel", "grelha", "Painel"], ["caixa", "caixa", "Caixa de entrada"],
       ["sec", "Clientes"], ["contactos", "pessoa", "Contactos"], ["erp/HD%20Customer", "empresa", "Clientes do Desk"],
-      ["sec", "Conhecimento"], ["erp/HD%20Article", "livro", "Base de conhecimento"], ["erp/HD%20Saved%20Reply", "template", "Respostas-modelo"],
-      ["desk-checklists", "tarefa", "Modelos de checklist"]],
+      ["sec", "Conhecimento"], ["desk-kb", "livro", "Base de conhecimento"], ["erp/HD%20Saved%20Reply", "template", "Respostas-modelo"],
+      ["desk-checklists", "tarefa", "Modelos de checklist"],
+      ["sec", "Configuração"], ["erp/HD%20Team", "pessoas", "Equipas"], ["erp/HD%20Service%20Level%20Agreement", "relogio", "Prazos (SLA)"],
+      ["erp/HD%20Service%20Holiday%20List", "cal", "Feriados"], ["erp/Assignment%20Rule", "tarefa", "Regras de atribuição"], ["erp/HD%20Settings", "roda", "Definições do Desk"]],
     modulos: [], defs: ["Atendimento (Desk)", "Correio"] },
   projetos: { nome: "Projetos", sub: "Projetos, tarefas e tempo", ic: "projeto", inicio: "projetos",
     nav: [["sec", "Trabalho"], ["projetos", "projeto", "Projetos"], ["tarefas", "tarefa", "Tarefas"], ["calendario", "cal", "Calendário"], ["sec", "Tempo"], ["tempo", "relogio", "Registo de horas"]],
@@ -5372,7 +5533,7 @@ const abrirApp = (chave, url) => {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpPainel, ErpContas, ErpImportar, RhAprovar, RhAusencias, MktSegmentos, MktMarcadores, MktModelos, ErpLista, ErpFicha, ErpProposta, ErpEmitir, ErpRecibo, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, DefUtilizadores, DefEmpresas, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpPainel, ErpContas, ErpImportar, RhAprovar, RhAusencias, CrmPainel, DeskPainel, DeskKb, MktSegmentos, MktMarcadores, MktModelos, ErpLista, ErpFicha, ErpProposta, ErpEmitir, ErpRecibo, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, DefUtilizadores, DefEmpresas, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -5519,6 +5680,9 @@ const App = {
         <ErpStock v-else-if="ecra==='erp-stock'" :artigo="partes[1]" :key="'s'+(partes[1]||'')"/>
         <ErpPessoas v-else-if="ecra==='pessoas'"/>
         <RhAprovar v-else-if="ecra==='rh-aprovar'"/>
+        <CrmPainel v-else-if="ecra==='crm-painel'"/>
+        <DeskPainel v-else-if="ecra==='desk-painel'"/>
+        <DeskKb v-else-if="ecra==='desk-kb'"/>
         <MktSegmentos v-else-if="ecra==='mkt-segmentos'"/>
         <MktMarcadores v-else-if="ecra==='mkt-marcadores'"/>
         <MktModelos v-else-if="ecra==='mkt-modelos'"/>
@@ -5546,7 +5710,7 @@ const App = {
 };
 
 const _app = createApp(App).component("AvFoto", AvFoto).component("RegistoMenu", RegistoMenu).component("RegistoLateral", RegistoLateral)
-  .component("RegistoHistorico", RegistoHistorico).component("RegistoLigacoes", RegistoLigacoes).component("RegistoArea", RegistoArea).component("TarefaForm", TarefaForm).component("NotaForm", NotaForm).component("ChamadaForm", ChamadaForm).component("MktCiclo", MktCiclo).component("MktComoFica", MktComoFica).component("MktBaseLegal", MktBaseLegal).component("EditorRico", EditorRico).component("ConversaRegisto", ConversaRegisto);
+  .component("RegistoHistorico", RegistoHistorico).component("RegistoLigacoes", RegistoLigacoes).component("RegistoArea", RegistoArea).component("TarefaForm", TarefaForm).component("NotaForm", NotaForm).component("ChamadaForm", ChamadaForm).component("ErpArvore", ErpArvore).component("ErpArvoreNo", ErpArvoreNo).component("ErpKanban", ErpKanban).component("ErpCalendario", ErpCalendario).component("MktCiclo", MktCiclo).component("MktComoFica", MktComoFica).component("MktBaseLegal", MktBaseLegal).component("EditorRico", EditorRico).component("ConversaRegisto", ConversaRegisto);
 _app.config.globalProperties.emailDoSite = emailDoSite;
 // 25-11-2026: um ecrã que falha a carregar (ex.: sem permissão) deixava «A carregar…» para sempre — passa a dizer porquê.
 // Só falhas ao ABRIR (setup/mounted): uma falha ao gravar já mostra o aviso e não pode tirar o formulário do ecrã.

@@ -70,7 +70,11 @@ def definicao(doctype: str):
     if m.is_submittable:
         campos.append({"campo": "docstatus", "rotulo": _("Estado do documento"), "tipo": "Select",
                        "opcoes": None, "opcoes_v": [{"v": 0, "r": _("Rascunho")}, {"v": 1, "r": _("Submetido")}, {"v": 2, "r": _("Cancelado")}]})
-    return {"campos": campos, "submetivel": bool(m.is_submittable), "pode": {
+    # lote 6/7: vista em árvore, Kanban (por um campo de escolha) e Calendário (por um campo de data)
+    escolha = [f.fieldname for f in m.fields if f.fieldtype == "Select" and f.options and not f.hidden and len([o for o in f.options.split("\n") if o]) <= 12]
+    datas = [f.fieldname for f in m.fields if f.fieldtype in ("Date", "Datetime") and not f.hidden]
+    return {"campos": campos, "submetivel": bool(m.is_submittable), "arvore": bool(m.is_tree),
+            "kanban": (["status"] if "status" in escolha else []) + [c for c in escolha if c != "status"], "calendario": datas, "pode": {
         "apagar": frappe.has_permission(doctype, "delete"), "escrever": frappe.has_permission(doctype, "write"),
         "submeter": bool(m.is_submittable and frappe.has_permission(doctype, "submit")),
         "cancelar": bool(m.is_submittable and frappe.has_permission(doctype, "cancel")),

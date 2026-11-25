@@ -859,3 +859,24 @@ tr.por-ler td b,tr.por-ler td{font-weight:600}
 .reg-form input:not([type=checkbox]):not([type=radio]),.reg-form select,.reg-form textarea,.seg-logica select{font:inherit;font-size:13.5px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;box-sizing:border-box}
 .seg-logica select{width:auto;padding:3px 6px}
 .reg-form input:focus,.reg-form select:focus,.reg-form textarea:focus{outline:2px solid var(--acao);outline-offset:-1px}
+
+/* ── 25-11-2026, lote 7: painéis, base de conhecimento, árvore, calendário, funil, imprimir relatório ── */
+.barras-h{display:flex;flex-direction:column;gap:7px}
+.bh{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) auto;gap:10px;align-items:center;font-size:13px}
+.bh-r{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bh-b{height:8px;border-radius:5px;background:var(--surface-2);overflow:hidden}.bh-b i{display:block;height:100%;background:#5b6f7a;border-radius:5px}
+.kb-grelha{display:grid;grid-template-columns:240px minmax(0,1fr);gap:16px;padding:0 24px 24px;align-items:start}
+.kb-cats{padding:8px;display:flex;flex-direction:column;gap:2px}.kb-cats>button,.kb-cat>button{all:unset;cursor:pointer;padding:7px 10px;border-radius:6px;font-size:13.5px;flex:1}
+.kb-cats>button.ativo,.kb-cat.ativo>button{background:var(--surface-2);font-weight:600}.kb-cat{display:flex;align-items:center}.kb-cat-acoes{display:none}.kb-cat:hover .kb-cat-acoes{display:flex}
+.kb-cat-acoes button{all:unset;cursor:pointer;padding:0 5px;color:var(--ink-3)}
+.arv{padding:8px 0}.arv-linha{display:flex;align-items:center;gap:4px;padding:5px 8px;font-size:13.5px}.arv-linha:hover{background:var(--surface-2)}
+.arv-linha a{color:var(--ink);text-decoration:none}.arv-seta,.arv-mais{all:unset;cursor:pointer;width:18px;text-align:center;color:var(--ink-3)}.arv-mais{margin-left:auto;opacity:0}.arv-linha:hover .arv-mais{opacity:1}
+.cal-erp{overflow:hidden}.cal-erp-grelha{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--line)}
+.cal-erp-sem{padding:6px;font-size:11px;color:var(--ink-3);text-transform:uppercase;border-bottom:1px solid var(--line)}
+.cal-erp-dia{min-height:92px;padding:4px 6px;border-right:1px solid var(--line-2);border-bottom:1px solid var(--line-2);display:flex;flex-direction:column;gap:2px;min-width:0}
+.cal-erp-dia.vazio{background:var(--surface-2)}.cal-erp-item{font-size:12px;padding:2px 5px;border-radius:4px;background:var(--surface-2);color:var(--ink);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.col-mais{all:unset;cursor:pointer;float:right;width:22px;height:22px;border-radius:6px;text-align:center;color:var(--ink-3);line-height:22px}.col-mais:hover{background:var(--surface-2);color:var(--ink)}
+.modos-erp{border-bottom:0}
+@media (max-width:900px){.kb-grelha{grid-template-columns:minmax(0,1fr);padding:0 16px 16px}.kb-cats{flex-direction:row;overflow-x:auto}.kb-cat-acoes{display:none!important}}
+@media (max-width:760px){.cal-erp-dia{min-height:58px}.cal-erp-item{font-size:10px;padding:1px 3px}}
+@media print{body.imprimir-rel .nav,body.imprimir-rel .topo,body.imprimir-rel .menu-movel,body.imprimir-rel .erp-filtros,body.imprimir-rel .btn{display:none!important}
+  body.imprimir-rel .app{display:block;height:auto}body.imprimir-rel .ecra{overflow:visible}body.imprimir-rel .tabela-wrap{max-height:none!important;overflow:visible}}
