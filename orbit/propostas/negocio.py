@@ -34,7 +34,12 @@ def _avancar(deal, fase):
         deal.closed_date = nowdate()
     elif fase == "Lost":
         deal.closed_date = nowdate()
-        deal.lost_reason = deal.lost_reason or ("Other" if frappe.db.exists("CRM Lost Reason", "Other") else None)
+        if not deal.lost_reason:
+            motivos = frappe.get_all("CRM Lost Reason", pluck="name")
+            deal.lost_reason = next((m for m in ("Other", "Outro") if m in motivos), None) or (motivos[0] if motivos else None)
+            if not deal.lost_reason:
+                frappe.get_doc({"doctype": "CRM Lost Reason", "lost_reason": "Outro"}).insert(ignore_permissions=True)
+                deal.lost_reason = "Outro"
         if not deal.lost_notes:
             deal.lost_notes = "Todos os orçamentos do negócio foram dados como perdidos."
     return True
@@ -60,6 +65,14 @@ def valor(negocio):
 
 
 def actualizar(negocio, fase=None):
+    """Nunca impede o orçamento: um erro no negócio fica registado e o orçamento grava na mesma."""
+    try:
+        _actualizar(negocio, fase)
+    except Exception:
+        frappe.log_error(title=f"Orbit: negócio {negocio} a partir do orçamento")
+
+
+def _actualizar(negocio, fase=None):
     if not negocio or not frappe.db.exists("CRM Deal", negocio):
         return
     deal = frappe.get_doc("CRM Deal", negocio)

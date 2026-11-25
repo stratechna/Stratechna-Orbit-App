@@ -507,9 +507,10 @@ def atualizar_deal(id_deal: str, dados):
         if deal.status == "Won":
             deal.probability = 100
         if deal.status == "Lost":
-            motivo = d.get("Lost_Reason") if frappe.db.exists("CRM Lost Reason", d.get("Lost_Reason") or "") else "Other"
+            motivo = d.get("Lost_Reason") if frappe.db.exists("CRM Lost Reason", d.get("Lost_Reason") or "") else \
+                next((m for m in ("Other", "Outro") if frappe.db.exists("CRM Lost Reason", m)), None)
             deal.lost_reason = deal.lost_reason or motivo
-            if deal.lost_reason == "Other" and not deal.lost_notes:
+            if deal.lost_reason in ("Other", "Outro", None) and not deal.lost_notes:
                 deal.lost_notes = _limpo(d.get("Lost_Notes")) or "Sem motivo indicado."
     for k, f in (("Amount", "deal_value"), ("Closing_Date", "expected_closure_date"), ("Moloni_Document_ID", "moloni_document_id"),
                  ("Deal_Name", "titulo")):
