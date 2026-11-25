@@ -193,6 +193,26 @@ def pesquisa(q: str):
     if frappe.db.exists("DocType", "HD Ticket"):
         junta("HD Ticket", ["subject", "raised_by"], ["subject", "raised_by", "name"],
               lambda r: f"#{r.name} {r.subject}", lambda r: r.raised_by or "", "Ticket")
+    # 25-11-2026 (lote 4 das opções dos originais): ⌘K também encontra o ERP, como a barra de pesquisa do desk
+    ERP = [("Customer", ["customer_name", "tax_id"], ["name", "customer_name", "tax_id"], "customer_name", "tax_id", "Cliente"),
+           ("Supplier", ["supplier_name", "tax_id"], ["name", "supplier_name", "tax_id"], "supplier_name", "tax_id", "Fornecedor"),
+           ("Item", ["item_name", "item_code"], ["name", "item_name", "item_code"], "item_name", "item_code", "Artigo"),
+           ("Quotation", ["party_name", "status"], ["name", "party_name"], "name", "party_name", "Proposta"),
+           ("Sales Order", ["customer", "status"], ["name", "customer"], "name", "customer", "Encomenda"),
+           ("Sales Invoice", ["customer", "status"], ["name", "customer"], "name", "customer", "Fatura"),
+           ("Delivery Note", ["customer", "status"], ["name", "customer"], "name", "customer", "Guia"),
+           ("Purchase Order", ["supplier", "status"], ["name", "supplier"], "name", "supplier", "Encomenda a fornecedor"),
+           ("Purchase Invoice", ["supplier", "status", "bill_no"], ["name", "supplier", "bill_no"], "name", "supplier", "Fatura de compra"),
+           ("Payment Entry", ["party_name", "paid_amount"], ["name", "party_name", "reference_no"], "name", "party_name", "Recibo"),
+           ("Project", ["project_name", "status"], ["name", "project_name"], "project_name", "status", "Projeto"),
+           ("Employee", ["employee_name", "designation"], ["name", "employee_name"], "employee_name", "designation", "Colaborador")]
+    for dt, campos, ou, tit, sub, tipo in ERP:
+        if len(out) >= 30 or not frappe.db.exists("DocType", dt):
+            continue
+        try:
+            junta(dt, campos, ou, (lambda t: lambda r: r.get(t))(tit), (lambda s_: lambda r: str(r.get(s_) or ""))(sub), tipo)
+        except Exception:  # noqa: BLE001 — um tipo sem acesso ou com campos diferentes não estraga a pesquisa
+            continue
     return out
 
 

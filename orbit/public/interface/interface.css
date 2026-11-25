@@ -811,3 +811,7 @@ a.tarefa-tit{color:inherit;text-decoration:none}a.tarefa-tit:hover{text-decorati
 .msg-acoes button:hover{color:var(--ink);background:var(--surface-2)}
 tr.por-ler td b,tr.por-ler td{font-weight:600}
 @media (max-width:760px){.desk-env{grid-template-columns:minmax(0,1fr)}}
+
+/* ── 25-11-2026, lote 4: listas do ERP e importar ── */
+.col-ord{display:flex;align-items:center;gap:4px}.col-ord button{all:unset;cursor:pointer;padding:0 4px;color:var(--ink-3)}.col-ord button:hover{color:var(--ink)}
+.imp-cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 12px;margin-top:8px;max-height:260px;overflow:auto}

@@ -69,8 +69,9 @@ function mes(d) { const x = new Date(String(d).replace(" ", "T")); return isNaN(
 const ESTADO_COR = { gray: "", orange: "ambar", blue: "azul", yellow: "ambar", purple: "roxo", green: "verde", red: "" };
 const FAIXA = { gray: "#94a3b8", orange: "#f59e0b", blue: "#60a5fa", yellow: "#facc15", purple: "#a78bfa", green: "#22c55e", red: "#ef4444", black: "#475569" };
 const ROTAS_DT = { contacto: "Contact", negocio: "CRM Deal", empresa: "CRM Organization", lead: "CRM Lead" };
-const DT_ROTA = Object.fromEntries(Object.entries(ROTAS_DT).map(([k, v]) => [v, k]));
-const link = (dt, dn) => `#/${DT_ROTA[dt] || "contacto"}/${encodeURIComponent(dn)}`;
+const DT_ROTA = Object.fromEntries(Object.entries(ROTAS_DT).map(([k, v]) => [v, k])); DT_ROTA["HD Ticket"] = "ticket";
+// 25-11-2026 (lote 4): o que não é do CRM/Desk abre na ficha do ERP (antes caía na ficha de contacto)
+const link = (dt, dn) => DT_ROTA[dt] ? `#/${DT_ROTA[dt]}/${encodeURIComponent(dn)}` : `#/erp/${encodeURIComponent(dt)}/${encodeURIComponent(dn)}`;
 
 const ICONES = {
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
@@ -3172,6 +3173,71 @@ const ErpContas = {
   </div><div v-else class="vazio">A carregar…</div>`,
 };
 
+// Importar dados para qualquer lista do ERP (o Data Import do Frappe, no /orbit) — lote 4, 25-11-2026
+const ErpImportar = {
+  props: ["doctype"],
+  setup(props) {
+    const mod = ref(null), escolhidos = ref([]), formato = ref("Excel"), tipo = ref("Insert New Records"), submeter = ref(false);
+    const fich = ref(null), nome = ref(null), prev = ref(null), estadoI = ref(null), falhas = ref([]), a = ref(false), entrada = ref(null); let tp;
+    onMounted(async () => { mod.value = await apiL("importar_modelo", { doctype: props.doctype }); escolhidos.value = mod.value.campos.slice(); });
+    onUnmounted(() => clearInterval(tp));
+    const get = async (metodo, dados) => { const r = await fetch("/api/method/" + metodo + "?" + new URLSearchParams(dados), { headers: { Accept: "application/json" } }); const j = await r.json().catch(() => ({}));
+      if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(String(m).replace(/<[^>]+>/g, "")); throw new Error(m); } return j.message; };
+    const urlModelo = computed(() => "/api/method/frappe.core.doctype.data_import.data_import.download_template?" + new URLSearchParams({ doctype: props.doctype,
+      export_fields: JSON.stringify({ [props.doctype]: tipo.value === "Update Existing Records" ? ["name"].concat(escolhidos.value) : escolhidos.value }),
+      export_records: tipo.value === "Update Existing Records" ? "all" : "blank_template", file_type: formato.value }).toString());
+    const carregar = async (ev) => { const fi = ev.target.files?.[0]; if (!fi) return; a.value = true;
+      try { const url = await carregarFicheiro(fi, { privado: 1 }); fich.value = { nome: fi.name, url };
+        nome.value = (await apiL("importar_novo", { doctype: props.doctype, ficheiro: url, tipo: tipo.value, submeter: submeter.value ? 1 : 0 }, true)).name;
+        prev.value = await get("frappe.core.doctype.data_import.data_import.get_preview_from_template", { data_import: nome.value, import_file: url });
+      } finally { a.value = false; ev.target.value = ""; } };
+    const post = async (metodo, dados) => { const r = await fetch("/api/method/" + metodo, { method: "POST", headers: { "X-Frappe-CSRF-Token": window.csrf_token, Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify(dados) });
+      const j = await r.json().catch(() => ({})); if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(String(m).replace(/<[^>]+>/g, "")); throw new Error(m); } return j.message; };
+    const importar = async () => { a.value = true;
+      try { await post("frappe.core.doctype.data_import.data_import.form_start_import", { data_import: nome.value });
+        const ver = async () => { estadoI.value = await get("frappe.core.doctype.data_import.data_import.get_import_status", { data_import_name: nome.value });
+          if (["Success", "Partial Success", "Error"].includes(estadoI.value.status)) { clearInterval(tp); a.value = false;
+            falhas.value = await get("frappe.core.doctype.data_import.data_import.get_import_logs", { data_import: nome.value, status: "failed" }); } };
+        tp = setInterval(ver, 2000); ver(); } catch (e) { a.value = false; } };
+    const recomecar = () => { fich.value = null; nome.value = null; prev.value = null; estadoI.value = null; falhas.value = []; };
+    const ESTADOS_I = { Pending: "À espera", Success: "Concluída", "Partial Success": "Concluída com erros", Error: "Falhou", Timed_Out: "Excedeu o tempo" };
+    const msg = (l) => { try { return JSON.parse(l.messages || "[]").map((m) => String(m.message || m.title || m).replace(/<[^>]+>/g, "")).join(" · "); } catch (e) { return l.exception ? String(l.exception).split("\n").filter(Boolean).pop() : ""; } };
+    return { tr, mod, escolhidos, formato, tipo, submeter, fich, prev, estadoI, falhas, a, entrada, urlModelo, carregar, importar, recomecar, ESTADOS_I, msg, irErp, nome };
+  },
+  template: `<div class="pad" v-if="mod" style="max-width:980px">
+    <div style="font-size:13px"><a :href="irErp(doctype)">← Voltar à lista</a></div>
+    <h1>Importar — {{ tr(doctype, doctype) }}</h1><div class="sub" style="margin-bottom:16px">Carregue uma folha (Excel ou CSV) e confirme a pré-visualização antes de importar.</div>
+    <section class="cartao" style="padding:14px 16px;margin-bottom:12px"><b>1. O que vai fazer</b>
+      <div class="reg-linha3" style="margin-top:8px">
+        <label class="erp-campo"><span>Tipo</span><select v-model="tipo" :disabled="!!nome"><option value="Insert New Records">Criar registos novos</option><option value="Update Existing Records">Atualizar registos que já existem</option></select></label>
+        <label class="erp-campo"><span>Formato do modelo</span><select v-model="formato"><option value="Excel">Excel</option><option value="CSV">CSV</option></select></label>
+        <label class="chk-col" style="align-self:end"><input type="checkbox" v-model="submeter" :disabled="!!nome"> Submeter depois de importar</label></div></section>
+    <section class="cartao" style="padding:14px 16px;margin-bottom:12px"><b>2. Descarregar o modelo</b> <span class="sub" style="font-size:12px">(opcional — pode usar a sua folha com os mesmos títulos)</span>
+      <details style="margin:8px 0"><summary class="sub" style="cursor:pointer">Colunas do modelo ({{ escolhidos.length }})</summary>
+        <div class="imp-cols"><label v-for="c in mod.todos" :key="c.campo" class="chk-col"><input type="checkbox" :value="c.campo" v-model="escolhidos" :disabled="!!c.obrigatorio"> {{ c.rotulo }}<span v-if="c.obrigatorio" class="obrig">*</span></label></div></details>
+      <a class="btn" :href="urlModelo">Descarregar o modelo</a></section>
+    <section class="cartao" style="padding:14px 16px;margin-bottom:12px"><b>3. Carregar a folha</b>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn" @click="entrada.click()" :disabled="a || !!estadoI">{{ fich ? 'Trocar a folha' : 'Escolher a folha…' }}</button><input ref="entrada" type="file" accept=".csv,.xlsx,.xls" style="display:none" @change="carregar">
+        <span v-if="fich" class="sub">{{ fich.nome }}</span><span v-if="a && !estadoI" class="sub">A ler…</span></div>
+      <template v-if="prev">
+        <div v-for="(w,k) in (prev.warnings||[]).slice(0,8)" :key="k" class="aviso" style="margin:8px 0 0">{{ String(w.message||w).replace(/<[^>]+>/g,'') }}</div>
+        <div class="tabela-wrap" style="margin:10px 0 0;max-height:320px"><table><thead><tr><th v-for="(c,i) in (prev.columns||[])" :key="i">{{ c.header_title || (c.df && c.df.label) || '' }}<small v-if="c.skip_import" class="sub"> (ignorada)</small></th></tr></thead>
+          <tbody><tr v-for="(r,i) in (prev.data||[]).slice(0,10)" :key="i" style="cursor:default"><td v-for="(v,j) in r" :key="j">{{ v }}</td></tr></tbody></table></div>
+        <div class="sub" style="font-size:12px;margin-top:6px">{{ (prev.data||[]).length }} linha(s) na folha{{ (prev.data||[]).length > 10 ? ' — mostram-se as 10 primeiras' : '' }}.</div>
+      </template></section>
+    <section class="cartao" style="padding:14px 16px" v-if="prev"><b>4. Importar</b>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn prim" @click="importar" :disabled="a || !!estadoI">{{ a ? 'A importar…' : 'Importar' }}</button>
+        <template v-if="estadoI"><span class="etq" :class="{Success:'verde','Partial Success':'ambar',Error:'ambar'}[estadoI.status]">{{ ESTADOS_I[estadoI.status] || estadoI.status }}</span>
+          <span class="sub">{{ estadoI.success || 0 }} importado(s){{ estadoI.failed ? ' · ' + estadoI.failed + ' com erro' : '' }}{{ estadoI.total_records ? ' de ' + estadoI.total_records : '' }}</span>
+          <a v-if="estadoI.failed" class="btn sm" :href="'/api/method/frappe.core.doctype.data_import.data_import.download_errored_template?data_import_name='+encodeURIComponent(nome)">Descarregar as linhas com erro</a>
+          <button v-if="!a" class="btn sm" @click="recomecar">Nova importação</button><a v-if="!a" class="btn sm" :href="irErp(doctype)">Ver a lista</a></template></div>
+      <div v-if="falhas.length" class="tabela-wrap" style="margin:10px 0 0;max-height:300px"><table><thead><tr><th>Linha(s)</th><th>Erro</th></tr></thead>
+        <tbody><tr v-for="(l,i) in falhas" :key="i" style="cursor:default"><td>{{ (JSON.parse(l.row_indexes||'[]')||[]).join(', ') }}</td><td style="white-space:normal">{{ msg(l) }}</td></tr></tbody></table></div>
+    </section>
+  </div><div v-else class="vazio">A carregar…</div>`,
+};
+
 const ErpModulo = {
   props: ["barra"],
   setup(props) {
@@ -3200,44 +3266,174 @@ const ErpModulo = {
     </div></div><div v-else class="vazio">A carregar…</div>`,
 };
 
+const OPS_ERP = { texto: [["like", "contém"], ["=", "é igual a"], ["!=", "não é"], ["not like", "não contém"], ["is", "preenchido / vazio"]],
+  numero: [["=", "="], [">", ">"], ["<", "<"], [">=", "≥"], ["<=", "≤"], ["!=", "≠"]],
+  data: [["timespan", "período"], [">=", "a partir de"], ["<=", "até"], ["between", "entre"], ["=", "no dia"], ["is", "preenchido / vazio"]],
+  escolha: [["=", "é"], ["!=", "não é"], ["in", "é um de"], ["not in", "não é nenhum de"], ["is", "preenchido / vazio"]],
+  ligacao: [["=", "é"], ["!=", "não é"], ["like", "contém"], ["in", "é um de"], ["is", "preenchido / vazio"]] };
+const PERIODOS_ERP = [["hoje", "Hoje"], ["ontem", "Ontem"], ["esta_semana", "Esta semana"], ["semana_passada", "Semana passada"], ["este_mes", "Este mês"], ["mes_passado", "Mês passado"],
+  ["ultimos_7", "Últimos 7 dias"], ["ultimos_30", "Últimos 30 dias"], ["este_ano", "Este ano"], ["ano_passado", "Ano passado"], ["proxima_semana", "Próxima semana"], ["proximo_mes", "Próximo mês"]];
+const tipoOp = (c) => !c ? "texto" : ["Int", "Float", "Currency", "Percent"].includes(c.tipo) ? "numero" : ["Date", "Datetime"].includes(c.tipo) ? "data"
+  : (c.tipo === "Select" || c.opcoes_v) ? "escolha" : ["Link", "Dynamic Link"].includes(c.tipo) ? "ligacao" : c.tipo === "Check" ? "escolha" : "texto";
+const apiL = (m, a = {}, post = false) => api("erp_listas." + m, a, post);
 const ErpLista = {
   props: ["doctype"],
   setup(props) {
-    const meta = ref(null); const linhas = ref([]); const mais = ref(false); const q = ref(""); const pagina = ref(0);
-    const colunas = ref([]); const titulo = ref(null); const a = ref(false); const ordem = ref("modified desc"); let tq;
+    // lote 4 (25-11): a lista do desk inteira — filtros por qualquer campo, contagem, colunas, ordem, vistas guardadas,
+    // selecção e acções em massa, PDF em lote e exportar (orbit/interface/erp_listas.py)
+    const meta = ref(null); const def = ref(null); const linhas = ref([]); const mais = ref(false); const q = ref(""); const pagina = ref(0); const total = ref(0);
+    const colunas = ref([]); const colEscolhidas = ref([]); const titulo = ref(null); const a = ref(false); const ordem = ref("modified desc"); let tq;
+    const filtros = ref([]); const novoF = ref(null); const verCols = ref(false); const sel = ref([]); const massa = ref({ acao: "", campo: "", valor: "" });
+    const vs = ref({ vistas: [], padrao: "" }); const vistaAtiva = ref(""); const menuV = ref(false);
+    const chaveLS = () => "orbit.erp.lista." + props.doctype;
     const carregar = async (junta = false) => {
       a.value = true;
-      const r = await api("erp.lista", { doctype: props.doctype, q: q.value, pagina: pagina.value, ordem: ordem.value });
-      linhas.value = junta ? linhas.value.concat(r.linhas) : r.linhas; mais.value = r.mais; colunas.value = r.colunas; titulo.value = r.titulo; a.value = false;
-    };
-    onMounted(async () => { meta.value = await metaErp(props.doctype); if (meta.value.single) { location.replace(irErp(props.doctype, props.doctype)); return; } carregar(); });
+      try { const r = await apiL("lista", { doctype: props.doctype, q: q.value, pagina: pagina.value, ordem: ordem.value, filtros: JSON.stringify(filtros.value), colunas: JSON.stringify(colEscolhidas.value) });
+        linhas.value = junta ? linhas.value.concat(r.linhas) : r.linhas; mais.value = r.mais; colunas.value = r.colunas; titulo.value = r.titulo; total.value = r.total;
+        if (!junta) sel.value = [];
+        try { localStorage.setItem(chaveLS(), JSON.stringify({ filtros: filtros.value, colunas: colEscolhidas.value, ordem: ordem.value, vista: vistaAtiva.value })); } catch (e) {}
+      } finally { a.value = false; } };
+    onMounted(async () => {
+      meta.value = await metaErp(props.doctype); if (meta.value.single) { location.replace(irErp(props.doctype, props.doctype)); return; }
+      def.value = await apiL("definicao", { doctype: props.doctype }).catch(() => ({ campos: [], pode: {} }));
+      vs.value = await apiL("vistas", { doctype: props.doctype }).catch(() => ({ vistas: [], padrao: "" }));
+      let g = null; try { g = JSON.parse(localStorage.getItem(chaveLS()) || "null"); } catch (e) {}
+      const pad = vs.value.vistas.find((v) => v.nome === vs.value.padrao);
+      if (g) { filtros.value = g.filtros || []; colEscolhidas.value = g.colunas || []; ordem.value = g.ordem || ordem.value; vistaAtiva.value = g.vista || ""; }
+      else if (pad) aplicarVista(pad, false);
+      carregar();
+    });
     watch(q, () => { clearTimeout(tq); tq = setTimeout(() => { pagina.value = 0; carregar(); }, 300); });
-    const campo = (f) => (meta.value?.campos || []).find((c) => c.fieldname === f) || { fieldname: f, label: f };
+    const campo = (f) => (meta.value?.campos || []).find((c) => c.fieldname === f) || { fieldname: f, label: ((def.value?.campos || []).find((c) => c.campo === f) || {}).rotulo || f };
+    const cdef = (f) => (def.value?.campos || []).find((c) => c.campo === f);
     const ordenar = (f) => { ordem.value = ordem.value === f + " desc" ? f + " asc" : f + " desc"; pagina.value = 0; carregar(); };
     const maisLinhas = () => { pagina.value++; carregar(true); };
     const abrir = (n) => { location.hash = irErp(props.doctype, n); };
-    return { meta, linhas, mais, q, colunas, titulo, a, campo, textoValor, ordenar, ordem, maisLinhas, abrir, irErp, ESTADO_DOC, COR_STATUS, statusPt, cor, ini, tr };
+    // filtros
+    const abrirFiltro = () => { novoF.value = { campo: "", op: "", valor: "", valor2: "" }; };
+    const opsDe = (f) => OPS_ERP[tipoOp(cdef(f))];
+    const juntarFiltro = () => { const n = novoF.value; if (!n.campo || !n.op) return;
+      let v = n.valor; if (n.op === "between") v = [n.valor, n.valor2]; if (["in", "not in"].includes(n.op)) v = String(n.valor).split(",").map((x) => x.trim()).filter(Boolean);
+      filtros.value = filtros.value.concat([[n.campo, n.op, v]]); novoF.value = null; vistaAtiva.value = ""; pagina.value = 0; carregar(); };
+    const tirarFiltro = (i) => { filtros.value = filtros.value.filter((_, k) => k !== i); vistaAtiva.value = ""; pagina.value = 0; carregar(); };
+    const limpar = () => { filtros.value = []; q.value = ""; vistaAtiva.value = ""; pagina.value = 0; carregar(); };
+    const rotuloOp = (f) => ((opsDe(f[0]) || []).find((o) => o[0] === f[1]) || [, f[1]])[1];
+    const rotuloValor = (f) => { const c = cdef(f[0]); if (f[1] === "timespan") return (PERIODOS_ERP.find((p) => p[0] === f[2]) || [, f[2]])[1];
+      if (f[1] === "is") return f[2] === "set" ? "preenchido" : "vazio"; if (c && c.opcoes_v) return (c.opcoes_v.find((o) => String(o.v) === String(f[2])) || {}).r || f[2];
+      return Array.isArray(f[2]) ? f[2].join(f[1] === "between" ? " e " : ", ") : f[2]; };
+    // colunas
+    const alternarCol = (c) => { const cur = colEscolhidas.value.length ? colEscolhidas.value : colunas.value.slice();
+      colEscolhidas.value = cur.includes(c) ? cur.filter((x) => x !== c) : cur.concat([c]); vistaAtiva.value = ""; carregar(); };
+    const moverCol = (c, d) => { const cur = colEscolhidas.value.length ? colEscolhidas.value.slice() : colunas.value.slice(); const i = cur.indexOf(c); const j = i + d;
+      if (i < 0 || j < 0 || j >= cur.length) return; [cur[i], cur[j]] = [cur[j], cur[i]]; colEscolhidas.value = cur; carregar(); };
+    const colunasPadrao = () => { colEscolhidas.value = []; carregar(); };
+    // vistas
+    const aplicarVista = (v, recarregar = true) => { const c = v.config || {}; filtros.value = c.filtros || []; colEscolhidas.value = c.colunas || []; ordem.value = c.ordem || "modified desc"; q.value = c.q || "";
+      vistaAtiva.value = v.nome + (v.equipa ? "*" : ""); pagina.value = 0; if (recarregar) carregar(); };
+    const vistaPorOmissao = () => { filtros.value = []; colEscolhidas.value = []; ordem.value = "modified desc"; q.value = ""; vistaAtiva.value = ""; pagina.value = 0; carregar(); };
+    const gravarVista = async (equipa, nomeAtual) => { const nome = prompt(nomeAtual ? "Nome da vista" : "Nome da nova vista", nomeAtual || ""); if (!nome) return;
+      vs.value = await apiL("vista_gravar", { doctype: props.doctype, nome, equipa: equipa ? 1 : 0, antigo: nomeAtual || null, config: JSON.stringify({ filtros: filtros.value, colunas: colEscolhidas.value, ordem: ordem.value, q: q.value }) }, true);
+      vistaAtiva.value = nome + (equipa ? "*" : ""); toast("Vista gravada"); };
+    const vistaAtual = computed(() => vs.value.vistas.find((v) => v.nome + (v.equipa ? "*" : "") === vistaAtiva.value));
+    const apagarVista = async () => { const v = vistaAtual.value; if (!v || !confirm(`Apagar a vista «${v.nome}»?`)) return; vs.value = await apiL("vista_apagar", { doctype: props.doctype, nome: v.nome, equipa: v.equipa ? 1 : 0 }, true); vistaPorOmissao(); };
+    const porOmissao = async () => { const v = vistaAtual.value; vs.value = await apiL("vista_padrao", { doctype: props.doctype, nome: v && !v.equipa ? v.nome : "" }, true); toast(v ? "Abre sempre com «" + v.nome + "»" : "Sem vista por omissão"); };
+    // selecção e massa
+    const todos = computed({ get: () => !!linhas.value.length && sel.value.length === linhas.value.length, set: (v) => (sel.value = v ? linhas.value.map((l) => l.name) : []) });
+    const opsMassa = computed(() => { const p = def.value?.pode || {}; const o = [];
+      if (p.escrever) o.push(["editar", "Alterar um campo"], ["atribuir", "Atribuir a"], ["etiqueta", "Pôr etiqueta"]);
+      if (p.submeter) o.push(["submeter", "Submeter"]); if (p.cancelar) o.push(["cancelar", "Cancelar"]); if (p.apagar) o.push(["apagar", "Apagar"]); return o; });
+    const camposEditaveis = computed(() => (def.value?.campos || []).filter((c) => !["owner", "creation", "modified", "_assign", "_user_tags", "docstatus"].includes(c.campo)));
+    const pessoasL = ref([]); watch(() => massa.value.acao, async (x) => { if (x === "atribuir" && !pessoasL.value.length) pessoasL.value = await apiConv("pessoas").catch(() => []); });
+    const aplicarMassa = async () => { const m = massa.value; if (!m.acao) return;
+      if (["apagar", "cancelar", "submeter"].includes(m.acao) && !confirm(`${{ apagar: "Apagar", cancelar: "Cancelar", submeter: "Submeter" }[m.acao]} ${sel.value.length} registo(s)?`)) return;
+      const r = await apiL("em_massa", { doctype: props.doctype, nomes: JSON.stringify(sel.value), acao: m.acao, campo: m.campo || null, valor: m.valor }, true);
+      toast(`${r.feitos} feito(s)` + (r.falhas.length ? ` · ${r.falhas.length} falharam: ${r.falhas[0].erro}` : "")); massa.value = { acao: "", campo: "", valor: "" }; carregar(); };
+    const pdfLote = () => { const p = new URLSearchParams({ doctype: props.doctype, name: JSON.stringify(sel.value) }); window.open("/api/method/frappe.utils.print_format.download_multi_pdf?" + p.toString(), "_blank"); };
+    const exportar = (soSel) => { const p = new URLSearchParams({ doctype: props.doctype, q: q.value, filtros: JSON.stringify(filtros.value), ordem: ordem.value, colunas: JSON.stringify(colEscolhidas.value), nomes: soSel ? JSON.stringify(sel.value) : "" });
+      window.location.href = "/api/method/orbit.interface.erp_listas.exportar?" + p.toString(); };
+    const maisAc = ref(false);
+    const fechar = () => { menuV.value = false; maisAc.value = false; }; onMounted(() => document.addEventListener("click", fechar)); onUnmounted(() => document.removeEventListener("click", fechar));
+    return { meta, def, linhas, mais, q, colunas, titulo, a, total, campo, cdef, textoValor, ordenar, ordem, maisLinhas, abrir, irErp, ESTADO_DOC, COR_STATUS, statusPt, cor, ini, tr,
+      filtros, novoF, abrirFiltro, opsDe, juntarFiltro, tirarFiltro, limpar, rotuloOp, rotuloValor, PERIODOS_ERP, tipoOp, verCols, alternarCol, moverCol, colunasPadrao, colEscolhidas,
+      vs, vistaAtiva, menuV, aplicarVista, vistaPorOmissao, gravarVista, vistaAtual, apagarVista, porOmissao, sel, todos, massa, opsMassa, camposEditaveis, pessoasL, aplicarMassa, pdfLote, exportar, maisAc };
   },
   template: `<div v-if="meta">
     <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-      <div><h1>{{ meta.rotulo }}</h1><div class="sub">{{ linhas.length }}{{ mais ? '+' : '' }} registos</div></div>
-      <div style="display:flex;gap:8px"><a v-if="meta.pode.create" class="btn prim" :href="irErp(doctype,'novo')">+ Novo</a></div>
+      <div><h1>{{ meta.rotulo }}</h1><div class="sub">{{ total }} {{ total===1 ? 'registo' : 'registos' }}<template v-if="filtros.length || q"> com estes filtros</template></div></div>
+      <div class="acoes-lista" :class="{abertas: maisAc}" @click.stop><a v-if="meta.pode.create" class="btn prim" :href="irErp(doctype,'novo')">+ Novo</a>
+        <button class="btn so-movel" @click="maisAc=!maisAc" aria-label="Mais ações">⋯</button>
+        <span class="acoes-sec" @click="maisAc=false"><button v-if="def && def.pode.exportar" class="btn" @click="exportar(false)">Exportar</button><a v-if="meta.pode.create" class="btn" :href="'#/importar-erp/'+encodeURIComponent(doctype)">Importar</a></span></div>
     </div>
-    <div class="filtros"><input class="filtro" style="border-style:solid;min-width:260px" v-model="q" :placeholder="'Procurar em ' + meta.rotulo.toLowerCase() + '…'"></div>
-    <div class="tabela-wrap cartoes-movel"><table>
-      <thead><tr><th @click="ordenar(titulo||'name')" style="cursor:pointer">{{ titulo ? campo(titulo).label : 'Nome' }}</th>
+    <div class="vistas">
+      <button :class="{ativo: !vistaAtiva}" @click="vistaPorOmissao">Todos</button>
+      <button v-for="v in vs.vistas" :key="v.nome+v.equipa" :class="{ativo: vistaAtiva===v.nome+(v.equipa?'*':'')}" @click="aplicarVista(v)">{{ v.equipa ? '👥 ' : '' }}{{ v.nome }}{{ vs.padrao===v.nome && !v.equipa ? ' ★' : '' }}</button>
+      <span class="reg-menu" @click.stop><button class="mais" @click="menuV=!menuV">+ Vista ▾</button>
+        <div v-if="menuV" class="cartao reg-menu-lista" style="left:0;right:auto" @click="menuV=false">
+          <button @click="gravarVista(false)">Guardar como vista minha…</button>
+          <button v-if="def && def.pode.escrever" @click="gravarVista(true)">Guardar como vista da equipa…</button>
+          <template v-if="vistaAtual"><button @click="gravarVista(vistaAtual.equipa, vistaAtual.nome)">Atualizar «{{ vistaAtual.nome }}» com o que está à vista</button>
+            <button v-if="!vistaAtual.equipa" @click="porOmissao">Abrir sempre com esta vista</button>
+            <button class="perigo" @click="apagarVista">Apagar a vista</button></template>
+          <button v-else-if="vs.padrao" @click="porOmissao">Deixar de abrir com «{{ vs.padrao }}»</button>
+        </div></span>
+    </div>
+    <div class="filtros">
+      <input class="filtro" style="border-style:solid;min-width:220px" v-model="q" :placeholder="'Procurar em ' + meta.rotulo.toLowerCase() + '…'">
+      <span v-for="(f,i) in filtros" :key="i" class="filtro on">{{ (cdef(f[0])||{}).rotulo || f[0] }} {{ rotuloOp(f) }} {{ rotuloValor(f) }} <span style="cursor:pointer" @click="tirarFiltro(i)">✕</span></span>
+      <span class="filtro-novo" @click.stop><button class="filtro" @click="novoF ? novoF=null : abrirFiltro()">+ Filtro</button>
+        <div v-if="novoF" class="cartao pop-filtro">
+          <select v-model="novoF.campo" @change="novoF.op=(opsDe(novoF.campo)||[[]])[0][0]; novoF.valor=''"><option value="" disabled>Campo…</option>
+            <optgroup label="Mais usados"><option v-for="c in (def&&def.campos||[]).filter(x=>x.filtro)" :key="'f'+c.campo" :value="c.campo">{{ c.rotulo }}</option></optgroup>
+            <optgroup label="Todos os campos"><option v-for="c in (def&&def.campos||[])" :key="c.campo" :value="c.campo">{{ c.rotulo }}</option></optgroup></select>
+          <select v-if="novoF.campo" v-model="novoF.op"><option v-for="o in opsDe(novoF.campo)" :key="o[0]" :value="o[0]">{{ o[1] }}</option></select>
+          <template v-if="novoF.campo && novoF.op">
+            <select v-if="novoF.op==='is'" v-model="novoF.valor"><option value="set">preenchido</option><option value="not set">vazio</option></select>
+            <select v-else-if="novoF.op==='timespan'" v-model="novoF.valor"><option v-for="p in PERIODOS_ERP" :key="p[0]" :value="p[0]">{{ p[1] }}</option></select>
+            <select v-else-if="cdef(novoF.campo) && cdef(novoF.campo).opcoes_v" v-model="novoF.valor"><option v-for="o in cdef(novoF.campo).opcoes_v" :key="o.v" :value="o.v">{{ o.r }}</option></select>
+            <select v-else-if="cdef(novoF.campo) && cdef(novoF.campo).opcoes && !['in','not in'].includes(novoF.op)" v-model="novoF.valor"><option v-for="o in cdef(novoF.campo).opcoes" :key="o" :value="o">{{ o }}</option></select>
+            <select v-else-if="cdef(novoF.campo) && cdef(novoF.campo).tipo==='Check'" v-model="novoF.valor"><option value="1">Sim</option><option value="0">Não</option></select>
+            <template v-else><input v-model="novoF.valor" :type="tipoOp(cdef(novoF.campo))==='data' ? 'date' : tipoOp(cdef(novoF.campo))==='numero' ? 'number' : 'text'" :placeholder="['in','not in'].includes(novoF.op) ? 'separe por vírgulas' : ''">
+              <input v-if="novoF.op==='between'" v-model="novoF.valor2" type="date"></template>
+          </template>
+          <button class="btn sm prim" @click="juntarFiltro" :disabled="!novoF.campo || !novoF.op">Aplicar</button>
+        </div></span>
+      <button v-if="filtros.length || q" class="filtro" @click="limpar">Limpar</button>
+      <span class="filtro-novo" style="margin-left:auto" @click.stop><button class="filtro" @click="verCols=!verCols">Colunas ▾</button>
+        <div v-if="verCols" class="cartao pop-filtro cols-erp" style="right:0;left:auto;min-width:260px;max-height:360px;overflow:auto">
+          <div v-for="c in colunas" :key="'a'+c" class="chk-col col-ord"><input type="checkbox" checked @change="alternarCol(c)"> <span class="cresce">{{ campo(c).label }}</span><button @click="moverCol(c,-1)" title="Para a esquerda">↑</button><button @click="moverCol(c,1)" title="Para a direita">↓</button></div>
+          <div class="sub" style="font-size:11px;margin:6px 0 2px">Juntar</div>
+          <label v-for="c in (def&&def.campos||[]).filter(x=>!colunas.includes(x.campo))" :key="c.campo" class="chk-col"><input type="checkbox" @change="alternarCol(c.campo)"> {{ c.rotulo }}</label>
+          <button class="btn sm" style="margin-top:6px" @click="colunasPadrao">Repor as colunas da lista</button>
+        </div></span>
+    </div>
+    <div v-if="sel.length" class="selec" style="margin:0 24px;border-radius:10px 10px 0 0;flex-wrap:wrap">
+      {{ sel.length }} selecionado(s) ·
+      <select class="btn sm" v-model="massa.acao" @change="massa.valor=''; massa.campo=''"><option value="">Ação…</option><option v-for="o in opsMassa" :key="o[0]" :value="o[0]">{{ o[1] }}</option></select>
+      <template v-if="massa.acao==='editar'"><select class="btn sm" v-model="massa.campo"><option value="">Campo…</option><option v-for="c in camposEditaveis" :key="c.campo" :value="c.campo">{{ c.rotulo }}</option></select>
+        <select v-if="massa.campo && cdef(massa.campo) && cdef(massa.campo).opcoes" class="btn sm" v-model="massa.valor"><option v-for="o in cdef(massa.campo).opcoes" :key="o" :value="o">{{ o }}</option></select>
+        <input v-else-if="massa.campo" class="btn sm" v-model="massa.valor" :type="tipoOp(cdef(massa.campo))==='data' ? 'date' : 'text'" placeholder="Novo valor"></template>
+      <select v-if="massa.acao==='atribuir'" class="btn sm" v-model="massa.valor"><option value="">Pessoa…</option><option v-for="p in pessoasL" :key="p.email" :value="p.email">{{ p.nome }}</option></select>
+      <input v-if="massa.acao==='etiqueta'" class="btn sm" v-model="massa.valor" placeholder="Etiqueta">
+      <button class="btn sm prim" @click="aplicarMassa" :disabled="!massa.acao || (['atribuir','etiqueta'].includes(massa.acao) && !massa.valor) || (massa.acao==='editar' && !massa.campo)">Aplicar</button>
+      <button v-if="def && def.pode.imprimir" class="btn sm" @click="pdfLote">PDF</button>
+      <button v-if="def && def.pode.exportar" class="btn sm" @click="exportar(true)">Exportar seleção</button>
+    </div>
+    <div class="tabela-wrap cartoes-movel" :style="sel.length?{borderTopLeftRadius:0,borderTopRightRadius:0}:{}"><table>
+      <thead><tr><th style="width:34px"><input type="checkbox" v-model="todos"></th><th @click="ordenar(titulo||'name')" style="cursor:pointer">{{ titulo ? campo(titulo).label : 'Nome' }}</th>
         <th v-for="c in colunas" :key="c" @click="ordenar(c)" style="cursor:pointer">{{ campo(c).label }}<span v-if="ordem.startsWith(c+' ')">{{ ordem.endsWith('asc') ? ' ↑' : ' ↓' }}</span></th>
         <th v-if="meta.submetivel">Estado</th></tr></thead>
       <tbody>
         <tr v-for="l in linhas" :key="l.name" @click="abrir(l.name)">
+          <td @click.stop class="cel-sel"><input type="checkbox" :value="l.name" v-model="sel"></td>
           <td class="cel-tit"><div class="pessoa"><span class="av" :style="{background:cor(l.name)}">{{ ini(l[titulo]||l.name) }}</span><a :href="irErp(doctype,l.name)" @click.stop>{{ tr(doctype, l[titulo] || l.name) }}</a></div><small v-if="titulo && l[titulo] && l[titulo]!==l.name" style="color:var(--ink-3)">{{ tr(doctype, l.name) }}</small></td>
           <td v-for="c in colunas" :key="c">{{ textoValor(campo(c), l[c]) }}</td>
           <td v-if="meta.submetivel"><span class="etq" :class="COR_STATUS[l.status] || ESTADO_DOC[l.docstatus||0][1]">{{ l.status ? statusPt(l.status) : ESTADO_DOC[l.docstatus||0][0] }}</span></td>
         </tr>
       </tbody></table>
-      <div v-if="!linhas.length && !a" class="vazio">Sem registos.</div>
+      <div v-if="!linhas.length && !a" class="vazio">{{ filtros.length || q ? 'Nada com estes filtros.' : 'Sem registos.' }}</div>
+      <div v-if="a && !linhas.length" class="carregar">A carregar…</div>
     </div>
-    <div v-if="mais" style="text-align:center;margin-bottom:24px"><button class="btn" @click="maisLinhas">Carregar mais</button></div>
+    <div v-if="mais" style="text-align:center;margin-bottom:24px"><button class="btn" @click="maisLinhas">Carregar mais ({{ linhas.length }} de {{ total }})</button></div>
   </div><div v-else class="vazio">A carregar…</div>`,
 };
 
@@ -4869,7 +5065,7 @@ const abrirApp = (chave, url) => {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpPainel, ErpContas, ErpLista, ErpFicha, ErpProposta, ErpEmitir, ErpRecibo, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, DefUtilizadores, DefEmpresas, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpPainel, ErpContas, ErpImportar, ErpLista, ErpFicha, ErpProposta, ErpEmitir, ErpRecibo, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, DefUtilizadores, DefEmpresas, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -5007,6 +5203,7 @@ const App = {
         <ErpModulo v-else-if="ecra==='erp-m'" :barra="partes[1]" :key="'m'+partes[1]"/>
         <ErpPainel v-else-if="ecra==='erp-painel'" :nome="partes[1]" :key="'pn'+partes[1]"/>
         <ErpContas v-else-if="ecra==='contas'" :lado="partes[1]==='pagar' ? 'pagar' : 'receber'" :key="'ct'+partes[1]"/>
+        <ErpImportar v-else-if="ecra==='importar-erp'" :doctype="partes[1]" :key="'im'+partes[1]"/>
         <ErpLista v-else-if="ecra==='erp' && !partes[2]" :doctype="partes[1]" :key="'l'+partes[1]"/>
         <ErpProposta v-else-if="ecra==='erp' && partes[1]==='Quotation' && partes[3]!=='completa'" :name="partes[2]" :key="'p'+partes[2]"/>
         <ErpEmitir v-else-if="ecra==='erp' && (partes[1]==='Sales Invoice' || partes[1]==='Delivery Note') && partes[3]!=='completa'" :dt="partes[1]" :name="partes[2]" :key="'e'+partes[1]+'/'+partes[2]"/>
