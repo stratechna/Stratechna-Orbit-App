@@ -247,18 +247,49 @@ def sincronizar(ligacao):
     return r
 
 
+_UNIDADE = {"un", "un.", "unid", "unid.", "uni", "unidade", "unidades", "u", "pç", "pc", "pcs", "peça", "peças"}
+
+
+def _uom(mu: dict):
+    """A unidade do Orbit para a unidade de medida do programa. «Unidade» fica a do Orbit (inteira);
+    qualquer outra (kg, m, hora, litro…) é procurada pelo nome ou criada a aceitar fracções — o programa
+    vende 1,5 kg e o Orbit recusava a venda por a unidade só aceitar números inteiros."""
+    nomes = [str(mu.get(k) or "").strip() for k in ("short_name", "name")]
+    nomes = [n for n in nomes if n]
+    if not nomes or any(n.lower() in _UNIDADE for n in nomes):
+        return None
+    for n in nomes:
+        u = frappe.db.get_value("UOM", {"name": n}, ["name", "must_be_whole_number"], as_dict=True) or \
+            frappe.db.get_value("UOM", {"uom_name": n}, ["name", "must_be_whole_number"], as_dict=True)
+        if u and not u.must_be_whole_number:
+            return u.name
+    nome = nomes[0][:140]
+    if frappe.db.exists("UOM", nome):
+        nome = f"{nome} (fracções)"[:140]
+        if frappe.db.exists("UOM", nome):
+            return nome
+    frappe.get_doc({"doctype": "UOM", "uom_name": nome, "must_be_whole_number": 0}).insert(ignore_permissions=True)
+    return nome
+
+
 def _item(ad, product_id, referencia=None, nome=None):
     """O artigo do Orbit para um artigo do programa (pela referência); cria-o se não existir."""
     ref = referencia
-    if not ref:
-        p = ad._post("products/getOne", {"product_id": int(product_id)})
-        p = (p[0] if isinstance(p, list) and p else p) or {}
-        ref, nome = p.get("reference"), nome or p.get("name")
+    if ref and frappe.db.exists("Item", str(ref)[:140]):
+        return str(ref)[:140]
+    p = {}
+    if product_id:
+        try:
+            p = ad._post("products/getOne", {"product_id": int(product_id)})
+            p = (p[0] if isinstance(p, list) and p else p) or {}
+        except Exception:  # noqa: BLE001
+            p = {}
+    ref, nome = ref or p.get("reference"), nome or p.get("name")
     ref = str(ref or f"MOLONI-{product_id}")[:140]
     if frappe.db.exists("Item", ref):
         return ref
     grupo = frappe.db.get_value("Item Group", {"is_group": 0}, "name")
-    uom = frappe.db.get_single_value("Stock Settings", "stock_uom") or "Nos"
+    uom = _uom(p.get("measurement_unit") or {}) or frappe.db.get_single_value("Stock Settings", "stock_uom") or "Nos"
     frappe.get_doc({"doctype": "Item", "item_code": ref, "item_name": (nome or ref)[:140], "item_group": grupo,
                     "stock_uom": uom, "is_stock_item": 1, "include_item_in_manufacturing": 0}).insert(ignore_permissions=True)
     return ref
@@ -344,6 +375,13 @@ def _receber_vendas(lig, ad, desde, erros):
                               "discount_percentage": flt(p.get("discount"))})
             if not itens:
                 continue
+            for i in itens:
+                if i["qty"] != int(i["qty"]):
+                    uom = frappe.db.get_value("Item", i["item_code"], "stock_uom")
+                    if frappe.db.get_value("UOM", uom, "must_be_whole_number"):
+                        raise frappe.ValidationError(
+                            f"{i['item_code']} vendido em {i['qty']} no programa, mas a unidade «{uom}» do Orbit só aceita "
+                            "números inteiros — mudar a unidade do artigo no Orbit (ou no programa) e sincronizar de novo")
             doc = frappe.get_doc({"doctype": doctype, "company": lig.company, "customer": cliente,
                                   "posting_date": str(full.get("date") or nowdate())[:10], "set_posting_time": 1,
                                   "items": itens, "orbit_do_programa": 1,
