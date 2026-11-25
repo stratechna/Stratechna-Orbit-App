@@ -192,7 +192,8 @@ def pdf(nome):
     from orbit.compras.docs import _docs
     docs_id = int(frappe.db.get_value("Fatura do Docs", nome, "docs_id"))
     if docs_id < 0:   # 25-11: veio do programa certificado — sem PDF no Docs
-        frappe.local.response.update({"type": "raw", "filename": "moloni.html", "content_type": "text/html",
+        frappe.local.response.update({"type": "download",   # as_raw do Frappe (inline com display_content_as)
+                                  "filename": "moloni.html", "content_type": "text/html",
                                       "filecontent": f"<p style='font-family:sans-serif'>Fatura de compra lançada no programa certificado (Moloni, documento {-docs_id}). O original está no Moloni.</p>"})
         return
     try:

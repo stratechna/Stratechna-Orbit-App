@@ -5009,8 +5009,8 @@ const Compras = {
       <div v-if="d.fatura?.is_return || d.registo.fatura_original" class="sub" style="margin:-6px 0 12px">Corrige a fatura {{ d.registo.fatura_original || '(não indicada)' }}<template v-if="d.fatura?.return_against"> — devolução da <a :href="irErp('Purchase Invoice', d.fatura.return_against)">{{ d.fatura.return_against }}</a></template><template v-else-if="d.fatura"> — sem ligação a uma fatura de compra do ERP</template></div>
       <div class="erp-totais cartao" style="margin:0 0 12px">
         <div><small>Total da fatura</small><b>{{ eur(d.registo.total) }}</b></div>
-        <div v-if="d.fatura"><small>Total no ERP</small><b :style="{color: Math.abs((d.fatura.grand_total||0)-(d.registo.total||0))>0.05 ? 'var(--acao)' : 'inherit'}">{{ eur(d.fatura.grand_total) }}</b></div>
-        <div><small>Vencimento</small><b>{{ (d.fatura?.due_date || d.registo.vencimento) ? data(d.fatura?.due_date || d.registo.vencimento, false) : '—' }}</b></div>
+        <div v-if="d.fatura"><small>Total no ERP</small><b :style="{color: Math.abs(Math.abs(d.fatura.grand_total||0)-(d.registo.total||0))>0.05 ? 'var(--acao)' : 'inherit'}">{{ eur(d.fatura.grand_total) }}</b></div>
+        <div v-if="!d.fatura?.is_return && d.registo.tipo_documento!=='Nota de crédito'"><small>Vencimento</small><b>{{ (d.fatura?.due_date || d.registo.vencimento) ? data(d.fatura?.due_date || d.registo.vencimento, false) : '—' }}</b></div>
         <div v-if="d.fatura"><small>Stock</small><b>{{ d.fatura.update_stock ? (d.fatura.is_return ? 'Sai do armazém' : 'Entra em armazém') : (d.fatura.is_return ? 'Sem saída' : 'Sem entrada') }}</b></div>
         <div v-if="d.fatura && !d.fatura.is_return"><small>Pagamento</small><b>{{ d.fatura.is_paid ? 'Já paga' : 'Por pagar' }}</b></div>
       </div>
