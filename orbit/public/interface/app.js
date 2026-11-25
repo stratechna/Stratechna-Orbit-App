@@ -1192,15 +1192,32 @@ const Lista = {
     const exportar = (soSel) => { const p = new URLSearchParams({ objeto: props.objeto, vista: vista.value, q: q.value, filtros: JSON.stringify(filtros.value),
       colunas: JSON.stringify(colunas.value.map((c) => c.campo)), nomes: soSel ? JSON.stringify(sel.value) : "" });
       window.location.href = "/api/method/orbit.interface.vistas.exportar?" + p.toString(); };
+    // 25-11-2026: «+ Novo» nas listas do CRM (leads, contactos, empresas) — janela curta, depois abre a ficha
+    const CAMPOS_NOVO = {
+      leads: [["first_name", "Nome", true], ["last_name", "Apelido"], ["organization", "Empresa"], ["email", "Email", false, "email"], ["mobile_no", "Telemóvel", false, "tel"]],
+      contactos: [["first_name", "Nome", true], ["last_name", "Apelido"], ["company_name", "Empresa (já registada)"], ["designation", "Cargo"], ["email", "Email", false, "email"], ["mobile_no", "Telemóvel", false, "tel"]],
+      empresas: [["organization_name", "Nome da empresa", true], ["website", "Site", false, "url"]],
+    };
+    const NOME_NOVO = { leads: "lead", contactos: "contacto", empresas: "empresa" };
+    const novoReg = ref(null); const aCriar = ref(false);
+    const abrirNovo = () => { novoReg.value = {}; };
+    const gravarNovo = async () => {
+      aCriar.value = true;
+      try { const r = await api("criar_registo", { objeto: props.objeto, dados: JSON.stringify(novoReg.value) }, true);
+        novoReg.value = null; toast("Criado."); window.location.hash = link(r.doctype, r.name); }
+      catch (e) { toast((e && e.message) || "Não foi possível criar."); }
+      finally { aCriar.value = false; }
+    };
     return { vista, q, linhas, total, mais, pagina, carregar, ordenar, valor, abrir, a, VISTAS, TITULOS, cor, ini, ordem, meta, salvas, salvaAtiva,
       filtros, colunas, novoF, verCols, sel, massa, escolherFixa, escolherSalva, apagarSalva, guardar, campoMeta, rotuloFiltro, juntarFiltro, tirarFiltro,
-      alternarCol, todos, opsMassa, opcoesMassa, aplicarMassa, exportar, OPS_TIPO, importar, marca, escolherMarca };
+      alternarCol, todos, opsMassa, opcoesMassa, aplicarMassa, exportar, OPS_TIPO, importar, marca, escolherMarca,
+      CAMPOS_NOVO, NOME_NOVO, novoReg, aCriar, abrirNovo, gravarNovo };
   },
   template: `
   <div>
     <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <div><h1>{{ TITULOS[objeto] }}</h1><div class="sub">{{ total }} registos</div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" @click="importar=true">Importar</button><button class="btn" @click="exportar(false)">Exportar</button><a v-if="objeto==='contactos'||objeto==='empresas'" class="btn" :href="'#/duplicados/'+objeto">Duplicados</a></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button v-if="CAMPOS_NOVO[objeto]" class="btn prim" @click="abrirNovo">+ Novo</button><button class="btn" @click="importar=true">Importar</button><button class="btn" @click="exportar(false)">Exportar</button><a v-if="objeto==='contactos'||objeto==='empresas'" class="btn" :href="'#/duplicados/'+objeto">Duplicados</a></div>
     </div>
     <div class="vistas marcas-sep" v-if="(meta?.marcas||[]).length > 1">
       <button :class="{ativo: !marca}" @click="escolherMarca('')">Todas as marcas</button>
@@ -1254,6 +1271,14 @@ const Lista = {
     <div class="mais-linhas" v-if="mais"><button class="btn sm" @click="pagina++; carregar(true)">Mostrar mais</button></div>
     </div>
     <Importar v-if="importar" :objeto="objeto" @fechar="importar=false" @feito="carregar()"/>
+    <div v-if="novoReg" class="modal-fundo" @click.self="novoReg=null"><div class="modal" style="max-width:520px">
+      <header><b>Novo {{ NOME_NOVO[objeto] }}</b><button class="btn sm" @click="novoReg=null">Fechar</button></header>
+      <form @submit.prevent="gravarNovo" style="display:flex;flex-direction:column;gap:10px;padding:14px 16px">
+        <label v-for="c in CAMPOS_NOVO[objeto]" :key="c[0]" class="erp-campo"><span>{{ c[1] }}<span v-if="c[2]" class="obrig">*</span></span>
+          <input v-model="novoReg[c[0]]" :type="c[3]||'text'" :required="c[2]" :autofocus="c[2]"></label>
+        <p class="sub" style="margin:0">O resto completa-se na ficha, que abre a seguir.</p>
+        <div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" class="btn" @click="novoReg=null">Cancelar</button><button type="submit" class="btn prim" :disabled="aCriar">{{ aCriar ? 'A criar…' : 'Criar' }}</button></div>
+      </form></div></div>
   </div>`,
 };
 

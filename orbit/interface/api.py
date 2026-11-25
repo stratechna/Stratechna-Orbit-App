@@ -1338,3 +1338,44 @@ def enviar_email(doctype: str, name: str, conta: str, para: str, assunto: str, h
             frappe.db.set_value("Communication", nome, "email_account", acc.name, update_modified=False)
         filtrar(frappe.get_doc("Communication", nome))
     return {"ok": True, "id": nome}
+
+
+# ── «+ Novo» nas listas do CRM (25-11-2026, pedido do Vítor: «leads, contactos e empresas — nenhum apresenta o botão
+# novo»). Os campos essenciais; o resto completa-se na ficha. Respeita as permissões de quem cria (sem ignore).
+@frappe.whitelist(methods=["POST"])
+def criar_registo(objeto: str, dados: str):
+    _guarda()
+    d = json.loads(dados or "{}") if isinstance(dados, str) else (dados or {})
+    t = lambda k: (d.get(k) or "").strip()  # noqa: E731
+    if objeto == "leads":
+        if not t("first_name") and not t("organization"):
+            frappe.throw("Escreva o nome da pessoa ou da empresa.")
+        doc = frappe.get_doc({"doctype": "CRM Lead", "first_name": t("first_name") or t("organization"),
+                              "last_name": t("last_name"), "email": t("email"), "mobile_no": t("mobile_no"),
+                              "organization": t("organization"), "lead_owner": frappe.session.user})
+        if t("source") and frappe.db.exists("CRM Lead Source", t("source")):
+            doc.source = t("source")
+        doc.insert()
+        return {"doctype": "CRM Lead", "name": doc.name}
+    if objeto == "contactos":
+        if not t("first_name"):
+            frappe.throw("Escreva o nome do contacto.")
+        doc = frappe.get_doc({"doctype": "Contact", "first_name": t("first_name"), "last_name": t("last_name"),
+                              "company_name": t("company_name") if t("company_name") and frappe.db.exists("CRM Organization", t("company_name")) else None,
+                              "designation": t("designation")})
+        if t("email"):
+            doc.append("email_ids", {"email_id": t("email"), "is_primary": 1})
+        if t("mobile_no"):
+            doc.append("phone_nos", {"phone": t("mobile_no"), "is_primary_mobile_no": 1})
+        doc.insert()
+        return {"doctype": "Contact", "name": doc.name}
+    if objeto == "empresas":
+        if not t("organization_name"):
+            frappe.throw("Escreva o nome da empresa.")
+        if frappe.db.exists("CRM Organization", t("organization_name")):
+            frappe.throw("Já existe uma empresa com esse nome.")
+        doc = frappe.get_doc({"doctype": "CRM Organization", "organization_name": t("organization_name"),
+                              "website": t("website")})
+        doc.insert()
+        return {"doctype": "CRM Organization", "name": doc.name}
+    frappe.throw("Tipo de registo desconhecido.")
