@@ -138,9 +138,14 @@ def _pai_gasto(company, nome):
     abbr = _abbr(company)
     if frappe.db.exists("Account", f"{nome} - {abbr}"):
         return f"{nome} - {abbr}"
+    # 25-11-2026: sem «Indirect/Direct Expenses» (plano SNC) o pai é a raiz dos gastos — antes era «um grupo de gastos
+    # qualquer» e cada grupo novo ficava dentro do anterior (Viaturas dentro de Instalações, Pessoal dentro de Viaturas…)
     return frappe.db.get_value("Account", {"company": company, "is_group": 1, "root_type": "Expense",
-                                           "parent_account": ("is", "set")}, "name") \
-        or frappe.db.get_value("Account", {"company": company, "is_group": 1, "root_type": "Expense"}, "name")
+                                           "account_number": "6"}, "name") \
+        or frappe.db.get_value("Account", {"company": company, "is_group": 1, "root_type": "Expense",
+                                           "parent_account": ("is", "not set"), "name": ("like", "6%")}, "name") \
+        or frappe.db.get_value("Account", {"company": company, "is_group": 1, "root_type": "Expense",
+                                           "parent_account": ("is", "not set")}, "name")
 
 
 def contas_iva(company) -> dict:

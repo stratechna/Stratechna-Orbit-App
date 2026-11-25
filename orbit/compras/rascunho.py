@@ -257,10 +257,11 @@ def conta_da_categoria(company, categoria) -> str | None:
 
 
 def conta_gasto(company, etiquetas, categoria=None) -> str:
-    """Etiqueta específica do Docs > categoria lida pela IA > Área do Docs > gasto por omissão da empresa."""
+    """Etiqueta específica do Docs > categoria lida pela IA > Área do Docs > «Outras despesas» > gasto por omissão."""
     return F0.conta_para_etiquetas(company, [e for e in etiquetas or [] if not e[:2].isdigit()]) or \
         conta_da_categoria(company, categoria) or F0.conta_para_etiquetas(company, etiquetas) or \
-        frappe.db.get_value("Company", company, "default_expense_account")
+        conta_da_categoria(company, "Outras despesas") or \
+        frappe.db.get_value("Company", company, "default_expense_account")   # (no SNC é o CMVMC — só em último caso)
 
 
 def _original(supplier, numero):
