@@ -62,7 +62,9 @@ def _recebeu_automatico_ha_pouco(email: str, dias: int) -> bool:
 
 def _candidatos(a) -> list[tuple]:
     """(registo, ref, dados) de quem entra hoje, antes dos travões 1-3."""
-    base = {r["email"]: r for r in destinatarios.contactaveis(a.assunto_marketing)}
+    if not a.get("marca") and len(destinatarios.marcas_da_conta()) > 1:
+        return []  # várias marcas e nenhuma escolhida na automação: não sai para ninguém (S7)
+    base = {r["email"]: r for r in destinatarios.contactaveis(a.assunto_marketing, a.get("marca"))}
     desde = get_datetime(a.activa_desde)
     saida = []
     if a.tipo == "Boas-vindas":

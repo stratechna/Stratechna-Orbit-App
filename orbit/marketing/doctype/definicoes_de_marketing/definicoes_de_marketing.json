@@ -162,6 +162,25 @@
    "label": "Dias mínimos entre dois emails automáticos à mesma pessoa",
    "default": "3",
    "idx": 23
+  },
+  {
+   "fieldname": "sec_base_legal",
+   "fieldtype": "Section Break",
+   "label": "Base legal automática"
+  },
+  {
+   "fieldname": "aviso_na_venda",
+   "fieldtype": "Check",
+   "label": "As vendas fora da loja dão a hipótese de recusar o marketing",
+   "default": "0",
+   "description": "Ligue só se as faturas, propostas ou contratos informarem o cliente de que pode recusar comunicações de marketing. Ligado, o cliente com fatura emitida passa a «Pode receber» com base «cliente» (só para a marca em que comprou)."
+  },
+  {
+   "fieldname": "b2b_automatico",
+   "fieldtype": "Check",
+   "label": "Contactos profissionais de empresas recebem (B2B)",
+   "default": "1",
+   "description": "Contacto de uma empresa (NIPC de pessoa colectiva) com email do domínio da empresa passa a «Pode receber» com base «b2b». Nunca mexe em quem recusou ou retirou."
   }
  ],
  "permissions": [
@@ -182,9 +201,37 @@
  "states": [],
  "links": [],
  "creation": "2026-10-03 10:00:00.000000",
- "modified": "2026-10-03 20:00:00.000000",
+ "modified": "2026-11-25 20:00:00.000000",
  "owner": "Administrator",
  "modified_by": "Administrator",
  "idx": 0,
- "issingle": 1
+ "issingle": 1,
+ "field_order": [
+  "modo",
+  "email_account",
+  "limite_hora",
+  "medir_aberturas",
+  "conjunto_configuracao",
+  "sec_marca",
+  "marca_nome",
+  "logo_url",
+  "cor_primaria",
+  "cor_acento",
+  "fonte_titulos",
+  "fonte_texto",
+  "legal_texto",
+  "redes",
+  "contactos",
+  "sec_plano",
+  "plano_nome",
+  "plano_contactos",
+  "plano_campanhas_mes",
+  "plano_envios_mes",
+  "responder_para",
+  "plano_automacoes",
+  "intervalo_minimo_dias",
+  "sec_base_legal",
+  "aviso_na_venda",
+  "b2b_automatico"
+ ]
 }

@@ -21,6 +21,20 @@
    "idx": 2
   },
   {
+   "fieldname": "logica",
+   "fieldtype": "Select",
+   "label": "Juntar as regras",
+   "options": "Todas\nQualquer",
+   "default": "Todas",
+   "description": "Todas: cumpre todas as regras · Qualquer: basta uma"
+  },
+  {
+   "fieldname": "marcador_auto",
+   "fieldtype": "Data",
+   "label": "Pôr o marcador em quem entrar",
+   "description": "Opcional: de hora a hora, quem cumprir as regras ganha este marcador (nunca é tirado sozinho)"
+  },
+  {
    "fieldname": "regras",
    "fieldtype": "Table",
    "label": "Regras — todas têm de se cumprir",
@@ -70,10 +84,18 @@
  "states": [],
  "links": [],
  "creation": "2026-10-03 10:00:00.000000",
- "modified": "2026-10-03 10:00:00.000000",
+ "modified": "2026-11-25 20:00:00.000000",
  "owner": "Administrator",
  "modified_by": "Administrator",
  "idx": 0,
  "autoname": "field:nome",
- "title_field": "nome"
+ "title_field": "nome",
+ "field_order": [
+  "nome",
+  "descricao",
+  "logica",
+  "marcador_auto",
+  "regras",
+  "contactaveis"
+ ]
 }

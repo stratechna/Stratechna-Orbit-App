@@ -55,7 +55,8 @@ _POR_DE_PE = ["orbit.marca.sincronizar", "orbit.marca.achatar",
 # O consentimento de marketing no CRM (campos, painel e histórico) entra em todos
 # os tenants por aqui — é o que o torna transversal, e o que faz um tenant novo
 # já nascer com ele.
-_MARKETING = ["orbit.marketing.consentimento.garantir", "orbit.marketing.menu.garantir"]
+_MARKETING = ["orbit.marketing.consentimento.garantir", "orbit.marketing.menu.garantir",
+              "orbit.marketing.segmentos.converter_segmento_texto"]
 # A marcação de reuniões precisa de dois campos próprios — a referência no
 # `Event` e o segredo do feed no `User`. Pela mesma razão que o consentimento:
 # um tenant novo tem de nascer com eles.
@@ -101,6 +102,7 @@ scheduler_events = {
     },
     # 23-11-2026: menções por ver há mais de 3 h seguem por email (orbit/interface/conversa.py)
     "hourly": ["orbit.marketing.envio.contagens_do_dia", "orbit.marketing.automacoes.correr",
+               "orbit.marketing.segmentos.marcadores_automaticos",
                "orbit.interface.conversa.avisos_por_email", "orbit.interface.desk.sem_resposta"],
 }
 
@@ -133,9 +135,10 @@ doc_events = {
     "Event": {"after_insert": "orbit.interface.ciclo.atividade"},
     "CRM Organization": {"after_insert": "orbit.interface.ciclo.empresa_gravada", "on_update": "orbit.interface.ciclo.empresa_gravada"},
     # 20-11-2026: um endereço novo no CRM vai buscar às caixas ligadas o que já se trocou com ele (emails_crm.py)
-    "Contact": {"after_insert": ["orbit.emails_crm.ao_gravar_registo", "orbit.interface.ciclo.contacto_gravado"],
+    "Contact": {"after_insert": ["orbit.emails_crm.ao_gravar_registo", "orbit.interface.ciclo.contacto_gravado",
+                                 "orbit.marketing.base_legal.ao_criar"],
                 "on_update": "orbit.emails_crm.ao_gravar_registo"},
-    "CRM Lead": {"after_insert": "orbit.emails_crm.ao_gravar_registo", "on_trash": "orbit.emails_crm.lead_apagada"},
+    "CRM Lead": {"after_insert": ["orbit.emails_crm.ao_gravar_registo", "orbit.marketing.base_legal.ao_criar"], "on_trash": "orbit.emails_crm.lead_apagada"},
     # 23-11-2026: marca herdada da lead/empresa e passada à empresa e aos contactos (orbit/interface/marcas.py)
     "CRM Deal": {"before_insert": "orbit.interface.marcas.negocio_antes",
                  "after_insert": ["orbit.emails_crm.ao_gravar_registo", "orbit.interface.ciclo.negocio_gravado",
@@ -150,7 +153,7 @@ doc_events = {
     # 25-11-2026: várias empresas — a marca fica escrita na venda e escolhe a série do programa certificado
     "Sales Invoice": {"before_validate": "orbit.empresas.antes_de_validar_venda",
                       "validate": "orbit.faturacao.emissao.validar_fatura",
-                      "on_submit": "orbit.faturacao.emissao.ao_submeter_fatura",
+                      "on_submit": ["orbit.faturacao.emissao.ao_submeter_fatura", "orbit.marketing.base_legal.fatura_submetida"],
                       "before_cancel": "orbit.faturacao.emissao.antes_de_cancelar_fatura"},
     "Payment Entry": {"on_submit": "orbit.faturacao.emissao.ao_submeter_pagamento"},
     # 24-11-2026 (fatura de compra F2): rascunho do Docs só se submete com todas as linhas ligadas

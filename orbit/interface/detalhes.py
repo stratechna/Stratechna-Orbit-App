@@ -16,7 +16,7 @@ import re
 import frappe
 from frappe import _
 
-_MKT = ["mkt_estado", "mkt_base_legal", "mkt_data", "mkt_origem", "mkt_idioma", "mkt_segmento", "mkt_assuntos", "mkt_texto"]
+_MKT = ["mkt_estado", "mkt_base_legal", "mkt_data", "mkt_origem", "mkt_idioma", "mkt_assuntos", "mkt_texto"]
 _SLA = ["sla", "sla_status", "communication_status", "sla_creation", "response_by", "first_response_time",
         "first_responded_on", "last_response_time", "last_responded_on"]
 _REDES = ["website", "linkedin", "twitter", "facebook"]

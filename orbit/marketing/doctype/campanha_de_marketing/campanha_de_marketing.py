@@ -81,6 +81,8 @@ class CampanhadeMarketing(Document):
             falta.append(_("o texto"))
         if not self.segmentos:
             falta.append(_("pelo menos um segmento"))
+        if not self.get("marca") and len(destinatarios.marcas_da_conta()) > 1:
+            falta.append(_("a marca (esta conta tem várias)"))
         return falta
 
     def _quota(self):

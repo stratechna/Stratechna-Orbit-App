@@ -6,10 +6,18 @@
  "engine": "InnoDB",
  "fields": [
   {
+   "fieldname": "negar",
+   "fieldtype": "Check",
+   "label": "Não é",
+   "in_list_view": 1,
+   "columns": 1,
+   "default": "0"
+  },
+  {
    "fieldname": "regra",
    "fieldtype": "Select",
    "label": "Regra",
-   "options": "Assunto de interesse\nSegmento\nIdioma\nBase legal\nTipo de registo\nEstado do lead\nOrganização contém\nAbriu nos últimos N dias\nClicou nos últimos N dias\nComprou nos últimos N dias\nNão compra há mais de N dias\nComprou no grupo de artigos\nTem pelo menos N encomendas",
+   "options": "Tem o marcador\nÉ da marca\nAssunto de interesse\nFase do ciclo\nResponsável\nOrigem\nSetor\nTerritório ou distrito\nEmpregados pelo menos\nOrganização contém\nSem atividade há mais de N dias\nTem negócio aberto na fase\nGanhou negócio nos últimos N dias\nPerdeu negócio (motivo)\nComprou nos últimos N dias\nNão compra há mais de N dias\nComprou no grupo de artigos\nComprou artigos da marca\nComprou o artigo\nTem pelo menos N encomendas\nFaturado pelo menos (€, 12 meses)\nTem faturas vencidas\nGrupo de cliente\nAbriu nos últimos N dias\nClicou nos últimos N dias\nIdioma\nBase legal\nTipo de registo\nEstado do lead\nCampo do CRM\nSegmento",
    "reqd": 1,
    "in_list_view": 1,
    "columns": 4,
@@ -22,7 +30,8 @@
    "reqd": 1,
    "in_list_view": 1,
    "columns": 6,
-   "idx": 2
+   "idx": 2,
+   "description": "Marcador, marca, fase, N.º de dias, valor… · «Campo do CRM»: campo=valor, campo~texto ou campo="
   }
  ],
  "permissions": [],
@@ -33,10 +42,15 @@
  "states": [],
  "links": [],
  "creation": "2026-10-03 10:00:00.000000",
- "modified": "2026-10-03 16:00:00.000000",
+ "modified": "2026-11-25 20:00:00.000000",
  "owner": "Administrator",
  "modified_by": "Administrator",
  "idx": 0,
  "istable": 1,
- "editable_grid": 1
+ "editable_grid": 1,
+ "field_order": [
+  "negar",
+  "regra",
+  "valor"
+ ]
 }

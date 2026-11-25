@@ -35,7 +35,7 @@ _BLOCO = ("tipo", "rotulo", "titulo", "subtitulo", "texto", "botao_texto", "url"
 _TIPOS_DE_BLOCO = ('Título', 'Texto', 'Botão', 'Imagem', 'Imagem com título', 'Imagem e texto', 'Faixa de destaque', 'Faixa de chamada', 'Produtos', 'Produto em destaque', 'Vantagens em colunas', 'Números', 'Lista de artigos', 'Evento', 'Testemunho', 'Galeria', 'Cupão', 'Assinatura', 'Separador', 'Espaço')
 _CAMPANHA = ("rotulo", "titulo", "modelo", "linha_assunto", "pre_cabecalho", "titulo_email", "subtitulo",
              "texto", "cta_texto", "cta_url", "imagem_topo", "destaque_texto", "destaque_subtexto",
-             "evento_data", "evento_hora", "evento_local", "assinatura", "agendar_para")
+             "evento_data", "evento_hora", "evento_local", "assinatura", "agendar_para", "marca")
 
 
 def definicoes(pedido: dict) -> dict:
