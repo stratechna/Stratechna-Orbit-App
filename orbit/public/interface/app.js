@@ -2583,6 +2583,76 @@ const DefConsulta = {
   </div>`,
 };
 
+// ── Definições › Utilizadores (25-11-2026, docs/PLANO-ORBIT-UTILIZADORES-LICENCAS.md): licenças, novo utilizador com
+// aviso de custo e desactivar — tudo pelo portal (orbit.interface.licencas → POST /api/v1/orbit/utilizadores).
+const PERFIS_ORBIT = { gestao: "Gestão", comercial: "Comercial", apoio: "Apoio ao cliente", rh: "Recursos humanos", contabilidade: "Contabilidade", producao: "Produção", operacoes: "Operações" };
+const DefUtilizadores = {
+  setup() {
+    const d = ref(null), cand = ref(null), form = ref(null), custo = ref(null), aGravar = ref(false);
+    const eur = (v) => (Number(v || 0)).toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+    const lic = (m) => api("licencas." + m);
+    const post = (m, a) => api("licencas." + m, a, true);
+    async function carregar() { d.value = await lic("estado"); }
+    async function abrirNovo() {
+      form.value = { email: "", nome: "", perfil: "operacoes" }; custo.value = null;
+      if (!cand.value) { const c = await lic("candidatas"); cand.value = ((c && c.caixas) || []).filter((x) => x.tipo === "caixa"); }
+    }
+    function escolher(c) { form.value.email = c.endereco; form.value.nome = form.value.nome || c.nome || ""; }
+    async function gravar(aceito) {
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(form.value.email || "")) { toast("Escreva um email válido."); return; }
+      aGravar.value = true;
+      try {
+        const r = await post("novo", { pessoa: JSON.stringify(form.value), aceito_custo: aceito ? 1 : 0 });
+        if (r.precisa_aceitar) { custo.value = r; return; }
+        if (!r.ok) { toast(r.erro || "Não foi possível criar o utilizador."); return; }
+        toast(r.aplicado && r.aplicado.ok === false ? "Utilizador registado; a criação no Orbit ficou para a equipa da Stratechna." : "Utilizador criado. Já pode entrar com a palavra-passe da caixa de correio.");
+        form.value = null; custo.value = null; cand.value = null; await carregar();
+      } finally { aGravar.value = false; }
+    }
+    async function desactivar(u, reactivar) {
+      if (!reactivar && !window.confirm(`Desactivar ${u.nome || u.email}? A pessoa deixa de entrar no Orbit e a licença fica livre. O plano não desce sozinho.`)) return;
+      const r = await post("desactivar", { email: u.email, reactivar: reactivar ? 1 : 0 });
+      if (!r.ok) { toast(r.erro || "Não foi possível."); return; }
+      toast(reactivar ? "Utilizador reactivado." : "Utilizador desactivado. A licença ficou livre."); await carregar();
+    }
+    onMounted(carregar);
+    return { d, cand, form, custo, aGravar, eur, abrirNovo, escolher, gravar, desactivar, PERFIS_ORBIT };
+  },
+  template: `
+  <div class="pad">
+    <div class="ola"><div><div style="font-size:13px"><a href="#/definicoes">← Definições</a></div><h1>Utilizadores do Orbit</h1>
+      <div class="sub" v-if="d && d.disponivel !== false && d.permitido !== false">Licenças: <b>{{ d.escolhidos }} de {{ d.contratados }}</b> usadas<template v-if="d.preco"> · {{ eur(d.preco) }}/utilizador/{{ d.ciclo || 'mês' }} (sem IVA)</template></div></div>
+      <button class="btn prim" v-if="d && d.permitido" @click="abrirNovo">+ Novo utilizador</button></div>
+    <div v-if="!d" class="carregar">A carregar…</div>
+    <div v-else-if="d.disponivel === false || d.permitido === false" class="cartao" style="padding:18px">{{ d.mensagem }}</div>
+    <div v-else class="tabela-wrap" style="margin:0"><table>
+      <thead><tr><th>Nome</th><th>Email</th><th>Perfil</th><th>Estado</th><th></th></tr></thead>
+      <tbody><tr v-for="u in d.pessoas.filter(x=>!x.servico)" :key="u.email"><td><b>{{ u.nome || '—' }}</b></td><td>{{ u.email }}</td><td>{{ PERFIS_ORBIT[u.perfil] || u.perfil || '—' }}</td>
+        <td><span class="etq" :class="u.desactivado?'':'verde'">{{ u.desactivado ? 'Desactivado' : 'Activo' }}</span></td>
+        <td style="text-align:right"><button class="btn sm" v-if="!u.desactivado" @click="desactivar(u,false)">Desactivar</button><button class="btn sm" v-else @click="desactivar(u,true)">Reactivar</button></td></tr></tbody>
+    </table></div>
+    <div class="modal-fundo" v-if="form" @click.self="form=null">
+      <div class="modal" style="max-width:560px"><header><b>Novo utilizador</b><button class="btn sm" @click="form=null">Fechar</button></header>
+        <div class="corpo-email form-cal" v-if="!custo">
+          <div v-if="cand && cand.length"><div class="sub" style="font-size:13px;margin-bottom:6px">Caixas da empresa que ainda não usam o Orbit</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" v-for="c in cand" :key="c.endereco" class="btn sm" :class="{prim: form.email===c.endereco}" @click="escolher(c)">{{ c.endereco }}</button></div></div>
+          <label>Email da pessoa (a caixa de correio dela)<input v-model="form.email" type="email" placeholder="nome@empresa.pt"></label>
+          <label>Nome<input v-model="form.nome" placeholder="Nome e apelido"></label>
+          <label>Perfil<select v-model="form.perfil"><option v-for="(n,k) in PERFIS_ORBIT" :key="k" :value="k">{{ n }}</option></select></label>
+          <div class="sub" style="font-size:12.5px">A pessoa entra no Orbit com o email e a palavra-passe da caixa de correio.</div>
+          <div style="display:flex;justify-content:flex-end"><button class="btn prim" :disabled="aGravar" @click="gravar(false)">{{ aGravar ? 'A criar…' : 'Criar utilizador' }}</button></div>
+        </div>
+        <div class="corpo-email" v-else>
+          <p><b>Não há licenças livres.</b> Ao continuar, o plano passa de <b>{{ custo.contratados }}</b> para <b>{{ custo.contratados + (custo.a_mais || 1) }}</b> utilizadores:
+            <b>+{{ eur((custo.preco || 0) * (custo.a_mais || 1)) }}/{{ custo.ciclo || 'mês' }}</b> (sem IVA).</p>
+          <p v-if="custo.acerto && custo.acerto.valor">Este período paga só a parte proporcional até {{ custo.acerto.ate ? new Date(custo.acerto.ate).toLocaleDateString('pt-PT') : 'à renovação' }}: <b>{{ eur(custo.acerto.valor) }}</b> + IVA. A fatura segue para o email de faturação da empresa.</p>
+          <p class="sub" style="font-size:12.5px">A alteração fica registada no portal Stratechna. Desactivar um utilizador mais tarde liberta a licença, mas o plano só desce a pedido.</p>
+          <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" @click="custo=null">Voltar</button><button class="btn prim" :disabled="aGravar" @click="gravar(true)">{{ aGravar ? 'A criar…' : 'Acrescentar utilizador e continuar' }}</button></div>
+        </div>
+      </div></div>
+  </div>`,
+};
+
 // ── Apps dentro da interface (as que o permitem: Meet e Booking) ──────────────────────────────────────
 const EMBUTIDAS = ["Meet", "Booking"];
 const AppEmbutida = {
@@ -3582,7 +3652,7 @@ const abrirApp = (chave, url) => {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpProposta, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpProposta, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, DefUtilizadores, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -3685,7 +3755,8 @@ const App = {
         <DeskModelos v-else-if="ecra==='desk-checklists'"/>
         <DefFluxos v-else-if="ecra==='definicoes' && partes[1]==='fluxos'" key="fluxos"/>
         <DefFormularios v-else-if="ecra==='definicoes' && partes[1]==='formularios'" key="formularios"/>
-        <DefConsulta v-else-if="ecra==='definicoes' && ['caixas','utilizadores'].includes(partes[1])" :chave="partes[1]" :key="partes[1]"/>
+        <DefUtilizadores v-else-if="ecra==='definicoes' && partes[1]==='utilizadores'" key="utilizadores"/>
+        <DefConsulta v-else-if="ecra==='definicoes' && partes[1]==='caixas'" :chave="partes[1]" :key="partes[1]"/>
         <DefLista v-else-if="ecra==='definicoes'" :chave="partes[1]" :key="partes[1]"/>
         <Tarefas v-else-if="ecra==='tarefas'"/>
         <Assinaturas v-else-if="ecra==='assinaturas'"/>

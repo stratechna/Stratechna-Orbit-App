@@ -33,6 +33,8 @@ def guarda(doc, method=None):
                              pluck="name")
     usados = len([u for u in activos if _conta(u, servico)])
     if usados + 1 > int(maximo):
-        frappe.throw(_("Atingiu os {0} utilizadores contratados do seu Orbit. Peça mais na área de cliente "
-                       "do portal Stratechna (Stratechna Orbit → Pessoas).").format(maximo),
+        # 25-11-2026: acima do limite, cria-se em Definições › Utilizadores (aviso do custo e plano actualizado)
+        frappe.throw(_("Atingiu os {0} utilizadores contratados do seu Orbit. Crie a pessoa em Definições › "
+                       "Utilizadores (/orbit#/definicoes/utilizadores): aí vê o custo de mais uma licença e o plano "
+                       "é actualizado ao confirmar.").format(maximo),
                      frappe.ValidationError, title=_("Utilizadores contratados"))
