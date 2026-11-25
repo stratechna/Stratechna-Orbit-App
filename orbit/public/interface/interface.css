@@ -855,3 +855,7 @@ tr.por-ler td b,tr.por-ler td{font-weight:600}
 .mkt-como{width:100%;max-width:680px;height:900px;border:1px solid var(--line);border-radius:8px;background:#f2f2f0;display:block;margin:0 16px 16px}
 .assinatura canvas,canvas[ref=quadro]{max-width:100%;touch-action:none}
 @media (max-width:760px){.seg-regra{grid-template-columns:minmax(0,1fr) 80px 28px}.seg-regra>*:nth-child(3){grid-column:1/3}.mkt-botoes{margin-left:0}.mkt-como{margin:0;height:640px}.mkt-galeria{padding:0 16px 16px}}
+/* janelas do /orbit: campos com o aspecto da casa, também no escuro */
+.reg-form input:not([type=checkbox]):not([type=radio]),.reg-form select,.reg-form textarea,.seg-logica select{font:inherit;font-size:13.5px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;box-sizing:border-box}
+.seg-logica select{width:auto;padding:3px 6px}
+.reg-form input:focus,.reg-form select:focus,.reg-form textarea:focus{outline:2px solid var(--acao);outline-offset:-1px}
