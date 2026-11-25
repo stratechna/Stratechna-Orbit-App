@@ -175,7 +175,7 @@ td a:hover{text-decoration:underline}
   .kpis{grid-template-columns:repeat(2,1fr)}.grelha2{grid-template-columns:1fr}
 }
 @media (max-width:760px){
-  .app{grid-template-columns:1fr}.nav{display:none}
+  .app{grid-template-columns:minmax(0,1fr)}
   .menu-movel{display:grid;grid-template-columns:repeat(5,1fr);background:var(--nav);position:sticky;bottom:0}
   .menu-movel button{all:unset;color:var(--nav-ink);text-align:center;padding:9px 0;font-size:11px}
   .menu-movel button.ativo{color:#fff;box-shadow:inset 0 2px 0 var(--acao)}
@@ -681,3 +681,44 @@ div.desk-prop{flex-direction:row;justify-content:space-between;color:var(--ink)}
 .erp-multi .erp-ligacao{flex:1;min-width:180px}
 .erp-linha-aberta td{background:var(--surface-2)}
 .erp-linha-campos{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 14px;padding:6px 2px}
+
+/* ── 25-11-2026: ecrã pequeno — gaveta ☰, barra de baixo por app, ficha sem transbordar, separadores numa linha, listas em cartões ── */
+.btn-gaveta,.so-gaveta,.so-movel,.gaveta-fundo{display:none}
+.vistas{overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap}.vistas::-webkit-scrollbar{display:none}
+.vistas button{white-space:nowrap;flex:none}
+.ficha>*{min-width:0}
+.acoes-lista{display:flex;gap:8px;flex-wrap:wrap;position:relative}.acoes-sec{display:contents}
+@media (max-width:1100px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .ficha{grid-template-columns:minmax(0,1fr)}
+  .nav{position:fixed;top:0;left:0;bottom:0;width:272px;max-width:86vw;z-index:80;transform:translateX(-105%);transition:transform .2s ease;overflow-y:auto;display:flex}
+  .nav.aberta{transform:none;box-shadow:0 0 40px rgba(0,0,0,.35)}
+  .gaveta-fundo{display:block;position:fixed;inset:0;background:rgba(10,20,26,.45);z-index:79}
+  .btn-gaveta{display:grid}.nav .so-gaveta{display:block}
+  .nav .so-gaveta button{width:calc(100% - 20px)}
+}
+@media (max-width:760px){
+  .nav{display:flex}
+  .topo{padding:0 10px;gap:6px}.topo .fora-gaveta{display:none}.pesquisa kbd{display:none}.pesquisa{padding:7px 8px}
+  .menu-movel{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .menu-movel button{display:flex!important;flex-direction:column;align-items:center;gap:2px;padding:7px 2px 6px!important;cursor:pointer}
+  .menu-movel button span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .menu-movel svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .menu-movel a{min-width:0}
+  .so-movel{display:inline-flex}
+  .acoes-sec{display:none}
+  .acoes-lista.abertas .acoes-sec{display:flex;flex-direction:column;gap:4px;position:absolute;top:100%;right:0;margin-top:6px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px;z-index:25;box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:170px}
+  .acoes-lista.abertas .acoes-sec .btn{justify-content:flex-start;border:0;width:100%;box-sizing:border-box}
+  .filtros .filtro[style*="min-width"]{min-width:0!important;flex:1 1 100%}
+  /* listas em cartões */
+  .cartoes-movel{overflow:visible}
+  .cartoes-movel thead{display:none}
+  .cartoes-movel table,.cartoes-movel tbody{display:block}
+  .cartoes-movel tr{display:flex;flex-wrap:wrap;align-items:center;gap:3px 10px;padding:11px 14px;border-bottom:1px solid var(--line-2)}
+  .cartoes-movel tr:last-child{border-bottom:0}
+  .cartoes-movel td{display:block;padding:0;border:0;white-space:normal;font-size:13px;color:var(--ink-2);min-width:0;background:none!important}
+  .cartoes-movel td:empty{display:none}
+  .cartoes-movel td.cel-tit{flex:1 1 calc(100% - 40px);order:-1;font-size:14px;color:var(--ink)}
+  .cartoes-movel td.cel-sel{order:-2;flex:none}
+  .cartoes-movel td.cel-tit~td:not(.cel-tit){font-size:12.5px}
+}

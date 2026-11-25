@@ -73,6 +73,8 @@ const DT_ROTA = Object.fromEntries(Object.entries(ROTAS_DT).map(([k, v]) => [v, 
 const link = (dt, dn) => `#/${DT_ROTA[dt] || "contacto"}/${encodeURIComponent(dn)}`;
 
 const ICONES = {
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  template: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h5"/>',
   megafone: '<path d="M3 10v4h4l6 4V6L7 10z"/><path d="M17 9a4 4 0 0 1 0 6"/>',
   apps: '<rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/>',
   euro: '<path d="M17 6a7 7 0 1 0 0 12"/><path d="M4 10h9M4 14h9"/>',
@@ -1213,7 +1215,8 @@ const Lista = {
       catch (e) { toast((e && e.message) || "Não foi possível criar."); }
       finally { aCriar.value = false; }
     };
-    return { vista, q, linhas, total, mais, pagina, carregar, ordenar, valor, abrir, a, VISTAS, TITULOS, cor, ini, ordem, meta, salvas, salvaAtiva,
+    const maisAc = ref(false);   // 25-11-2026: Importar/Exportar/Duplicados num «⋯» no telemóvel
+    return { maisAc, vista, q, linhas, total, mais, pagina, carregar, ordenar, valor, abrir, a, VISTAS, TITULOS, cor, ini, ordem, meta, salvas, salvaAtiva,
       filtros, colunas, novoF, verCols, sel, massa, escolherFixa, escolherSalva, apagarSalva, guardar, campoMeta, rotuloFiltro, juntarFiltro, tirarFiltro,
       alternarCol, todos, opsMassa, opcoesMassa, aplicarMassa, exportar, OPS_TIPO, importar, marca, escolherMarca,
       CAMPOS_NOVO, NOME_NOVO, novoReg, aCriar, abrirNovo, gravarNovo };
@@ -1222,7 +1225,7 @@ const Lista = {
   <div>
     <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <div><h1>{{ TITULOS[objeto] }}</h1><div class="sub">{{ total }} registos</div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button v-if="CAMPOS_NOVO[objeto]" class="btn prim" @click="abrirNovo">+ Novo</button><button class="btn" @click="importar=true">Importar</button><button class="btn" @click="exportar(false)">Exportar</button><a v-if="objeto==='contactos'||objeto==='empresas'" class="btn" :href="'#/duplicados/'+objeto">Duplicados</a></div>
+      <div class="acoes-lista" :class="{abertas: maisAc}"><button v-if="CAMPOS_NOVO[objeto]" class="btn prim" @click="abrirNovo">+ Novo</button><button class="btn so-movel" @click="maisAc=!maisAc" title="Mais ações" aria-label="Mais ações">⋯</button><span class="acoes-sec" @click="maisAc=false"><button class="btn" @click="importar=true">Importar</button><button class="btn" @click="exportar(false)">Exportar</button><a v-if="objeto==='contactos'||objeto==='empresas'" class="btn" :href="'#/duplicados/'+objeto">Duplicados</a></span></div>
     </div>
     <div class="vistas marcas-sep" v-if="(meta?.marcas||[]).length > 1">
       <button :class="{ativo: !marca}" @click="escolherMarca('')">Todas as marcas</button>
@@ -1258,12 +1261,12 @@ const Lista = {
       <button class="btn sm prim" @click="aplicarMassa" :disabled="!massa.acao">Aplicar</button>
       <button class="btn sm" @click="exportar(true)">Exportar seleção</button>
     </div>
-    <div class="tabela-wrap" :style="sel.length?{borderTopLeftRadius:0,borderTopRightRadius:0}:{}"><table>
+    <div class="tabela-wrap cartoes-movel" :style="sel.length?{borderTopLeftRadius:0,borderTopRightRadius:0}:{}"><table>
       <thead><tr><th style="width:34px"><input type="checkbox" v-model="todos"></th><th v-for="c in colunas" :key="c.campo" @click="ordenar(c.campo)" style="cursor:pointer">{{ c.rotulo }}<span v-if="ordem.startsWith(c.campo+' ')">{{ ordem.endsWith('asc') ? ' ↑' : ' ↓' }}</span></th></tr></thead>
       <tbody>
         <tr v-for="l in linhas" :key="l.name">
-          <td @click.stop><input type="checkbox" :value="l.name" v-model="sel"></td>
-          <td v-for="(c,i) in colunas" :key="c.campo" @click="abrir(l)">
+          <td @click.stop class="cel-sel"><input type="checkbox" :value="l.name" v-model="sel"></td>
+          <td v-for="(c,i) in colunas" :key="c.campo" @click="abrir(l)" :class="{'cel-tit': i===0}">
             <div v-if="i===0" class="pessoa"><AvFoto :email="l.email_id || l.email || l.email_geral || emailDoSite(l.website)" :nome="valor(l,c.campo)||l.name" :tam="28"/><a href="#" @click.prevent>{{ valor(l,c.campo) || l.name }}</a></div>
             <span v-else-if="c.campo==='status'" class="etq">{{ valor(l,c.campo) }}</span>
             <span v-else-if="c.campo==='orbit_ciclo' && l.orbit_ciclo" class="etq" :class="{Cliente:'verde',Oportunidade:'roxo',Promotor:'verde','Lead qualificada (vendas)':'azul','Lead qualificada (marketing)':'azul'}[l.orbit_ciclo]">{{ l.orbit_ciclo }}</span>
@@ -1372,10 +1375,10 @@ const DeskTickets = {
           <textarea class="ed-campo" v-model="resolver.nota" rows="4" style="width:100%;box-sizing:border-box"></textarea>
           <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn prim" :disabled="!resolver.nota.trim()" @click="confirmar">Confirmar</button></div></div></div></div>
     </div>
-    <div class="tabela-wrap" v-else><table>
+    <div class="tabela-wrap cartoes-movel" v-else><table>
       <thead><tr><th style="width:70px">N.º</th><th>Assunto</th><th>Cliente</th><th>Estado</th><th>Prioridade</th><th>Equipa</th><th>Responsável</th><th>Prazo</th><th>Última atividade</th></tr></thead>
       <tbody><tr v-for="t in d?.linhas||[]" :key="t.name" @click="abrir(t)" style="cursor:pointer">
-        <td class="sub">#{{ t.name }}</td><td><b>{{ t.assunto }}</b><div class="sub" style="font-size:12px" v-if="t.marca">{{ t.marca }}</div></td>
+        <td class="sub">#{{ t.name }}</td><td class="cel-tit"><b>{{ t.assunto }}</b><div class="sub" style="font-size:12px" v-if="t.marca">{{ t.marca }}</div></td>
         <td><span class="pessoa"><AvFoto :email="t.email" :nome="t.cliente" :tam="24"/>{{ t.cliente }}</span></td>
         <td><span class="etq" :class="{Open:'azul',Replied:'roxo',Paused:'ambar',Resolved:'verde',Closed:''}[t.estado]">{{ t.estado_pt }}</span></td>
         <td><span class="etq" :class="{Urgent:'ambar',High:'ambar'}[t.prioridade]">{{ t.prioridade_pt }}</span></td>
@@ -2868,13 +2871,13 @@ const ErpLista = {
       <div style="display:flex;gap:8px"><a v-if="meta.pode.create" class="btn prim" :href="irErp(doctype,'novo')">+ Novo</a></div>
     </div>
     <div class="filtros"><input class="filtro" style="border-style:solid;min-width:260px" v-model="q" :placeholder="'Procurar em ' + meta.rotulo.toLowerCase() + '…'"></div>
-    <div class="tabela-wrap"><table>
+    <div class="tabela-wrap cartoes-movel"><table>
       <thead><tr><th @click="ordenar(titulo||'name')" style="cursor:pointer">{{ titulo ? campo(titulo).label : 'Nome' }}</th>
         <th v-for="c in colunas" :key="c" @click="ordenar(c)" style="cursor:pointer">{{ campo(c).label }}<span v-if="ordem.startsWith(c+' ')">{{ ordem.endsWith('asc') ? ' ↑' : ' ↓' }}</span></th>
         <th v-if="meta.submetivel">Estado</th></tr></thead>
       <tbody>
         <tr v-for="l in linhas" :key="l.name" @click="abrir(l.name)">
-          <td><div class="pessoa"><span class="av" :style="{background:cor(l.name)}">{{ ini(l[titulo]||l.name) }}</span><a :href="irErp(doctype,l.name)" @click.stop>{{ tr(doctype, l[titulo] || l.name) }}</a></div><small v-if="titulo && l[titulo] && l[titulo]!==l.name" style="color:var(--ink-3)">{{ tr(doctype, l.name) }}</small></td>
+          <td class="cel-tit"><div class="pessoa"><span class="av" :style="{background:cor(l.name)}">{{ ini(l[titulo]||l.name) }}</span><a :href="irErp(doctype,l.name)" @click.stop>{{ tr(doctype, l[titulo] || l.name) }}</a></div><small v-if="titulo && l[titulo] && l[titulo]!==l.name" style="color:var(--ink-3)">{{ tr(doctype, l.name) }}</small></td>
           <td v-for="c in colunas" :key="c">{{ textoValor(campo(c), l[c]) }}</td>
           <td v-if="meta.submetivel"><span class="etq" :class="ESTADO_DOC[l.docstatus||0][1]">{{ l.status || ESTADO_DOC[l.docstatus||0][0] }}</span></td>
         </tr>
@@ -3914,7 +3917,8 @@ const App = {
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
-    window.addEventListener("hashchange", () => { rota.value = location.hash || "#/inicio"; estado.erroEcra = ""; document.querySelector(".ecra")?.scrollTo(0, 0); });
+    const gaveta = ref(false);   // 25-11-2026: menu ☰ abaixo de 1100 px (no telemóvel só se navegava no CRM)
+    window.addEventListener("hashchange", () => { gaveta.value = false; rota.value = location.hash || "#/inicio"; estado.erroEcra = ""; document.querySelector(".ecra")?.scrollTo(0, 0); });
     onMounted(async () => { ctx.value = await api("contexto"); window.__ctx = ctx.value; contarChat(); setInterval(() => { if (!document.hidden) contarChat(); }, 60000); });
     // 23-11-2026: as não lidas do Chat no menu (mensagens diretas e tópicos dos canais)
     const contarChat = async () => {
@@ -3962,11 +3966,19 @@ const App = {
     const irApp = (a) => { seletor.value = false; if (a.chave === APP_ATUAL) return; abrirApp(a.chave, a.url); };
     const ativoNav = (n) => { const e = ecra.value; const r = partes.value.join("/"); return n[0] === r || decodeURIComponent(n[0]) === r || e === n[0] || (n[0]==='contactos'&&e==='contacto') || (n[0]==='negocios'&&e==='negocio') || (n[0]==='empresas'&&e==='empresa') || (n[0]==='leads'&&e==='lead') || (n[0]==='projetos'&&e==='projeto') || (n[0]==='tarefas'&&e==='fila'); };
     const rotaCal = computed(() => partes.value.join("/"));
-    return { ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal, APP, APP_ATUAL, modulosApp, seletor, LISTA_APPS, irApp, ativoNav, srcApp };
+    // 25-11-2026: a barra de baixo do telemóvel é a de cada app (era a do CRM em todas): 4 destinos + «Menu»
+    const MOVEL = computed(() => {
+      const curto = { "Caixa de entrada": "Caixa", "Calendário": "Agenda", "Base de conhecimento": "Artigos", "Faturas de compra": "Compras", "Definições do Orbit": "Definições", "Registo de horas": "Horas" };
+      let l = NAV.filter((n) => n[0] !== "sec").map((n) => ({ n, rota: n[0], ic: n[1], r: curto[n[2]] || n[2] }));
+      if (l.length < 4) l = l.concat(modulosApp.value.filter((m) => m.barra).map((m) => ({ n: ["erp-m/" + encodeURIComponent(m.barra)], rota: "erp-m/" + encodeURIComponent(m.barra), ic: "grelha", r: m.nome })));
+      return l.slice(0, 4);
+    });
+    return { gaveta, MOVEL, ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal, APP, APP_ATUAL, modulosApp, seletor, LISTA_APPS, irApp, ativoNav, srcApp };
   },
   template: `
   <div class="app" v-if="ctx">
-    <nav class="nav" aria-label="Navegação principal">
+    <div class="gaveta-fundo" v-if="gaveta" @click="gaveta=false"></div>
+    <nav class="nav" :class="{aberta: gaveta}" aria-label="Navegação principal">
       <div class="marca"><div class="logo logo-app"><img :src="srcApp(APP_ATUAL)" alt=""></div><div>{{ APP.nome }}<small>{{ APP.sub }}</small></div></div>
       <template v-for="(n,i) in NAV" :key="i">
         <h6 v-if="n[0]==='sec'">{{ n[1] }}</h6>
@@ -3975,10 +3987,14 @@ const App = {
       <template v-if="modulosApp.length"><h6>{{ APP_ATUAL==='admin' ? 'Sistema' : 'Módulos' }}</h6>
       <a v-for="m in modulosApp" :key="m.url" :href="m.barra ? '#/erp-m/'+encodeURIComponent(m.barra) : m.url" :target="m.barra ? null : '_blank'" style="text-decoration:none"><button tabindex="-1" :class="{ativo: ecra==='erp-m' && partes[1]===m.barra}"><Icone n="grelha"/>{{ m.nome }}<span class="fora" v-if="!m.barra">↗</span></button></a></template>
 
+      <div class="so-gaveta"><h6>Conta</h6>
+        <a :href="'#/definicoes'" style="text-decoration:none"><button tabindex="-1"><Icone n="roda"/>Definições — {{ APP.nome }}</button></a>
+        <button @click="tema"><Icone n="lua"/>Claro / escuro</button></div>
       <div class="fim"><div class="av" style="background:#5b6f7a">{{ ctx.iniciais }}</div><div style="min-width:0">{{ ctx.nome }}<br><a href="/?cmd=web_logout" style="color:#7f939d;font-size:12px">Sair</a></div></div>
     </nav>
     <div class="main">
       <header class="topo">
+        <button class="icone-btn btn-gaveta" @click="gaveta=true" title="Menu" aria-label="Abrir o menu"><Icone n="menu"/></button>
         <div style="position:relative">
           <button class="icone-btn" :class="{ativo: seletor}" @click="seletor=!seletor" title="Todas as apps"><Icone n="apps"/></button>
           <div class="cartao seletor-apps" v-if="seletor" @click.self="seletor=false">
@@ -3997,8 +4013,8 @@ const App = {
         </div>
         <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
           <Sino/>
-          <button class="icone-btn" @click="tema" title="Claro / escuro"><Icone n="lua"/></button>
-          <a class="icone-btn" :href="'#/definicoes'" :title="'Definições — ' + APP.nome" :class="{ativo: ecra==='definicoes'}"><Icone n="roda"/></a>
+          <button class="icone-btn fora-gaveta" @click="tema" title="Claro / escuro"><Icone n="lua"/></button>
+          <a class="icone-btn fora-gaveta" :href="'#/definicoes'" :title="'Definições — ' + APP.nome" :class="{ativo: ecra==='definicoes'}"><Icone n="roda"/></a>
         </div>
       </header>
       <main class="ecra">
@@ -4045,7 +4061,8 @@ const App = {
       </main>
     </div>
     <nav class="menu-movel" aria-label="Navegação">
-      <a v-for="m in [['inicio','Início'],['contactos','Contactos'],['negocios','Negócios'],['caixa','Caixa'],['calendario','Agenda']]" :key="m[0]" :href="'#/'+m[0]" style="text-decoration:none"><button :class="{ativo: ecra===m[0]}" tabindex="-1">{{ m[1] }}</button></a>
+      <a v-for="m in MOVEL" :key="m.rota" :href="'#/'+m.rota" style="text-decoration:none"><button :class="{ativo: ativoNav(m.n)}" tabindex="-1"><Icone :n="m.ic"/><span>{{ m.r }}</span></button></a>
+      <button @click="gaveta=true" :class="{ativo: gaveta}"><Icone n="menu"/><span>Menu</span></button>
     </nav>
     <div class="toast" v-if="estado.toast">{{ estado.toast }}</div>
   </div>
