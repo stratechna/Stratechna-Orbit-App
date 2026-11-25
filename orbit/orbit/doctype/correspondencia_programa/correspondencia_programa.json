@@ -1,0 +1,91 @@
+{
+ "doctype": "DocType",
+ "name": "Correspondencia Programa",
+ "module": "Orbit",
+ "custom": 0,
+ "engine": "InnoDB",
+ "track_changes": 0,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "creation": "2026-11-25 21:00:00.000000",
+ "modified": "2026-11-25 21:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "fields": [
+  {
+   "fieldname": "ligacao",
+   "fieldtype": "Link",
+   "label": "Ligação",
+   "options": "Ligacao Faturacao",
+   "reqd": 1,
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "tipo",
+   "fieldtype": "Select",
+   "label": "Tipo",
+   "options": "artigo\nfornecedor\ncliente\nmovimento\nfatura_compra\nencomenda_compra\nvenda\nguia",
+   "reqd": 1,
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "doctype_orbit",
+   "fieldtype": "Data",
+   "label": "Documento no Orbit (tipo)"
+  },
+  {
+   "fieldname": "nome_orbit",
+   "fieldtype": "Data",
+   "label": "Documento no Orbit",
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "id_externo",
+   "fieldtype": "Data",
+   "label": "Id no programa",
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "origem",
+   "fieldtype": "Select",
+   "label": "Nasceu em",
+   "options": "Orbit\nPrograma",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "assinatura",
+   "fieldtype": "Data",
+   "label": "Assinatura dos dados"
+  },
+  {
+   "fieldname": "sincronizado_em",
+   "fieldtype": "Datetime",
+   "label": "Sincronizado em"
+  },
+  {
+   "fieldname": "nota",
+   "fieldtype": "Small Text",
+   "label": "Nota"
+  }
+ ],
+ "autoname": "hash",
+ "naming_rule": "Random",
+ "description": "25-11-2026: o que já foi sincronizado com o programa certificado e de onde veio — trava duplicados e ciclos.",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1
+  }
+ ]
+}

@@ -4170,7 +4170,9 @@ const APPS = {
   gestao: { nome: "Gestão", sub: "Dinheiro e obrigações", ic: "euro", inicio: "",
     nav: [], modulos: ["Invoicing", "Payments", "Banking", "Accounting", "Financial Reports", "Subscription"], defs: ["Vendas e faturação", "Marcas e empresa"] },
   operacoes: { nome: "Operações", sub: "Comprar, produzir, vender", ic: "cubo", inicio: "",
-    nav: [["sec", "Compras"], ["compras", "euro", "Faturas de compra"], ["sec", "Stock"], ["erp-stock", "cubo", "Inventário"]],
+    nav: [["sec", "Vendas"], ["erp/Quotation", "nota", "Propostas"], ["erp/Sales Order", "nota", "Encomendas"], ["erp/Sales Invoice", "euro", "Faturas"], ["erp/Delivery Note", "cubo", "Guias de transporte"], ["erp/Payment Entry", "euro", "Recibos"],
+      ["sec", "Compras"], ["compras", "euro", "Faturas de compra"], ["erp/Purchase Order", "nota", "Encomendas a fornecedor"], ["erp/Purchase Receipt", "cubo", "Receções"], ["erp/Supplier", "pessoas", "Fornecedores"],
+      ["sec", "Stock"], ["erp-stock", "cubo", "Inventário"]],
     modulos: ["Selling", "Buying", "Stock", "Assets", "Manufacturing", "Subcontracting", "Quality"], defs: ["Vendas e faturação"] },
   // 22-11-2026: o Marketing com o mesmo aspecto das outras apps (os ecrãs dele são da secretária, mostrados cá dentro).
   marketing: { nome: "Marketing", sub: "Campanhas e envios", ic: "megafone", inicio: "erp-desk/%2Fdesk%2Fcampanha-de-marketing",

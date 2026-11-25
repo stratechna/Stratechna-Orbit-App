@@ -224,12 +224,16 @@ def _empresa(f=None):
 
 
 def _etiquetas(docs_id):
+    if not docs_id or int(docs_id) <= 0:
+        return []   # 25-11: fatura de compra vinda do programa certificado, não do Docs
     from orbit.compras.docs import _docs, _nome
     meta = _docs(f"/api/documents/{docs_id}/")
     return [_nome("/api/tags/", t) for t in meta.get("tags") or []]
 
 
 def _anexar(pi, docs_id, dados=None):
+    if (not docs_id or int(docs_id) <= 0) and not dados:
+        return
     from orbit.compras.docs import _docs
     if dados is None:
         dados, _ = _docs(f"/api/documents/{docs_id}/download/", binario=True)

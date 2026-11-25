@@ -12,7 +12,7 @@ from orbit.faturacao.base import CONSUMIDOR_FINAL, Cliente, ErroFaturacao, Linha
 DT = "Ligacao Faturacao"
 CAMPOS_PASSWORD = ("client_secret", "palavra_passe", "access_token", "refresh_token")
 CAMPOS = ("client_id", "utilizador", "empresa_id", "zona_fiscal", "token_expira", "serie_fatura",
-          "serie_fatura_recibo", "serie_nota_credito", "serie_recibo", "serie_guia", "serie_proforma", "prazo_id", "metodo_pagamento_id",
+          "serie_fatura_recibo", "serie_nota_credito", "serie_recibo", "serie_guia", "serie_proforma", "serie_fatura_compra", "serie_encomenda_compra", "sinc_inventario", "sinc_compras", "prazo_id", "metodo_pagamento_id",
           "metodo_envio_id", "categoria_id", "unidade_id", "motivo_isencao")
 
 

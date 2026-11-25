@@ -216,7 +216,7 @@ class Moloni(Adaptador):
                 raise ErroFaturacao(f"falta escolher «{campo}» na ligação (botão «Ler opções do programa»)")
         corpo = {"category_id": int(self.cfg["categoria_id"]), "type": 2 if l.servico else 1, "name": l.nome[:200],
                  "reference": l.codigo[:50], "price": round(l.preco_unitario, 6), "unit_id": int(self.cfg["unidade_id"]),
-                 "has_stock": 0, "summary": l.resumo[:200]}
+                 "has_stock": 1 if (self.cfg.get("sinc_inventario") and not l.servico) else 0, "summary": l.resumo[:200]}
         if l.taxa_iva > 0:
             corpo["taxes"] = [{"tax_id": self._taxa_id(l.taxa_iva), "order": 0, "cumulative": 0,
                                "value": round(l.preco_unitario * l.taxa_iva / 100, 4)}]
@@ -381,3 +381,132 @@ class Moloni(Adaptador):
             r = [d for d in (self._post("documents/getAll", {"qty": 50}) or [])
                  if str(d.get("lastmodified") or "") >= desde]
         return [self._resultado(d) for d in (r if isinstance(r, list) else []) if d.get("document_id")]
+
+
+    # ── sincronização bidireccional (25-11-2026, docs/PLANO-SINCRONIZACAO-MOLONI-STOCK-COMPRAS.md) ─────────────
+    def _todos(self, endpoint: str, dados: Optional[dict] = None, por_pagina: int = 50, maximo: int = 2000) -> list:
+        """getAll paginado (qty/offset)."""
+        out, offset = [], 0
+        while offset < maximo:
+            r = self._post(endpoint, {**(dados or {}), "qty": por_pagina, "offset": offset})
+            lote = r if isinstance(r, list) else []
+            out += lote
+            if len(lote) < por_pagina:
+                break
+            offset += por_pagina
+        return out
+
+    def armazens(self) -> list[dict]:
+        return [{"id": str(w["warehouse_id"]), "nome": w.get("title") or w.get("name") or str(w["warehouse_id"]),
+                 "principal": bool(w.get("is_default"))} for w in (self._post("warehouses/getAll") or []) if w.get("warehouse_id")]
+
+    def artigo_por_referencia(self, referencia: str) -> Optional[dict]:
+        ja = self._post("products/getByReference", {"reference": referencia, "exact": 1})
+        for p in (ja if isinstance(ja, list) else []):
+            if str(p.get("reference")) == referencia:
+                return p
+        return None
+
+    def movimentos_stock(self, dia: str, armazem_id: Optional[str] = None) -> list[dict]:
+        """Movimentos de stock de um dia (AAAA-MM-DD), todos os armazéns ou um."""
+        dados = {"date": dia}
+        if armazem_id:
+            dados["warehouse_id"] = int(armazem_id)
+        return self._todos("productStocks/getAll", dados)
+
+    def inserir_movimento(self, product_id: str, qty: float, armazem_id: str, data: str, notas: str) -> str:
+        res = self._valido(self._post("productStocks/insert", {
+            "product_id": int(product_id), "movement_date": data, "qty": round(qty, 4),
+            "warehouse_id": int(armazem_id), "notes": notas[:250]}), f"o movimento de stock ({notas[:40]})")
+        return str(res.get("product_stock_id") or res.get("id") or "")
+
+    def fornecedores(self) -> list[dict]:
+        return self._todos("suppliers/getAll")
+
+    def _proximo_numero_fornecedor(self) -> str:
+        try:
+            r = self._post("suppliers/getNextNumber")
+            return str((r or {}).get("number") or "")
+        except ErroFaturacao:
+            return ""
+
+    def garantir_fornecedor(self, nome: str, nif: str, pais: str = "PT", morada: str = "", cp: str = "", cidade: str = "",
+                            email: str = "", telefone: str = "", id_externo: Optional[str] = None) -> str:
+        if id_externo:
+            self._post("suppliers/update", {"supplier_id": int(id_externo), "name": nome[:100], "email": email,
+                                            "address": morada or "—", "zip_code": cp or "0000-000", "city": cidade or "—",
+                                            "phone": telefone, "vat": nif, "country_id": PAISES.get((pais or "PT").upper(), 1),
+                                            "language_id": 1})
+            return str(id_externo)
+        if nif:
+            ja = self._post("suppliers/getByVat", {"vat": nif})
+            if isinstance(ja, list) and ja:
+                return str(ja[0]["supplier_id"])
+        for campo in ("prazo_id", "metodo_pagamento_id", "metodo_envio_id"):
+            if not self.cfg.get(campo):
+                raise ErroFaturacao(f"falta escolher «{campo}» na ligação (botão «Ler opções do programa»)")
+        res = self._valido(self._post("suppliers/insert", {
+            "vat": nif or CONSUMIDOR_FINAL, "number": self._proximo_numero_fornecedor() or (nif or "F")[:20], "name": nome[:100],
+            "email": email, "address": morada or "—", "zip_code": cp or "0000-000", "city": cidade or "—",
+            "country_id": PAISES.get((pais or "PT").upper(), 1), "language_id": 1, "phone": telefone,
+            "maturity_date_id": int(self.cfg["prazo_id"]), "payment_method_id": int(self.cfg["metodo_pagamento_id"]),
+            "delivery_method_id": int(self.cfg["metodo_envio_id"]), "discount": 0, "credit_limit": 0, "payment_day": 0,
+        }), f"o fornecedor {nome}")
+        return str(res["supplier_id"])
+
+    def _linhas_compra(self, linhas: list) -> list[dict]:
+        out = []
+        for i, l in enumerate(linhas):
+            pid = self.garantir_artigo(l)
+            linha = {"product_id": int(pid), "name": l.nome[:200], "qty": l.quantidade, "price": round(l.preco_unitario, 6),
+                     "discount": round(l.desconto_pct, 2), "order": i}
+            if l.taxa_iva > 0:
+                linha["taxes"] = [{"tax_id": self._taxa_id(l.taxa_iva)}]
+            else:
+                linha["exemption_reason"] = l.motivo_isencao or "M07"
+            out.append(linha)
+        return out
+
+    def inserir_compra(self, tipo: str, fornecedor_id: str, numero: str, data: str, vencimento: str, linhas: list,
+                       referencia: str, serie: Optional[str] = None, notas: str = "") -> str:
+        """tipo: «fatura_compra» (supplierInvoices) ou «encomenda_compra» (supplierPurchaseOrder)."""
+        modulo = {"fatura_compra": "supplierInvoices", "encomenda_compra": "supplierPurchaseOrder"}[tipo]
+        r = self._post(f"{modulo}/getAll", {"our_reference": referencia, "qty": 20})
+        for d in (r if isinstance(r, list) else []):
+            if str(d.get("our_reference") or "") == referencia:
+                return str(d["document_id"])
+        corpo = {"document_set_id": self._serie(tipo, {tipo: serie} if serie else None), "supplier_id": int(fornecedor_id),
+                 "date": data, "expiration_date": vencimento or data, "our_reference": referencia[:60],
+                 "your_reference": (numero or "")[:60], "notes": notas[:1000], "status": 1,
+                 "financial_discount": 0, "special_discount": 0, "products": self._linhas_compra(linhas)}
+        res = self._valido(self._post(f"{modulo}/insert", corpo), f"a compra {referencia}")
+        return str(res["document_id"])
+
+    def actualizar_preco_custo(self, product_id: str, preco: float) -> None:
+        try:
+            self._post("products/update", {"product_id": int(product_id), "price_purchase": round(preco, 6)})
+        except ErroFaturacao:
+            pass   # o custo é informativo; a compra está registada
+
+    def compras_desde(self, tipo: str, desde: str) -> list[dict]:
+        modulo = {"fatura_compra": "supplierInvoices", "encomenda_compra": "supplierPurchaseOrder"}[tipo]
+        return [d for d in self._todos(f"{modulo}/getAll") if str(d.get("lastmodified") or d.get("date") or "") >= desde[:10]]
+
+    def compra(self, tipo: str, document_id: str) -> dict:
+        modulo = {"fatura_compra": "supplierInvoices", "encomenda_compra": "supplierPurchaseOrder"}[tipo]
+        r = self._post(f"{modulo}/getOne", {"document_id": int(document_id)})
+        return (r[0] if isinstance(r, list) and r else r) or {}
+
+    def vendas_desde(self, desde: str) -> list[dict]:
+        """Faturas, faturas-recibo e guias fechadas no Moloni desde `desde` (para as que não vieram do Orbit)."""
+        out = []
+        for tipo in ("fatura", "fatura_recibo", "guia"):
+            for d in self._todos(f"{MODULO[tipo]}/getAll"):
+                if str(d.get("date") or "") >= desde[:10] and int(d.get("status") or 0) == 1:
+                    d["_tipo"] = tipo
+                    out.append(d)
+        return out
+
+    def documento(self, document_id: str) -> dict:
+        r = self._post("documents/getOne", {"document_id": int(document_id)})
+        return (r[0] if isinstance(r, list) and r else r) or {}

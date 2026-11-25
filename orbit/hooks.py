@@ -86,7 +86,7 @@ _FATURACAO = ["orbit.faturacao.instalar.garantir"]   # DP8, 05-11-2026
 _BOOKING = ["orbit.booking.garantir"]   # O1/I1, 06-11-2026: negócio do CRM ligado à marcação do Booking
 # 10-11-2026: propostas comerciais por cima do Orçamento (orbit/propostas; docs/PLANO-PROPOSTAS-ORBIT.md)
 _PROPOSTAS = ["orbit.propostas.instalar.garantir", "orbit.marcas_artigos.garantir", "orbit.inventario.campos.garantir", "orbit.inventario.encomendas.garantir", "orbit.inventario.armazens.instalar"]
-after_migrate = _FATURACAO + _BOOKING + _PROPOSTAS + _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA + _LINGUA + _EMAILS_CRM + _INTERFACE + _NOTAS + ["orbit.generos.acertar", "orbit.notificacoes_pt.acertar", "orbit.territorios.acertar", "orbit.listas_pt.acertar", "orbit.configuracao_pt.acertar", "orbit.compras.preparar.tudo", "orbit.compras.rascunho.garantir_campos", "orbit.empresas.garantir", "orbit.empresas.contabilidade_inicial", "orbit.interface.emitir.garantir", "orbit.interface.emitir.garantir_proforma"]
+after_migrate = _FATURACAO + _BOOKING + _PROPOSTAS + _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA + _LINGUA + _EMAILS_CRM + _INTERFACE + _NOTAS + ["orbit.generos.acertar", "orbit.notificacoes_pt.acertar", "orbit.territorios.acertar", "orbit.listas_pt.acertar", "orbit.configuracao_pt.acertar", "orbit.compras.preparar.tudo", "orbit.compras.rascunho.garantir_campos", "orbit.empresas.garantir", "orbit.empresas.contabilidade_inicial", "orbit.interface.emitir.garantir", "orbit.interface.emitir.garantir_proforma", "orbit.faturacao.sincronizacao.garantir"]
 after_install = _POR_DE_PE + _MARKETING + _MARCACAO + _ORGANIZACAO + ["orbit.remetentes.garantir"] + _LINGUA + _NOTAS + ["orbit.generos.acertar", "orbit.notificacoes_pt.acertar", "orbit.territorios.acertar", "orbit.listas_pt.acertar", "orbit.configuracao_pt.acertar"]
 
 # Email marketing: a saída das campanhas corre ao minuto (o ritmo por hora
@@ -96,7 +96,7 @@ scheduler_events = {
     "cron": {
         "* * * * *": ["orbit.marketing.envio.processar"],
         # 05-11-2026 (DP8): faturação certificada — repetir o que ficou por emitir e ler anulações do programa
-        "*/15 * * * *": ["orbit.faturacao.emissao.periodico", "orbit.interface.trabalho.lembretes",
+        "*/15 * * * *": ["orbit.faturacao.emissao.periodico", "orbit.faturacao.sincronizacao.periodico", "orbit.interface.trabalho.lembretes",
                          "orbit.interface.desk.enviar_inqueritos"],
     },
     # 23-11-2026: menções por ver há mais de 3 h seguem por email (orbit/interface/conversa.py)
@@ -154,7 +154,17 @@ doc_events = {
                       "before_cancel": "orbit.faturacao.emissao.antes_de_cancelar_fatura"},
     "Payment Entry": {"on_submit": "orbit.faturacao.emissao.ao_submeter_pagamento"},
     # 24-11-2026 (fatura de compra F2): rascunho do Docs só se submete com todas as linhas ligadas
-    "Purchase Invoice": {"before_submit": "orbit.compras.rascunho.antes_de_submeter"},
+    "Purchase Invoice": {"before_submit": "orbit.compras.rascunho.antes_de_submeter",
+                         "on_submit": "orbit.faturacao.sincronizacao.ao_submeter_compra"},
+    # 25-11-2026: sincronização bidireccional com o programa certificado (opção na Ligação Faturação)
+    "Purchase Order": {"on_submit": "orbit.faturacao.sincronizacao.ao_submeter_compra"},
+    "Stock Entry": {"on_submit": "orbit.faturacao.sincronizacao.ao_mexer_stock",
+                    "on_cancel": "orbit.faturacao.sincronizacao.ao_mexer_stock"},
+    "Stock Reconciliation": {"on_submit": "orbit.faturacao.sincronizacao.ao_mexer_stock",
+                             "on_cancel": "orbit.faturacao.sincronizacao.ao_mexer_stock"},
+    "Purchase Receipt": {"on_submit": "orbit.faturacao.sincronizacao.ao_mexer_stock",
+                         "on_cancel": "orbit.faturacao.sincronizacao.ao_mexer_stock"},
+    "Supplier": {"on_update": "orbit.faturacao.sincronizacao.ao_gravar_fornecedor"},
     # 10-11-2026: marca → série/timbre/textos, linhas de transporte e montagem, IVA (orbit/propostas/regras.py)
     # 10-11-2026: a marca do artigo pelo prefixo da referência (A… JFusados, N… Arnox) → armazém da marca
     "Item": {"before_validate": "orbit.marcas_artigos.antes_de_validar_artigo"},

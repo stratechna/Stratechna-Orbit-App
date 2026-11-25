@@ -161,6 +161,64 @@
    "description": "Marcas da mesma empresa com imagem própria: cada marca com as suas séries (no Moloni, a série leva o Template de Identificação da marca). Sem linha para a marca = as séries acima."
   },
   {
+   "fieldname": "sec_sinc",
+   "fieldtype": "Section Break",
+   "label": "Sincronização com o programa"
+  },
+  {
+   "fieldname": "sinc_inventario",
+   "fieldtype": "Check",
+   "label": "Sincronizar inventário",
+   "default": "0",
+   "description": "Movimentos de stock nos dois sentidos (o Orbit manda no stock). Documentos emitidos no programa entram no Orbit como emitidos."
+  },
+  {
+   "fieldname": "sinc_compras",
+   "fieldtype": "Check",
+   "label": "Sincronizar compras e fornecedores",
+   "default": "0",
+   "description": "Fornecedores pelo NIF, encomendas e faturas de compra nos dois sentidos. As compras do programa entram por rever."
+  },
+  {
+   "fieldname": "serie_fatura_compra",
+   "fieldtype": "Data",
+   "label": "Série das faturas de compra"
+  },
+  {
+   "fieldname": "serie_encomenda_compra",
+   "fieldtype": "Data",
+   "label": "Série das encomendas a fornecedor"
+  },
+  {
+   "fieldname": "col_sinc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sinc_desde",
+   "fieldtype": "Date",
+   "label": "Sincronizar desde",
+   "description": "Primeiro dia lido do programa. Vazio = hoje."
+  },
+  {
+   "fieldname": "ultima_sinc",
+   "fieldtype": "Datetime",
+   "label": "Última sincronização",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sinc_estado",
+   "fieldtype": "Small Text",
+   "label": "Estado da sincronização",
+   "read_only": 1
+  },
+  {
+   "fieldname": "armazens_programa",
+   "fieldtype": "Table",
+   "label": "Armazéns no programa",
+   "options": "Armazem do Programa",
+   "description": "Cada armazém do Orbit e o armazém correspondente no programa. Movimentos de armazéns fora desta tabela não se sincronizam."
+  },
+  {
    "fieldname": "sec_pred",
    "fieldtype": "Section Break",
    "label": "Predefinições do programa",
@@ -270,5 +328,5 @@
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
- "modified": "2026-11-25 20:00:00.000000"
+ "modified": "2026-11-25 21:00:00.000000"
 }

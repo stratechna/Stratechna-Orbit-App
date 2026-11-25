@@ -40,6 +40,8 @@ def validar_fatura(doc, method=None):
 
 
 def ao_submeter_fatura(doc, method=None):
+    if doc.get("orbit_do_programa") or doc.flags.get("orbit_do_programa"):
+        return   # 25-11: veio do programa certificado (já está lá emitida)
     lig = da_empresa(doc.company)
     if not lig:
         return
@@ -51,6 +53,8 @@ def ao_submeter_fatura(doc, method=None):
 
 def ao_submeter_guia(doc, method=None):
     """25-11-2026: a guia de transporte segue para o programa certificado, que a comunica à AT."""
+    if doc.get("orbit_do_programa") or doc.flags.get("orbit_do_programa"):
+        return
     lig = da_empresa(doc.company)
     if not lig or doc.get("is_return"):
         return

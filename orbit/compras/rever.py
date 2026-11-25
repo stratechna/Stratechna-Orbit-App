@@ -46,6 +46,8 @@ def _eur(v):
 
 
 def _docs_nota(docs_id, texto):
+    if not docs_id or int(docs_id) <= 0:
+        return True   # 25-11: veio do programa certificado
     try:
         _docs_pedir("POST", f"/api/documents/{int(docs_id)}/notes/", {"note": texto[:2000]})
         return True
@@ -60,6 +62,8 @@ def _por_nome(caminho, nome):
 
 
 def devolver_docs(f, pi) -> list:
+    if not f.docs_id or int(f.docs_id) <= 0:
+        return []   # 25-11: veio do programa certificado — nada a devolver ao Docs
     """Processo, Valor total, Vencimento, «Por pagar» e uma nota no documento do Docs. Devolve o que ficou por fazer."""
     falhas = []
     meta = _docs_pedir("GET", f"/api/documents/{int(f.docs_id)}/")
@@ -181,6 +185,10 @@ def pdf(nome):
     _ver()
     from orbit.compras.docs import _docs
     docs_id = int(frappe.db.get_value("Fatura do Docs", nome, "docs_id"))
+    if docs_id < 0:   # 25-11: veio do programa certificado — sem PDF no Docs
+        frappe.local.response.update({"type": "raw", "filename": "moloni.html", "content_type": "text/html",
+                                      "filecontent": f"<p style='font-family:sans-serif'>Fatura de compra lançada no programa certificado (Moloni, documento {-docs_id}). O original está no Moloni.</p>"})
+        return
     try:
         meta = _docs(f"/api/documents/{docs_id}/")
         mime = (meta.get("mime_type") or "").lower()
