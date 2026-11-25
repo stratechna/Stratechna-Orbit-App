@@ -186,7 +186,7 @@ def _emitir_recibo(dc, ad, ensaio):
 
 def periodico():
     """De 15 em 15 min: volta a tentar o que ficou por emitir e lê do programa as anulações."""
-    if not frappe.db.table_exists("tabDocumento Certificado"):
+    if not frappe.db.table_exists("Documento Certificado"):
         return
     limite = add_to_date(now_datetime(), minutes=-10)
     for nome in frappe.get_all(DC, filters={"estado": "Por emitir", "modified": ["<", limite],
@@ -327,6 +327,11 @@ def pedido_da_guia(dn, lig, rascunho: bool) -> Pedido:
         carga = {"morada": c.get("morada"), "cidade": c.get("cidade"), "cp": c.get("cp"), "pais": c.get("pais", "PT")}
     else:
         carga = {"morada": carga_end.address_line_1, "cidade": carga_end.city, "cp": carga_end.pin, "pais": "PT"}
+    faltam = [n for n, v in (("morada de carga (armazém ou empresa)", carga.get("morada")), ("morada de descarga (cliente)", dest.get("morada")))
+              if not v]
+    if faltam:
+        raise ErroFaturacao("a guia não tem " + " nem ".join(faltam) + " — a AT exige as duas. Ponha a morada no armazém "
+                            "(ou na empresa) e a morada de entrega na guia ou no cliente.", permanente=True)
     inicio = dn.get("orbit_inicio_transporte") or f"{dn.posting_date} {dn.posting_time or '09:00:00'}"
     cliente = Cliente(nome=dn.customer_name or cust.customer_name, nif=cust.get("tax_id") or "", pais=dest.get("pais", "PT"),
                       morada=dest.get("morada", ""), cidade=dest.get("cidade", ""), codigo_postal=dest.get("cp", ""),

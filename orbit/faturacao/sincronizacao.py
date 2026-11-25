@@ -67,7 +67,7 @@ def _assinatura(*v):
 
 
 def _ligacoes(campo):
-    if not frappe.db.table_exists(f"tab{DT}") or not frappe.get_meta(DT).has_field(campo):
+    if not frappe.db.table_exists(DT) or not frappe.get_meta(DT).has_field(campo):
         return []
     return [frappe.get_doc(DT, n) for n in frappe.get_all(DT, filters={"activa": 1, campo: 1}, pluck="name")]
 

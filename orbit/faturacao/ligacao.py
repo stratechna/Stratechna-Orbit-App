@@ -18,7 +18,7 @@ CAMPOS = ("client_id", "utilizador", "empresa_id", "zona_fiscal", "token_expira"
 
 def da_empresa(company: str) -> Optional["frappe.model.document.Document"]:
     """A ligação ACTIVA da empresa, ou None — sem ela nada muda no comportamento do ERPNext."""
-    if not company or not frappe.db.table_exists("tabLigacao Faturacao"):
+    if not company or not frappe.db.table_exists("Ligacao Faturacao"):
         return None
     nome = frappe.db.get_value(DT, {"company": company, "activa": 1}, "name")
     return frappe.get_doc(DT, nome) if nome else None
