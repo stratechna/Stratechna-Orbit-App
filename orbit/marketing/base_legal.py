@@ -33,11 +33,10 @@ MUTAVEIS = (None, "", "Sem registo")
 
 
 def _definicao(campo: str, omissao: int) -> int:
-    try:
-        v = frappe.db.get_single_value("Definicoes de Marketing", campo)
-    except Exception:  # noqa: BLE001
-        return omissao
-    return omissao if v is None else cint(v)
+    # Um Check novo num Single lê-se 0 enquanto ninguém gravar as definições: sem linha gravada vale a omissão.
+    v = frappe.db.sql("SELECT value FROM `tabSingles` WHERE doctype = 'Definicoes de Marketing' AND field = %s",
+                      campo)
+    return omissao if not v or v[0][0] in (None, "") else cint(v[0][0])
 
 
 def colectiva(nif: str | None) -> bool:
