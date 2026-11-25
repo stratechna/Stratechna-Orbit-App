@@ -252,6 +252,11 @@ def associar(marca: str, empresa: str):
         b.append("brand_defaults", {"company": empresa, "default_warehouse": novo_arm})
     b.flags.ignore_permissions = True
     b.save()
+    # os artigos da marca que tinham o armazém antigo por omissão passam à empresa e ao armazém novos
+    if antigo and novo_arm and antigo != novo_arm:
+        frappe.db.sql("""update `tabItem Default` d join tabItem i on i.name = d.parent and d.parenttype = 'Item'
+                         set d.company = %s, d.default_warehouse = %s
+                         where i.brand = %s and d.default_warehouse = %s""", (empresa, novo_arm, marca, antigo))
     # o armazém antigo sem stock nenhum, noutra empresa, desactiva-se (fica no histórico)
     if antigo and novo_arm and antigo != novo_arm and not frappe.db.sql(
             "select 1 from `tabStock Ledger Entry` where warehouse=%s limit 1", antigo):
