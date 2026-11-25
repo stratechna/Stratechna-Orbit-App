@@ -16,7 +16,13 @@
 		{ sel: '.caixa3', flex: [ 2 ] },
 		{ sel: '.caixa:not(.caixa3)', flex: [ 1 ] },
 		{ sel: '.chat', flex: [ 1, 2 ] },
-		{ sel: '.docs', flex: [ 1 ] }
+		{ sel: '.docs', flex: [ 1 ] },
+		// 25-11-2026 (Vítor): também nos documentos — fichas do ERP, faturas/guias/propostas/recibos, tickets, compras
+		{ sel: '.erp-registo', flex: [ 0 ] },
+		{ sel: '.prop-corpo', flex: [ 0 ] },
+		{ sel: '.desk-grelha', flex: [ 0 ] },
+		{ sel: '.compras-rever', flex: [ 1 ] },
+		{ sel: '.fila', flex: [ 0 ] }
 	];
 	var MIN = 160, CHAVE = 'orbit-paineis:';
 	var css = document.createElement( 'style' );

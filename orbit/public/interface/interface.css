@@ -815,3 +815,9 @@ tr.por-ler td b,tr.por-ler td{font-weight:600}
 /* ── 25-11-2026, lote 4: listas do ERP e importar ── */
 .col-ord{display:flex;align-items:center;gap:4px}.col-ord button{all:unset;cursor:pointer;padding:0 4px;color:var(--ink-3)}.col-ord button:hover{color:var(--ink)}
 .imp-cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 12px;margin-top:8px;max-height:260px;overflow:auto}
+
+/* ── 25-11-2026 (Vítor): blocos dos módulos em colunas equilibradas (sem buracos), documentos com colunas redimensionáveis ── */
+.erp-mod{display:block;columns:4 260px;column-gap:16px}
+.erp-mod .erp-sec-mod{break-inside:avoid;display:inline-block;width:100%;margin:0 0 16px;vertical-align:top}
+.erp-sec-mod header{display:flex;justify-content:space-between;align-items:center;gap:8px}
+@media (min-width:1101px){.prop-corpo{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px}.prop-corpo .prop-lado{max-width:none}}

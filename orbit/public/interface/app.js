@@ -3249,14 +3249,20 @@ const ErpModulo = {
     const moeda = (v) => moedaEUR(v);
     const href = (i) => i.tipo === "doc" ? irErp(i.doctype, i.single ? i.doctype : null) : i.tipo === "rel" ? "#/erp-rel/" + encodeURIComponent(i.relatorio) : i.tipo === "mod" ? "#/erp-m/" + encodeURIComponent(i.barra) : i.tipo === "painel" ? "#/erp-painel/" + encodeURIComponent(i.painel) : i.tipo === "nativo" ? "#/" + i.rota : "#/";
     const valorN = (n) => n.tipo === "Currency" ? new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(n.valor || 0) : new Intl.NumberFormat("pt-PT").format(n.valor || 0);
-    return { m, href, nums, valorN, res, moeda };
+    // 25-11-2026 (Vítor): blocos arrumados — sem título passa a «Principal», os longos dividem-se em 1 e 2 (colunas equilibradas no CSS)
+    const secoes = computed(() => { const out = []; for (const sx of (m.value?.secoes || [])) {
+        const t = sx.titulo ? sx.titulo.charAt(0).toUpperCase() + sx.titulo.slice(1) : "Principal";
+        if (sx.itens.length > 10) { const meio = Math.ceil(sx.itens.length / 2);
+          out.push({ ...sx, titulo: t + " · 1", itens: sx.itens.slice(0, meio) }, { ...sx, titulo: t + " · 2", itens: sx.itens.slice(meio), resumos: [] }); }
+        else out.push({ ...sx, titulo: t }); } return out; });
+    return { m, href, nums, valorN, res, moeda, secoes };
   },
   template: `<div v-if="m" class="pad">
     <h1>{{ m.titulo }}</h1><div class="sub" style="margin-bottom:16px">Documentos, configuração e relatórios deste módulo</div>
     <div v-if="nums.length" class="erp-numeros"><div v-for="n in nums" :key="n.rotulo" class="cartao"><small>{{ n.rotulo }}</small><b>{{ valorN(n) }}</b></div></div>
     <div class="erp-mod">
-      <section v-for="s in m.secoes" :key="s.titulo" class="cartao erp-sec-mod">
-        <header v-if="s.titulo"><b>{{ s.titulo.charAt(0).toUpperCase() + s.titulo.slice(1) }}</b></header>
+      <section v-for="s in secoes" :key="s.titulo" class="cartao erp-sec-mod">
+        <header><b>{{ s.titulo }}</b><span class="sub" style="font-weight:400;font-size:12px">{{ s.itens.length }}</span></header>
         <a v-for="l in (s.resumos||[])" :key="l" v-show="res[l]" :href="'#/contas/'+l" class="erp-resumo">
           <span><small>Em dívida</small><b>{{ res[l] && moeda(res[l].divida) }}</b></span>
           <span :class="{alerta: res[l] && res[l].vencido > 0}"><small>Vencido</small><b>{{ res[l] && moeda(res[l].vencido) }}</b></span>
