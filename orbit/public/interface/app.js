@@ -1755,7 +1755,14 @@ const Ficha = {
       apiV("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (vendas.value = r)).catch(() => {});
       if (props.doctype === "CRM Deal") apiP("negocio.do_negocio", { negocio: props.name }).then((r) => (orcs.value = r)).catch(() => {});
       carregarConv();
+      carregarExt();
     };
+    // lote 1 (25-11): «⋯», atribuir, etiquetas, partilhar, anexos e histórico também no CRM
+    const ext = ref(null);
+    const carregarExt = async () => { ext.value = await apiR("extras", { doctype: props.doctype, name: props.name }).catch(() => null); };
+    const apagarRegisto = async () => { if (!confirm("Apagar definitivamente «" + (f.value?.titulo || props.name) + "»? Não se desfaz.")) return;
+      await apiR("apagar", { doctype: props.doctype, name: props.name }, true); toast("Apagado");
+      location.hash = "#/" + ({ "CRM Lead": "leads", "CRM Deal": "negocios", "Contact": "contactos", "CRM Organization": "empresas" }[props.doctype] || "inicio"); };
     const vendas = ref(null);
     // 25-11-2026: orçamentos do negócio (docs/PLANO-ORCAMENTO-NEGOCIO-ORBIT.md)
     const orcs = ref(null);
@@ -1840,13 +1847,14 @@ const Ficha = {
     const ic = (t) => IC_EVENTO[t] || IC_EVENTO.nota;
     const marcarEmail = () => { window.__ref_email = (f.value && f.value.email_principal) || ""; };
     const novoEmail = ref(false);
-    return { orcs, criarOrcamento, COR_ORC, irErp, tornarPrincipal, PAISES_PT, alternarCheck, alternarMarca, edMorada, editarMorada, gravarMorada, novoEmail, conv, convForm, aConverter, abrirConversao, converter, pode, assocAberta, assocQ, assocRes, abrirAssoc, procurarAssoc, ligarAssoc, tirarAssoc, vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
+    return { ext, carregarExt, apagarRegisto, orcs, criarOrcamento, COR_ORC, irErp, tornarPrincipal, PAISES_PT, alternarCheck, alternarMarca, edMorada, editarMorada, gravarMorada, novoEmail, conv, convForm, aConverter, abrirConversao, converter, pode, assocAberta, assocQ, assocRes, abrirAssoc, procurarAssoc, ligarAssoc, tirarAssoc, vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
       grupos, mudarFase, NOMES, tit, sub, link, data, eur, ic, cor, ESTADO_COR };
   },
   template: `
   <div class="ficha" v-if="f">
     <aside class="col-esq">
-      <div style="font-size:13px;display:flex;justify-content:space-between"><a href="javascript:history.back()">← Voltar</a></div>
+      <div style="font-size:13px;display:flex;justify-content:space-between;align-items:center"><a href="javascript:history.back()">← Voltar</a>
+        <RegistoMenu v-if="ext" :doctype="doctype" :name="name" :ext="ext" :apagar="true" :rota-novo="false" @recarregar="carregarExt" @apagado="apagarRegisto"/></div>
       <div class="cabeca">
         <AvFoto :email="f.email_principal || emailDoSite((f.props.find(p=>p.campo==='website') || {}).valor)" :nome="f.titulo" :tam="56"/>
         <h1>{{ f.titulo }}</h1><div class="sub">{{ f.sub }}</div>
@@ -1940,9 +1948,13 @@ const Ficha = {
         <button :class="{ativo:filtro==='tarefas'}" @click="filtro='tarefas'">Tarefas</button>
         <button :class="{ativo:filtro==='reunioes'}" @click="filtro='reunioes'">Reuniões</button>
         <button :class="{ativo:filtro==='tickets'}" @click="filtro='tickets'">Tickets</button>
+        <button :class="{ativo:filtro==='anexos'}" @click="filtro='anexos'">Anexos <span class="sub">{{ ext?.anexos?.length || '' }}</span></button>
+        <button :class="{ativo:filtro==='historico'}" @click="filtro='historico'">Histórico</button>
       </div>
       <FichaDetalhes v-if="filtro==='detalhes'" :doctype="doctype" :name="name" :key="doctype+name" @mudou="carregar"/>
       <ConversaRegisto v-else-if="filtro==='conversa'" :doctype="doctype" :nome="name" :key="'c'+doctype+name"/>
+      <RegistoHistorico v-else-if="filtro==='historico'" :doctype="doctype" :name="name" :key="'h'+doctype+name"/>
+      <div v-else-if="filtro==='anexos'" class="cartao" style="padding:14px"><RegistoLateral v-if="ext" :doctype="doctype" :name="name" :ext="ext" :partes="['anexos']"/></div>
       <template v-else>
       <div class="cartao compor" v-if="modo==='nota'"><textarea v-model="notaTxt" rows="1" :placeholder="'Escrever uma nota sobre ' + f.titulo + '…'" @keydown.meta.enter="enviarNota" @keydown.ctrl.enter="enviarNota"></textarea><button class="btn sm prim" @click="enviarNota" :disabled="!notaTxt.trim()">Gravar nota</button></div>
       <div class="cartao compor" v-else><input v-model="tarefaTxt" placeholder="Nova tarefa…" @keyup.enter="enviarTarefa"><input type="date" v-model="tarefaData" style="flex:none;width:150px"><button class="btn sm prim" @click="enviarTarefa" :disabled="!tarefaTxt.trim()">Criar tarefa</button></div>
@@ -1970,6 +1982,7 @@ const Ficha = {
     </div>
 
     <aside class="col-dir">
+      <RegistoLateral v-if="ext" :doctype="doctype" :name="name" :ext="ext" :partes="['atribuir','etiquetas','partilha']" class="reg-crm"/>
       <template v-for="(lista, dt) in f.assoc" :key="dt">
         <template v-if="lista.length || dt!=='CRM Lead'">
           <div class="bloco-tit">{{ NOMES[dt] }} <span class="sub" style="font-weight:400"><template v-if="pode(dt)"><a href="#" @click.prevent="abrirAssoc(dt)">+ Adicionar</a> · </template>{{ lista.length }}</span></div>
@@ -3436,6 +3449,7 @@ const ErpEmitir = {
         <p class="sub" style="margin:0;font-size:12px">As linhas vêm com o preço e o desconto do documento de origem e os dois documentos ficam associados.</p>
         <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" @click="imp=null">Cancelar</button><button class="btn prim" :disabled="!imp.escolhido || imp.aImportar" @click="importar">{{ imp.aImportar ? 'A importar…' : 'Importar' }}</button></div>
       </div></div></div>
+    <div style="padding:0 24px 24px"><RegistoArea v-if="name && name!=='novo'" :doctype="dt" :name="name" :key="'ra'+name"/></div>
   </div>`,
 };
 
@@ -3527,6 +3541,7 @@ const ErpRecibo = {
           <section class="cartao"><h2>Recibo certificado</h2><div class="prop-tot"><span>Estado</span><b>{{ doc.orbit_documento_certificado ? 'Enviado ao programa' : 'Sem programa certificado ligado' }}</b></div></section></aside>
       </div>
     </template>
+    <div style="padding:0 24px 24px"><RegistoArea v-if="name && name!=='novo'" doctype="Payment Entry" :name="name" :key="'ra'+name"/></div>
   </div>`,
 };
 const ErpProposta = {
@@ -3734,7 +3749,199 @@ const ErpProposta = {
         <div style="text-align:right"><button class="btn prim" :disabled="a" @click="enviar">Enviar</button></div>
       </div>
     </div></div>
+    <div style="padding:0 24px 24px"><RegistoArea v-if="name && name!=='novo'" doctype="Quotation" :name="name" :key="'ra'+name"/></div>
   </div><div v-else class="vazio">A carregar…</div>`,
+};
+
+// ── Lote 1 (25-11-2026): o que qualquer registo tem no ecrã antigo — menu «⋯», atribuir, etiquetas, partilhar,
+// anexos, histórico e ligações (orbit/interface/registo.py). Registados em _app.component para servirem também a ficha do CRM.
+const ROTAS_INV = Object.fromEntries(Object.entries(ROTAS_DT).map(([k, v]) => [v, k]));
+const apiR = (m, a = {}, post = false) => api("registo." + m, a, post);
+const tamanho = (b) => !b ? "" : b < 1024 ? b + " B" : b < 1048576 ? Math.round(b / 1024) + " KB" : (b / 1048576).toFixed(1) + " MB";
+const RegistoMenu = {
+  props: ["doctype", "name", "ext", "apagar", "rotaNovo"],
+  emits: ["recarregar", "apagado"],
+  setup(props, { emit }) {
+    const aberto = ref(false), imp = ref(null), mail = ref(null), ren = ref(null), a = ref(false);
+    const fechar = () => { aberto.value = false; };
+    onMounted(() => document.addEventListener("click", fechar)); onUnmounted(() => document.removeEventListener("click", fechar));
+    const abrirNovo = (doc) => { try { sessionStorage.setItem("orbit.erp.novo", JSON.stringify(doc)); } catch (e) {} location.hash = irErp(props.doctype, "novo"); };
+    const duplicar = async () => { const r = await apiR("duplicar", { doctype: props.doctype, name: props.name }, true); abrirNovo(r.doc); };
+    const corrigir = async () => { const r = await apiR("corrigir", { doctype: props.doctype, name: props.name }, true); abrirNovo(r.doc); };
+    const copiar = async () => { try { await navigator.clipboard.writeText(location.href); toast("Ligação copiada"); } catch (e) { toast(location.href); } };
+    const seguir = async () => { const r = await apiR("seguir", { doctype: props.doctype, name: props.name, seguir: props.ext.seguir ? 0 : 1 }, true);
+      props.ext.seguir = r.seguir; toast(r.seguir ? "Passa a receber as alterações por email" : "Deixou de seguir"); };
+    const abrirImp = () => { const i = props.ext.impressao; imp.value = { formato: i.padrao, cabecalho: i.cabecalho, lingua: i.lingua }; };
+    const urlImp = (pdf) => { const i = imp.value; const p = new URLSearchParams({ doctype: props.doctype, name: props.name, format: i.formato,
+        no_letterhead: i.cabecalho ? 0 : 1, letterhead: i.cabecalho || "", _lang: i.lingua });
+      return (pdf ? "/api/method/frappe.utils.print_format.download_pdf?" : "/printview?") + p.toString(); };
+    const abrirMail = async () => { const s = await apiR("email_sugestao", { doctype: props.doctype, name: props.name });
+      const i = props.ext.impressao;
+      mail.value = { para: s.para, cc: "", bcc: "", verCc: false, assunto: s.assunto, mensagem: "", pdf: true, formato: i.padrao, cabecalho: i.cabecalho, lingua: i.lingua, anexos: [] }; };
+    const enviar = async () => { const m = mail.value; a.value = true;
+      try { await apiR("enviar_email", { doctype: props.doctype, name: props.name, para: m.para, cc: m.cc, bcc: m.bcc, assunto: m.assunto, mensagem: m.mensagem,
+        anexar_pdf: m.pdf ? 1 : 0, formato: m.formato, cabecalho: m.cabecalho, lingua: m.lingua, anexos: JSON.stringify(m.anexos) }, true);
+        toast("Email enviado"); mail.value = null; emit("recarregar"); } finally { a.value = false; } };
+    const renomear = async () => { a.value = true;
+      try { const r = await apiR("renomear", { doctype: props.doctype, name: props.name, novo: ren.value.novo, juntar: ren.value.juntar ? 1 : 0 }, true);
+        ren.value = null; toast("Nome mudado"); location.hash = irErp(props.doctype, r.name); } finally { a.value = false; } };
+    return { aberto, imp, mail, ren, a, duplicar, corrigir, copiar, seguir, abrirImp, urlImp, abrirMail, enviar, renomear, emit };
+  },
+  template: `<span class="reg-menu" @click.stop>
+    <button class="btn" @click="aberto=!aberto" title="Mais ações" aria-label="Mais ações">⋯</button>
+    <div v-if="aberto && ext" class="cartao reg-menu-lista" @click="aberto=false">
+      <button v-if="ext.pode.imprimir" @click="abrirImp">Imprimir…</button>
+      <button v-if="ext.pode.email" @click="abrirMail">Enviar por email…</button>
+      <button v-if="ext.pode.criar && rotaNovo !== false" @click="duplicar">Duplicar</button>
+      <button v-if="ext.pode.corrigir" @click="corrigir">Corrigir (nova versão)</button>
+      <button v-if="ext.pode.renomear" @click="ren={novo:name, juntar:false}">Mudar o nome…</button>
+      <button @click="copiar">Copiar a ligação</button>
+      <button @click="seguir">{{ ext.seguir ? 'Deixar de seguir' : 'Seguir (alterações por email)' }}</button>
+      <button v-if="apagar && ext.pode.apagar" class="perigo" @click="emit('apagado')">Apagar…</button>
+    </div>
+    <div v-if="imp" class="modal-fundo" @click.self="imp=null"><div class="modal" style="max-width:460px">
+      <header><b>Imprimir</b><button class="btn sm" @click="imp=null">Fechar</button></header>
+      <div class="reg-form">
+        <label class="erp-campo"><span>Formato</span><select v-model="imp.formato"><option v-for="f in ext.impressao.formatos" :key="f" :value="f">{{ f==='Standard' ? 'Padrão' : f }}</option></select></label>
+        <label class="erp-campo"><span>Papel timbrado</span><select v-model="imp.cabecalho"><option value="">Sem papel timbrado</option><option v-for="c in ext.impressao.cabecalhos" :key="c" :value="c">{{ c }}</option></select></label>
+        <label class="erp-campo"><span>Língua</span><select v-model="imp.lingua"><option v-for="l in ext.impressao.linguas" :key="l.v" :value="l.v">{{ l.r }}</option></select></label>
+        <div class="reg-botoes"><a class="btn" :href="urlImp(false)" target="_blank">Pré-visualizar</a><a class="btn prim" :href="urlImp(true)" target="_blank">Descarregar PDF</a></div>
+      </div></div></div>
+    <div v-if="mail" class="modal-fundo" @click.self="mail=null"><div class="modal" style="max-width:640px">
+      <header><b>Enviar por email</b><button class="btn sm" @click="mail=null">Fechar</button></header>
+      <form class="reg-form" @submit.prevent="enviar">
+        <label class="erp-campo"><span>Para<span class="obrig">*</span></span><input v-model="mail.para" required placeholder="email@exemplo.pt, outro@exemplo.pt"></label>
+        <a v-if="!mail.verCc" href="javascript:void 0" class="sub" style="font-size:12px" @click="mail.verCc=true">+ Cc / Bcc</a>
+        <template v-else><label class="erp-campo"><span>Cc</span><input v-model="mail.cc"></label><label class="erp-campo"><span>Bcc</span><input v-model="mail.bcc"></label></template>
+        <label class="erp-campo"><span>Assunto</span><input v-model="mail.assunto"></label>
+        <div class="erp-campo"><span>Mensagem</span><EditorRico v-model="mail.mensagem"/></div>
+        <label class="chk-col"><input type="checkbox" v-model="mail.pdf"> Anexar o documento em PDF</label>
+        <div v-if="mail.pdf" class="reg-linha3">
+          <select v-model="mail.formato"><option v-for="f in ext.impressao.formatos" :key="f" :value="f">{{ f==='Standard' ? 'Padrão' : f }}</option></select>
+          <select v-model="mail.cabecalho"><option value="">Sem papel timbrado</option><option v-for="c in ext.impressao.cabecalhos" :key="c" :value="c">{{ c }}</option></select>
+          <select v-model="mail.lingua"><option v-for="l in ext.impressao.linguas" :key="l.v" :value="l.v">{{ l.r }}</option></select></div>
+        <template v-if="ext.anexos.length"><span class="sub" style="font-size:12px">Anexar também:</span>
+          <label v-for="x in ext.anexos" :key="x.id" class="chk-col"><input type="checkbox" :value="x.id" v-model="mail.anexos"> {{ x.nome }}</label></template>
+        <div class="reg-botoes"><button type="button" class="btn" @click="mail=null">Cancelar</button><button class="btn prim" :disabled="a">{{ a ? 'A enviar…' : 'Enviar' }}</button></div>
+      </form></div></div>
+    <div v-if="ren" class="modal-fundo" @click.self="ren=null"><div class="modal" style="max-width:440px">
+      <header><b>Mudar o nome</b><button class="btn sm" @click="ren=null">Fechar</button></header>
+      <form class="reg-form" @submit.prevent="renomear"><label class="erp-campo"><span>Novo nome</span><input v-model="ren.novo" required></label>
+        <label class="chk-col"><input type="checkbox" v-model="ren.juntar"> Juntar a um registo que já tenha esse nome</label>
+        <div class="reg-botoes"><button class="btn prim" :disabled="a">Mudar</button></div></form></div></div>
+  </span>`,
+};
+
+const RegistoLateral = {
+  props: { doctype: String, name: String, ext: Object, partes: { type: Array, default: () => ["atribuir", "etiquetas", "anexos", "partilha"] } },
+  emits: ["mudou"],
+  setup(props, { emit }) {
+    const pessoas = ref([]), escolher = ref(null), tag = ref(""), sug = ref([]), part = ref(null), a = ref(false);
+    const eu = () => window.__ctx?.utilizador || window.__ctx?.email || "";
+    const carregarPessoas = async () => { if (!pessoas.value.length) pessoas.value = await apiConv("pessoas"); };
+    const aplicar = (r) => { Object.assign(props.ext, r); emit("mudou"); };
+    const atribuir = async (lista) => { if (!lista.length) return; aplicar(await apiR("atribuir", { doctype: props.doctype, name: props.name, utilizadores: JSON.stringify(lista) }, true)); escolher.value = null; };
+    const desatribuir = async (u) => aplicar(await apiR("desatribuir", { doctype: props.doctype, name: props.name, utilizador: u }, true));
+    let tq; const procurarTag = () => { clearTimeout(tq); tq = setTimeout(async () => { sug.value = tag.value.trim() ? await apiR("etiquetas_sugeridas", { doctype: props.doctype, q: tag.value }) : []; }, 200); };
+    const porTag = async (t, tirar) => { t = (t || "").trim(); if (!t) return; aplicar(await apiR("etiqueta", { doctype: props.doctype, name: props.name, etiqueta: t, tirar: tirar ? 1 : 0 }, true)); tag.value = ""; sug.value = []; };
+    const partilhar = async () => { const p = part.value; aplicar(await apiR("partilhar", { doctype: props.doctype, name: props.name, utilizador: p.todos ? null : p.utilizador, todos: p.todos ? 1 : 0, ler: 1, escrever: p.escrever ? 1 : 0, partilhar: p.partilhar ? 1 : 0 }, true)); part.value = null; };
+    const tirarPartilha = async (s) => aplicar(await apiR("partilhar", { doctype: props.doctype, name: props.name, utilizador: s.todos ? null : s.utilizador, tirar: 1 }, true));
+    const entrada = ref(null);
+    const carregar = async (ev) => { const fs = [...(ev.target.files || [])]; if (!fs.length) return; a.value = true;
+      try { for (const f of fs) await carregarFicheiro(f, { doctype: props.doctype, docname: props.name, privado: 1 });
+        aplicar(await apiR("extras", { doctype: props.doctype, name: props.name })); toast(fs.length > 1 ? fs.length + " ficheiros anexados" : "Ficheiro anexado"); }
+      finally { a.value = false; ev.target.value = ""; } };
+    const privado = async (x) => { props.ext.anexos = await apiR("anexo_privado", { id: x.id, privado: x.privado ? 0 : 1 }, true); };
+    const tirarAnexo = async (x) => { if (!confirm(`Apagar o anexo «${x.nome}»?`)) return; props.ext.anexos = await apiR("anexo_apagar", { id: x.id }, true); emit("mudou"); };
+    const largar = (ev) => { const fs = ev.dataTransfer?.files; if (fs?.length) carregar({ target: { files: fs, value: "" } }); };
+    const ver = (x) => props.partes.includes(x);
+    return { ver, pessoas, escolher, carregarPessoas, atribuir, desatribuir, eu, tag, sug, procurarTag, porTag, part, partilhar, tirarPartilha, entrada, carregar, privado, tirarAnexo, largar, a, data, tamanho, ini, cor };
+  },
+  template: `<div class="reg-lateral">
+    <section v-if="ver('atribuir')"><div class="bloco-tit">Atribuído a
+      <span class="sub" style="font-weight:400" v-if="ext.pode.escrever"><a href="javascript:void 0" @click="atribuir([eu()])" v-if="eu() && !ext.atribuidos.some(x=>x.utilizador===eu())">a mim</a><template v-if="eu() && !ext.atribuidos.some(x=>x.utilizador===eu())"> · </template><a href="javascript:void 0" @click="carregarPessoas(); escolher=[]">+ Atribuir</a></span></div>
+      <div v-if="!ext.atribuidos.length" class="sub" style="font-size:13px">Ninguém</div>
+      <div class="reg-chips"><span v-for="x in ext.atribuidos" :key="x.utilizador" class="reg-chip"><span class="av" :style="{background:cor(x.nome),width:'20px',height:'20px',fontSize:'10px'}">{{ ini(x.nome) }}</span>{{ x.nome }}<button v-if="ext.pode.escrever" @click="desatribuir(x.utilizador)" title="Tirar">×</button></span></div>
+      <div v-if="escolher" class="reg-escolha cartao">
+        <label v-for="p in pessoas" :key="p.email" class="chk-col"><input type="checkbox" :value="p.email" v-model="escolher" :disabled="ext.atribuidos.some(x=>x.utilizador===p.email)"> {{ p.nome }}</label>
+        <div class="reg-botoes"><button class="btn sm" @click="escolher=null">Cancelar</button><button class="btn sm prim" :disabled="!escolher.length" @click="atribuir(escolher)">Atribuir</button></div></div>
+    </section>
+    <section v-if="ver('etiquetas')"><div class="bloco-tit">Etiquetas</div>
+      <div class="reg-chips"><span v-for="t in ext.etiquetas" :key="t" class="reg-chip etq">{{ t }}<button v-if="ext.pode.escrever" @click="porTag(t,true)" title="Tirar">×</button></span></div>
+      <div v-if="ext.pode.escrever" class="reg-tag"><input v-model="tag" placeholder="+ Etiqueta" @input="procurarTag" @keydown.enter.prevent="porTag(tag)">
+        <div v-if="sug.length" class="cartao reg-sug"><div v-for="s in sug" :key="s" @mousedown.prevent="porTag(s)">{{ s }}</div></div></div>
+    </section>
+    <section v-if="ver('anexos')" @dragover.prevent @drop.prevent="largar"><div class="bloco-tit">Anexos <span class="sub" style="font-weight:400">{{ ext.anexos.length }}<template v-if="ext.pode.escrever"> · <a href="javascript:void 0" @click="entrada.click()">{{ a ? 'A carregar…' : '+ Anexar' }}</a></template></span></div>
+      <input ref="entrada" type="file" multiple style="display:none" @change="carregar">
+      <div v-if="!ext.anexos.length" class="sub reg-largar" style="font-size:13px">{{ ext.pode.escrever ? 'Largue aqui os ficheiros ou use «+ Anexar».' : '—' }}</div>
+      <div v-for="x in ext.anexos" :key="x.id" class="reg-anexo">
+        <a :href="x.url" target="_blank" :title="x.nome"><b>{{ x.nome }}</b><small class="sub">{{ tamanho(x.tamanho) }} · {{ data(x.quando,false) }}<template v-if="x.campo"> · campo da ficha</template></small></a>
+        <button v-if="ext.pode.escrever" class="reg-ic" :title="x.privado ? 'Privado — só quem entra no Orbit. Tornar público' : 'Público — qualquer pessoa com a ligação. Tornar privado'" @click="privado(x)">{{ x.privado ? '🔒' : '🌐' }}</button>
+        <button v-if="ext.pode.escrever" class="reg-ic" title="Apagar o anexo" @click="tirarAnexo(x)">×</button>
+      </div>
+    </section>
+    <section v-if="ver('partilha') && (ext.pode.partilhar || ext.partilhas.length)"><div class="bloco-tit">Partilhado com <a v-if="ext.pode.partilhar" class="sub" style="font-weight:400" href="javascript:void 0" @click="carregarPessoas(); part={utilizador:'',escrever:false,partilhar:false,todos:false}">+ Partilhar</a></div>
+      <div v-if="!ext.partilhas.length" class="sub" style="font-size:13px">Só quem tem acesso pelo perfil.</div>
+      <div v-for="s in ext.partilhas" :key="s.utilizador||'todos'" class="reg-anexo"><span><b>{{ s.nome }}</b><small class="sub">{{ s.escrever ? 'pode alterar' : 'só ler' }}{{ s.partilhar ? ' · pode partilhar' : '' }}</small></span>
+        <button v-if="ext.pode.partilhar" class="reg-ic" title="Deixar de partilhar" @click="tirarPartilha(s)">×</button></div>
+      <div v-if="part" class="reg-escolha cartao">
+        <label class="chk-col"><input type="checkbox" v-model="part.todos"> Toda a equipa</label>
+        <select v-if="!part.todos" v-model="part.utilizador"><option value="" disabled>Pessoa…</option><option v-for="p in pessoas" :key="p.email" :value="p.email">{{ p.nome }}</option></select>
+        <label class="chk-col"><input type="checkbox" v-model="part.escrever"> Pode alterar</label>
+        <label class="chk-col"><input type="checkbox" v-model="part.partilhar"> Pode partilhar</label>
+        <div class="reg-botoes"><button class="btn sm" @click="part=null">Cancelar</button><button class="btn sm prim" :disabled="!part.todos && !part.utilizador" @click="partilhar">Partilhar</button></div></div>
+    </section>
+  </div>`,
+};
+
+const RegistoHistorico = {
+  props: ["doctype", "name"],
+  setup(props) { const h = ref(null); onMounted(async () => { h.value = await apiR("historico", { doctype: props.doctype, name: props.name }); }); return { h, data, statusPt }; },
+  template: `<div class="reg-hist"><div v-if="!h" class="carregar">A carregar…</div>
+    <div v-for="(v,i) in h||[]" :key="i" class="reg-versao">
+      <div class="sub" style="font-size:12px"><b style="color:var(--ink)">{{ v.quem }}</b> · {{ data(v.quando) }}</div>
+      <div v-if="v.criado" style="font-size:13px">criou este registo</div>
+      <div v-for="(x,k) in v.alteracoes" :key="k" class="reg-alt"><span class="campo">{{ x.campo }}</span>
+        <template v-if="x.acao"> <span class="sub">{{ x.acao }}</span></template>
+        <template v-else><span class="de">{{ statusPt(x.de) }}</span> → <span class="para">{{ statusPt(x.para) }}</span></template></div>
+    </div></div>`,
+};
+
+const RegistoLigacoes = {
+  props: ["doctype", "name"],
+  setup(props) { const l = ref(null); onMounted(async () => { l.value = await apiR("ligacoes", { doctype: props.doctype, name: props.name }); });
+    const ir = (dt, n) => (ROTAS_INV[dt] ? "#/" + ROTAS_INV[dt] + "/" + encodeURIComponent(n) : irErp(dt, n)); return { l, ir, data, statusPt }; },
+  template: `<div class="reg-lig"><div v-if="!l" class="carregar">A carregar…</div><template v-else>
+    <template v-if="l.origem.length"><div class="bloco-tit">Ligado a</div>
+      <div class="reg-chips"><a v-for="o in l.origem" :key="o.doctype+o.name" class="reg-chip" :href="ir(o.doctype,o.name)"><small class="sub">{{ o.rotulo }}</small> {{ o.name }}</a></div></template>
+    <div class="bloco-tit" style="margin-top:12px">Nasceu deste registo ou aponta para ele</div>
+    <div v-if="!l.ligados.length" class="sub" style="font-size:13px">Nenhum documento ligado.</div>
+    <details v-for="g in l.ligados" :key="g.doctype" class="reg-grupo" open><summary><b>{{ g.rotulo }}</b> <span class="sub">{{ g.n }}</span>
+      <a class="sub" style="font-size:12px;margin-left:auto" :href="irErp(g.doctype)">lista →</a></summary>
+      <a v-for="x in g.itens" :key="x.name" :href="ir(g.doctype,x.name)" class="reg-anexo"><span><b>{{ x.titulo }}</b><small class="sub" v-if="x.titulo!==x.name">{{ x.name }}</small></span><span class="etq" v-if="x.estado">{{ statusPt(x.estado) }}</span></a>
+    </details></template></div>`,
+};
+
+const RegistoArea = {
+  props: ["doctype", "name"],
+  setup(props) {
+    const ext = ref(null), sep = ref("conversa");
+    const carregar = async () => { ext.value = await apiR("extras", { doctype: props.doctype, name: props.name }).catch(() => null); };
+    onMounted(carregar);
+    return { ext, sep, carregar };
+  },
+  template: `<div v-if="ext" class="erp-registo">
+    <div class="cartao erp-registo-principal">
+      <div class="vistas" style="padding:0 14px;align-items:center"><button :class="{ativo: sep==='conversa'}" @click="sep='conversa'">Comentários</button><button :class="{ativo: sep==='historico'}" @click="sep='historico'">Histórico</button><button :class="{ativo: sep==='ligacoes'}" @click="sep='ligacoes'">Ligações</button>
+        <span style="margin-left:auto;flex:none"><RegistoMenu :doctype="doctype" :name="name" :ext="ext" @recarregar="carregar"/></span></div>
+      <div style="padding:12px 14px">
+        <ConversaRegisto v-if="sep==='conversa'" :doctype="doctype" :nome="name" :key="'c'+name"/>
+        <RegistoHistorico v-else-if="sep==='historico'" :doctype="doctype" :name="name"/>
+        <RegistoLigacoes v-else :doctype="doctype" :name="name"/>
+      </div>
+    </div>
+    <aside class="cartao"><RegistoLateral :doctype="doctype" :name="name" :ext="ext"/></aside>
+  </div>`,
 };
 
 const ErpFicha = {
@@ -3743,6 +3950,13 @@ const ErpFicha = {
   setup(props) {
     const meta = ref(null); const doc = ref(null); const novo = ref(false); const podeGravar = ref(true); const sujo = ref(false); const a = ref(false);
     const aba = ref(0); const fechadas = ref({}); const nomeNovo = ref(""); const criarOps = ref([]); const aviso = ref("");
+    // lote 1 (25-11): anexos, atribuir, etiquetas, partilhar, histórico, ligações, «⋯», anterior/seguinte
+    const ext = ref(null); const viz = ref({}); const separador = ref("conversa");
+    const carregarExt = async () => { if (props.name === "novo" || !props.name) return;
+      ext.value = await apiR("extras", { doctype: props.doctype, name: props.name }).catch(() => null);
+      viz.value = await apiR("vizinhos", { doctype: props.doctype, name: props.name }).catch(() => ({})); };
+    const teclaS = (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); if (!soLeitura.value && (novo.value || sujo.value) && !a.value) gravar(); } };
+    onMounted(() => { window.addEventListener("keydown", teclaS); carregarExt(); }); onUnmounted(() => window.removeEventListener("keydown", teclaS));
     const carregar = async () => {
       meta.value = await metaErp(props.doctype);
       const r = await api("erp.documento", { doctype: props.doctype, name: props.name === "novo" ? undefined : props.name });
@@ -3869,16 +4083,17 @@ const ErpFicha = {
       a.value = true;
       try { const r = await api("erp." + m, { doctype: props.doctype, name: doc.value.name }, true);
         if (m === "apagar") { toast("Apagado"); location.hash = irErp(props.doctype); return; }
-        doc.value = r.doc; await nextTick(); sujo.value = false; toast(m === "submeter" ? "Submetido" : "Cancelado");
+        carregarExt(); doc.value = r.doc; await nextTick(); sujo.value = false; toast(m === "submeter" ? "Submetido" : "Cancelado");
       } finally { a.value = false; }
     };
     const aberta = (s, i) => !(s.collapsible && !fechadas.value[i + ":" + s.label]);
     const alternar = (s, i) => { fechadas.value[i + ":" + s.label] = !fechadas.value[i + ":" + s.label]; };
-    return { statusPt, meta, doc, novo, sujo, a, aba, abasVis, abasBarra, abaVisivel, escolherAba, condTexto, secEscondida, botao, visivel, roCampo, obrig, secVisivel, tituloDoc, gravar, accao, docstatus, soLeitura, aberta, alternar, ESTADO_DOC, irErp, precisaNome, nomeNovo, cor, ini, criarOps, criarDe, moeda, pdf, aviso, tr };
+    return { ext, viz, separador, carregarExt, statusPt, meta, doc, novo, sujo, a, aba, abasVis, abasBarra, abaVisivel, escolherAba, condTexto, secEscondida, botao, visivel, roCampo, obrig, secVisivel, tituloDoc, gravar, accao, docstatus, soLeitura, aberta, alternar, ESTADO_DOC, irErp, precisaNome, nomeNovo, cor, ini, criarOps, criarDe, moeda, pdf, aviso, tr };
   },
   template: `<div v-if="meta && doc" class="erp-ficha">
     <div class="erp-topo">
-      <a class="sub" :href="irErp(doctype)" v-if="!meta.single">← {{ meta.rotulo }}</a>
+      <div class="erp-nav" v-if="!meta.single"><a class="sub" :href="irErp(doctype)">← {{ meta.rotulo }}</a>
+        <span v-if="!novo" class="erp-viz"><a v-if="viz.anterior" :href="irErp(doctype, viz.anterior)" title="Anterior na lista" class="btn sm">‹</a><a v-if="viz.seguinte" :href="irErp(doctype, viz.seguinte)" title="Seguinte na lista" class="btn sm">›</a></span></div>
       <div class="erp-tit"><span class="av" :style="{background:cor(doc.name||'n')}">{{ ini(tituloDoc) }}</span>
         <div class="cresce"><h1>{{ tituloDoc }}</h1><div class="sub">{{ meta.rotulo }}<span v-if="!novo && !meta.single && tituloDoc!==tr(doctype, doc.name)"> · {{ tr(doctype, doc.name) }}</span></div></div>
         <span v-if="meta.submetivel && !novo" class="etq" :class="ESTADO_DOC[docstatus][1]">{{ doc.status ? statusPt(doc.status) : ESTADO_DOC[docstatus][0] }}</span>
@@ -3890,6 +4105,7 @@ const ErpFicha = {
           <button v-if="meta.pode.delete && !novo && docstatus!==1 && !meta.single" class="btn" :disabled="a" @click="accao('apagar','Apagar definitivamente este registo?')">Apagar</button>
           <a v-if="meta.transacao && pdf" class="btn" :href="pdf" target="_blank">PDF</a>
           <button v-for="o in criarOps" :key="o.doctype" class="btn" :disabled="a" @click="criarDe(o)">Criar {{ o.rotulo }} →</button>
+          <RegistoMenu v-if="ext && !novo && !meta.single" :doctype="doctype" :name="doc.name" :ext="ext" @recarregar="carregarExt"/>
         </div>
       </div>
       <div v-if="meta.transacao && doc.grand_total !== undefined" class="erp-totais cartao">
@@ -3923,6 +4139,17 @@ const ErpFicha = {
           </div>
         </section>
       </template>
+    </div>
+    <div v-if="ext && !novo && !meta.single" class="erp-registo">
+      <div class="cartao erp-registo-principal">
+        <div class="vistas" style="padding:0 14px"><button :class="{ativo: separador==='conversa'}" @click="separador='conversa'">Comentários</button><button :class="{ativo: separador==='historico'}" @click="separador='historico'">Histórico</button><button :class="{ativo: separador==='ligacoes'}" @click="separador='ligacoes'">Ligações</button></div>
+        <div style="padding:12px 14px">
+          <ConversaRegisto v-if="separador==='conversa'" :doctype="doctype" :nome="doc.name" :key="'c'+doc.name"/>
+          <RegistoHistorico v-else-if="separador==='historico'" :doctype="doctype" :name="doc.name" :key="'h'+doc.modified"/>
+          <RegistoLigacoes v-else :doctype="doctype" :name="doc.name" :key="'l'+doc.name"/>
+        </div>
+      </div>
+      <aside class="cartao"><RegistoLateral :doctype="doctype" :name="doc.name" :ext="ext"/></aside>
     </div>
   </div><div v-else class="vazio">A carregar…</div>`,
 };
@@ -4494,7 +4721,8 @@ const App = {
   <div v-else class="arranque">Stratechna Orbit</div>`,
 };
 
-const _app = createApp(App).component("AvFoto", AvFoto);
+const _app = createApp(App).component("AvFoto", AvFoto).component("RegistoMenu", RegistoMenu).component("RegistoLateral", RegistoLateral)
+  .component("RegistoHistorico", RegistoHistorico).component("RegistoLigacoes", RegistoLigacoes).component("RegistoArea", RegistoArea).component("EditorRico", EditorRico).component("ConversaRegisto", ConversaRegisto);
 _app.config.globalProperties.emailDoSite = emailDoSite;
 // 25-11-2026: um ecrã que falha a carregar (ex.: sem permissão) deixava «A carregar…» para sempre — passa a dizer porquê.
 // Só falhas ao ABRIR (setup/mounted): uma falha ao gravar já mostra o aviso e não pode tirar o formulário do ecrã.
