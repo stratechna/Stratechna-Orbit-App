@@ -340,7 +340,10 @@ const Tarefas = {
       await apiT("criar", { titulo: nova.value.titulo, data: nova.value.data || null, projeto: nova.value.projeto || null }, true);
       nova.value = { titulo: "", data: "", projeto: nova.value.projeto }; toast("Tarefa criada"); carregar();
     };
-    return { vista, itens, q, grupos, feita, nova, criar, projs, link, data };
+    // lote 2 (25-11): a tarefa abre — do CRM numa janela com todos os campos, do projeto na ficha completa
+    const aberta = ref(null);
+    const abrir = (t) => { if (t.tipo === "crm") aberta.value = { id: t.id }; else location.hash = irErp("Task", t.id); };
+    return { vista, itens, q, grupos, feita, nova, criar, projs, link, data, aberta, abrir, carregar };
   },
   template: `
   <div>
@@ -361,7 +364,7 @@ const Tarefas = {
       <header><h2 :style="g.g==='atrasadas'?{color:'var(--acao)'}:{}">{{ g.r }} <span class="sub" style="font-weight:400">{{ g.itens.length }}</span></h2></header>
       <div class="linha" v-for="t in g.itens" :key="t.tipo+t.id">
         <span class="chk" @click="feita(t)" title="Marcar como concluída" style="cursor:pointer"></span>
-        <div class="cresce">{{ t.titulo }}<small>
+        <div class="cresce"><a href="javascript:void 0" class="tarefa-tit" @click="abrir(t)">{{ t.titulo }}</a><small>
           <a v-if="t.projeto" :href="'#/projeto/'+encodeURIComponent(t.projeto)">{{ t.projeto_nome || t.projeto }}</a>
           <a v-else-if="t.ref" :href="link(t.ref[0],t.ref[1])">{{ t.ref_titulo }}</a>
           <span v-if="t.dono"> · {{ t.dono }}</span></small></div>
@@ -369,6 +372,7 @@ const Tarefas = {
         <span class="sub" v-if="t.data">{{ data(t.data,false) }}</span>
       </div>
     </div>
+    <TarefaForm v-if="aberta" :id="aberta.id" @fechar="aberta=null" @gravado="carregar()"/>
   </div>`,
 };
 
@@ -932,27 +936,46 @@ const Compositor = {
   </div>`,
 };
 const NovoEmail = {
-  components: { Compositor }, props: ["doctype", "name", "para"], emits: ["fechar", "enviado"],
+  components: { Compositor }, props: ["doctype", "name", "para", "resposta"], emits: ["fechar", "enviado"],
   setup(props, { emit }) {
-    const caixas = ref(null); const f = ref({ conta: "", para: props.para || "", cc: "", assunto: "", texto: "" }); const aEnviar = ref(false);
+    const rr = props.resposta || {};
+    const caixas = ref(null); const f = ref({ conta: "", para: rr.para || props.para || "", cc: rr.cc || "", bcc: "", assunto: rr.assunto || "", texto: "", html: rr.citacao || "", rico: !!props.resposta, agendar: "", anexos: [] }); const aEnviar = ref(false);
+    const verMais = ref(!!rr.cc); const anexoIn = ref(null);
+    const juntarAnexos = async (ev) => { for (const fi of [...(ev.target.files || [])]) {
+        const fd = new FormData(); fd.append("file", fi, fi.name); fd.append("is_private", 1); fd.append("doctype", props.doctype); fd.append("docname", props.name);
+        const r = await fetch("/api/method/upload_file", { method: "POST", body: fd, headers: { "X-Frappe-CSRF-Token": window.csrf_token, Accept: "application/json" } });
+        const j = await r.json().catch(() => ({})); if (j.message) f.value.anexos.push({ id: j.message.name, nome: fi.name }); else toast("Não foi possível anexar " + fi.name); }
+      ev.target.value = ""; };
     onMounted(async () => { caixas.value = await api("minhas_caixas"); f.value.conta = (caixas.value[0] || {}).conta || ""; });
     const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const enviar = async () => {
-      if (!f.value.conta || !f.value.para || !f.value.assunto || !f.value.texto.trim()) { toast("Falta a caixa, o destinatário, o assunto ou o texto"); return; }
+      const temTexto = f.value.rico ? String(f.value.html || "").replace(/<[^>]+>/g, "").trim() : f.value.texto.trim();
+      if (!f.value.conta || !f.value.para || !f.value.assunto || !temTexto) { toast("Falta a caixa, o destinatário, o assunto ou o texto"); return; }
       aEnviar.value = true;
-      try { const html = f.value.texto.trim().split(/\n{2,}/).map((p) => "<p>" + esc(p).replace(/\n/g, "<br>") + "</p>").join("");
-        await api("enviar_email", { doctype: props.doctype, name: props.name, conta: f.value.conta, para: f.value.para, cc: f.value.cc, assunto: f.value.assunto, html }, true);
-        toast("Email enviado"); emit("enviado"); emit("fechar"); } finally { aEnviar.value = false; }
+      try { const html = f.value.rico ? f.value.html : f.value.texto.trim().split(/\n{2,}/).map((p) => "<p>" + esc(p).replace(/\n/g, "<br>") + "</p>").join("");
+        const r = await api("actividades.email_enviar", { doctype: props.doctype, name: props.name, conta: f.value.conta, para: f.value.para, cc: f.value.cc, bcc: f.value.bcc, assunto: f.value.assunto, html,
+          anexos: f.value.anexos.length ? JSON.stringify(f.value.anexos.map((x) => x.id)) : null, agendar: f.value.agendar ? f.value.agendar.replace("T", " ") + ":00" : null, responder_a: rr.responder_a || null }, true);
+        toast(r.agendado ? "Email agendado para " + data(r.agendado) : "Email enviado"); emit("enviado"); emit("fechar"); } finally { aEnviar.value = false; }
     };
-    return { caixas, f, aEnviar, enviar };
+    const passarRico = () => { if (!f.value.rico) { f.value.html = f.value.texto.trim().split(/\n{2,}/).filter(Boolean).map((p) => "<p>" + esc(p).replace(/\n/g, "<br>") + "</p>").join("") + (f.value.html || ""); f.value.rico = true; } };
+    return { caixas, f, aEnviar, enviar, verMais, anexoIn, juntarAnexos, passarRico };
   },
-  template: `<div class="modal-fundo" @click.self="$emit('fechar')"><div class="modal" style="max-width:680px"><header><b>Novo email</b><button class="btn sm" @click="$emit('fechar')">Fechar</button></header>
+  template: `<div class="modal-fundo" @click.self="$emit('fechar')"><div class="modal" style="max-width:680px"><header><b>{{ resposta ? 'Responder' : 'Novo email' }}</b><button class="btn sm" @click="$emit('fechar')">Fechar</button></header>
     <div class="corpo-email form-cal">
       <div v-if="caixas && !caixas.length" class="aviso" style="margin:0">Ainda não há caixas ligadas ao CRM de onde possa escrever (ligam-se no portal, em Stratechna Orbit).</div>
       <label>De<select v-model="f.conta"><option v-for="c in caixas||[]" :key="c.conta" :value="c.conta">{{ c.email }}{{ c.privada ? ' (a sua caixa)' : ' (equipa)' }}</option></select></label>
-      <div class="linha3" style="grid-template-columns:1fr 1fr"><label>Para<input v-model="f.para"></label><label>Cc<input v-model="f.cc"></label></div>
+      <label>Para<input v-model="f.para"></label>
+      <a v-if="!verMais" href="javascript:void 0" class="sub" style="font-size:12px" @click="verMais=true">+ Cc / Bcc</a>
+      <div v-else class="linha3" style="grid-template-columns:1fr 1fr"><label>Cc<input v-model="f.cc"></label><label>Bcc<input v-model="f.bcc"></label></div>
       <label>Assunto<input v-model="f.assunto"></label>
-      <Compositor v-model="f.texto" :doctype="doctype" :name="name" :para="f.para" :linhas="9" @assunto="(a)=>{ if(!f.assunto) f.assunto=a }" @enviar="enviar"/>
+      <Compositor v-if="!f.rico" v-model="f.texto" :doctype="doctype" :name="name" :para="f.para" :linhas="9" @assunto="(a)=>{ if(!f.assunto) f.assunto=a }" @enviar="enviar"/>
+      <EditorRico v-else v-model="f.html"/>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button v-if="!f.rico" type="button" class="btn sm" @click="passarRico">Aa Formatação</button>
+        <button type="button" class="btn sm" @click="anexoIn.click()">📎 Anexar</button><input ref="anexoIn" type="file" multiple style="display:none" @change="juntarAnexos">
+        <span v-for="(x,k) in f.anexos" :key="x.id" class="reg-chip">{{ x.nome }}<button type="button" @click="f.anexos.splice(k,1)">×</button></span>
+        <label class="sub" style="font-size:12px;display:flex;gap:6px;align-items:center;margin-left:auto">Agendar <input type="datetime-local" v-model="f.agendar" style="width:auto"></label>
+      </div>
       <div style="display:flex;justify-content:space-between;align-items:center"><span class="sub" style="font-size:12px">Fica nos Enviados da caixa e na cronologia · sabe-se quando é aberto</span><button class="btn prim" @click="enviar" :disabled="aEnviar">{{ aEnviar ? 'A enviar…' : 'Enviar' }}</button></div>
     </div></div></div>`,
 };
@@ -1191,6 +1214,11 @@ const Lista = {
     const aplicarMassa = async () => {
       const m = massa.value; if (!m.acao) return;
       if (m.acao === "apagar" && !confirm(`Apagar ${sel.value.length} registo(s)? Não se desfaz.`)) return;
+      // lote 2: passar a «perdido» em massa pede o motivo uma vez e aplica-o a todos
+      if (m.acao === "estado" && ["negocios", "leads"].includes(props.objeto)) { const p = await perdidos(); const dtM = props.objeto === "negocios" ? "CRM Deal" : "CRM Lead";
+        if ((dtM === "CRM Deal" ? p.negocio : p.lead).includes(m.valor)) { const mot = await pedirMotivo("Motivo de perda para " + sel.value.length + " registo(s)"); if (!mot) return;
+          let ok = 0; for (const nm of sel.value) { try { await apiA("marcar_estado", { doctype: dtM, name: nm, estado: m.valor, motivo: mot.motivo, notas: mot.notas }, true); ok++; } catch (e) {} }
+          toast(`${ok} atualizado(s)`); massa.value = { acao: "", valor: "" }; carregar(); return; } }
       const r = await apiVis("em_massa", { objeto: props.objeto, nomes: JSON.stringify(sel.value), acao: m.acao, valor: m.valor }, true);
       toast(`${r.feitos} atualizado(s)` + (r.falhas.length ? ` · ${r.falhas.length} falharam` : "")); if (r.falhas.length) console.warn(r.falhas);
       massa.value = { acao: "", valor: "" }; carregar();
@@ -1657,6 +1685,7 @@ const FichaDetalhes = {
     const editar = (p) => { if (!p.editavel) return; ed.value = p.campo; valorEd.value = p.valor ?? ""; nextTick(() => document.querySelector(".det .ed-campo")?.focus()); };
     const gravar = async (p) => {
       if (String(valorEd.value ?? "") === String(p.valor ?? "")) { ed.value = ""; return; }
+      if (p.campo === "status" && ["CRM Deal", "CRM Lead"].includes(props.doctype)) { const ok = await mudarEstadoCRM(props.doctype, props.name, valorEd.value); ed.value = ""; if (ok) feito(); return; }
       let r; try { r = await api("guardar", { doctype: props.doctype, name: props.name, campo: p.campo, valor: valorEd.value }, true); } catch (e) { return; }
       ed.value = "";
       if (r && r.preenchido && r.preenchido.length) feito("NIPC confirmado no VIES" + (r.nome_vies ? " (" + r.nome_vies + ")" : "") + " — preenchido: " + r.preenchido.join(", ").toLowerCase());
@@ -1797,6 +1826,8 @@ const Ficha = {
     const editar = (p) => { if (!p.editavel) return; ed.value = p.campo; valorEd.value = p.valor || ""; nextTick(() => document.querySelector(".prop .ed-campo")?.focus()); };
     const gravar = async (p) => {
       if (String(valorEd.value ?? "") === String(p.valor ?? "")) { ed.value = ""; return; }
+      // lote 2: passar a «perdido» pede o motivo (como no CRM original)
+      if (p.campo === "status" && ["CRM Deal", "CRM Lead"].includes(props.doctype)) { const ok = await mudarEstadoCRM(props.doctype, props.name, valorEd.value); ed.value = ""; if (ok) { toast("Gravado"); carregar(); } return; }
       let r;
       try { r = await api("guardar", { doctype: props.doctype, name: props.name, campo: p.campo, valor: valorEd.value }, true); }
       catch (e) { return; }   // o erro (NIF inválido, VIES…) já apareceu; fica a editar
@@ -1839,7 +1870,7 @@ const Ficha = {
       for (const i of cron.value.passado) { const m = mes(i.data); if (!atual || atual.mes !== m) { atual = { mes: m, itens: [] }; g.push(atual); } atual.itens.push(i); }
       return g;
     });
-    const mudarFase = async (s) => { await api("guardar", { doctype: "CRM Deal", name: props.name, campo: "status", valor: s }, true); toast("Fase alterada"); carregar(); };
+    const mudarFase = async (s) => { if (await mudarEstadoCRM("CRM Deal", props.name, s)) { toast("Fase alterada"); carregar(); } };
     const NOMES = { "CRM Deal": "Negócios", "Contact": "Contactos", "CRM Organization": "Empresa", "CRM Lead": "Leads" };
     const tit = (dt, r) => dt === "CRM Deal" ? (r.titulo || r.lead_name || r.organization || r.name) : dt === "Contact" ? (r.full_name || r.name) : dt === "CRM Organization" ? (r.organization_name || r.name) : (r.lead_name || r.name);
     const sub = (dt, r) => dt === "CRM Deal" ? [r.estado, r.deal_value ? eur(r.deal_value) : "", r.expected_closure_date ? "fecha a " + data(r.expected_closure_date, false) : ""].filter(Boolean).join(" · ")
@@ -1847,7 +1878,38 @@ const Ficha = {
     const ic = (t) => IC_EVENTO[t] || IC_EVENTO.nota;
     const marcarEmail = () => { window.__ref_email = (f.value && f.value.email_principal) || ""; };
     const novoEmail = ref(false);
-    return { ext, carregarExt, apagarRegisto, orcs, criarOrcamento, COR_ORC, irErp, tornarPrincipal, PAISES_PT, alternarCheck, alternarMarca, edMorada, editarMorada, gravarMorada, novoEmail, conv, convForm, aConverter, abrirConversao, converter, pode, assocAberta, assocQ, assocRes, abrirAssoc, procurarAssoc, ligarAssoc, tirarAssoc, vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
+    // lote 2 (25-11): tarefas/notas que abrem, chamadas registadas, notas fixadas, responder no registo, criar no contexto, imagem
+    const tarefaAberta = ref(null), notaAberta = ref(null), chamada = ref(null), resposta = ref(null), fixadasL = ref([]), agendadosL = ref([]);
+    const carregarFix = async () => { fixadasL.value = await apiA("fixadas", { doctype: props.doctype, name: props.name }).catch(() => []);
+      agendadosL.value = await apiA("agendados", { doctype: props.doctype, name: props.name }).catch(() => []); };
+    onMounted(carregarFix);
+    const abrirItem = (i) => { if (i.tipo === "tarefa") tarefaAberta.value = { id: i.id }; else if (i.tipo === "nota") notaAberta.value = { id: i.id }; else abrirEmail(i); };
+    const depoisAtividade = () => { carregarCron(); carregarFix(); };
+    // «Ligar»: regista a chamada ao tocar e, ao voltar ao Orbit, pergunta «Como correu a chamada?» (orbit/chamadas_crm.py)
+    const ligar = async () => {
+      const num = f.value.telefone; if (!num) return;
+      let nome = null;
+      try { nome = await api("orbit.chamadas_crm.iniciar", { chave: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), numero: num, doctype: props.doctype, name: props.name }, true); } catch (e) {}
+      if (nome) { const volta = () => { if (document.visibilityState === "visible") { document.removeEventListener("visibilitychange", volta); setTimeout(() => (chamada.value = { pendente: nome }), 400); } };
+        document.addEventListener("visibilitychange", volta); setTimeout(() => { if (!chamada.value && document.visibilityState === "visible") { document.removeEventListener("visibilitychange", volta); chamada.value = { pendente: nome }; } }, 4000); }
+      location.href = "tel:" + num;
+    };
+    const responder = (todos) => { const e = email.value; if (!e) return;
+      const eu = (window.__ctx?.utilizador || "").toLowerCase(); const sep = (x) => String(x || "").split(/[,;]/).map((y) => y.trim()).filter(Boolean);
+      const para = sep(e.de).concat(todos ? sep(e.para) : []).filter((x) => !eu || !x.toLowerCase().includes(eu));
+      resposta.value = { para: [...new Set(para)].join(", "), cc: todos ? e.cc || "" : "", assunto: /^re:/i.test(e.assunto || "") ? e.assunto : "Re: " + (e.assunto || ""),
+        citacao: `<p></p><blockquote type="cite">${e.html || ""}</blockquote>`, responder_a: e.id }; email.value = null; };
+    const agendadoAcao = async (x, acao) => { if (acao === "cancelar" && !confirm("Cancelar o envio deste email?")) return; await apiA("agendado_acao", { id: x.id, acao }, true); toast(acao === "enviar" ? "A enviar" : "Envio cancelado"); carregarFix(); carregarCron(); };
+    const novoNegocio = async () => { const t = prompt("Nome do negócio", f.value.titulo || ""); if (t === null) return;
+      const r = await apiA("novo_negocio", { doctype: props.doctype, name: props.name, titulo: t }, true); toast("Negócio criado"); location.hash = link("CRM Deal", r.name); };
+    const novoContacto = ref(null);
+    const gravarContacto = async () => { const c = novoContacto.value; if (!c.nome.trim()) return;
+      await apiA("novo_contacto", { negocio: props.name, nome: c.nome, apelido: c.apelido, email: c.email, telemovel: c.telemovel }, true); novoContacto.value = null; toast("Contacto criado e associado"); carregar(); };
+    const fotoIn = ref(null);
+    const trocarFoto = async (ev) => { const fi = ev.target.files?.[0]; if (!fi) return;
+      const url = await carregarFicheiro(fi, { doctype: props.doctype, docname: props.name, privado: 0 }); await apiA("imagem", { doctype: props.doctype, name: props.name, url }, true); toast("Imagem gravada"); ev.target.value = ""; carregar(); };
+    const tirarFoto = async () => { await apiA("imagem", { doctype: props.doctype, name: props.name, url: "" }, true); toast("Imagem retirada"); carregar(); };
+    return { tarefaAberta, notaAberta, chamada, resposta, fixadasL, agendadosL, abrirItem, depoisAtividade, ligar, responder, agendadoAcao, novoNegocio, novoContacto, gravarContacto, fotoIn, trocarFoto, tirarFoto, ext, carregarExt, apagarRegisto, orcs, criarOrcamento, COR_ORC, irErp, tornarPrincipal, PAISES_PT, alternarCheck, alternarMarca, edMorada, editarMorada, gravarMorada, novoEmail, conv, convForm, aConverter, abrirConversao, converter, pode, assocAberta, assocQ, assocRes, abrirAssoc, procurarAssoc, ligarAssoc, tirarAssoc, vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
       grupos, mudarFase, NOMES, tit, sub, link, data, eur, ic, cor, ESTADO_COR };
   },
   template: `
@@ -1856,12 +1918,15 @@ const Ficha = {
       <div style="font-size:13px;display:flex;justify-content:space-between;align-items:center"><a href="javascript:history.back()">← Voltar</a>
         <RegistoMenu v-if="ext" :doctype="doctype" :name="name" :ext="ext" :apagar="true" :rota-novo="false" @recarregar="carregarExt" @apagado="apagarRegisto"/></div>
       <div class="cabeca">
-        <AvFoto :email="f.email_principal || emailDoSite((f.props.find(p=>p.campo==='website') || {}).valor)" :nome="f.titulo" :tam="56"/>
+        <div class="foto-reg" :class="{editavel: f.pode_editar && doctype!=='CRM Deal'}" @click="f.pode_editar && doctype!=='CRM Deal' && fotoIn.click()" :title="f.pode_editar && doctype!=='CRM Deal' ? 'Trocar a imagem' : ''">
+          <img v-if="f.imagem" :src="f.imagem" alt="" class="av-img"><AvFoto v-else :email="f.email_principal || emailDoSite((f.props.find(p=>p.campo==='website') || {}).valor)" :nome="f.titulo" :tam="56"/></div>
+        <input ref="fotoIn" type="file" accept="image/*" style="display:none" @change="trocarFoto">
+        <a v-if="f.imagem && f.pode_editar" href="javascript:void 0" class="sub" style="font-size:11px" @click="tirarFoto">tirar imagem</a>
         <h1>{{ f.titulo }}</h1><div class="sub">{{ f.sub }}</div>
         <div class="acoes-rap">
           <button @click="modo='nota'"><span><Icone n="nota"/></span>Nota</button>
           <button @click="novoEmail=true"><span><Icone n="mail"/></span>Email</button>
-          <a v-if="f.telefone" :href="'tel:'+f.telefone" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)"><span style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface-2)"><Icone n="tel"/></span>Ligar</a>
+          <a v-if="f.telefone" :href="'tel:'+f.telefone" @click.prevent="ligar" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)"><span style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface-2)"><Icone n="tel"/></span>Ligar</a>
           <button @click="modo='tarefa'"><span><Icone n="tarefa"/></span>Tarefa</button>
           <button @click="filtro='conversa'"><span><Icone n="chat"/></span>Conversa</button>
           <a :href="'#/calendario/nova/'+encodeURIComponent(doctype)+'/'+encodeURIComponent(name)" @click="marcarEmail" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--ink-2)"><span style="width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:var(--surface-2)"><Icone n="cal"/></span>Reunião</a>
@@ -1956,18 +2021,21 @@ const Ficha = {
       <RegistoHistorico v-else-if="filtro==='historico'" :doctype="doctype" :name="name" :key="'h'+doctype+name"/>
       <div v-else-if="filtro==='anexos'" class="cartao" style="padding:14px"><RegistoLateral v-if="ext" :doctype="doctype" :name="name" :ext="ext" :partes="['anexos']"/></div>
       <template v-else>
-      <div class="cartao compor" v-if="modo==='nota'"><textarea v-model="notaTxt" rows="1" :placeholder="'Escrever uma nota sobre ' + f.titulo + '…'" @keydown.meta.enter="enviarNota" @keydown.ctrl.enter="enviarNota"></textarea><button class="btn sm prim" @click="enviarNota" :disabled="!notaTxt.trim()">Gravar nota</button></div>
-      <div class="cartao compor" v-else><input v-model="tarefaTxt" placeholder="Nova tarefa…" @keyup.enter="enviarTarefa"><input type="date" v-model="tarefaData" style="flex:none;width:150px"><button class="btn sm prim" @click="enviarTarefa" :disabled="!tarefaTxt.trim()">Criar tarefa</button></div>
+      <div class="cartao compor" v-if="modo==='nota'"><textarea v-model="notaTxt" rows="1" :placeholder="'Escrever uma nota sobre ' + f.titulo + '…'" @keydown.meta.enter="enviarNota" @keydown.ctrl.enter="enviarNota"></textarea><button class="btn sm" @click="notaAberta={}" title="Com título e formatação">Aa</button><button class="btn sm prim" @click="enviarNota" :disabled="!notaTxt.trim()">Gravar nota</button></div>
+      <div class="cartao compor" v-else><input v-model="tarefaTxt" placeholder="Nova tarefa…" @keyup.enter="enviarTarefa"><input type="date" v-model="tarefaData" style="flex:none;width:150px"><button class="btn sm" @click="tarefaAberta={inicial:{titulo:tarefaTxt,data:tarefaData}}" title="Responsável, prioridade, hora e descrição">Mais…</button><button class="btn sm prim" @click="enviarTarefa" :disabled="!tarefaTxt.trim()">Criar tarefa</button></div>
+      <div v-if="filtro==='chamadas'" style="margin:-4px 0 10px"><button class="btn sm" @click="chamada={}">+ Registar chamada</button></div>
+      <div v-for="x in agendadosL" :key="x.id" class="aviso" style="margin:0 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">📅 Email agendado para {{ data(x.quando) }}: <b>{{ x.assunto }}</b><span style="margin-left:auto;display:flex;gap:6px"><button class="btn sm" @click="agendadoAcao(x,'enviar')">Enviar já</button><button class="btn sm" @click="agendadoAcao(x,'cancelar')">Cancelar</button></span></div>
+      <div v-for="n in fixadasL" :key="n.id" class="cartao nota-fixa" @click="notaAberta={id:n.id}"><b>📌 {{ n.titulo }}</b><div class="rico-ver" v-html="n.html"></div><small class="sub">{{ n.quem }} · {{ data(n.quando) }}</small></div>
       <div v-if="!cron" class="carregar">A carregar…</div>
       <template v-else>
         <template v-if="cron.proximos.length"><div class="mes">Próximo</div>
           <div class="evento" v-for="i in cron.proximos" :key="i.tipo+i.id"><div class="ic" :style="{background:ic(i.tipo)[1],color:ic(i.tipo)[2]}"><Icone :n="ic(i.tipo)[0]"/></div>
-            <div class="cartao corpo"><header><b>{{ i.titulo }}</b><span :class="i.atrasada?'etq ambar':'sub'">{{ i.atrasada ? 'Atrasada · ' : '' }}{{ data(i.data) }}</span></header><p v-if="i.texto">{{ i.texto }}</p><p v-if="i.quem" class="sub">{{ i.quem }}</p></div></div>
+            <div class="cartao corpo abre" @click="abrirItem(i)"><header><b>{{ i.titulo }}</b><span :class="i.atrasada?'etq ambar':'sub'">{{ i.atrasada ? 'Atrasada · ' : '' }}{{ data(i.data) }}</span></header><p v-if="i.texto">{{ i.texto }}</p><p v-if="i.quem" class="sub">{{ i.quem }}</p></div></div>
         </template>
         <div v-if="!grupos.length && !cron.proximos.length" class="vazio">Ainda não há atividade.<br><button class="btn sm" style="margin-top:10px" @click="procurar">Procurar emails antigos nas caixas ligadas</button></div>
         <template v-for="g in grupos" :key="g.mes"><div class="mes">{{ g.mes }}</div>
           <div class="evento" v-for="i in g.itens" :key="i.tipo+i.id"><div class="ic" :style="{background:ic(i.tipo)[1],color:ic(i.tipo)[2]}"><Icone :n="ic(i.tipo)[0]"/></div>
-            <div class="cartao corpo" :class="{abre:i.tipo==='email'}" @click="abrirEmail(i)">
+            <div class="cartao corpo" :class="{abre:['email','tarefa','nota'].includes(i.tipo)}" @click="abrirItem(i)">
               <header><b><template v-if="i.tipo==='email'">{{ i.sentido==='Sent' ? 'Email enviado: ' : 'Email recebido: ' }}</template>{{ i.titulo }}</b>
                 <span class="sub">{{ data(i.data) }}<template v-if="i.duracao"> · {{ Math.round(i.duracao/60) }} min</template></span></header>
               <p v-if="i.tipo==='email'" class="sub" style="margin-top:2px">{{ i.sentido==='Sent' ? 'Para ' + (i.para||'') : 'De ' + (i.quem||'') }}<template v-if="i.conta"> · {{ i.conta }}</template> <span v-if="i.privado" class="priv">· só para si</span> <span v-if="i.sentido==='Sent' && i.lido" class="etq verde" style="font-size:11px">Aberto</span></p>
@@ -1985,7 +2053,7 @@ const Ficha = {
       <RegistoLateral v-if="ext" :doctype="doctype" :name="name" :ext="ext" :partes="['atribuir','etiquetas','partilha']" class="reg-crm"/>
       <template v-for="(lista, dt) in f.assoc" :key="dt">
         <template v-if="lista.length || dt!=='CRM Lead'">
-          <div class="bloco-tit">{{ NOMES[dt] }} <span class="sub" style="font-weight:400"><template v-if="pode(dt)"><a href="#" @click.prevent="abrirAssoc(dt)">+ Adicionar</a> · </template>{{ lista.length }}</span></div>
+          <div class="bloco-tit">{{ NOMES[dt] }} <span class="sub" style="font-weight:400"><template v-if="pode(dt)"><template v-if="(dt==='CRM Deal' && ['Contact','CRM Organization'].includes(doctype)) || (dt==='Contact' && doctype==='CRM Deal')"><a href="#" @click.prevent="dt==='CRM Deal' ? novoNegocio() : (novoContacto={nome:'',apelido:'',email:'',telemovel:''})">+ Novo</a> · </template><a href="#" @click.prevent="abrirAssoc(dt)">+ Associar</a> · </template>{{ lista.length }}</span></div>
           <div v-if="assocAberta===dt" class="assoc-procura">
             <input v-model="assocQ" :placeholder="'Procurar ' + NOMES[dt].toLowerCase() + '…'" @input="procurarAssoc" @keydown.esc="assocAberta=null" ref="assocInput">
             <div v-for="c in assocRes" :key="c.name" class="assoc-op" @click="ligarAssoc(dt,c)"><b>{{ c.titulo }}</b><small>{{ c.sub }}</small></div>
@@ -2029,7 +2097,15 @@ const Ficha = {
       <a v-for="t in f.tickets" :key="t.name" class="assoc" :href="'#/ticket/'+encodeURIComponent(t.name)" style="display:block;text-decoration:none;color:inherit"><b>#{{ t.name }} {{ t.subject }}</b><small>{{ t.status }} · {{ data(t.modified,false) }}</small></a>
     </aside>
 
-    <NovoEmail v-if="novoEmail" :doctype="doctype" :name="name" :para="f.email_principal" @fechar="novoEmail=false" @enviado="carregarCron()"/>
+    <NovoEmail v-if="novoEmail" :doctype="doctype" :name="name" :para="f.email_principal" @fechar="novoEmail=false" @enviado="depoisAtividade()"/>
+    <NovoEmail v-if="resposta" :doctype="doctype" :name="name" :resposta="resposta" @fechar="resposta=null" @enviado="depoisAtividade()"/>
+    <TarefaForm v-if="tarefaAberta" :id="tarefaAberta.id" :inicial="tarefaAberta.inicial" :doctype="doctype" :name="name" @fechar="tarefaAberta=null; tarefaTxt=''" @gravado="depoisAtividade()"/>
+    <NotaForm v-if="notaAberta" :id="notaAberta.id" :doctype="doctype" :name="name" @fechar="notaAberta=null" @gravado="depoisAtividade()"/>
+    <ChamadaForm v-if="chamada" :doctype="doctype" :name="name" :pendente="chamada.pendente" :numero="f.telefone" @fechar="chamada=null" @gravado="depoisAtividade()"/>
+    <div v-if="novoContacto" class="modal-fundo" @click.self="novoContacto=null"><div class="modal" style="max-width:480px"><header><b>Novo contacto neste negócio</b><button class="btn sm" @click="novoContacto=null">Fechar</button></header>
+      <form class="reg-form" @submit.prevent="gravarContacto"><div class="reg-linha3" style="grid-template-columns:1fr 1fr"><label class="erp-campo"><span>Nome<span class="obrig">*</span></span><input v-model="novoContacto.nome" required autofocus></label><label class="erp-campo"><span>Apelido</span><input v-model="novoContacto.apelido"></label></div>
+        <label class="erp-campo"><span>Email</span><input type="email" v-model="novoContacto.email"></label><label class="erp-campo"><span>Telemóvel</span><input type="tel" v-model="novoContacto.telemovel"></label>
+        <div class="reg-botoes"><button class="btn prim">Criar e associar</button></div></form></div></div>
     <div class="modal-fundo" v-if="convForm" @click.self="convForm=null">
       <div class="modal" style="max-width:520px"><header><b>Converter «{{ f.titulo }}» em negócio</b><button class="btn sm" @click="convForm=null">Fechar</button></header>
         <form class="corpo-email form-cal" @submit.prevent="converter">
@@ -2043,7 +2119,7 @@ const Ficha = {
         </form></div>
     </div>
     <div class="modal-fundo" v-if="email" @click.self="email=null">
-      <div class="modal"><header><div><b>{{ email.assunto }}</b><div class="sub">De {{ email.de }} · para {{ email.para }}<span v-if="email.cc"> · cc {{ email.cc }}</span> · {{ data(email.data) }}</div></div><div style="display:flex;gap:6px"><a class="btn sm prim" :href="'#/caixa/'+encodeURIComponent(email.id)">Responder</a><button class="btn sm" @click="email=null">Fechar</button></div></header>
+      <div class="modal"><header><div><b>{{ email.assunto }}</b><div class="sub">De {{ email.de }} · para {{ email.para }}<span v-if="email.cc"> · cc {{ email.cc }}</span> · {{ data(email.data) }}</div></div><div style="display:flex;gap:6px"><button class="btn sm prim" @click="responder(false)">Responder</button><button class="btn sm" @click="responder(true)">Responder a todos</button><button class="btn sm" @click="email=null">Fechar</button></div></header>
         <div class="corpo-email"><EmailCorpo :html="email.html"/></div></div>
     </div>
   </div>
@@ -2065,8 +2141,8 @@ const Funil = {
     const largar = async (col) => {
       const n = arrastar.value; alvo.value = ""; arrastar.value = null;
       if (!n || n.estado === col.estado) return;
-      if (tipo.value === "leads") await api("mover_lead", { lead: n.name, estado: col.estado }, true);
-      else await api("mover", { negocio: n.name, estado: col.estado }, true);
+      // lote 2: largar em «Perdido» pede o motivo de perda
+      if (!(await mudarEstadoCRM(tipo.value === "leads" ? "CRM Lead" : "CRM Deal", n.name, col.estado))) return;
       toast(`Passou a «${col.rotulo}»`); carregar();
     };
     const total = computed(() => d.value && tipo.value !== "leads" ? d.value.colunas.filter((c) => c.tipo !== "Won").reduce((a, c) => a + c.total, 0) : 0);
@@ -3922,6 +3998,112 @@ const RegistoLigacoes = {
     </details></template></div>`,
 };
 
+// ── Lote 2 (25-11-2026): actividades do CRM como no original — tarefas, notas, chamadas, motivo de perda (orbit/interface/actividades.py)
+const apiA = (m, a = {}, post = false) => api("actividades." + m, a, post);
+const ESTADOS_T = [["Backlog", "Por planear"], ["Todo", "Por fazer"], ["In Progress", "Em curso"], ["Done", "Feita"], ["Canceled", "Cancelada"]];
+const PRIOR_T = [["Low", "Baixa"], ["Medium", "Média"], ["High", "Alta"]];
+let _perdidos = null;
+async function perdidos() { if (!_perdidos) _perdidos = await apiA("motivos_perda").catch(() => ({ motivos: [], negocio: [], lead: [] })); return _perdidos; }
+// Pede o motivo de perda (janela no App); devolve {motivo, notas} ou null se cancelar
+function pedirMotivo(titulo) { return new Promise(async (resolve) => { const p = await perdidos(); estado.perda = { titulo, motivos: p.motivos, motivo: "", notas: "", resolve }; }); }
+async function mudarEstadoCRM(doctype, name, novo) {
+  const p = await perdidos(); const lista = doctype === "CRM Deal" ? p.negocio : p.lead;
+  let extra = {};
+  if (lista.includes(novo)) { const r = await pedirMotivo(doctype === "CRM Deal" ? "Negócio perdido" : "Lead perdida"); if (!r) return false; extra = r; }
+  await apiA("marcar_estado", { doctype, name, estado: novo, motivo: extra.motivo || null, notas: extra.notas || null }, true); return true;
+}
+const dtLocal = (v) => v ? String(v).replace(" ", "T").slice(0, 16) : "";
+
+const TarefaForm = {
+  props: ["id", "doctype", "name", "inicial"], emits: ["fechar", "gravado"],
+  setup(props, { emit }) {
+    const t = ref(null), pessoas = ref([]), a = ref(false), verDesc = ref(false);
+    onMounted(async () => {
+      pessoas.value = await apiConv("pessoas").catch(() => []);
+      if (props.id) { const r = await apiA("tarefa_obter", { id: props.id }); r.data = dtLocal(r.data); t.value = r; verDesc.value = !!r.descricao; }
+      else t.value = { titulo: (props.inicial || {}).titulo || "", descricao: "", estado: "Todo", prioridade: "Medium", data: dtLocal((props.inicial || {}).data), responsavel: window.__ctx?.utilizador || "", pode_escrever: true };
+    });
+    const gravar = async () => { a.value = true;
+      try { await apiA("tarefa_gravar", { dados: JSON.stringify({ ...t.value, doctype: props.doctype, name: props.name, data: t.value.data ? t.value.data.replace("T", " ") + ":00" : null }) }, true);
+        toast(props.id ? "Tarefa gravada" : "Tarefa criada"); emit("gravado"); emit("fechar"); } finally { a.value = false; } };
+    const apagar = async () => { if (!confirm("Apagar esta tarefa?")) return; await apiA("tarefa_apagar", { id: props.id }, true); toast("Tarefa apagada"); emit("gravado"); emit("fechar"); };
+    return { t, pessoas, a, verDesc, gravar, apagar, ESTADOS_T, PRIOR_T };
+  },
+  template: `<div class="modal-fundo" @click.self="$emit('fechar')"><div class="modal" style="max-width:560px">
+    <header><b>{{ id ? 'Tarefa' : 'Nova tarefa' }}</b><button class="btn sm" @click="$emit('fechar')">Fechar</button></header>
+    <form v-if="t" class="reg-form" @submit.prevent="gravar">
+      <label class="erp-campo"><span>Título<span class="obrig">*</span></span><input v-model="t.titulo" required autofocus :disabled="!t.pode_escrever"></label>
+      <div class="reg-linha3">
+        <label class="erp-campo"><span>Estado</span><select v-model="t.estado" :disabled="!t.pode_escrever"><option v-for="e in ESTADOS_T" :key="e[0]" :value="e[0]">{{ e[1] }}</option></select></label>
+        <label class="erp-campo"><span>Prioridade</span><select v-model="t.prioridade" :disabled="!t.pode_escrever"><option v-for="e in PRIOR_T" :key="e[0]" :value="e[0]">{{ e[1] }}</option></select></label>
+        <label class="erp-campo"><span>Responsável</span><select v-model="t.responsavel" :disabled="!t.pode_escrever"><option v-for="p in pessoas" :key="p.email" :value="p.email">{{ p.nome }}</option></select></label>
+      </div>
+      <label class="erp-campo"><span>Prazo (dia e hora)</span><input type="datetime-local" v-model="t.data" :disabled="!t.pode_escrever"></label>
+      <a v-if="!verDesc" href="javascript:void 0" class="sub" style="font-size:12px" @click="verDesc=true">+ Descrição</a>
+      <div v-else class="erp-campo"><span>Descrição</span><EditorRico v-model="t.descricao" :ro="!t.pode_escrever"/></div>
+      <div class="reg-botoes"><button v-if="id && t.pode_apagar" type="button" class="btn" style="margin-right:auto" @click="apagar">Apagar</button>
+        <button type="button" class="btn" @click="$emit('fechar')">Cancelar</button><button v-if="t.pode_escrever" class="btn prim" :disabled="a">{{ id ? 'Gravar' : 'Criar' }}</button></div>
+    </form></div></div>`,
+};
+
+const NotaForm = {
+  props: ["id", "doctype", "name"], emits: ["fechar", "gravado"],
+  setup(props, { emit }) {
+    const n = ref(null), a = ref(false);
+    onMounted(async () => { n.value = props.id ? await apiA("nota_obter", { id: props.id }) : { titulo: "", html: "", fixada: 0, pode_escrever: true }; });
+    const gravar = async () => { a.value = true;
+      try { await apiA("nota_gravar", { dados: JSON.stringify({ id: props.id, doctype: props.doctype, name: props.name, titulo: n.value.titulo, html: n.value.html }) }, true);
+        toast("Nota gravada"); emit("gravado"); emit("fechar"); } finally { a.value = false; } };
+    const fixar = async () => { n.value = await apiA("nota_fixar", { id: props.id, fixar: n.value.fixada ? 0 : 1 }, true); toast(n.value.fixada ? "Nota fixada no topo" : "Nota solta"); emit("gravado"); };
+    const apagar = async () => { if (!confirm("Apagar esta nota?")) return; await apiA("nota_apagar", { id: props.id }, true); toast("Nota apagada"); emit("gravado"); emit("fechar"); };
+    return { n, a, gravar, fixar, apagar };
+  },
+  template: `<div class="modal-fundo" @click.self="$emit('fechar')"><div class="modal" style="max-width:640px">
+    <header><b>{{ id ? 'Nota' : 'Nova nota' }}</b><span style="display:flex;gap:6px"><button v-if="id && n && n.pode_escrever" class="btn sm" @click="fixar">{{ n.fixada ? 'Soltar' : '📌 Fixar no topo' }}</button><button class="btn sm" @click="$emit('fechar')">Fechar</button></span></header>
+    <form v-if="n" class="reg-form" @submit.prevent="gravar">
+      <label class="erp-campo"><span>Título</span><input v-model="n.titulo" :disabled="!n.pode_escrever" placeholder="(opcional)"></label>
+      <div class="erp-campo"><span>Texto</span><EditorRico v-model="n.html" :ro="!n.pode_escrever"/></div>
+      <div class="reg-botoes"><button v-if="id && n.pode_apagar" type="button" class="btn" style="margin-right:auto" @click="apagar">Apagar</button>
+        <button type="button" class="btn" @click="$emit('fechar')">Cancelar</button><button v-if="n.pode_escrever" class="btn prim" :disabled="a">Gravar</button></div>
+    </form></div></div>`,
+};
+
+// «Registar chamada» à mão e «Como correu a chamada?» depois de «Ligar» (orbit/chamadas_crm.py)
+const ChamadaForm = {
+  props: ["doctype", "name", "pendente", "numero"], emits: ["fechar", "gravado"],
+  setup(props, { emit }) {
+    const agora = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    const c = ref({ sentido: "Outgoing", estado: props.pendente ? "atendida" : "Completed", inicio: agora, duracao: props.pendente ? 5 : 5, nota: "", tarefa: "", tarefa_data: "", numero: props.numero || "" });
+    const a = ref(false);
+    const gravar = async () => { a.value = true;
+      try {
+        if (props.pendente) await api("orbit.chamadas_crm.comentar", { nome: props.pendente, estado: c.value.estado, duracao: Math.round((Number(c.value.duracao) || 0) * 60), nota: c.value.nota, tarefa: c.value.tarefa, tarefa_data: c.value.tarefa_data }, true);
+        else await apiA("chamada_registar", { doctype: props.doctype, name: props.name, sentido: c.value.sentido, estado: c.value.estado, inicio: c.value.inicio.replace("T", " ") + ":00", duracao_min: c.value.duracao, numero: c.value.numero, nota: c.value.nota }, true);
+        toast("Chamada registada"); emit("gravado"); emit("fechar"); } finally { a.value = false; } };
+    const naoLiguei = async () => { await api("orbit.chamadas_crm.anular", { nome: props.pendente }, true).catch(() => {}); emit("fechar"); };
+    return { c, a, gravar, naoLiguei };
+  },
+  template: `<div class="modal-fundo"><div class="modal" style="max-width:520px">
+    <header><b>{{ pendente ? 'Como correu a chamada?' : 'Registar chamada' }}</b><button v-if="!pendente" class="btn sm" @click="$emit('fechar')">Fechar</button></header>
+    <form class="reg-form" @submit.prevent="gravar">
+      <template v-if="pendente">
+        <div class="reg-chips"><label v-for="e in [['atendida','Atendeu'],['nao_atendeu','Não atendeu'],['ocupado','Ocupado'],['numero_errado','Número errado']]" :key="e[0]" class="reg-chip" :class="{ativo: c.estado===e[0]}"><input type="radio" v-model="c.estado" :value="e[0]" style="display:none">{{ e[1] }}</label></div>
+      </template>
+      <template v-else>
+        <div class="reg-linha3">
+          <label class="erp-campo"><span>Sentido</span><select v-model="c.sentido"><option value="Outgoing">Efetuada</option><option value="Incoming">Recebida</option></select></label>
+          <label class="erp-campo"><span>Resultado</span><select v-model="c.estado"><option value="Completed">Atendida</option><option value="No Answer">Não atendida</option><option value="Busy">Ocupado</option><option value="Failed">Falhou</option></select></label>
+          <label class="erp-campo"><span>Número</span><input v-model="c.numero" type="tel"></label>
+        </div>
+        <label class="erp-campo"><span>Quando</span><input type="datetime-local" v-model="c.inicio"></label>
+      </template>
+      <label v-if="(pendente ? c.estado==='atendida' : c.estado==='Completed')" class="erp-campo"><span>Duração (minutos)</span><input type="number" min="0" step="1" v-model="c.duracao"></label>
+      <label class="erp-campo"><span>Nota</span><textarea v-model="c.nota" rows="3" placeholder="O que se falou…"></textarea></label>
+      <div v-if="pendente" class="reg-linha3" style="grid-template-columns:2fr 1fr"><label class="erp-campo"><span>Próxima tarefa</span><input v-model="c.tarefa" placeholder="(opcional)"></label><label class="erp-campo"><span>Até</span><input type="date" v-model="c.tarefa_data"></label></div>
+      <div class="reg-botoes"><button v-if="pendente" type="button" class="btn" style="margin-right:auto" @click="naoLiguei">Não cheguei a ligar</button><button class="btn prim" :disabled="a">Gravar</button></div>
+    </form></div></div>`,
+};
+
 const RegistoArea = {
   props: ["doctype", "name"],
   setup(props) {
@@ -4720,12 +4902,18 @@ const App = {
       <button @click="gaveta=true" :class="{ativo: gaveta}"><Icone n="menu"/><span>Menu</span></button>
     </nav>
     <div class="toast" v-if="estado.toast">{{ estado.toast }}</div>
+    <div v-if="estado.perda" class="modal-fundo"><div class="modal" style="max-width:460px">
+      <header><b>{{ estado.perda.titulo }}</b><button class="btn sm" @click="estado.perda.resolve(null); estado.perda=null">Cancelar</button></header>
+      <form class="reg-form" @submit.prevent="estado.perda.resolve({motivo: estado.perda.motivo, notas: estado.perda.notas}); estado.perda=null">
+        <label class="erp-campo"><span>Motivo de perda<span class="obrig">*</span></span><select v-model="estado.perda.motivo" required><option value="" disabled>Escolher…</option><option v-for="m in estado.perda.motivos" :key="m.v" :value="m.v">{{ m.r }}</option></select></label>
+        <label class="erp-campo"><span>Notas<span v-if="['Other','Outro'].includes(estado.perda.motivo)" class="obrig">*</span></span><textarea v-model="estado.perda.notas" rows="3" :required="['Other','Outro'].includes(estado.perda.motivo)"></textarea></label>
+        <div class="reg-botoes"><button class="btn prim" :disabled="!estado.perda.motivo">Confirmar</button></div></form></div></div>
   </div>
   <div v-else class="arranque">Stratechna Orbit</div>`,
 };
 
 const _app = createApp(App).component("AvFoto", AvFoto).component("RegistoMenu", RegistoMenu).component("RegistoLateral", RegistoLateral)
-  .component("RegistoHistorico", RegistoHistorico).component("RegistoLigacoes", RegistoLigacoes).component("RegistoArea", RegistoArea).component("EditorRico", EditorRico).component("ConversaRegisto", ConversaRegisto);
+  .component("RegistoHistorico", RegistoHistorico).component("RegistoLigacoes", RegistoLigacoes).component("RegistoArea", RegistoArea).component("TarefaForm", TarefaForm).component("NotaForm", NotaForm).component("ChamadaForm", ChamadaForm).component("EditorRico", EditorRico).component("ConversaRegisto", ConversaRegisto);
 _app.config.globalProperties.emailDoSite = emailDoSite;
 // 25-11-2026: um ecrã que falha a carregar (ex.: sem permissão) deixava «A carregar…» para sempre — passa a dizer porquê.
 // Só falhas ao ABRIR (setup/mounted): uma falha ao gravar já mostra o aviso e não pode tirar o formulário do ecrã.

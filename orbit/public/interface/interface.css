@@ -791,3 +791,13 @@ div.desk-prop{flex-direction:row;justify-content:space-between;color:var(--ink)}
 .erp-registo>aside{padding:14px}
 .reg-crm{margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line)}
 @media (max-width:900px){.erp-registo{grid-template-columns:minmax(0,1fr)}.reg-linha3{grid-template-columns:minmax(0,1fr)}.reg-menu-lista{position:fixed;left:12px;right:12px;top:auto;bottom:60px;min-width:0}}
+
+/* ── 25-11-2026, lote 2: actividades do CRM ── */
+.foto-reg{display:inline-block;border-radius:50%;margin:0 auto}.foto-reg.editavel{cursor:pointer;position:relative}
+.foto-reg.editavel:hover::after{content:"Trocar";position:absolute;inset:0;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;font-size:11px;display:grid;place-items:center}
+.av-img{width:56px;height:56px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 10px}
+.nota-fixa{padding:10px 14px;margin:0 0 10px;cursor:pointer;border-left:3px solid var(--ambar)}
+.nota-fixa .rico-ver{font-size:13px;color:var(--ink-2);max-height:6em;overflow:hidden}
+label.reg-chip{cursor:pointer}label.reg-chip.ativo{border-color:var(--acao);color:var(--acao);font-weight:600}
+a.tarefa-tit{color:inherit;text-decoration:none}a.tarefa-tit:hover{text-decoration:underline}
+.cartao.corpo.abre{cursor:pointer}
