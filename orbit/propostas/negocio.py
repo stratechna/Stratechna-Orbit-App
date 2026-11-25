@@ -78,7 +78,8 @@ def _actualizar(negocio, fase=None):
     deal = frappe.get_doc("CRM Deal", negocio)
     mudou = False
     v = valor(negocio)
-    if deal.status not in FINAIS and flt(deal.deal_value) != v and orcamentos(negocio):
+    abertos = [q for q in orcamentos(negocio) if q.status not in ("Lost", "Cancelled", "Expired")]
+    if deal.status not in FINAIS and flt(deal.deal_value) != v and abertos:      # tudo perdido: fica o último valor
         deal.deal_value = v
         mudou = True
     if fase:

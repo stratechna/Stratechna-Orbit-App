@@ -1495,6 +1495,17 @@ def _linhas_portal(doc, linhas):
 @frappe.whitelist()
 def orcamento_portal(dados):
     _so_portal()
+    # o ERPNext confirma permissões por dentro (modelos de IVA, listas de preços…) e a conta do portal não tem papéis
+    # no ERP: depois de confirmado que é o portal, o orçamento faz-se como Administrator
+    quem = frappe.session.user
+    frappe.set_user("Administrator")
+    try:
+        return _orcamento_portal(dados)
+    finally:
+        frappe.set_user(quem)
+
+
+def _orcamento_portal(dados):
     from frappe.utils import add_days, getdate, nowdate
     from orbit.propostas import negocio as N
     d = _dados(dados) or {}
