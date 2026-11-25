@@ -3575,7 +3575,9 @@ const ErpLista = {
       window.location.href = "/api/method/orbit.interface.erp_listas.exportar?" + p.toString(); };
     const maisAc = ref(false);
     const fechar = () => { menuV.value = false; maisAc.value = false; }; onMounted(() => document.addEventListener("click", fechar)); onUnmounted(() => document.removeEventListener("click", fechar));
-    return { meta, def, linhas, mais, q, colunas, titulo, a, total, campo, cdef, textoValor, ordenar, ordem, maisLinhas, abrir, irErp, ESTADO_DOC, COR_STATUS, statusPt, cor, ini, tr,
+    // o «Estado» do documento já tem coluna própria (selo); não se repete o campo status
+    const colunasVis = computed(() => colunas.value.filter((c) => !(meta.value?.submetivel && c === "status")));
+    return { colunasVis, meta, def, linhas, mais, q, colunas, titulo, a, total, campo, cdef, textoValor, ordenar, ordem, maisLinhas, abrir, irErp, ESTADO_DOC, COR_STATUS, statusPt, cor, ini, tr,
       filtros, novoF, abrirFiltro, opsDe, juntarFiltro, tirarFiltro, limpar, rotuloOp, rotuloValor, PERIODOS_ERP, tipoOp, verCols, alternarCol, moverCol, colunasPadrao, colEscolhidas,
       vs, vistaAtiva, menuV, aplicarVista, vistaPorOmissao, gravarVista, vistaAtual, apagarVista, porOmissao, sel, todos, massa, opsMassa, camposEditaveis, pessoasL, aplicarMassa, pdfLote, exportar, maisAc };
   },
@@ -3642,13 +3644,13 @@ const ErpLista = {
     </div>
     <div class="tabela-wrap cartoes-movel" :style="sel.length?{borderTopLeftRadius:0,borderTopRightRadius:0}:{}"><table>
       <thead><tr><th style="width:34px"><input type="checkbox" v-model="todos"></th><th @click="ordenar(titulo||'name')" style="cursor:pointer">{{ titulo ? campo(titulo).label : 'Nome' }}</th>
-        <th v-for="c in colunas" :key="c" @click="ordenar(c)" style="cursor:pointer">{{ campo(c).label }}<span v-if="ordem.startsWith(c+' ')">{{ ordem.endsWith('asc') ? ' ↑' : ' ↓' }}</span></th>
+        <th v-for="c in colunasVis" :key="c" @click="ordenar(c)" style="cursor:pointer">{{ campo(c).label }}<span v-if="ordem.startsWith(c+' ')">{{ ordem.endsWith('asc') ? ' ↑' : ' ↓' }}</span></th>
         <th v-if="meta.submetivel">Estado</th></tr></thead>
       <tbody>
         <tr v-for="l in linhas" :key="l.name" @click="abrir(l.name)">
           <td @click.stop class="cel-sel"><input type="checkbox" :value="l.name" v-model="sel"></td>
           <td class="cel-tit"><div class="pessoa"><span class="av" :style="{background:cor(l.name)}">{{ ini(l[titulo]||l.name) }}</span><a :href="irErp(doctype,l.name)" @click.stop>{{ tr(doctype, l[titulo] || l.name) }}</a></div><small v-if="titulo && l[titulo] && l[titulo]!==l.name" style="color:var(--ink-3)">{{ tr(doctype, l.name) }}</small></td>
-          <td v-for="c in colunas" :key="c">{{ textoValor(campo(c), l[c]) }}</td>
+          <td v-for="c in colunasVis" :key="c">{{ textoValor(campo(c), l[c]) }}</td>
           <td v-if="meta.submetivel"><span class="etq" :class="COR_STATUS[l.status] || ESTADO_DOC[l.docstatus||0][1]">{{ l.status ? statusPt(l.status) : ESTADO_DOC[l.docstatus||0][0] }}</span></td>
         </tr>
       </tbody></table>
