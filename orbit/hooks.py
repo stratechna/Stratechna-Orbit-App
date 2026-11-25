@@ -81,7 +81,7 @@ _LINGUA = ["orbit.lingua.garantir"]
 # 05-11-2026: os emails no CRM (orbit/emails_crm.py; docs/PLANO-EMAILS-NO-CRM.md) — campos próprios
 _EMAILS_CRM = ["orbit.emails_crm.instalar"]
 # 20-11-2026: campos da interface /orbit (Responsável em contactos e empresas)
-_INTERFACE = ["orbit.interface.desk.instalar", "orbit.interface.conversa.instalar", "orbit.interface.instalar.instalar", "orbit.interface.ciclo.instalar", "orbit.interface.marcas.instalar", "orbit.interface.detalhes.instalar", "orbit.fluxos_crm.instalar", "orbit.interface.formularios.instalar"]
+_INTERFACE = ["orbit.interface.desk.instalar", "orbit.interface.conversa.instalar", "orbit.interface.instalar.instalar", "orbit.interface.ciclo.instalar", "orbit.interface.marcas.instalar", "orbit.interface.detalhes.instalar", "orbit.fluxos_crm.instalar", "orbit.interface.formularios.instalar", "orbit.correio_servicos.acertar"]
 _FATURACAO = ["orbit.faturacao.instalar.garantir"]   # DP8, 05-11-2026
 _BOOKING = ["orbit.booking.garantir"]   # O1/I1, 06-11-2026: negócio do CRM ligado à marcação do Booking
 # 10-11-2026: propostas comerciais por cima do Orçamento (orbit/propostas; docs/PLANO-PROPOSTAS-ORBIT.md)
@@ -145,7 +145,7 @@ doc_events = {
     # 17-10-2026 (corte do Zoho): o tempo registado no Orbit vai para o livro de horas do portal
     "Timesheet": {"on_submit": "orbit.portal.tempo_submetido", "on_cancel": "orbit.portal.tempo_cancelado"},
     # 17-10-2026: a conta de saída por omissão é o remetente dos avisos — chama-se «Stratechna Orbit»
-    "Email Account": {"on_update": "orbit.remetentes.conta_gravada"},
+    "Email Account": {"validate": "orbit.correio_servicos.validar", "on_update": "orbit.remetentes.conta_gravada"},
     # 05-11-2026 (DP8): o documento fiscal só nasce no programa certificado (Moloni, …) — inerte sem Ligacao activa
     "Sales Invoice": {"validate": "orbit.faturacao.emissao.validar_fatura",
                       "on_submit": "orbit.faturacao.emissao.ao_submeter_fatura",

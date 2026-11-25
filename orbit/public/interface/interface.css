@@ -657,3 +657,27 @@ div.desk-prop{flex-direction:row;justify-content:space-between;color:var(--ink)}
 .rico-texto.rico-vazio::before{content:attr(data-vazio);color:var(--ink-3);pointer-events:none}
 .rico:focus-within{outline:2px solid var(--acao);outline-offset:-1px}
 .rico.ro .rico-texto{background:var(--surface-2)}
+
+/* 25-11-2026: ficha genérica com todos os tipos de campo do ecrã antigo; separadores/secções escondidos com aviso */
+.vistas button.inativo{color:var(--ink-3);opacity:.6;cursor:help}
+.erp-sec-oculta{opacity:.7;border-style:dashed}
+.erp-sec-oculta header{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.erp-campo textarea.erp-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+.erp-img{max-width:220px;max-height:160px;border-radius:7px;border:1px solid var(--line);display:block;margin-bottom:6px;object-fit:contain}
+.erp-html{font-size:13.5px;color:var(--ink-2)}
+.erp-titulo{margin:6px 0 2px;font-size:14px}
+.erp-anexo{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.erp-anexo-acc{margin-left:auto;display:flex;gap:6px}
+.erp-estrelas button{all:unset;cursor:pointer;font-size:20px;color:var(--line);padding:0 1px}
+.erp-estrelas button.on{color:#e0a100}
+.erp-duracao{display:flex;gap:8px;flex-wrap:wrap}
+.erp-duracao label{display:flex;align-items:center;gap:4px;margin:0}
+.erp-duracao input{width:70px!important}
+.erp-assinatura canvas{border:1px dashed var(--line);border-radius:7px;background:#fff;max-width:100%;touch-action:none;display:block}
+.erp-assinatura > div{display:flex;align-items:center;gap:8px;margin-top:6px}
+.erp-ass-atual{height:40px;border:1px solid var(--line);border-radius:4px;background:#fff}
+.erp-multi{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.erp-multi .etq button{all:unset;cursor:pointer;margin-left:6px}
+.erp-multi .erp-ligacao{flex:1;min-width:180px}
+.erp-linha-aberta td{background:var(--surface-2)}
+.erp-linha-campos{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 14px;padding:6px 2px}

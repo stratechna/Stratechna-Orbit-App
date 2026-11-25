@@ -2696,6 +2696,19 @@ const _metas = {};
 async function metaErp(dt) { if (!_metas[dt]) _metas[dt] = await api("erp.meta", { doctype: dt }); return _metas[dt]; }
 const ESTRUTURA = ["Section Break", "Column Break", "Tab Break"];
 const NUMERICOS = ["Int", "Float", "Currency", "Percent"];
+// 25-11-2026: tipos sem valor próprio (não se gravam nem contam como obrigatórios) e tipos de tabela-filha
+const SEM_VALOR = ["HTML", "Button", "Heading", "Image", "Fold"];
+const FILHAS = ["Table", "Table MultiSelect"];
+const MONO = ["Code", "JSON", "Markdown Editor", "HTML Editor", "Geolocation"];
+// Carregar um ficheiro como o ecrã antigo (upload_file do Frappe); devolve o endereço do ficheiro.
+async function carregarFicheiro(ficheiro, { doctype, docname, fieldname, privado = 1 } = {}) {
+  const fd = new FormData(); fd.append("file", ficheiro, ficheiro.name); fd.append("is_private", privado ? 1 : 0);
+  if (doctype && docname && !String(docname).startsWith("novo")) { fd.append("doctype", doctype); fd.append("docname", docname); if (fieldname) fd.append("fieldname", fieldname); }
+  const r = await fetch("/api/method/upload_file", { method: "POST", body: fd, headers: { "X-Frappe-CSRF-Token": window.csrf_token, Accept: "application/json" } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.message) throw new Error("Não foi possível carregar o ficheiro.");
+  return j.message.file_url;
+}
 function avaliar(expr, doc) {
   if (!expr) return true;
   if (expr.startsWith("eval:")) { try { return !!new Function("doc", "parent", `return (${expr.slice(5)})`)(doc, doc); } catch (e) { return true; } }
@@ -2799,7 +2812,7 @@ const ErpLigacao = {
 
 const ErpCampo = {
   components: { ErpLigacao },
-  props: ["c", "doc", "ro", "compacto"],
+  props: ["c", "doc", "ro", "compacto", "botao", "doctype"],
   setup(props) {
     const v = computed({ get: () => props.doc[props.c.fieldname], set: (x) => { props.doc[props.c.fieldname] = x; } });
     const dt = computed({ get: () => (props.doc[props.c.fieldname] || "").replace(" ", "T").slice(0, 16), set: (x) => { props.doc[props.c.fieldname] = x ? x.replace("T", " ") + ":00" : null; } });
@@ -2807,11 +2820,39 @@ const ErpCampo = {
     const editor = ref(null);
     onMounted(() => { if (editor.value) editor.value.innerHTML = props.doc[props.c.fieldname] || ""; });
     const html = (e) => { props.doc[props.c.fieldname] = e.target.innerHTML; };
-    return { v, dt, num, editor, html, textoValor };
+    // Select: opções escondidas pela interface só aparecem se já estiverem escolhidas
+    const opcoes = computed(() => (props.c.opcoes || []).filter((o) => !o.oculta || o.v === v.value));
+    // Anexo: carregar, trocar e tirar (como no ecrã antigo)
+    const aCarregar = ref(false);
+    const anexar = async (e) => {
+      const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
+      aCarregar.value = true;
+      try { v.value = await carregarFicheiro(f, { doctype: props.doctype || props.doc.doctype, docname: props.doc.name, fieldname: props.c.fieldname, privado: props.c.fieldtype !== "Attach Image" }); }
+      catch (err) { toast(err.message); } finally { aCarregar.value = false; }
+    };
+    // Classificação: o Frappe guarda a fracção (0–1) de N estrelas (options, 5 por omissão)
+    const estrelas = computed(() => Number(props.c.options) || 5);
+    const nota = computed(() => Math.round((Number(v.value) || 0) * estrelas.value));
+    const classificar = (n) => { if (!props.ro) v.value = n === nota.value ? 0 : n / estrelas.value; };
+    // Duração: segundos no Frappe; mostra-se em dias/horas/minutos/segundos
+    const partes = (t) => { t = Math.max(0, Math.round(Number(t) || 0)); return { d: Math.floor(t / 86400), h: Math.floor(t % 86400 / 3600), m: Math.floor(t % 3600 / 60), s: t % 60 }; };
+    const dur = computed(() => partes(v.value));
+    const mudarDur = (k, x) => { const p = { ...dur.value, [k]: Math.max(0, Number(x) || 0) }; v.value = p.d * 86400 + p.h * 3600 + p.m * 60 + p.s; };
+    // Autocompletar: sugestões das opções do campo
+    const sugestoes = computed(() => String(props.c.options || "").split("\n").filter(Boolean));
+    const idLista = "ac-" + Math.random().toString(36).slice(2);
+    // Assinatura: desenhada num quadro, gravada como imagem (data URL), como o ecrã antigo
+    const quadro = ref(null); let aDesenhar = false;
+    const ponto = (e) => { const r = quadro.value.getBoundingClientRect(); const t = e.touches?.[0] || e; return [t.clientX - r.left, t.clientY - r.top]; };
+    const comecar = (e) => { if (props.ro) return; aDesenhar = true; const g = quadro.value.getContext("2d"); g.lineWidth = 2; g.lineCap = "round"; g.strokeStyle = "#161a1d"; g.beginPath(); g.moveTo(...ponto(e)); };
+    const tracar = (e) => { if (!aDesenhar) return; e.preventDefault(); const g = quadro.value.getContext("2d"); g.lineTo(...ponto(e)); g.stroke(); };
+    const acabar = () => { if (!aDesenhar) return; aDesenhar = false; v.value = quadro.value.toDataURL("image/png"); };
+    const limparAss = () => { v.value = null; if (quadro.value) quadro.value.getContext("2d").clearRect(0, 0, quadro.value.width, quadro.value.height); };
+    return { v, dt, num, editor, html, textoValor, opcoes, aCarregar, anexar, estrelas, nota, classificar, dur, mudarDur, sugestoes, idLista, quadro, comecar, tracar, acabar, limparAss, MONO };
   },
   template: `
     <template v-if="c.fieldtype==='Check'"><label class="erp-chk"><input type="checkbox" :checked="!!v" :disabled="ro" @change="v = $event.target.checked ? 1 : 0"> <span v-if="!compacto">{{ c.label }}</span></label></template>
-    <select v-else-if="c.fieldtype==='Select'" v-model="v" :disabled="ro"><option v-for="o in c.opcoes" :key="o.v" :value="o.v">{{ o.r }}</option></select>
+    <select v-else-if="c.fieldtype==='Select'" v-model="v" :disabled="ro"><option v-for="o in opcoes" :key="o.v" :value="o.v">{{ o.r }}</option></select>
     <ErpLigacao v-else-if="c.fieldtype==='Link'" v-model="v" :alvo="c.options" :ro="ro"/>
     <ErpLigacao v-else-if="c.fieldtype==='Dynamic Link'" v-model="v" :alvo="doc[c.options]" :ro="ro"/>
     <input v-else-if="['Int','Float','Currency','Percent'].includes(c.fieldtype)" type="number" :step="c.fieldtype==='Int'?1:'any'" v-model="num" :disabled="ro">
@@ -2821,10 +2862,51 @@ const ErpCampo = {
     <input v-else-if="c.fieldtype==='Password'" type="password" v-model="v" :disabled="ro" autocomplete="new-password">
     <input v-else-if="c.fieldtype==='Color'" type="color" v-model="v" :disabled="ro">
     <div v-else-if="c.fieldtype==='Text Editor'" ref="editor" class="erp-editor" :contenteditable="!ro" @input="html"></div>
+    <textarea v-else-if="MONO.includes(c.fieldtype) && !compacto" v-model="v" :disabled="ro" rows="6" class="erp-mono" spellcheck="false"></textarea>
     <textarea v-else-if="['Small Text','Text','Long Text'].includes(c.fieldtype) && !compacto" v-model="v" :disabled="ro" rows="3"></textarea>
-    <div v-else-if="['Attach','Attach Image'].includes(c.fieldtype)" class="erp-anexo"><a v-if="v" :href="v" target="_blank">{{ String(v).split('/').pop() }}</a><span v-else class="sub">sem ficheiro</span></div>
+    <div v-else-if="['Attach','Attach Image'].includes(c.fieldtype)" class="erp-anexo">
+      <img v-if="c.fieldtype==='Attach Image' && v" :src="v" class="erp-img" alt="">
+      <a v-if="v" :href="v" target="_blank">{{ String(v).split('/').pop() }}</a><span v-else class="sub">{{ aCarregar ? 'A carregar…' : 'sem ficheiro' }}</span>
+      <span v-if="!ro" class="erp-anexo-acc"><label class="btn sm">{{ v ? 'Trocar' : 'Carregar' }}<input type="file" hidden :accept="c.fieldtype==='Attach Image' ? 'image/*' : null" @change="anexar"></label><button v-if="v" class="btn sm" type="button" @click="v=null">Tirar</button></span>
+    </div>
     <div v-else-if="c.fieldtype==='Read Only'" class="erp-ro">{{ v }}</div>
+    <div v-else-if="c.fieldtype==='HTML'" class="erp-html" v-html="c.options"></div>
+    <h4 v-else-if="c.fieldtype==='Heading'" class="erp-titulo">{{ c.label }}</h4>
+    <button v-else-if="c.fieldtype==='Button'" class="btn sm" type="button" @click="botao && botao(c)">{{ c.label }}</button>
+    <img v-else-if="c.fieldtype==='Image'" :src="doc[c.options]" class="erp-img" alt="">
+    <div v-else-if="c.fieldtype==='Rating'" class="erp-estrelas"><button v-for="n in estrelas" :key="n" type="button" :class="{on: n<=nota}" :disabled="ro" @click="classificar(n)">★</button></div>
+    <div v-else-if="c.fieldtype==='Duration'" class="erp-duracao">
+      <label v-for="k in ['d','h','m','s']" :key="k"><input type="number" min="0" :value="dur[k]" :disabled="ro" @change="mudarDur(k, $event.target.value)"><span>{{ {d:'dias',h:'h',m:'min',s:'s'}[k] }}</span></label>
+    </div>
+    <div v-else-if="c.fieldtype==='Signature'" class="erp-assinatura">
+      <img v-if="v && (ro || !quadro)" :src="v" alt="Assinatura">
+      <template v-if="!ro"><canvas ref="quadro" width="420" height="140" @mousedown="comecar" @mousemove="tracar" @mouseup="acabar" @mouseleave="acabar" @touchstart="comecar" @touchmove="tracar" @touchend="acabar"></canvas>
+        <div><img v-if="v" :src="v" alt="" class="erp-ass-atual"><button class="btn sm" type="button" @click="limparAss">Limpar</button></div></template>
+    </div>
+    <template v-else-if="c.fieldtype==='Autocomplete'"><input v-model="v" :disabled="ro" :list="idLista"><datalist :id="idLista"><option v-for="o in sugestoes" :key="o" :value="o"/></datalist></template>
     <input v-else v-model="v" :disabled="ro" :type="c.options==='Email'?'email':c.options==='Phone'?'tel':'text'">`,
+};
+
+// Tabela de escolha múltipla (Table MultiSelect): cada linha da tabela-filha guarda uma ligação; mostra-se como etiquetas.
+const ErpMulti = {
+  components: { ErpLigacao },
+  props: ["c", "doc", "filha", "ro"],
+  setup(props) {
+    const linhas = computed(() => props.doc[props.c.fieldname] || (props.doc[props.c.fieldname] = []));
+    const campoLig = computed(() => (props.filha?.campos || []).find((x) => x.fieldtype === "Link"));
+    const novo = ref("");
+    watch(novo, (x) => {
+      if (!x || !campoLig.value) return;
+      if (!linhas.value.some((l) => l[campoLig.value.fieldname] === x)) linhas.value.push({ doctype: props.c.options, [campoLig.value.fieldname]: x });
+      nextTick(() => { novo.value = ""; });
+    });
+    const tirar = (i) => linhas.value.splice(i, 1);
+    return { linhas, campoLig, novo, tirar, tr };
+  },
+  template: `<div class="erp-multi">
+    <span v-for="(l,i) in linhas" :key="i" class="etq">{{ campoLig ? tr(campoLig.options, l[campoLig.fieldname]) : '' }}<button v-if="!ro" type="button" @click="tirar(i)" title="Tirar">×</button></span>
+    <ErpLigacao v-if="!ro && campoLig" v-model="novo" :alvo="campoLig.options"/>
+  </div>`,
 };
 
 const ErpTabela = {
@@ -2833,9 +2915,13 @@ const ErpTabela = {
   setup(props) {
     const linhas = computed(() => props.doc[props.c.fieldname] || (props.doc[props.c.fieldname] = []));
     const cols = computed(() => {
-      const cs = (props.filha?.campos || []).filter((x) => !ESTRUTURA.includes(x.fieldtype) && !x.hidden && x.fieldtype !== "Table");
+      const cs = (props.filha?.campos || []).filter((x) => !ESTRUTURA.includes(x.fieldtype) && !x.hidden && !FILHAS.includes(x.fieldtype) && !SEM_VALOR.includes(x.fieldtype));
       const lv = cs.filter((x) => x.in_list_view); return (lv.length ? lv : cs).slice(0, 6);
     });
+    // 25-11-2026: todos os campos da linha (o «editar linha» do ecrã antigo) — as colunas só mostram até 6
+    const todos = computed(() => (props.filha?.campos || []).filter((x) => !ESTRUTURA.includes(x.fieldtype) && !x.hidden));
+    const visL = (x, l) => avaliar(x.depends_on, Object.assign({}, l, { parent: props.doc })) && (x.fieldtype !== "HTML" || x.options);
+    const aberta = ref(null);
     let n = 0;
     const juntar = () => {
       const l = { name: "novo-" + Date.now() + "-" + (n++), doctype: props.c.options };
@@ -2843,16 +2929,23 @@ const ErpTabela = {
       linhas.value.push(l);
     };
     const tirar = (i) => { linhas.value.splice(i, 1); };
-    return { linhas, cols, juntar, tirar };
+    return { linhas, cols, juntar, tirar, todos, visL, aberta };
   },
   template: `<div class="erp-tabela">
     <div class="tabela-wrap" style="margin:0"><table>
-      <thead><tr><th style="width:34px">#</th><th v-for="x in cols" :key="x.fieldname">{{ x.label }}<span v-if="x.reqd" class="obrig">*</span></th><th v-if="!ro" style="width:34px"></th></tr></thead>
-      <tbody><tr v-for="(l,i) in linhas" :key="l.name||i" style="cursor:default">
+      <thead><tr><th style="width:34px">#</th><th v-for="x in cols" :key="x.fieldname">{{ x.label }}<span v-if="x.reqd" class="obrig">*</span></th><th style="width:34px"></th><th v-if="!ro" style="width:34px"></th></tr></thead>
+      <tbody><template v-for="(l,i) in linhas" :key="l.name||i"><tr style="cursor:default">
         <td class="sub">{{ i+1 }}</td>
         <td v-for="x in cols" :key="x.fieldname"><ErpCampo :c="x" :doc="l" :ro="ro || x.read_only" compacto="1"/></td>
+        <td><button class="icone-btn" :title="aberta===i ? 'Fechar a linha' : 'Todos os campos da linha'" @click="aberta = aberta===i ? null : i">{{ aberta===i ? '▴' : '⋯' }}</button></td>
         <td v-if="!ro"><button class="icone-btn" title="Tirar linha" @click="tirar(i)">×</button></td>
-      </tr></tbody></table>
+      </tr>
+      <tr v-if="aberta===i" class="erp-linha-aberta"><td :colspan="cols.length + (ro ? 2 : 3)"><div class="erp-linha-campos">
+        <template v-for="x in todos" :key="x.fieldname"><div v-if="visL(x, l)" class="erp-campo">
+          <label v-if="!['Check','Button','Heading','HTML'].includes(x.fieldtype)">{{ x.label }}<span v-if="x.reqd" class="obrig">*</span></label>
+          <ErpCampo :c="x" :doc="l" :ro="ro || x.read_only" :doctype="c.options"/>
+          <small v-if="x.descricao" class="sub">{{ x.descricao }}</small></div></template>
+      </div></td></tr></template></tbody></table>
       <div v-if="!linhas.length" class="vazio" style="padding:12px">Sem linhas.</div>
     </div>
     <button v-if="!ro" class="btn sm" style="margin-top:8px" @click="juntar">+ Linha</button>
@@ -3123,7 +3216,7 @@ const ErpProposta = {
 };
 
 const ErpFicha = {
-  components: { ErpCampo, ErpTabela },
+  components: { ErpCampo, ErpTabela, ErpMulti },
   props: ["doctype", "name"],
   setup(props) {
     const meta = ref(null); const doc = ref(null); const novo = ref(false); const podeGravar = ref(true); const sujo = ref(false); const a = ref(false);
@@ -3195,16 +3288,50 @@ const ErpFicha = {
     const obrig = (c) => c.reqd || (c.mandatory_depends_on && avaliar(c.mandatory_depends_on, doc.value));
     const visivel = (c) => {
       if (c.hidden || !avaliar(c.depends_on, doc.value)) return false;
-      if (roCampo(c) && !novo.value && vazioV(doc.value[c.fieldname]) && c.fieldtype !== "Table") return false;   // como no ERPNext: só-leitura vazio não aparece
+      if (c.fieldtype === "HTML") return !!c.options;   // HTML preenchido só pelo script do ecrã antigo: nada a mostrar
+      if (c.fieldtype === "Image") return !!doc.value[c.options];
+      if (SEM_VALOR.includes(c.fieldtype) || FILHAS.includes(c.fieldtype)) return true;
+      if (roCampo(c) && !novo.value && vazioV(doc.value[c.fieldname])) return false;   // como no ERPNext: só-leitura vazio não aparece
       return true;
     };
     const secVisivel = (s) => avaliar(s.depends_on, doc.value) && s.colunas.some((col) => col.some(visivel));
     const abaVisivel = (t) => avaliar(t.depends_on, doc.value) && t.secoes.some(secVisivel);
-    const abasVis = computed(() => abas.value.filter(abaVisivel));
+    // 25-11-2026: separadores e secções escondidos por uma condição que a pessoa pode mudar na ficha (ex.: «Ativar
+    // receção» na Conta de e-mail) já não desaparecem sem aviso — mostram-se apagados, a dizer o que os abre.
+    const temCampos = (s) => s.colunas.some((col) => col.some((c) => !c.hidden));
+    const condTexto = (expr) => {
+      if (!expr || !meta.value) return "";
+      const nomes = expr.startsWith("eval:") ? [...new Set([...expr.matchAll(/doc\.(\w+)/g)].map((m) => m[1]))] : [expr];
+      const cs = nomes.map((n) => meta.value.campos.find((c) => c.fieldname === n));
+      if (!cs.length || cs.some((c) => !c || c.hidden || roCampo(c) || !["Check", "Select"].includes(c.fieldtype) || !visivel(c))) return "";
+      const rot = cs.map((c) => "«" + c.label + "»").join(", ");
+      return cs.length === 1 && cs[0].fieldtype === "Check" && !/!/.test(expr.replace(/!=/g, "")) ? "Aparece com " + rot + " ligado" : "Depende de " + rot;
+    };
+    const abasBarra = computed(() => abas.value.filter((t) => abaVisivel(t) || (t.secoes.some(temCampos) && !avaliar(t.depends_on, doc.value) && condTexto(t.depends_on))));
+    const abasVis = abasBarra;
+    const secEscondida = (s) => s.label && temCampos(s) && !avaliar(s.depends_on, doc.value) && condTexto(s.depends_on);
+    const escolherAba = (t, i) => { if (abaVisivel(t)) aba.value = i; else toast(condTexto(t.depends_on) + "."); };
+    watch(abasBarra, (l) => { if (!l[aba.value] || !abaVisivel(l[aba.value])) aba.value = Math.max(0, l.findIndex(abaVisivel)); });
+    // Botões: correm no script do ecrã antigo — abre-se o mesmo registo lá, dentro do Orbit
+    const botao = (c) => {
+      if (novo.value || sujo.value) { toast("Grave primeiro e depois use «" + c.label + "»."); return; }
+      location.hash = "#/erp-desk/" + encodeURIComponent(meta.value.desk + (meta.value.single ? "" : "/" + encodeURIComponent(doc.value.name)));
+    };
+    // Comportamentos do ecrã antigo que a ficha genérica repete (o script de cada tipo não corre aqui)
+    const COMPORT = {
+      "Email Account": {
+        service: async (x) => { if (!x) return; Object.assign(doc.value, await api("orbit.correio_servicos.valores", { service: x, use_imap: doc.value.use_imap ? 1 : 0 })); },
+        use_imap: async (x) => { if (!doc.value.service) return; Object.assign(doc.value, await api("orbit.correio_servicos.valores", { service: doc.value.service, use_imap: x ? 1 : 0 })); },
+        domain: async (x) => { if (!x) return; Object.assign(doc.value, await api("orbit.correio_servicos.valores_dominio", { domain: x })); },
+      },
+    };
+    for (const [campo, fn] of Object.entries(COMPORT[props.doctype] || {})) {
+      watch(() => doc.value?.[campo], (n, o) => { if (o !== undefined && n !== o) fn(n); });
+    }
     const tituloDoc = computed(() => { const t = meta.value?.titulo; if (meta.value?.single) return meta.value.rotulo; return tr(props.doctype, (t && doc.value?.[t]) || (novo.value ? "Novo — " + meta.value?.rotulo : doc.value?.name)); });
     const precisaNome = computed(() => novo.value && meta.value && (!meta.value.nomeacao || meta.value.nomeacao.toLowerCase() === "prompt"));
     const gravar = async () => {
-      const falta = meta.value.campos.filter((c) => !ESTRUTURA.includes(c.fieldtype) && visivel(c) && obrig(c) && vazioV(doc.value[c.fieldname]));
+      const falta = meta.value.campos.filter((c) => !ESTRUTURA.includes(c.fieldtype) && !SEM_VALOR.includes(c.fieldtype) && visivel(c) && obrig(c) && vazioV(doc.value[c.fieldname]));
       if (falta.length) { toast("Falta preencher: " + falta.map((c) => c.label).join(", ")); return; }
       a.value = true;
       try {
@@ -3225,7 +3352,7 @@ const ErpFicha = {
     };
     const aberta = (s, i) => !(s.collapsible && !fechadas.value[i + ":" + s.label]);
     const alternar = (s, i) => { fechadas.value[i + ":" + s.label] = !fechadas.value[i + ":" + s.label]; };
-    return { meta, doc, novo, sujo, a, aba, abasVis, visivel, roCampo, obrig, secVisivel, tituloDoc, gravar, accao, docstatus, soLeitura, aberta, alternar, ESTADO_DOC, irErp, precisaNome, nomeNovo, cor, ini, criarOps, criarDe, moeda, pdf, aviso, tr };
+    return { meta, doc, novo, sujo, a, aba, abasVis, abasBarra, abaVisivel, escolherAba, condTexto, secEscondida, botao, visivel, roCampo, obrig, secVisivel, tituloDoc, gravar, accao, docstatus, soLeitura, aberta, alternar, ESTADO_DOC, irErp, precisaNome, nomeNovo, cor, ini, criarOps, criarDe, moeda, pdf, aviso, tr };
   },
   template: `<div v-if="meta && doc" class="erp-ficha">
     <div class="erp-topo">
@@ -3252,19 +3379,21 @@ const ErpFicha = {
       </div>
       <div v-if="aviso" class="aviso" style="margin-top:8px">{{ aviso }}</div>
       <div v-if="precisaNome" class="erp-campo" style="max-width:420px;margin-top:10px"><label>Nome do registo<span class="obrig">*</span></label><input v-model="nomeNovo"></div>
-      <div class="vistas" v-if="abasVis.length>1" style="padding:12px 0 0"><button v-for="(t,i) in abasVis" :key="t.label+i" :class="{ativo: aba===i}" @click="aba=i">{{ t.label }}</button></div>
+      <div class="vistas" v-if="abasBarra.length>1" style="padding:12px 0 0"><button v-for="(t,i) in abasBarra" :key="t.label+i" :class="{ativo: aba===i, inativo: !abaVisivel(t)}" :title="abaVisivel(t) ? '' : condTexto(t.depends_on)" @click="escolherAba(t,i)">{{ t.label }}</button></div>
     </div>
-    <div class="erp-corpo" v-if="abasVis[aba]">
+    <div class="erp-corpo" v-if="abasVis[aba] && abaVisivel(abasVis[aba])">
       <template v-for="(s,si) in abasVis[aba].secoes" :key="si">
+        <section v-if="!secVisivel(s) && secEscondida(s)" class="cartao erp-sec erp-sec-oculta"><header><b>{{ s.label }}</b><span class="sub">{{ condTexto(s.depends_on) }}</span></header></section>
         <section v-if="secVisivel(s)" class="cartao erp-sec">
           <header v-if="s.label" @click="s.collapsible && alternar(s,si)" :style="{cursor: s.collapsible?'pointer':'default'}"><b>{{ s.label }}</b><span v-if="s.collapsible" class="sub">{{ aberta(s,si) ? '▾' : '▸' }}</span></header>
           <div v-show="aberta(s,si)" class="erp-cols" :style="{gridTemplateColumns: 'repeat(' + s.colunas.filter(c=>c.some(visivel)).length + ', minmax(0,1fr))'}">
             <div v-for="(col,ci) in s.colunas.filter(c=>c.some(visivel))" :key="ci">
               <template v-for="c in col" :key="c.fieldname">
                 <div v-if="visivel(c)" class="erp-campo" :class="{largo: c.fieldtype==='Table'}">
-                  <label v-if="c.fieldtype!=='Check'">{{ c.label }}<span v-if="obrig(c)" class="obrig">*</span></label>
+                  <label v-if="!['Check','Button','Heading','HTML'].includes(c.fieldtype)">{{ c.label }}<span v-if="obrig(c)" class="obrig">*</span></label>
                   <ErpTabela v-if="c.fieldtype==='Table'" :c="c" :doc="doc" :filha="meta.filhas[c.options]" :ro="roCampo(c)"/>
-                  <ErpCampo v-else :c="c" :doc="doc" :ro="roCampo(c)"/>
+                  <ErpMulti v-else-if="c.fieldtype==='Table MultiSelect'" :c="c" :doc="doc" :filha="meta.filhas[c.options]" :ro="roCampo(c)"/>
+                  <ErpCampo v-else :c="c" :doc="doc" :ro="roCampo(c)" :botao="botao" :doctype="doctype"/>
                   <small v-if="c.descricao" class="sub">{{ c.descricao }}</small>
                 </div>
               </template>

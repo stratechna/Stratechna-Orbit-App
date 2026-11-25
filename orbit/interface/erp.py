@@ -44,10 +44,17 @@ def _marca(t: str) -> str:
     return t
 
 
-# Tipos de campo que a ficha genérica não desenha (estrutura ou só para o desk).
+# Tipos de campo de estrutura. 25-11-2026 (regra do Vítor): nenhum campo que o ecrã antigo mostra pode faltar
+# na interface — a ficha desenha todos os tipos; só o «Fold» (antigo, sem efeito no Frappe 16) fica de fora.
 _ESTRUTURA = {"Section Break", "Column Break", "Tab Break"}
-_SEM_UI = {"HTML", "Button", "Fold", "Heading", "Image", "Geolocation", "Signature", "Barcode", "Icon",
-           "Table MultiSelect", "Markdown Editor", "HTML Editor", "Code", "JSON", "Rating", "Duration", "Autocomplete"}
+_SEM_UI = {"Fold"}
+# Tipos sem valor próprio (não se gravam): texto, títulos, botões, imagem de outro campo.
+_SEM_VALOR = {"HTML", "Button", "Heading", "Image", "Fold"}
+_FILHAS = ("Table", "Table MultiSelect")
+# Opções mal traduzidas pela tradução do Frappe/ERPNext por serem a mesma palavra noutro módulo.
+_OPCOES_TR = {("Email Account", "auth_method", "Basic"): "Básica"}   # «Vencimento base» é o salário do RH
+# Opções que a interface não oferece (só aparecem se já estiverem escolhidas).
+_OPCOES_OCULTAS = {("Email Account", "service"): {"Frappe Mail"}}   # produto da Frappe Cloud, não o Orbit Mail
 _PADRAO = {"name", "owner", "creation", "modified", "modified_by", "docstatus", "idx", "parent", "parentfield",
            "parenttype", "doctype", "_user_tags", "_comments", "_assign", "_liked_by", "_seen"}
 _PROPS = ("fieldname", "fieldtype", "options", "reqd", "read_only", "hidden", "depends_on", "mandatory_depends_on",
@@ -121,7 +128,9 @@ def _campos(meta) -> list:
         # 23-11-2026: campo sem rótulo mostrava o nome técnico (ASSIGN_CONDITION) — passa a texto traduzível
         d["label"] = _marca(_(f.label) if f.label else (_(frappe.unscrub(f.fieldname)) if f.fieldtype not in _ESTRUTURA else ""))
         if f.fieldtype == "Select" and f.options:
-            d["opcoes"] = [{"v": o, "r": _marca(_(o)) if o else ""} for o in f.options.split("\n")]
+            ocultas = _OPCOES_OCULTAS.get((meta.name, f.fieldname), set())
+            d["opcoes"] = [{"v": o, "r": _OPCOES_TR.get((meta.name, f.fieldname, o)) or (_marca(_(o)) if o else ""),
+                            **({"oculta": 1} if o in ocultas else {})} for o in f.options.split("\n")]
         if f.description:
             d["descricao"] = _marca(_(f.description))
         out.append(d)
@@ -135,7 +144,7 @@ def meta(doctype: str):
     m = frappe.get_meta(doctype)
     filhas = {}
     for f in m.fields:
-        if f.fieldtype in ("Table",) and f.options and frappe.db.exists("DocType", f.options):
+        if f.fieldtype in _FILHAS and f.options and frappe.db.exists("DocType", f.options):
             fm = frappe.get_meta(f.options)
             filhas[f.options] = {"campos": _campos(fm)}
     pode = {p: bool(frappe.has_permission(doctype, p)) for p in ("create", "write", "delete")}
@@ -145,8 +154,9 @@ def meta(doctype: str):
         "titulo": m.title_field or ("item_name" if doctype == "Item" else None), "imagem": m.image_field,
         "pesquisa": [c.strip() for c in (m.search_fields or "").split(",") if c.strip()],
         "nomeacao": m.autoname or "", "campos": _campos(m), "filhas": filhas, "pode": pode,
+        "desk": "/desk/" + frappe.scrub(doctype).replace("_", "-"),   # o ecrã antigo, para os botões que só lá correm
         "transacao": doctype in TRANSACOES,
-        "lista": [f.fieldname for f in m.fields if f.in_list_view and f.fieldtype not in _ESTRUTURA][:6],
+        "lista": [f.fieldname for f in m.fields if f.in_list_view and f.fieldtype not in _ESTRUTURA and f.fieldtype not in _SEM_VALOR][:6],
         "filtros": [{"fieldname": f.fieldname, "label": _(f.label or f.fieldname), "fieldtype": f.fieldtype,
                      "options": f.options} for f in m.fields if f.in_standard_filter][:8],
     }
@@ -158,7 +168,7 @@ def lista(doctype: str, q: str = None, filtros: str = None, pagina: int = 0, ord
     _ler(doctype)
     m = frappe.get_meta(doctype)
     titulo = m.title_field if m.title_field and m.has_field(m.title_field) else None
-    colunas = [f.fieldname for f in m.fields if f.in_list_view and f.fieldtype not in _ESTRUTURA and f.fieldtype != "Table"
+    colunas = [f.fieldname for f in m.fields if f.in_list_view and f.fieldtype not in _ESTRUTURA and f.fieldtype not in _FILHAS and f.fieldtype not in _SEM_VALOR
                and f.fieldname != titulo][:6]   # o título não se repete como coluna
     campos = ["name", "modified"] + ([titulo] if titulo else []) + colunas
     if m.is_submittable:
@@ -200,13 +210,13 @@ def _aplicar(d, dados: dict) -> None:
     """Só os campos que a definição permite editar; as tabelas-filhas são substituídas linha a linha."""
     m = d.meta
     for f in m.fields:
-        if f.fieldname not in dados or f.fieldtype in _ESTRUTURA or f.fieldtype in _SEM_UI:
+        if f.fieldname not in dados or f.fieldtype in _ESTRUTURA or f.fieldtype in _SEM_VALOR:
             continue
-        if f.read_only and not f.fieldtype == "Table":
+        if f.read_only and f.fieldtype not in _FILHAS:
             continue
         if d.docstatus == 1 and not f.allow_on_submit:
             continue
-        if f.fieldtype == "Table":
+        if f.fieldtype in _FILHAS:
             linhas = []
             for r in dados.get(f.fieldname) or []:
                 limpa = {k: v for k, v in r.items() if k not in _PADRAO or k == "name"}
