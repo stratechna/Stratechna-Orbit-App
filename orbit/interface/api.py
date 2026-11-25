@@ -121,8 +121,12 @@ def _modulos():
     for r in frappe.get_all("Has Role", filters={"parenttype": "Desktop Icon"}, fields=["parent", "role"]):
         restritos.setdefault(r.parent, set()).add(r.role)
     out = []
+    from orbit import empresas as _E
+    sem_contab = not _E.contabilidade_ligada()   # 25-11-2026: contabilidade desligada por omissão
     for grupo, lista in (("Gestão", _GESTAO), ("Recursos Humanos", _RH), ("Sistema", _SISTEMA)):
         for nome, pt in lista:
+            if sem_contab and nome in _E.MODULOS_CONTAB:
+                continue
             d = icones.get(nome)
             if not d or (restritos.get(nome) and not (restritos[nome] & papeis)):
                 continue

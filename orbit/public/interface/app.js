@@ -2633,8 +2633,14 @@ const DefEmpresas = {
   setup() {
     const d = ref(null), form = ref(null), aGravar = ref(false), erro = ref("");
     const e = (m, a, post) => api("orbit.empresas." + m, a || {}, !!post);
-    async function carregar() { try { d.value = await e("lista"); erro.value = ""; } catch (x) { erro.value = (x && x.message) || "Sem acesso."; } }
+    const contab = ref(null);
+    async function carregar() { try { d.value = await e("lista"); erro.value = ""; contab.value = (await e("contabilidade")).ligada; } catch (x) { erro.value = (x && x.message) || "Sem acesso."; } }
     onMounted(carregar);
+    async function mudarContab(v) {
+      if (!confirm(v ? "Ligar a contabilidade? Passam a ver-se o plano de contas, os lançamentos e os relatórios financeiros." : "Desligar a contabilidade? Ficam à vista o inventário, as vendas, as compras, as faturas e os pagamentos.")) { contab.value = !v; return; }
+      try { const r = await e("mudar_contabilidade", { ligar: v ? 1 : 0 }, true); contab.value = r.ligada; toast(r.ligada ? "Contabilidade ligada." : "Contabilidade desligada."); }
+      catch (x) { toast((x && x.message) || "Não foi possível mudar."); contab.value = !v; }
+    }
     const abrirNova = () => { form.value = { nome: "", nif: "", pais: "Portugal", moeda: "EUR", abreviatura: "", morada: "", codigo_postal: "", cidade: "", marcas: [] }; };
     const empresaDe = (m) => (m.orbit_empresa || (d.value && d.value.principal));
     async function gravar() {
@@ -2652,7 +2658,7 @@ const DefEmpresas = {
       catch (x) { toast((x && x.message) || "Não foi possível mudar."); }
       await carregar();
     }
-    return { d, form, aGravar, erro, abrirNova, gravar, mudar, empresaDe };
+    return { d, form, aGravar, erro, abrirNova, gravar, mudar, empresaDe, contab, mudarContab };
   },
   template: `
   <div class="pad" style="max-width:980px">
@@ -2667,6 +2673,10 @@ const DefEmpresas = {
         <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>{{ c.name }}</b>
           <span class="sub">NIF {{ c.tax_id || '—' }} · {{ c.abbr }} · {{ c.default_currency }}<span v-if="c.principal"> · principal</span></span></div>
         <div class="sub" style="margin-top:6px">Marcas: <span v-if="!c.marcas.length">nenhuma</span><span v-for="(m,i) in c.marcas" :key="m">{{ i ? ', ' : '' }}{{ m }}</span></div>
+      </div>
+      <div class="cartao" style="padding:14px 16px;margin:14px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div><b>Contabilidade</b><div class="sub">{{ contab ? 'Ligada: plano de contas, lançamentos e relatórios financeiros à vista.' : 'Desligada: inventário, vendas, compras, faturas e pagamentos, sem a contabilidade.' }}</div></div>
+        <label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" :checked="contab" @change="mudarContab($event.target.checked)">{{ contab ? 'Ligada' : 'Desligada' }}</label>
       </div>
       <h2 style="font-size:15px;margin:18px 0 8px">Marcas</h2>
       <div class="cartao" style="padding:6px 16px">

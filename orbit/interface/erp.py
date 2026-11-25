@@ -92,6 +92,9 @@ def menu(barra: str):
         frappe.throw(_("Módulo desconhecido."), frappe.DoesNotExistError)
     s = frappe.get_doc("Workspace Sidebar", barra)
     secoes, atual = [], {"titulo": "", "itens": []}
+    # 25-11-2026: contabilidade desligada (a opção inicial) — fora do menu o plano de contas, lançamentos e relatórios
+    from orbit import empresas as _E
+    sem_contab = not _E.contabilidade_ligada()
     for i in s.items:
         if i.type == "Section Break":
             if atual["itens"]:
@@ -109,6 +112,10 @@ def menu(barra: str):
         if i.link_type == "Workspace":
             if i.link_to != barra and frappe.db.exists("Workspace Sidebar", i.link_to):   # o «Home» é o próprio módulo
                 atual["itens"].append({"tipo": "mod", "rotulo": _marca(_(i.label or i.link_to)), "barra": i.link_to, "icone": i.icon})
+            continue
+        if sem_contab and ((i.link_type == "DocType" and i.link_to in _E.DOCTYPES_CONTAB)
+                           or (i.link_type == "Report" and i.link_to in _E.RELATORIOS_CONTAB)
+                           or (i.link_type == "Workspace" and i.link_to in _E.MODULOS_CONTAB)):
             continue
         if i.link_type == "DocType":
             if not frappe.db.exists("DocType", i.link_to) or not frappe.has_permission(i.link_to, "read"):

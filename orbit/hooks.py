@@ -86,7 +86,7 @@ _FATURACAO = ["orbit.faturacao.instalar.garantir"]   # DP8, 05-11-2026
 _BOOKING = ["orbit.booking.garantir"]   # O1/I1, 06-11-2026: negócio do CRM ligado à marcação do Booking
 # 10-11-2026: propostas comerciais por cima do Orçamento (orbit/propostas; docs/PLANO-PROPOSTAS-ORBIT.md)
 _PROPOSTAS = ["orbit.propostas.instalar.garantir", "orbit.marcas_artigos.garantir", "orbit.inventario.campos.garantir", "orbit.inventario.encomendas.garantir", "orbit.inventario.armazens.instalar"]
-after_migrate = _FATURACAO + _BOOKING + _PROPOSTAS + _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA + _LINGUA + _EMAILS_CRM + _INTERFACE + _NOTAS + ["orbit.generos.acertar", "orbit.notificacoes_pt.acertar", "orbit.territorios.acertar", "orbit.listas_pt.acertar", "orbit.configuracao_pt.acertar", "orbit.compras.preparar.tudo", "orbit.compras.rascunho.garantir_campos", "orbit.empresas.garantir"]
+after_migrate = _FATURACAO + _BOOKING + _PROPOSTAS + _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA + _LINGUA + _EMAILS_CRM + _INTERFACE + _NOTAS + ["orbit.generos.acertar", "orbit.notificacoes_pt.acertar", "orbit.territorios.acertar", "orbit.listas_pt.acertar", "orbit.configuracao_pt.acertar", "orbit.compras.preparar.tudo", "orbit.compras.rascunho.garantir_campos", "orbit.empresas.garantir", "orbit.empresas.contabilidade_inicial"]
 after_install = _POR_DE_PE + _MARKETING + _MARCACAO + _ORGANIZACAO + ["orbit.remetentes.garantir"] + _LINGUA + _NOTAS + ["orbit.generos.acertar", "orbit.notificacoes_pt.acertar", "orbit.territorios.acertar", "orbit.listas_pt.acertar", "orbit.configuracao_pt.acertar"]
 
 # Email marketing: a saída das campanhas corre ao minuto (o ritmo por hora

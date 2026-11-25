@@ -254,3 +254,71 @@ def associar(marca: str, empresa: str):
         frappe.db.set_value("Warehouse", antigo, "disabled", 1)
     frappe.db.commit()
     return {"ok": True, "marca": marca, "empresa": empresa, "armazem": novo_arm}
+
+
+# ── Contabilidade desligada por omissão (25-11-2026, pedido do Vítor: «queremos gerir inventário, faturação, etc.,
+# mas não contabilidade») ──────────────────────────────────────────────────────────────────────────────────────
+# O ERPNext continua a fazer os lançamentos por baixo (não se desligam); com a opção desligada o Orbit esconde a
+# contabilidade — módulos, plano de contas, lançamentos, razão, balancete, balanço, resultados — e o inventário deixa
+# de gerar lançamentos (perpetual inventory) nas empresas ainda sem movimentos de stock.
+CHAVE_CONTAB = "orbit_contabilidade"
+MODULOS_CONTAB = ("Accounting", "Banking", "Financial Reports", "Assets", "Budget", "Share Management", "Accounts Setup")
+DOCTYPES_CONTAB = {"Account", "Journal Entry", "Journal Entry Template", "GL Entry", "Cost Center", "Cost Center Allocation",
+                   "Fiscal Year", "Period Closing Voucher", "Budget", "Accounting Dimension", "Finance Book",
+                   "Accounting Period", "Payment Reconciliation", "Bank Reconciliation Tool", "Bank Clearance",
+                   "Process Period Closing Voucher", "Accounts Settings", "Chart of Accounts Importer",
+                   "Exchange Rate Revaluation", "Repost Accounting Ledger", "Unreconcile Payment", "Ledger Merge"}
+RELATORIOS_CONTAB = {"General Ledger", "Trial Balance", "Balance Sheet", "Profit and Loss Statement", "Cash Flow",
+                     "Consolidated Financial Statement", "Trial Balance for Party", "Financial Ratios",
+                     "Dimension-wise Accounts Balance Report", "Budget Variance Report", "Accounts Payable Summary",
+                     "Gross Profit", "Profitability Analysis", "Custom Financial Statement", "Deferred Revenue and Expense"}
+
+
+def contabilidade_ligada() -> bool:
+    return str(frappe.defaults.get_global_default(CHAVE_CONTAB) or "0") == "1"
+
+
+def _aplicar_contabilidade(ligar: bool) -> dict:
+    escondidos = []
+    if frappe.db.exists("DocType", "Desktop Icon"):
+        for nome in MODULOS_CONTAB:
+            if frappe.db.exists("Desktop Icon", nome):
+                frappe.db.set_value("Desktop Icon", nome, "hidden", 0 if ligar else 1, update_modified=False)
+                escondidos.append(nome)
+    perpetuo = []
+    for c in frappe.get_all("Company", fields=["name", "enable_perpetual_inventory"]):
+        tem_stock = frappe.db.sql("select 1 from `tabStock Ledger Entry` where company=%s limit 1", c.name)
+        if tem_stock:
+            continue   # com movimentos, mudar deixaria o stock e a contabilidade desacertados — fica como está
+        alvo = 1 if ligar else 0
+        if int(c.enable_perpetual_inventory or 0) != alvo:
+            frappe.db.set_value("Company", c.name, "enable_perpetual_inventory", alvo, update_modified=False)
+            perpetuo.append(c.name)
+    frappe.defaults.set_global_default(CHAVE_CONTAB, "1" if ligar else "0")
+    frappe.clear_cache()
+    return {"modulos": escondidos, "inventario_sem_lancamentos": [] if ligar else perpetuo}
+
+
+def contabilidade_inicial():
+    """after_migrate: num tenant onde a opção nunca foi escolhida, fica desligada (a opção inicial)."""
+    if not frappe.db.exists("DocType", "Company") or frappe.defaults.get_global_default(CHAVE_CONTAB) not in (None, ""):
+        return
+    try:
+        _aplicar_contabilidade(False)
+        frappe.db.commit()
+    except Exception:
+        frappe.log_error(title="orbit.empresas.contabilidade_inicial")
+
+
+@frappe.whitelist()
+def contabilidade():
+    _so_admin()
+    return {"ligada": contabilidade_ligada()}
+
+
+@frappe.whitelist(methods=["POST"])
+def mudar_contabilidade(ligar: int = 0):
+    _so_admin()
+    r = _aplicar_contabilidade(bool(int(ligar)))
+    frappe.db.commit()
+    return {"ok": True, "ligada": bool(int(ligar)), **r}
