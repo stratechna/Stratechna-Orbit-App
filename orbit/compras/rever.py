@@ -80,14 +80,20 @@ def devolver_docs(f, pi) -> list:
     if ids["Vencimento"] and pi.due_date:
         valores[ids["Vencimento"]] = str(getdate(pi.due_date))
     etiquetas = set(meta.get("tags") or [])
-    if (f.tipo_documento or "Fatura") == "Fatura":   # a fatura-recibo e a simplificada já vêm pagas
-        por_pagar, pago = _por_nome("/api/tags/", "Por pagar"), _por_nome("/api/tags/", "Pago")
+    por_pagar, pago = _por_nome("/api/tags/", "Por pagar"), _por_nome("/api/tags/", "Pago")
+    if pi.get("is_paid") or (f.tipo_documento or "Fatura") in R.PAGAS:   # fatura-recibo / simplificada: já paga
+        if pago:
+            etiquetas.add(pago)
+            etiquetas.discard(por_pagar)
+    elif (f.tipo_documento or "Fatura") == "Fatura" and not pi.get("is_return"):
         if por_pagar and pago not in etiquetas:
             etiquetas.add(por_pagar)
     _docs_pedir("PATCH", f"/api/documents/{int(f.docs_id)}/", {
         "custom_fields": [{"field": k, "value": v} for k, v in valores.items()], "tags": sorted(etiquetas)})
     quem = frappe.db.get_value("User", frappe.session.user, "full_name") or frappe.session.user
-    if not _docs_nota(f.docs_id, f"Lançada no ERP do Orbit como {pi.name} ({_eur(pi.grand_total)}), "
+    como = "nota de crédito " + pi.name + (f", devolução da {pi.return_against}" if pi.get("return_against") else "") \
+        if pi.get("is_return") else pi.name
+    if not _docs_nota(f.docs_id, f"Lançada no ERP do Orbit como {como} ({_eur(pi.grand_total)}), "
                                  f"confirmada por {quem}."):
         falhas.append("a nota no Docs")
     return falhas
@@ -136,8 +142,6 @@ def _impedimento_forcar(f, pi):
         return f"Estado «{f.estado}»."
     if f.duplicada_de:
         return f"É repetida de {f.duplicada_de}."
-    if f.tipo_documento == "Nota de crédito":
-        return "As notas de crédito ficam para a F4."
     if (f.moeda or "EUR") != "EUR":
         return f"Moeda {f.moeda}: só EUR."
     if not (f.fornecedor_nome or f.fornecedor_nif):
@@ -152,12 +156,14 @@ def detalhe(nome):
     reg = {k: f.get(k) for k in ("name", "docs_id", "estado", "motivo", "tipo_documento", "fornecedor_nome",
                                  "fornecedor_nif", "fornecedor_pais", "fornecedor", "numero", "data_fatura",
                                  "vencimento", "atcud", "moeda", "total_sem_iva", "total_iva", "total", "contas_certas",
-                                 "nif_valido", "duplicada_de", "fatura_compra", "area", "docs_actualizado")}
+                                 "nif_valido", "duplicada_de", "fatura_compra", "area", "docs_actualizado",
+                                 "fatura_original", "devolve")}
     fatura, linhas = None, []
     if pi:
         fatura = {k: pi.get(k) for k in ("name", "docstatus", "supplier", "supplier_name", "posting_date", "due_date",
                                          "bill_no", "net_total", "total_taxes_and_charges", "grand_total",
-                                         "update_stock", "taxes_and_charges")}
+                                         "update_stock", "taxes_and_charges", "is_return", "return_against",
+                                         "is_paid", "cash_bank_account")}
         fatura["supplier_nif"] = frappe.db.get_value("Supplier", pi.supplier, "tax_id") or ""
         stock = set(frappe.get_all("Item", filters={"name": ["in", [l.item_code for l in pi.items]], "is_stock_item": 1},
                                    pluck="name")) if pi.items else set()
@@ -170,7 +176,7 @@ def detalhe(nome):
                 "qty": l.qty, "uom": l.uom, "rate": l.rate, "amount": l.amount, "warehouse": l.warehouse or "",
                 "expense_account": l.expense_account or "", "purchase_order": l.purchase_order or "",
                 "sugestao": l.orbit_sugestao or "", "sugestao_nome": sug or "", "stock": l.item_code in stock,
-                "iva": l.item_tax_template or ""})
+                "iva": l.item_tax_template or "", "categoria": l.get("orbit_categoria") or ""})
     impedimento = _impedimento_forcar(f, pi)
     return {"registo": reg, "fatura": fatura, "linhas": linhas,
             "lidas": json.loads(f.linhas or "[]") if not pi else [],
@@ -244,7 +250,7 @@ def _ligar(l, item_code, pi, como):
     l.uom = l.stock_uom = it.stock_uom
     l.conversion_factor = 1
     l.orbit_ligacao = como
-    if it.is_stock_item:
+    if it.is_stock_item and not pi.is_return:
         po = R._encomenda(pi.supplier, it.name, l.qty)
         if po:
             l.purchase_order, l.po_detail = po.parent, po.name
@@ -264,8 +270,7 @@ def _custo(l, f, pi):
     l.uom = l.stock_uom = frappe.db.get_value("Item", F0.ARTIGO_GASTO, "stock_uom")
     l.conversion_factor = 1
     l.orbit_ligacao = "Custo"
-    l.expense_account = F0.conta_para_etiquetas(pi.company, etiquetas) or \
-        frappe.db.get_value("Company", pi.company, "default_expense_account")
+    l.expense_account = R.conta_gasto(pi.company, etiquetas, l.get("orbit_categoria"))
 
 
 def _codigo_livre(base):
@@ -309,7 +314,14 @@ def _gravar(f, pi):
     stock = [l for l in pi.items if l.item_code != F0.ARTIGO_GASTO
              and frappe.db.get_value("Item", l.item_code, "is_stock_item")]
     armazens = {l.name: R.armazem(l.item_code, pi.company) for l in stock}
-    pi.update_stock = 1 if stock and all(armazens.values()) else 0
+    pode_stock = True
+    if pi.is_return:   # devolução: só mexe no stock se a original mexeu e todos os artigos são dela (D12)
+        if pi.return_against and not {l.item_code for l in stock} <= set(frappe.get_all(
+                "Purchase Invoice Item", filters={"parent": pi.return_against}, pluck="item_code")):
+            pi.return_against = None
+        pode_stock = bool(pi.return_against and frappe.db.get_value("Purchase Invoice", pi.return_against, "update_stock"))
+        f.devolve = pi.return_against
+    pi.update_stock = 1 if pode_stock and stock and all(armazens.values()) else 0
     for l in pi.items:
         l.warehouse = armazens.get(l.name) if pi.update_stock else None
     pi.flags.ignore_permissions = True
@@ -318,6 +330,9 @@ def _gravar(f, pi):
     if mudou:   # uma regra de preço do ERP não pode mudar o que a fatura diz
         for l in mudou:
             l.qty, l.rate = precos[l.name]
+        pi.save()
+    if pi.is_paid and flt(pi.paid_amount) != flt(pi.grand_total):
+        pi.paid_amount, pi.base_paid_amount = pi.grand_total, pi.base_grand_total
         pi.save()
     f.linhas_ligadas = sum(1 for l in pi.items if l.orbit_ligacao not in PENDENTES)
     f.linhas_total = len(pi.items)

@@ -26,6 +26,13 @@ FISCAIS = {"Fatura", "Fatura-recibo", "Fatura simplificada", "Nota de crédito"}
 AREAS_COMPRA = ("02 ", "03 ", "04 ")
 MAX_BYTES = 12 * 1024 * 1024
 
+def _categorias():
+    from orbit.compras.preparar import CONTAS
+    return ["Mercadoria"] + list(CONTAS)
+
+
+_CATEGORIAS = _categorias()   # F4 (25-11): a IA classifica cada linha numa conta de gasto (D5)
+
 _FERRAMENTA = {
     "type": "function",
     "function": {
@@ -53,7 +60,11 @@ _FERRAMENTA = {
                     "preco_unitario": {"type": "number", "description": "Sem IVA"},
                     "desconto_percentagem": {"type": "number"},
                     "taxa_iva": {"type": "number", "description": "Percentagem, ex. 23; 0 se isento ou autoliquidação"},
-                    "total_sem_iva": {"type": "number", "description": "Total da linha sem IVA, depois do desconto"}}}},
+                    "total_sem_iva": {"type": "number", "description": "Total da linha sem IVA, depois do desconto"},
+                    "categoria": {"type": "string", "enum": _CATEGORIAS,
+                                  "description": "«Mercadoria» se é um artigo para revenda/stock; senão a natureza do gasto"}}}},
+                "fatura_original": {"type": "string",
+                                    "description": "Nas notas de crédito: o número da fatura que corrigem ou anulam"},
                 "portes": {"type": "number", "description": "Portes/transporte, se vierem fora das linhas"},
                 "iva_por_taxa": {"type": "array", "items": {"type": "object", "properties": {
                     "taxa": {"type": "number"}, "base": {"type": "number"}, "iva": {"type": "number"}}}},
@@ -70,7 +81,9 @@ _INSTRUCOES = (
     "Lê este documento de compra e regista-o com a ferramenta registar_fatura. Copia os valores exactamente como "
     "estão escritos (números com ponto decimal, sem símbolo de moeda). Uma linha por artigo ou serviço faturado; "
     "portes e descontos globais em campos próprios. Se o documento não for uma fatura de fornecedor (pró-forma, "
-    "orçamento, recibo, extrato, guia), indica-o no tipo. Não inventes: o que não estiver no documento fica vazio."
+    "orçamento, recibo, extrato, guia), indica-o no tipo. Não inventes: o que não estiver no documento fica vazio. "
+    "Em cada linha indica a categoria: «Mercadoria» para artigos comprados para revenda ou stock, senão a natureza "
+    "do gasto. Numa nota de crédito escreve os valores sem sinal e indica a fatura que ela corrige."
 )
 
 
@@ -224,6 +237,24 @@ def conferir(d: dict, empresa_nif: str) -> tuple[str, list, dict]:
     return ("Lida" if not motivos else "Por rever"), motivos, extra
 
 
+def _sem_sinal(d: dict) -> dict:
+    """Nota de crédito: os valores ficam positivos (o sinal é dado pela devolução no ERP, F4)."""
+    if (d.get("tipo") or "") != "Nota de crédito":
+        return d
+    for k in ("total_sem_iva", "total_iva", "total", "portes"):
+        if d.get(k) is not None:
+            d[k] = abs(flt(d[k]))
+    for l in d.get("linhas") or []:
+        for k in ("quantidade", "preco_unitario", "total_sem_iva"):
+            if l.get(k) is not None:
+                l[k] = abs(flt(l[k]))
+    for x in d.get("iva_por_taxa") or []:
+        for k in ("base", "iva"):
+            if x.get(k) is not None:
+                x[k] = abs(flt(x[k]))
+    return d
+
+
 def _data(v):
     try:
         return getdate(v) if v else None
@@ -260,7 +291,7 @@ def processar(docs_id: int, forcar: int = 0):
         if tipo_ficheiro not in ("application/pdf",) and not tipo_ficheiro.startswith("image/"):
             tipo_ficheiro = "application/pdf" if dados[:4] == b"%PDF" else tipo_ficheiro
         doc.estado = "A ler"
-        lido = _ia(dados, tipo_ficheiro)
+        lido = _sem_sinal(_ia(dados, tipo_ficheiro))
         # 25-11-2026 (várias empresas, D5): a empresa é a do NIF do adquirente na fatura; emitida por uma empresa do
         # tenant → é dessa (o conferir vê que é uma venda); sem NIF conhecido → a principal, e o conferir avisa
         from orbit.empresas import por_nif, principal
@@ -273,6 +304,7 @@ def processar(docs_id: int, forcar: int = 0):
             "fornecedor_nif": extra.get("nif") or "", "fornecedor_pais": extra.get("pais") or "",
             "nif_valido": 1 if extra.get("nif_valido") else 0, "destinatario_nif": extra.get("dest") or "",
             "numero": (lido.get("numero") or "")[:140], "data_fatura": _data(lido.get("data")),
+            "fatura_original": (lido.get("fatura_original") or "")[:140],
             "vencimento": _data(lido.get("vencimento")), "atcud": (lido.get("atcud") or "")[:140],
             "moeda": (lido.get("moeda") or "EUR")[:3].upper(), "total_sem_iva": flt(lido.get("total_sem_iva")),
             "total_iva": flt(lido.get("total_iva")), "total": flt(lido.get("total")),

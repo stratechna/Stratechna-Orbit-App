@@ -4433,13 +4433,16 @@ const Compras = {
         <div><h1 style="margin:0">{{ d.fatura?.supplier_name || d.registo.fornecedor_nome || 'Fornecedor por ler' }}</h1>
           <div class="sub">{{ d.registo.tipo_documento }} {{ d.registo.numero }} · {{ d.registo.data_fatura ? data(d.registo.data_fatura, false) : 'sem data' }}
             · NIF {{ d.registo.fornecedor_nif || '—' }}<template v-if="d.fatura && !d.fatura.supplier_nif && d.registo.fornecedor_nif"> (grava-se no fornecedor ao confirmar)</template></div></div>
-        <span class="etq" :class="COR_ESTADO[d.registo.estado]">{{ d.registo.estado }}</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><span v-if="d.fatura?.is_return || d.registo.tipo_documento==='Nota de crédito'" class="etq roxo">Nota de crédito</span>
+          <span class="etq" :class="COR_ESTADO[d.registo.estado]">{{ d.registo.estado }}</span></div>
       </div>
+      <div v-if="d.fatura?.is_return || d.registo.fatura_original" class="sub" style="margin:-6px 0 12px">Corrige a fatura {{ d.registo.fatura_original || '(não indicada)' }}<template v-if="d.fatura?.return_against"> — devolução da <a :href="irErp('Purchase Invoice', d.fatura.return_against)">{{ d.fatura.return_against }}</a></template><template v-else-if="d.fatura"> — sem ligação a uma fatura de compra do ERP</template></div>
       <div class="erp-totais cartao" style="margin:0 0 12px">
         <div><small>Total da fatura</small><b>{{ eur(d.registo.total) }}</b></div>
         <div v-if="d.fatura"><small>Total no ERP</small><b :style="{color: Math.abs((d.fatura.grand_total||0)-(d.registo.total||0))>0.05 ? 'var(--acao)' : 'inherit'}">{{ eur(d.fatura.grand_total) }}</b></div>
         <div><small>Vencimento</small><b>{{ (d.fatura?.due_date || d.registo.vencimento) ? data(d.fatura?.due_date || d.registo.vencimento, false) : '—' }}</b></div>
-        <div v-if="d.fatura"><small>Stock</small><b>{{ d.fatura.update_stock ? 'Entra em armazém' : 'Sem entrada' }}</b></div>
+        <div v-if="d.fatura"><small>Stock</small><b>{{ d.fatura.update_stock ? (d.fatura.is_return ? 'Sai do armazém' : 'Entra em armazém') : (d.fatura.is_return ? 'Sem saída' : 'Sem entrada') }}</b></div>
+        <div v-if="d.fatura && !d.fatura.is_return"><small>Pagamento</small><b>{{ d.fatura.is_paid ? 'Já paga' : 'Por pagar' }}</b></div>
       </div>
       <div v-if="notas.length" class="cartao compras-notas"><div v-for="(n,i) in notas" :key="i">{{ n }}</div></div>
 
@@ -4452,7 +4455,7 @@ const Compras = {
           </div>
           <div class="sub" style="margin-top:4px" v-if="l.item_code">Artigo: <a :href="irErp('Item', l.item_code)">{{ l.item_code }}</a> {{ l.item_name !== l.item_code ? '— ' + l.item_name : '' }}
             <template v-if="l.warehouse"> · {{ l.warehouse }}</template><template v-if="l.purchase_order"> · encomenda <a :href="irErp('Purchase Order', l.purchase_order)">{{ l.purchase_order }}</a></template></div>
-          <div class="sub" style="margin-top:4px" v-else-if="l.ligacao==='Custo'">Custo: {{ l.expense_account }}</div>
+          <div class="sub" style="margin-top:4px" v-else-if="l.ligacao==='Custo'">Custo: {{ l.expense_account }}<template v-if="l.categoria && l.categoria!=='Mercadoria'"> · lida como «{{ l.categoria }}»</template></div>
           <div class="compras-acoes" v-if="aberta">
             <button v-if="l.sugestao" class="btn" :disabled="a" @click="linha(l,'sugestao')">Usar a sugestão: {{ l.sugestao_nome || l.sugestao }}</button>
             <div class="erp-campo" style="margin:0;min-width:220px;flex:1"><ErpLigacao v-model="escolha[l.name]" alvo="Item"/></div>
