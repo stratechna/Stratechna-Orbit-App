@@ -46,7 +46,7 @@
    "fieldname": "tipo",
    "fieldtype": "Select",
    "label": "Tipo",
-   "options": "fatura\nfatura_recibo\nnota_credito\nrecibo",
+   "options": "fatura\nfatura_recibo\nnota_credito\nrecibo\nguia\nproforma",
    "read_only": 1,
    "in_list_view": 1
   },
@@ -169,5 +169,6 @@
   }
  ],
  "sort_field": "modified",
- "sort_order": "DESC"
+ "sort_order": "DESC",
+ "modified": "2026-11-25 20:00:00.000000"
 }

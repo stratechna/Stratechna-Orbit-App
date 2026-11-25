@@ -24,7 +24,9 @@ from orbit.faturacao.base import (CONSUMIDOR_FINAL, Adaptador, Cliente, ErroFatu
 
 API = "https://api.moloni.pt/v1"
 MODULO = {"fatura": "invoices", "fatura_recibo": "invoiceReceipts", "nota_credito": "creditNotes",
-          "recibo": "receipts"}
+          "recibo": "receipts",
+          # 25-11-2026: pró-forma (não fiscal) e guia de transporte (comunicada à AT pelo Moloni ao fechar)
+          "proforma": "proFormaInvoices", "guia": "deliveryNotes"}
 PAISES = {"PT": 1, "ES": 70, "FR": 75, "DE": 56, "IT": 109, "GB": 230, "BR": 31}   # country_id do Moloni
 
 
@@ -273,7 +275,8 @@ class Moloni(Adaptador):
         return Resultado(id_externo=str(doc.get("document_id")), numero=numero, atcud=atcud, estado=estado,
                          total=float(doc.get("gross_value") or doc.get("net_value") or 0), ja_existia=ja_existia,
                          bruto={k: doc.get(k) for k in ("document_id", "number", "status", "date", "gross_value",
-                                                         "net_value", "our_reference", "customer_id")})
+                                                         "net_value", "our_reference", "customer_id",
+                                                         "transport_code", "at_code")})
 
     def obter(self, tipo: str, id_externo: str) -> Resultado:
         r = self._post("documents/getOne", {"document_id": int(id_externo)})
@@ -308,6 +311,24 @@ class Moloni(Adaptador):
                                               "value": round(p.origem_valor or self._total(p), 2)}]
             if p.motivo:
                 corpo["notes"] = (p.motivo + ("\n" + p.notas if p.notas else ""))[:1000]
+        if p.associados and p.tipo in ("fatura", "fatura_recibo"):   # pró-forma e guias de origem (25-11)
+            corpo["associated_documents"] = [{"associated_id": int(i), "value": round(float(v or 0), 2)}
+                                             for i, v in p.associados if i]
+        if p.tipo == "guia":
+            t = p.transporte or {}
+            corpo.update({k: v for k, v in {
+                "delivery_datetime": t.get("inicio"),
+                "delivery_departure_address": t.get("carga_morada"), "delivery_departure_city": t.get("carga_cidade"),
+                "delivery_departure_zip_code": t.get("carga_cp"), "delivery_departure_country": PAISES.get(t.get("carga_pais") or "PT", 1),
+                "delivery_destination_address": t.get("descarga_morada"), "delivery_destination_city": t.get("descarga_cidade"),
+                "delivery_destination_zip_code": t.get("descarga_cp"),
+                "delivery_destination_country": PAISES.get(t.get("descarga_pais") or "PT", 1),
+            }.items() if v})
+            if self.cfg.get("metodo_envio_id"):
+                corpo["delivery_method_id"] = int(self.cfg["metodo_envio_id"])
+            if t.get("matricula"):
+                corpo["notes"] = (f"Matrícula: {t['matricula']}" + ("\n" + corpo["notes"] if corpo.get("notes") else ""))[:1000]
+            corpo.pop("expiration_date", None)
         if p.tipo == "fatura_recibo":
             if not self.cfg.get("metodo_pagamento_id"):
                 raise ErroFaturacao("falta o método de pagamento da ligação para emitir faturas-recibo")

@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
-TIPOS = ("fatura", "fatura_recibo", "nota_credito")
+TIPOS = ("fatura", "fatura_recibo", "nota_credito", "proforma", "guia")
 
 # Motivos de isenção da AT (tabela do SAF-T PT, campo TaxExemptionCode). Uma linha a 0 % sem motivo é recusada.
 MOTIVOS_ISENCAO = {
@@ -103,6 +103,8 @@ class Pedido:
     origem_valor: float = 0.0
     motivo: str = ""                           # nota de crédito: porquê
     series: Optional[dict] = None              # 25-11-2026: séries da marca do documento ({"fatura": "SHX", …})
+    associados: Optional[list] = None          # 25-11-2026: [(id_externo, valor)] — pró-forma, guias de origem
+    transporte: Optional[dict] = None          # 25-11-2026, guias: carga, descarga, início, matrícula
 
 
 @dataclass
@@ -146,7 +148,7 @@ def validar_pedido(p: Pedido) -> None:
     for l in p.linhas:
         if l.quantidade <= 0:
             raise ErroFaturacao(f"«{l.nome}»: quantidade tem de ser positiva (as devoluções são notas de crédito)")
-        if l.taxa_iva == 0 and l.motivo_isencao not in MOTIVOS_ISENCAO:
+        if l.taxa_iva == 0 and p.tipo != "guia" and l.motivo_isencao not in MOTIVOS_ISENCAO:
             raise ErroFaturacao(f"«{l.nome}» está a 0 % de IVA sem motivo de isenção válido (M01…M99)")
     if p.tipo == "nota_credito" and not p.origem_id_externo:
         raise ErroFaturacao("a nota de crédito tem de indicar o documento certificado que corrige")

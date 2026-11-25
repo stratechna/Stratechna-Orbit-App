@@ -49,6 +49,24 @@ def ao_submeter_fatura(doc, method=None):
     frappe.enqueue("orbit.faturacao.emissao.emitir", queue="short", documento=nome, enqueue_after_commit=True)
 
 
+def ao_submeter_guia(doc, method=None):
+    """25-11-2026: a guia de transporte segue para o programa certificado, que a comunica à AT."""
+    lig = da_empresa(doc.company)
+    if not lig or doc.get("is_return"):
+        return
+    nome = _novo_documento("Delivery Note", doc.name, lig, "guia")
+    if frappe.get_meta("Delivery Note").has_field("orbit_documento_certificado"):
+        doc.db_set("orbit_documento_certificado", nome, update_modified=False)
+    frappe.enqueue("orbit.faturacao.emissao.emitir", queue="short", documento=nome, enqueue_after_commit=True)
+
+
+def antes_de_cancelar_guia(doc, method=None):
+    n = frappe.db.get_value(DC, {"documento_tipo": "Delivery Note", "documento": doc.name, "estado": "Emitido"}, "numero")
+    if n is not None:
+        frappe.throw(f"Esta guia já foi comunicada pelo programa certificado ({n or 'sem número'}). Anule-a no "
+                     f"programa — a anulação chega ao Orbit sozinha.")
+
+
 def antes_de_cancelar_fatura(doc, method=None):
     nome = frappe.db.get_value(DC, {"documento_tipo": "Sales Invoice", "documento": doc.name,
                                      "estado": "Emitido"}, "numero")
@@ -96,6 +114,11 @@ def emitir(documento: str):
     try:
         if dc.tipo == "recibo":
             res = _emitir_recibo(dc, ad, ensaio)
+        elif dc.documento_tipo == "Delivery Note":
+            dn = frappe.get_doc("Delivery Note", dc.documento)
+            pedido = pedido_da_guia(dn, lig, rascunho=ensaio)
+            res = ad.emitir(pedido)
+            _guardar_ids(dn, pedido)
         else:
             si = frappe.get_doc("Sales Invoice", dc.documento)
             pedido = pedido_da_fatura(si, lig, rascunho=ensaio)
@@ -118,6 +141,11 @@ def emitir(documento: str):
             if dc.documento_tipo == "Sales Invoice":
                 frappe.db.set_value("Sales Invoice", dc.documento, "orbit_numero_certificado", res.numero,
                                     update_modified=False)
+            elif dc.documento_tipo == "Delivery Note":
+                codigo_at = (res.bruto or {}).get("transport_code") or (res.bruto or {}).get("at_code") or ""
+                for campo, valor in (("orbit_numero_certificado", res.numero), ("orbit_codigo_at", codigo_at)):
+                    if frappe.get_meta("Delivery Note").has_field(campo):
+                        frappe.db.set_value("Delivery Note", dc.documento, campo, valor, update_modified=False)
         dc.save(ignore_permissions=True)
     except ErroFaturacao as e:
         dc.reload()
@@ -222,7 +250,8 @@ def series_da_marca(lig, marca) -> dict | None:
         return None
     for l in lig.get("series_marca") or []:
         if l.marca == marca:
-            return {t: l.get(f"serie_{t}") for t in ("fatura", "fatura_recibo", "nota_credito", "recibo") if l.get(f"serie_{t}")}
+            return {t: l.get(f"serie_{t}") for t in ("fatura", "fatura_recibo", "nota_credito", "recibo", "guia", "proforma")
+                    if l.get(f"serie_{t}")}
     return None
 
 
@@ -255,7 +284,86 @@ def pedido_da_fatura(si, lig, rascunho: bool) -> Pedido:
         if not origem:
             raise ErroFaturacao(f"a fatura de origem {si.return_against} não está emitida no programa certificado")
         origem_valor = abs(flt(si.grand_total))
-    return Pedido(series=series_da_marca(lig, si.get("orbit_marca")), tipo=tipo, referencia=si.name, data=str(si.posting_date), vencimento=str(si.due_date or si.posting_date),
+    associados = []
+    if tipo != "nota_credito":
+        if si.get("orbit_proforma_id"):
+            associados.append((si.orbit_proforma_id, flt(si.get("orbit_proforma_valor")) or flt(si.grand_total)))
+        guias = {it.get("delivery_note") for it in si.items if it.get("delivery_note")}
+        guias |= {o.split("|", 1)[1] for o in (si.get("orbit_origens") or "").splitlines() if o.startswith("Delivery Note|")}
+        for g in guias:
+            d = frappe.db.get_value(DC, {"documento_tipo": "Delivery Note", "documento": g, "estado": "Emitido"},
+                                    ["id_externo", "total"], as_dict=True)
+            if d and d.id_externo:
+                associados.append((d.id_externo, flt(d.total)))
+    return Pedido(series=series_da_marca(lig, si.get("orbit_marca")), associados=associados or None, tipo=tipo, referencia=si.name, data=str(si.posting_date), vencimento=str(si.due_date or si.posting_date),
                   cliente=cliente, linhas=linhas, notas=(si.get("remarks") or "")[:1000] if si.get("remarks") != "No Remarks" else "",
                   rascunho=rascunho, origem_id_externo=origem, origem_valor=origem_valor,
                   motivo=si.get("orbit_motivo_nc") or "")
+
+
+# ── guias de transporte e pró-formas (25-11-2026) ─────────────────────────────────────────────────────────────
+def _morada(nome):
+    if not nome or not frappe.db.exists("Address", nome):
+        return {}
+    a = frappe.get_doc("Address", nome)
+    pais = (frappe.db.get_value("Country", a.country, "code") or "pt").upper() if a.country else "PT"
+    return {"morada": " ".join(x for x in [a.address_line1, a.address_line2] if x), "cidade": a.city or "",
+            "cp": a.pincode or "", "pais": pais}
+
+
+def pedido_da_guia(dn, lig, rascunho: bool) -> Pedido:
+    cust = frappe.get_doc("Customer", dn.customer)
+    dest = _morada(dn.get("shipping_address_name") or dn.get("customer_address"))
+    armazem = next((it.warehouse for it in dn.items if it.warehouse), None)
+    carga_end = frappe.db.get_value("Warehouse", armazem, ["address_line_1", "city", "pin"], as_dict=True) if armazem else None
+    if not (carga_end and carga_end.address_line_1):
+        empresa = frappe.db.get_value("Dynamic Link", {"link_doctype": "Company", "link_name": dn.company,
+                                                        "parenttype": "Address"}, "parent")
+        c = _morada(empresa)
+        carga = {"morada": c.get("morada"), "cidade": c.get("cidade"), "cp": c.get("cp"), "pais": c.get("pais", "PT")}
+    else:
+        carga = {"morada": carga_end.address_line_1, "cidade": carga_end.city, "cp": carga_end.pin, "pais": "PT"}
+    inicio = dn.get("orbit_inicio_transporte") or f"{dn.posting_date} {dn.posting_time or '09:00:00'}"
+    cliente = Cliente(nome=dn.customer_name or cust.customer_name, nif=cust.get("tax_id") or "", pais=dest.get("pais", "PT"),
+                      morada=dest.get("morada", ""), cidade=dest.get("cidade", ""), codigo_postal=dest.get("cp", ""),
+                      id_externo=_id_de("Customer", dn.customer, lig.programa))
+    linhas = [Linha(codigo=it.item_code, nome=it.item_name, quantidade=abs(flt(it.qty)),
+                    preco_unitario=abs(flt(it.net_rate or it.rate)), taxa_iva=_taxa(dn, it),
+                    motivo_isencao=dn.get("orbit_motivo_isencao") or lig.motivo_isencao or "",
+                    servico=not frappe.db.get_value("Item", it.item_code, "is_stock_item"),
+                    id_externo=_id_de("Item", it.item_code, lig.programa)) for it in dn.items]
+    return Pedido(tipo="guia", referencia=dn.name, data=str(dn.posting_date), vencimento=str(dn.posting_date),
+                  cliente=cliente, linhas=linhas, rascunho=rascunho, series=series_da_marca(lig, dn.get("orbit_marca")),
+                  notas=(dn.get("instructions") or "")[:1000],
+                  transporte={"inicio": str(inicio)[:19], "matricula": dn.get("vehicle_no") or "",
+                              "carga_morada": carga.get("morada"), "carga_cidade": carga.get("cidade"),
+                              "carga_cp": carga.get("cp"), "carga_pais": carga.get("pais"),
+                              "descarga_morada": dest.get("morada"), "descarga_cidade": dest.get("cidade"),
+                              "descarga_cp": dest.get("cp"), "descarga_pais": dest.get("pais")})
+
+
+def emitir_proforma_certificada(si):
+    """A pró-forma no programa certificado (não fiscal). Sem ligação activa não faz nada. Em ensaio, o rascunho
+    criado é apagado logo a seguir, como nas faturas."""
+    lig = da_empresa(si.company)
+    if not lig:
+        return None
+    ad = adaptador_de(lig)
+    ensaio = lig.modo != "Real"
+    pedido = pedido_da_fatura(si, lig, rascunho=ensaio)
+    pedido.tipo, pedido.associados = "proforma", None
+    pedido.referencia = si.get("orbit_proforma_numero") or si.name
+    res = ad.emitir(pedido)
+    _guardar_ids(si, pedido)
+    if ensaio:
+        if res.estado == "rascunho":
+            ad.apagar_rascunho("proforma", res.id_externo)
+        return {"ensaio": True, "numero": res.numero}
+    pdf = None
+    try:
+        pdf = ad.obter_pdf("proforma", res.id_externo)
+    except ErroFaturacao:
+        pass
+    if frappe.get_meta("Sales Invoice").has_field("orbit_proforma_id"):
+        si.db_set("orbit_proforma_id", res.id_externo, update_modified=False)
+    return {"numero": res.numero, "id": res.id_externo, "pdf": pdf}

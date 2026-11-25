@@ -139,6 +139,16 @@
    "label": "Recibos"
   },
   {
+   "fieldname": "serie_guia",
+   "fieldtype": "Data",
+   "label": "Série das guias de transporte"
+  },
+  {
+   "fieldname": "serie_proforma",
+   "fieldtype": "Data",
+   "label": "Série das pró-formas"
+  },
+  {
    "fieldname": "sec_series_marca",
    "fieldtype": "Section Break",
    "label": "Séries por marca"
@@ -260,5 +270,5 @@
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
- "modified": "2026-11-25 12:00:00.000000"
+ "modified": "2026-11-25 20:00:00.000000"
 }

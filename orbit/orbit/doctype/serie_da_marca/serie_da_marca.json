@@ -8,16 +8,55 @@
  "sort_field": "modified",
  "sort_order": "DESC",
  "creation": "2026-11-25 12:00:00.000000",
- "modified": "2026-11-25 12:00:00.000000",
+ "modified": "2026-11-25 20:00:00.000000",
  "owner": "Administrator",
  "modified_by": "Administrator",
  "description": "25-11-2026: séries do programa certificado por marca (cada série leva no Moloni o Template de Identificação com o logótipo da marca).",
  "fields": [
-  {"fieldname": "marca", "fieldtype": "Link", "label": "Marca", "options": "Brand", "reqd": 1, "in_list_view": 1},
-  {"fieldname": "serie_fatura", "fieldtype": "Data", "label": "Série das faturas", "in_list_view": 1},
-  {"fieldname": "serie_fatura_recibo", "fieldtype": "Data", "label": "Série das faturas-recibo", "in_list_view": 1},
-  {"fieldname": "serie_nota_credito", "fieldtype": "Data", "label": "Série das notas de crédito", "in_list_view": 1},
-  {"fieldname": "serie_recibo", "fieldtype": "Data", "label": "Série dos recibos", "in_list_view": 1}
+  {
+   "fieldname": "marca",
+   "fieldtype": "Link",
+   "label": "Marca",
+   "options": "Brand",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "serie_fatura",
+   "fieldtype": "Data",
+   "label": "Série das faturas",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "serie_fatura_recibo",
+   "fieldtype": "Data",
+   "label": "Série das faturas-recibo",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "serie_nota_credito",
+   "fieldtype": "Data",
+   "label": "Série das notas de crédito",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "serie_recibo",
+   "fieldtype": "Data",
+   "label": "Série dos recibos",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "serie_guia",
+   "fieldtype": "Data",
+   "label": "Série das guias de transporte",
+   "in_list_view": 0
+  },
+  {
+   "fieldname": "serie_proforma",
+   "fieldtype": "Data",
+   "label": "Série das pró-formas",
+   "in_list_view": 0
+  }
  ],
  "istable": 1,
  "editable_grid": 1,

@@ -3123,6 +3123,284 @@ const EditorRico = {
     },
   },
 };
+// ── Emitir fatura e guia de transporte (25-11-2026, maquete aprovada: docs/orbit-interface/emitir/) ──────────────
+// O mesmo desenho da proposta: marca que vende → empresa e série; «Importar de…» outro documento do cliente (as
+// funções de conversão do ERPNext); documentos associados nos dois sentidos; pró-forma a partir da fatura em rascunho.
+const apiE = (m, a = {}, post = false) => api("emitir." + m, a, post);
+const ROT_DT = { "Quotation": "Proposta", "Sales Order": "Encomenda", "Delivery Note": "Guia", "Sales Invoice": "Fatura", "Payment Entry": "Recibo" };
+const ErpEmitir = {
+  components: { ErpLigacao },
+  props: ["dt", "name"],
+  setup(props) {
+    const fatura = props.dt === "Sales Invoice";
+    const doc = ref(null), novo = ref(false), sujo = ref(false), a = ref(false), aviso = ref(""), podeGravar = ref(true);
+    const marcas = ref([]), assoc = ref([]), imp = ref(null), novaLinha = ref("");
+    const moeda = (v) => new Intl.NumberFormat("pt-PT", { style: "currency", currency: doc.value?.currency || "EUR" }).format(v || 0);
+    const carregar = async () => {
+      const [r, ms] = await Promise.all([api("erp.documento", { doctype: props.dt, name: props.name === "novo" ? undefined : props.name }), apiP("versoes.marcas").catch(() => [])]);
+      marcas.value = ms || []; doc.value = r.doc; novo.value = r.novo; podeGravar.value = r.novo ? true : r.pode_gravar;
+      if (r.novo) { let p = null; try { p = JSON.parse(sessionStorage.getItem("orbit.erp.novo") || "null"); sessionStorage.removeItem("orbit.erp.novo"); } catch (e) {}
+        if (p && p.doctype === props.dt) { doc.value = p; (doc.value.items || []).forEach((l, i) => { if (!l.name) l.name = "novo-" + i; }); } }
+      assoc.value = r.novo ? [] : (await apiE("associados", { doctype: props.dt, name: props.name }).catch(() => [])) || [];
+      await nextTick(); sujo.value = false; ultima = assin();
+    };
+    onMounted(carregar);
+    watch(doc, (n, o) => { if (o) sujo.value = true; }, { deep: true });
+    const ro = computed(() => !podeGravar.value || (doc.value?.docstatus || 0) !== 0);
+    const docstatus = computed(() => doc.value?.docstatus || 0);
+    let ultima = "", tr0;
+    const assin = () => { const d = doc.value; if (!d) return ""; return JSON.stringify([d.customer, d.orbit_marca, d.taxes_and_charges, (d.items || []).map((l) => [l.item_code, l.qty, l.rate, l.discount_percentage, l.warehouse])]); };
+    const recalcular = async () => { if (ro.value) return;
+      const r = await api("erp.recalcular", { doctype: props.dt, dados: JSON.stringify(doc.value) }, true).catch(() => null);
+      if (!r) return; aviso.value = r.aviso || ""; if (!r.doc) return;
+      const nomes = (doc.value.items || []).map((l) => l.name);
+      r.doc.items = (r.doc.items || []).map((l, i) => (!l.name && nomes[i] ? { ...l, name: nomes[i] } : l));
+      Object.assign(doc.value, r.doc); ultima = assin(); };
+    watch(() => assin(), (s) => { if (s === ultima) return; ultima = s; clearTimeout(tr0); tr0 = setTimeout(recalcular, 450); });
+    const acrescentar = (codigo) => { if (!codigo) return; doc.value.items = doc.value.items || [];
+      doc.value.items.push({ name: "novo-" + Math.random().toString(36).slice(2, 9), doctype: props.dt + " Item", item_code: codigo, qty: 1 }); novaLinha.value = ""; };
+    watch(novaLinha, (v) => { if (v) acrescentar(v); });
+    const remover = (l) => { doc.value.items = doc.value.items.filter((x) => x !== l); };
+    const gravar = async () => {
+      if (!doc.value.customer) { toast("Escolha o cliente"); return null; }
+      if (!(doc.value.items || []).length) { toast("Acrescente pelo menos uma linha"); return null; }
+      a.value = true;
+      try { const r = await api("erp.gravar", { doctype: props.dt, dados: JSON.stringify(doc.value) }, true); toast("Gravado");
+        if (novo.value || r.doc.name !== props.name) { location.hash = irErp(props.dt, r.doc.name); return r.doc; }
+        doc.value = r.doc; await nextTick(); sujo.value = false; ultima = assin(); return r.doc; } finally { a.value = false; }
+    };
+    const emitir = async () => {
+      const txt = fatura ? "Emitir esta fatura? Depois de emitida já não se altera (corrige-se com nota de crédito)." : "Emitir esta guia? O stock sai do armazém e a guia segue para comunicação à AT.";
+      if (!confirm(txt)) return;
+      if (sujo.value || novo.value) { const g = await gravar(); if (!g || novo.value) return; }
+      a.value = true; try { const r = await api("erp.submeter", { doctype: props.dt, name: doc.value.name }, true); doc.value = r.doc; await nextTick(); sujo.value = false; toast(fatura ? "Fatura emitida" : "Guia emitida"); await carregar(); } finally { a.value = false; }
+    };
+    const proforma = async () => {
+      if (sujo.value || novo.value) { toast("Grave a fatura primeiro"); return; }
+      a.value = true; try { const r = await apiE("emitir_proforma", { name: doc.value.name }, true);
+        toast("Pró-forma " + r.numero + (r.certificado && r.certificado.erro ? " (o programa certificado falhou: " + r.certificado.erro + ")" : ""));
+        window.open((r.certificado && r.certificado.pdf) || r.pdf, "_blank"); await carregar(); } finally { a.value = false; }
+    };
+    const converter = async (destino) => { const r = await api("erp.criar_de", { doctype: props.dt, name: doc.value.name, destino }, true);
+      try { sessionStorage.setItem("orbit.erp.novo", JSON.stringify(r.doc)); } catch (e) {} location.hash = irErp(destino, "novo"); };
+    const receber = () => { try { sessionStorage.setItem("orbit.recibo", JSON.stringify({ cliente: doc.value.customer, fatura: doc.value.name })); } catch (e) {} location.hash = irErp("Payment Entry", "novo"); };
+    // «Importar de…»
+    const abrirImportar = async () => { if (!doc.value.customer) { toast("Escolha primeiro o cliente"); return; }
+      imp.value = { filtro: "", lista: null, escolhido: null, linhas: [], marcadas: {}, aImportar: false };
+      imp.value.lista = await apiE("importaveis", { destino: props.dt, cliente: doc.value.customer }); };
+    const tiposImp = computed(() => [...new Set((imp.value?.lista || []).map((x) => x.tipo))]);
+    const listaImp = computed(() => (imp.value?.lista || []).filter((x) => !imp.value.filtro || x.tipo === imp.value.filtro));
+    const escolherImp = async (x) => { imp.value.escolhido = x; imp.value.linhas = await apiE("linhas_de", { doctype: x.doctype, name: x.name, destino: props.dt });
+      imp.value.marcadas = Object.fromEntries(imp.value.linhas.map((l) => [l.i, true])); };
+    const importar = async () => { const x = imp.value.escolhido; if (!x) return;
+      const linhas = imp.value.linhas.filter((l) => imp.value.marcadas[l.i]).map((l) => l.i);
+      if (!linhas.length) { toast("Escolha pelo menos uma linha"); return; }
+      imp.value.aImportar = true;
+      try { const r = await apiE("importar", { destino: props.dt, fontes: JSON.stringify([{ doctype: x.doctype, name: x.name, linhas }]), dados: JSON.stringify(doc.value) }, true);
+        Object.assign(doc.value, r.doc); ultima = assin(); toast(linhas.length + " linha(s) importada(s) de " + x.name); imp.value = null; }
+      finally { if (imp.value) imp.value.aImportar = false; } };
+    const origens = computed(() => (doc.value?.orbit_origens || "").split("\n").filter(Boolean).map((o) => { const [dt, n] = o.split("|"); return { dt, n }; }));
+    const marcaSel = computed(() => marcas.value.find((m) => m.name === doc.value?.orbit_marca));
+    const titulo = computed(() => novo.value ? (fatura ? "Nova fatura" : "Nova guia de transporte") : (fatura ? "Fatura " : "Guia ") + (doc.value?.orbit_numero_certificado || doc.value?.name));
+    const pdf = computed(() => doc.value && !novo.value ? `/api/method/frappe.utils.print_format.download_pdf?doctype=${encodeURIComponent(props.dt)}&name=${encodeURIComponent(doc.value.name)}` : "");
+    return { fatura, doc, novo, sujo, a, aviso, ro, docstatus, marcas, marcaSel, assoc, imp, novaLinha, moeda, remover, gravar, emitir, proforma, converter, receber,
+      abrirImportar, tiposImp, listaImp, escolherImp, importar, origens, titulo, pdf, irErp, link, ESTADO_DOC, statusPt, ROT_DT };
+  },
+  template: `<div v-if="doc" class="pad prop">
+    <div class="sub"><a :href="irErp(dt)">← {{ fatura ? 'Faturas' : 'Guias de transporte' }}</a> · <a v-if="!novo" :href="irErp(dt, doc.name) + '/completa'">ficha completa</a></div>
+    <div class="prop-topo">
+      <div><div class="prop-tit"><h1>{{ titulo }}</h1><span class="etq" :class="ESTADO_DOC[docstatus][1]">{{ docstatus===0 ? 'Rascunho' : (doc.status ? statusPt(doc.status) : ESTADO_DOC[docstatus][0]) }}</span><span v-if="sujo" class="etq ambar">Por gravar</span><span v-if="doc.orbit_proforma_numero" class="etq">Pró-forma {{ doc.orbit_proforma_numero }}</span></div>
+        <div class="sub" v-if="!novo">{{ doc.name }} · {{ doc.company }}</div></div>
+      <div class="prop-accoes">
+        <a v-if="pdf" class="btn" :href="pdf" target="_blank">PDF</a>
+        <button v-if="!ro && (novo || sujo)" class="btn" :disabled="a" @click="gravar">Guardar rascunho</button>
+        <button v-if="fatura && !novo && docstatus===0 && !ro" class="btn" :disabled="a" @click="proforma">{{ doc.orbit_proforma_numero ? 'Nova pró-forma' : 'Emitir pró-forma' }}</button>
+        <button v-if="docstatus===0 && !ro" class="btn prim" :disabled="a" @click="emitir">{{ fatura ? (doc.orbit_proforma_numero ? 'Converter em fatura' : 'Emitir fatura') : 'Emitir e comunicar à AT' }}</button>
+        <button v-if="!fatura && docstatus===1" class="btn prim" @click="converter('Sales Invoice')">Converter em fatura</button>
+        <button v-if="fatura && docstatus===1 && doc.outstanding_amount > 0" class="btn prim" @click="receber">Receber pagamento</button>
+        <button v-if="fatura && docstatus===1 && !doc.update_stock" class="btn" @click="converter('Delivery Note')">Criar guia</button>
+      </div>
+    </div>
+    <div v-if="aviso" class="aviso">{{ aviso }}</div>
+    <div class="prop-corpo">
+      <div class="prop-principal">
+        <section class="cartao prop-dados" :aria-label="fatura ? 'Dados da fatura' : 'Dados da guia'">
+          <div class="prop-marcas" v-if="marcas.length"><div class="sub">Marca que {{ fatura ? 'vende' : 'envia' }}</div>
+            <div class="prop-chips"><button v-for="m in marcas" :key="m.name" type="button" :disabled="ro" :class="{ativo: doc.orbit_marca===m.name}" @click="doc.orbit_marca=m.name"><span :style="{background: m.orbit_cor || '#5b6470'}"></span>{{ m.name }}</button></div>
+            <div class="sub">{{ fatura ? 'Faturada' : 'Emitida' }} por <b>{{ doc.company }}</b><template v-if="doc.orbit_marca"> · série da marca {{ doc.orbit_marca }} no programa certificado</template></div></div>
+          <div class="prop-campos">
+            <label>Cliente<ErpLigacao v-model="doc.customer" alvo="Customer" :ro="ro"/></label>
+            <label>Data<input type="date" v-model="doc.posting_date" :disabled="ro"></label>
+            <label v-if="fatura">Vencimento<input type="date" v-model="doc.due_date" :disabled="ro"></label>
+            <template v-else>
+              <label>Início do transporte<input type="datetime-local" :value="(doc.orbit_inicio_transporte||'').replace(' ','T').slice(0,16)" @input="doc.orbit_inicio_transporte=$event.target.value.replace('T',' ')+':00'" :disabled="ro"></label>
+              <label>Matrícula<input v-model="doc.vehicle_no" :disabled="ro" placeholder="AA-00-AA"></label>
+              <label>Armazém de carga<ErpLigacao v-model="doc.set_warehouse" alvo="Warehouse" :ro="ro" :filtros="JSON.stringify({is_group: 0, company: doc.company})"/></label>
+              <label>Morada de descarga<ErpLigacao v-model="doc.shipping_address_name" alvo="Address" :ro="ro"/></label>
+            </template>
+          </div>
+        </section>
+        <section class="cartao" aria-label="Linhas" style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <label v-if="!ro" class="cresce" style="min-width:220px"><span class="so-leitor">Adicionar artigo</span><ErpLigacao v-model="novaLinha" alvo="Item"/></label>
+            <button v-if="!ro" type="button" class="btn" @click="abrirImportar">Importar de {{ fatura ? 'proposta, encomenda ou guia' : 'encomenda ou fatura' }}…</button>
+          </div>
+          <div v-if="origens.length" class="sub" style="background:var(--surface-2,#f6f8f9);border-radius:10px;padding:8px 12px">Linhas importadas de <template v-for="(o, i) in origens" :key="o.n">{{ i ? ', ' : '' }}<a :href="irErp(o.dt, o.n)">{{ ROT_DT[o.dt] || o.dt }} {{ o.n }}</a></template></div>
+          <div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px">
+            <table class="tab-emitir" style="width:100%;border-collapse:collapse;min-width:620px;font-size:13px">
+              <thead><tr><th style="text-align:left">Artigo</th><th>Qtd</th><th>Preço</th><th v-if="fatura">Desc. %</th><th style="text-align:left">Armazém</th><th>Total</th><th v-if="!ro"></th></tr></thead>
+              <tbody>
+                <tr v-for="l in doc.items || []" :key="l.name">
+                  <td><b>{{ l.item_name || l.item_code }}</b><div class="sub" style="font-size:12px">{{ l.item_code }}</div></td>
+                  <td style="text-align:right"><input type="number" min="0" step="any" v-model.number="l.qty" :disabled="ro" style="width:72px;text-align:right"></td>
+                  <td style="text-align:right"><input type="number" min="0" step="0.01" v-model.number="l.rate" :disabled="ro" style="width:96px;text-align:right"></td>
+                  <td v-if="fatura" style="text-align:right"><input type="number" min="0" max="100" step="0.01" v-model.number="l.discount_percentage" :disabled="ro" style="width:64px;text-align:right"></td>
+                  <td class="sub" style="font-size:12px">{{ l.warehouse || '—' }}</td>
+                  <td style="text-align:right;font-weight:600">{{ moeda(l.amount) }}</td>
+                  <td v-if="!ro"><button type="button" class="btn sm" @click="remover(l)" aria-label="Remover linha">×</button></td>
+                </tr>
+                <tr v-if="!(doc.items||[]).length"><td :colspan="fatura ? 7 : 6" class="sub" style="text-align:center;padding:14px">Sem linhas — acrescente um artigo ou importe de outro documento.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <label class="sub" style="display:flex;flex-direction:column;gap:4px">Observações<textarea rows="2" v-model="doc.remarks" :disabled="ro"></textarea></label>
+        </section>
+      </div>
+      <aside class="prop-lado" aria-label="Resumo">
+        <section class="cartao" aria-label="Documentos associados">
+          <h2>Documentos associados</h2>
+          <div v-if="!assoc.length && !origens.length" class="sub">Nenhum.</div>
+          <a v-for="x in assoc" :key="x.doctype+x.name" :href="irErp(x.doctype, x.name)" class="prop-tot" style="text-decoration:none;color:inherit"><span><b>{{ x.tipo }}</b> {{ x.name }}</span><span class="etq">{{ x.docstatus===0 ? 'Rascunho' : statusPt(x.estado) }}</span></a>
+        </section>
+        <section class="cartao">
+          <h2>Resumo</h2>
+          <div class="prop-tot"><span>Total sem IVA</span><span>{{ moeda(doc.net_total) }}</span></div>
+          <div class="prop-tot" v-for="t in doc.taxes || []" :key="t.name || t.idx"><span>{{ t.description }}</span><span>{{ moeda(t.tax_amount) }}</span></div>
+          <div class="prop-tot" style="border-top:2px solid var(--ink);padding-top:8px"><b>Total</b><b style="font-size:20px">{{ moeda(doc.grand_total) }}</b></div>
+          <div class="prop-tot" v-if="fatura && docstatus===1"><span>Em dívida</span><span>{{ moeda(doc.outstanding_amount) }}</span></div>
+        </section>
+        <section class="cartao" aria-label="Programa certificado">
+          <h2>{{ fatura ? 'Documento certificado' : 'Comunicação à AT' }}</h2>
+          <div class="prop-tot"><span>N.º certificado</span><span>{{ doc.orbit_numero_certificado || '—' }}</span></div>
+          <div class="prop-tot" v-if="!fatura"><span>Código AT</span><span>{{ doc.orbit_codigo_at || '—' }}</span></div>
+          <div class="prop-tot"><span>Estado</span><b>{{ doc.orbit_documento_certificado ? 'Enviado ao programa' : (docstatus===1 ? 'Sem programa certificado ligado' : 'Por emitir') }}</b></div>
+          <p class="sub" style="margin:4px 0 0;font-size:12px">{{ fatura ? 'Ao emitir, o número, o ATCUD e o PDF vêm do programa certificado.' : 'O programa certificado comunica a guia à AT; o código AT fica aqui e sai no PDF que acompanha a mercadoria.' }}</p>
+        </section>
+      </aside>
+    </div>
+    <div v-if="imp" class="modal-fundo" @click.self="imp=null"><div class="modal" style="max-width:860px">
+      <header><b>Importar para a {{ fatura ? 'fatura' : 'guia' }}</b><button class="btn sm" @click="imp=null">Fechar</button></header>
+      <div style="padding:14px 16px;display:flex;flex-direction:column;gap:12px">
+        <div class="sub">Documentos de {{ doc.customer_name || doc.customer }} que ainda têm alguma coisa por {{ fatura ? 'faturar' : 'enviar' }}.</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" :class="{prim: !imp.filtro}" @click="imp.filtro=''">Todos</button><button v-for="t in tiposImp" :key="t" class="btn sm" :class="{prim: imp.filtro===t}" @click="imp.filtro=t">{{ t }}</button></div>
+        <div v-if="!imp.lista" class="sub">A procurar…</div>
+        <div v-else-if="!listaImp.length" class="sub">Não há nada por {{ fatura ? 'faturar' : 'enviar' }} deste cliente.</div>
+        <div v-else style="overflow-x:auto;border:1px solid var(--line);border-radius:10px"><table class="tab-emitir" style="width:100%;border-collapse:collapse;min-width:560px;font-size:13px">
+          <thead><tr><th></th><th style="text-align:left">Documento</th><th style="text-align:left">Data</th><th style="text-align:left">Estado</th><th>Valor</th></tr></thead>
+          <tbody><tr v-for="x in listaImp" :key="x.doctype+x.name" :style="imp.escolhido===x ? {background:'var(--surface-2,#f6f8f9)'} : {}">
+            <td><input type="radio" name="imp" :checked="imp.escolhido===x" @change="escolherImp(x)" :aria-label="'Importar '+x.name"></td>
+            <td><b>{{ x.tipo }} {{ x.name }}</b><div v-if="x.marca" class="sub" style="font-size:12px">marca {{ x.marca }}</div></td><td>{{ x.data }}</td><td>{{ statusPt(x.estado) }}</td><td style="text-align:right">{{ moeda(x.total) }}</td></tr></tbody></table></div>
+        <fieldset v-if="imp.escolhido" style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0">
+          <legend class="sub" style="padding:0 6px">Linhas de {{ imp.escolhido.name }}</legend>
+          <div v-if="!imp.linhas.length" class="sub">Já está tudo {{ fatura ? 'faturado' : 'enviado' }}.</div>
+          <label v-for="l in imp.linhas" :key="l.i" style="display:flex;gap:10px;align-items:center;padding:4px 0"><input type="checkbox" v-model="imp.marcadas[l.i]"><span class="cresce">{{ l.item_name }}</span><span class="sub">{{ l.qty }} {{ l.uom }}</span><span style="min-width:90px;text-align:right">{{ moeda(l.amount) }}</span></label>
+        </fieldset>
+        <p class="sub" style="margin:0;font-size:12px">As linhas vêm com o preço e o desconto do documento de origem e os dois documentos ficam associados.</p>
+        <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" @click="imp=null">Cancelar</button><button class="btn prim" :disabled="!imp.escolhido || imp.aImportar" @click="importar">{{ imp.aImportar ? 'A importar…' : 'Importar' }}</button></div>
+      </div></div></div>
+  </div>`,
+};
+
+// ── Receber pagamento (recibo) ─────────────────────────────────────────────────────────────────────────────
+const ErpRecibo = {
+  components: { ErpLigacao },
+  props: ["name"],
+  setup(props) {
+    const novo = props.name === "novo";
+    const f = ref({ cliente: "", valor: 0, data: new Date().toISOString().slice(0, 10), modo: "", referencia: "" });
+    const faturas = ref(null), modos = ref([]), doc = ref(null), assoc = ref([]), a = ref(false);
+    const moeda = (v) => new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(v || 0);
+    const carregarFaturas = async (marcar) => { if (!f.value.cliente) { faturas.value = null; return; }
+      const l = await apiE("em_aberto", { cliente: f.value.cliente }); faturas.value = l.map((x) => ({ ...x, pagar: marcar ? x.name === marcar : false, valor: marcar && x.name === marcar ? x.divida : 0 }));
+      if (marcar) f.value.valor = faturas.value.filter((x) => x.pagar).reduce((s, x) => s + x.valor, 0); };
+    onMounted(async () => {
+      if (novo) { modos.value = ((await apiE("contas_recebimento").catch(() => ({}))) || {}).modos || [];
+        f.value.modo = modos.value.find((m) => /transfer/i.test(m)) || modos.value[0] || "";
+        let p = null; try { p = JSON.parse(sessionStorage.getItem("orbit.recibo") || "null"); sessionStorage.removeItem("orbit.recibo"); } catch (e) {}
+        if (p) { f.value.cliente = p.cliente; await carregarFaturas(p.fatura); } }
+      else { const r = await api("erp.documento", { doctype: "Payment Entry", name: props.name }); doc.value = r.doc;
+        assoc.value = (await apiE("associados", { doctype: "Payment Entry", name: props.name }).catch(() => [])) || []; }
+    });
+    watch(() => f.value.cliente, (v, o) => { if (novo && v !== o) carregarFaturas(); });
+    const marcar = (x) => { x.valor = x.pagar ? x.divida : 0; };
+    const liquidado = computed(() => (faturas.value || []).filter((x) => x.pagar).reduce((s, x) => s + (Number(x.valor) || 0), 0));
+    const diferenca = computed(() => (Number(f.value.valor) || 0) - liquidado.value);
+    const distribuir = () => { let resto = Number(f.value.valor) || 0;
+      for (const x of faturas.value || []) { const v = Math.min(resto, x.divida); x.pagar = v > 0; x.valor = Math.round(v * 100) / 100; resto -= v; } };
+    const emitir = async () => {
+      const lista = (faturas.value || []).filter((x) => x.pagar && x.valor > 0).map((x) => ({ name: x.name, valor: x.valor }));
+      if (!lista.length) { toast("Escolha pelo menos uma fatura"); return; }
+      if (diferenca.value < -0.004) { toast("O valor recebido é menor do que o liquidado"); return; }
+      if (!confirm("Emitir o recibo de " + moeda(f.value.valor) + "?")) return;
+      a.value = true;
+      try { const r = await apiE("gravar_recibo", { cliente: f.value.cliente, data: f.value.data, valor: f.value.valor, modo: f.value.modo, referencia: f.value.referencia, faturas: JSON.stringify(lista), submeter: 1 }, true);
+        toast(r.recibos.length > 1 ? r.recibos.length + " recibos emitidos (um por marca)" : "Recibo emitido"); location.hash = irErp("Payment Entry", r.recibos[0].name); }
+      finally { a.value = false; } };
+    const hoje = new Date().toISOString().slice(0, 10);
+    return { novo, f, faturas, modos, doc, assoc, a, moeda, marcar, liquidado, diferenca, distribuir, emitir, irErp, statusPt, ESTADO_DOC, hoje };
+  },
+  template: `<div class="pad prop">
+    <div class="sub"><a :href="irErp('Payment Entry')">← Recibos</a><template v-if="!novo"> · <a :href="irErp('Payment Entry', name) + '/completa'">ficha completa</a></template></div>
+    <template v-if="novo">
+      <div class="prop-topo"><div class="prop-tit"><h1>Receber pagamento</h1></div><div class="prop-accoes"><button class="btn prim" :disabled="a" @click="emitir">Emitir recibo</button></div></div>
+      <div class="prop-corpo">
+        <div class="prop-principal">
+          <section class="cartao prop-dados" aria-label="Pagamento"><div class="prop-campos">
+            <label>Cliente<ErpLigacao v-model="f.cliente" alvo="Customer"/></label>
+            <label>Valor recebido<input type="number" min="0" step="0.01" v-model.number="f.valor"></label>
+            <label>Data<input type="date" v-model="f.data"></label>
+            <label>Meio de pagamento<select v-model="f.modo"><option v-for="m in modos" :key="m" :value="m">{{ m }}</option></select></label>
+            <label>Referência do pagamento<input v-model="f.referencia" placeholder="Ex.: TRF 25/11"></label>
+          </div></section>
+          <section class="cartao" aria-label="Faturas em aberto" style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center"><h2 style="margin:0;font-size:15px">Faturas em aberto deste cliente</h2><button v-if="faturas && faturas.length" class="btn sm" @click="distribuir">Distribuir pelas mais antigas</button></div>
+            <div v-if="!f.cliente" class="sub">Escolha o cliente.</div>
+            <div v-else-if="!faturas" class="sub">A procurar…</div>
+            <div v-else-if="!faturas.length" class="sub">Este cliente não tem faturas em aberto.</div>
+            <div v-else style="overflow-x:auto;border:1px solid var(--line);border-radius:10px"><table class="tab-emitir" style="width:100%;border-collapse:collapse;min-width:560px;font-size:13px">
+              <thead><tr><th>Pagar</th><th style="text-align:left">Fatura</th><th style="text-align:left">Vencimento</th><th>Em dívida</th><th>A liquidar</th></tr></thead>
+              <tbody><tr v-for="x in faturas" :key="x.name">
+                <td style="text-align:center"><input type="checkbox" v-model="x.pagar" @change="marcar(x)" :aria-label="'Pagar '+x.numero"></td>
+                <td><b>{{ x.numero }}</b><div v-if="x.marca" class="sub" style="font-size:12px">marca {{ x.marca }}</div></td>
+                <td :style="x.vencida ? {color:'var(--acao)',fontWeight:600} : {}">{{ x.vencimento }}<template v-if="x.vencida"> · vencida</template></td>
+                <td style="text-align:right">{{ moeda(x.divida) }}</td>
+                <td style="text-align:right"><input type="number" min="0" :max="x.divida" step="0.01" v-model.number="x.valor" :disabled="!x.pagar" style="width:100px;text-align:right"></td></tr></tbody></table></div>
+          </section>
+        </div>
+        <aside class="prop-lado" aria-label="Resumo">
+          <section class="cartao"><h2>Resumo</h2>
+            <div class="prop-tot"><span>Recebido</span><span>{{ moeda(f.valor) }}</span></div>
+            <div class="prop-tot"><span>Liquidado</span><span>{{ moeda(liquidado) }}</span></div>
+            <div class="prop-tot" style="border-top:1px solid var(--line);padding-top:8px"><b>Diferença</b><b :style="diferenca < -0.004 ? {color:'var(--acao)'} : {}">{{ moeda(diferenca) }}</b></div>
+            <p class="sub" style="margin:4px 0 0;font-size:12px">O que sobra fica como adiantamento do cliente. Faturas de marcas diferentes saem em recibos separados, cada um na série da sua marca.</p></section>
+        </aside>
+      </div>
+    </template>
+    <template v-else-if="doc">
+      <div class="prop-topo"><div><div class="prop-tit"><h1>Recibo {{ doc.name }}</h1><span class="etq" :class="ESTADO_DOC[doc.docstatus||0][1]">{{ ESTADO_DOC[doc.docstatus||0][0] }}</span></div><div class="sub">{{ doc.party_name || doc.party }} · {{ doc.posting_date }} · {{ doc.mode_of_payment }}</div></div>
+        <div class="prop-accoes"><a class="btn" :href="'/api/method/frappe.utils.print_format.download_pdf?doctype=Payment%20Entry&name='+encodeURIComponent(doc.name)" target="_blank">PDF</a></div></div>
+      <div class="prop-corpo">
+        <div class="prop-principal"><section class="cartao"><h2 style="font-size:15px;margin:0 0 8px">Faturas liquidadas</h2>
+          <a v-for="r in doc.references || []" :key="r.name" class="prop-tot" :href="irErp(r.reference_doctype, r.reference_name)" style="text-decoration:none;color:inherit"><span>{{ r.reference_name }}</span><span>{{ moeda(r.allocated_amount) }}</span></a>
+          <div class="prop-tot" style="border-top:2px solid var(--ink);padding-top:8px"><b>Recebido</b><b>{{ moeda(doc.paid_amount) }}</b></div></section></div>
+        <aside class="prop-lado"><section class="cartao"><h2>Documentos associados</h2>
+          <div v-if="!assoc.length" class="sub">Nenhum.</div>
+          <a v-for="x in assoc" :key="x.doctype+x.name" :href="irErp(x.doctype, x.name)" class="prop-tot" style="text-decoration:none;color:inherit"><span><b>{{ x.tipo }}</b> {{ x.name }}</span><span class="etq">{{ statusPt(x.estado) }}</span></a></section>
+          <section class="cartao"><h2>Recibo certificado</h2><div class="prop-tot"><span>Estado</span><b>{{ doc.orbit_documento_certificado ? 'Enviado ao programa' : 'Sem programa certificado ligado' }}</b></div></section></aside>
+      </div>
+    </template>
+  </div>`,
+};
 const ErpProposta = {
   components: { ErpLigacao, EditorRico },
   props: ["name"],
@@ -3925,7 +4203,7 @@ const abrirApp = (chave, url) => {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpProposta, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, DefUtilizadores, DefEmpresas, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpProposta, ErpEmitir, ErpRecibo, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, DefUtilizadores, DefEmpresas, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -4062,6 +4340,8 @@ const App = {
         <ErpModulo v-else-if="ecra==='erp-m'" :barra="partes[1]" :key="'m'+partes[1]"/>
         <ErpLista v-else-if="ecra==='erp' && !partes[2]" :doctype="partes[1]" :key="'l'+partes[1]"/>
         <ErpProposta v-else-if="ecra==='erp' && partes[1]==='Quotation' && partes[3]!=='completa'" :name="partes[2]" :key="'p'+partes[2]"/>
+        <ErpEmitir v-else-if="ecra==='erp' && (partes[1]==='Sales Invoice' || partes[1]==='Delivery Note') && partes[3]!=='completa'" :dt="partes[1]" :name="partes[2]" :key="'e'+partes[1]+'/'+partes[2]"/>
+        <ErpRecibo v-else-if="ecra==='erp' && partes[1]==='Payment Entry' && partes[3]!=='completa'" :name="partes[2]" :key="'r'+partes[2]"/>
         <ErpFicha v-else-if="ecra==='erp'" :doctype="partes[1]" :name="partes[2]" :key="'f'+partes[1]+'/'+partes[2]"/>
         <ErpStock v-else-if="ecra==='erp-stock'" :artigo="partes[1]" :key="'s'+(partes[1]||'')"/>
         <ErpPessoas v-else-if="ecra==='pessoas'"/>
