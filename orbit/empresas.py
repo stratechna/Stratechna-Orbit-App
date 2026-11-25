@@ -169,6 +169,8 @@ def criar(nome: str, nif: str, pais: str = "Portugal", moeda: str = "EUR", abrev
                         "chart_of_accounts": plano or "Standard", "create_chart_of_accounts_based_on": "Standard Template"})
     c.flags.ignore_permissions = True
     c.insert()
+    if not contabilidade_ligada():   # contabilidade desligada: o inventário da empresa nova sem lançamentos
+        frappe.db.set_value("Company", c.name, "enable_perpetual_inventory", 0, update_modified=False)
     if morada:
         frappe.get_doc({"doctype": "Address", "address_title": nome, "address_type": "Billing", "address_line1": morada[:140],
                         "pincode": codigo_postal, "city": cidade or "-", "country": pais or "Portugal", "is_your_company_address": 1,
@@ -238,7 +240,9 @@ def associar(marca: str, empresa: str):
             novo_arm = w.name
     elif antigo:
         novo_arm = antigo
-    linhas = [d for d in b.get("brand_defaults") or [] if d.company != empresa]
+    # a linha da empresa antiga que apontava para o armazém que a marca deixa sai (a marca passou de empresa)
+    linhas = [d for d in b.get("brand_defaults") or [] if d.company != empresa
+              and not (antigo and novo_arm and antigo != novo_arm and d.default_warehouse == antigo)]
     b.set("brand_defaults", [])
     for d in linhas:
         b.append("brand_defaults", {k: d.get(k) for k in ("company", "default_warehouse", "default_price_list",
