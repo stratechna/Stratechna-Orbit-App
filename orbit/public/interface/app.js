@@ -2376,6 +2376,7 @@ const Definicoes = {
       if (daApp("CRM")) { junta("CRM", { href: "#/definicoes/fluxos", rotulo: "Fluxos (automatismos)" }); junta("CRM", { href: "#/definicoes/formularios", rotulo: "Formulários (disposição das fichas)" }); junta("CRM", { href: "#/definicoes/campos", rotulo: "Campos personalizados" }); }
       if (daApp("Correio")) junta("Correio", { href: "#/definicoes/caixas", rotulo: "Caixas ligadas ao Orbit" });
       if (!props.gruposApp) junta("Conta e utilizadores", { href: "#/definicoes/utilizadores", rotulo: "Utilizadores do Orbit" });
+      if (!props.gruposApp) junta("Conta e utilizadores", { href: "#/definicoes/empresas", rotulo: "Empresas e marcas" });
       d0.value.filter((x) => daApp(x.grupo)).forEach((x) => x.itens.forEach((i) => junta(x.grupo, { href: i.url, rotulo: i.rotulo })));
       return Object.keys(g).sort((a, b) => (ORDEM.indexOf(a) + 99) % 99 - (ORDEM.indexOf(b) + 99) % 99).map((k) => ({ grupo: k, itens: g[k] }));
     });
@@ -2626,6 +2627,77 @@ const DefConsulta = {
 // ── Definições › Utilizadores (25-11-2026, docs/PLANO-ORBIT-UTILIZADORES-LICENCAS.md): licenças, novo utilizador com
 // aviso de custo e desactivar — tudo pelo portal (orbit.interface.licencas → POST /api/v1/orbit/utilizadores).
 const PERFIS_ORBIT = { gestao: "Gestão", comercial: "Comercial", apoio: "Apoio ao cliente", rh: "Recursos humanos", contabilidade: "Contabilidade", producao: "Produção", operacoes: "Operações" };
+// ── Definições › Empresas (25-11-2026, docs/PLANO-ORBIT-VARIAS-EMPRESAS.md): várias empresas no mesmo Orbit; cada marca
+// pertence a uma empresa, que é quem fatura. Só o administrador do Orbit.
+const DefEmpresas = {
+  setup() {
+    const d = ref(null), form = ref(null), aGravar = ref(false), erro = ref("");
+    const e = (m, a, post) => api("orbit.empresas." + m, a || {}, !!post);
+    async function carregar() { try { d.value = await e("lista"); erro.value = ""; } catch (x) { erro.value = (x && x.message) || "Sem acesso."; } }
+    onMounted(carregar);
+    const abrirNova = () => { form.value = { nome: "", nif: "", pais: "Portugal", moeda: "EUR", abreviatura: "", morada: "", codigo_postal: "", cidade: "", marcas: [] }; };
+    const empresaDe = (m) => (m.orbit_empresa || (d.value && d.value.principal));
+    async function gravar() {
+      if (!form.value.nome.trim() || !form.value.nif.trim()) { toast("Escreva o nome legal e o NIF."); return; }
+      aGravar.value = true;
+      try {
+        const r = await e("criar", { ...form.value, marcas: JSON.stringify(form.value.marcas) }, true);
+        toast("Empresa " + r.empresa + " criada."); form.value = null; await carregar();
+      } catch (x) { toast((x && x.message) || "Não foi possível criar a empresa."); }
+      finally { aGravar.value = false; }
+    }
+    async function mudar(marca, empresa) {
+      if (!confirm("A marca " + marca + " passa a ser faturada por " + empresa + ". Continuar?")) { await carregar(); return; }
+      try { const r = await e("associar", { marca, empresa }, true); toast("Marca " + marca + " em " + empresa + (r.armazem ? " · armazém " + r.armazem : "")); }
+      catch (x) { toast((x && x.message) || "Não foi possível mudar."); }
+      await carregar();
+    }
+    return { d, form, aGravar, erro, abrirNova, gravar, mudar, empresaDe };
+  },
+  template: `
+  <div class="pad" style="max-width:980px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+      <div><h1>Empresas</h1><div class="sub">Cada marca pertence a uma empresa, que é quem fatura. O CRM e o Desk separam-se pela marca.</div></div>
+      <button v-if="d" class="btn prim" @click="abrirNova">+ Nova empresa</button>
+    </div>
+    <div v-if="erro" class="cartao" style="padding:14px">{{ erro }}</div>
+    <div v-else-if="!d" class="sub">A carregar…</div>
+    <template v-else>
+      <div class="cartao" v-for="c in d.empresas" :key="c.name" style="padding:14px 16px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>{{ c.name }}</b>
+          <span class="sub">NIF {{ c.tax_id || '—' }} · {{ c.abbr }} · {{ c.default_currency }}<span v-if="c.principal"> · principal</span></span></div>
+        <div class="sub" style="margin-top:6px">Marcas: <span v-if="!c.marcas.length">nenhuma</span><span v-for="(m,i) in c.marcas" :key="m">{{ i ? ', ' : '' }}{{ m }}</span></div>
+      </div>
+      <h2 style="font-size:15px;margin:18px 0 8px">Marcas</h2>
+      <div class="cartao" style="padding:6px 16px">
+        <div v-for="m in d.marcas" :key="m.name" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">
+          <b>{{ m.name }}</b>
+          <select class="btn" :value="empresaDe(m)" @change="mudar(m.name, $event.target.value)"><option v-for="c in d.empresas" :key="c.name" :value="c.name">{{ c.name }}</option></select>
+        </div>
+      </div>
+    </template>
+    <div v-if="form" class="modal-fundo" @click.self="form=null"><div class="modal" style="max-width:560px">
+      <header><b>Nova empresa</b><button class="btn sm" @click="form=null">Fechar</button></header>
+      <form @submit.prevent="gravar" style="display:flex;flex-direction:column;gap:10px;padding:14px 16px">
+        <label class="erp-campo"><span>Nome legal<span class="obrig">*</span></span><input v-model="form.nome" required placeholder="Ex.: Talentos Transparentes Unipessoal, Lda."></label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <label class="erp-campo"><span>NIF<span class="obrig">*</span></span><input v-model="form.nif" required inputmode="numeric"></label>
+          <label class="erp-campo"><span>Abreviatura</span><input v-model="form.abreviatura" maxlength="10" placeholder="Automática"></label>
+          <label class="erp-campo"><span>País</span><input v-model="form.pais"></label>
+          <label class="erp-campo"><span>Moeda</span><input v-model="form.moeda" maxlength="3"></label>
+        </div>
+        <label class="erp-campo"><span>Morada</span><input v-model="form.morada"></label>
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px">
+          <label class="erp-campo"><span>Código postal</span><input v-model="form.codigo_postal" placeholder="0000-000"></label>
+          <label class="erp-campo"><span>Localidade</span><input v-model="form.cidade"></label>
+        </div>
+        <div><span class="sub">Marcas desta empresa</span><div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px">
+          <label v-for="m in d.marcas" :key="m.name" style="display:flex;gap:6px;align-items:center"><input type="checkbox" :value="m.name" v-model="form.marcas">{{ m.name }}</label></div></div>
+        <p class="sub" style="margin:0">A empresa nasce com o plano de contas, os armazéns e os modelos de IVA da empresa principal. As marcas escolhidas passam a ser faturadas por ela, com o seu armazém.</p>
+        <div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" class="btn" @click="form=null">Cancelar</button><button type="submit" class="btn prim" :disabled="aGravar">{{ aGravar ? 'A criar…' : 'Criar empresa' }}</button></div>
+      </form></div></div>
+  </div>`,
+};
 const DefUtilizadores = {
   setup() {
     const d = ref(null), cand = ref(null), form = ref(null), custo = ref(null), aGravar = ref(false);
@@ -3804,7 +3876,7 @@ const APPS = {
       ["erp-desk/%2Fdesk%2Fsupressao-de-marketing", "nota", "Supressões"]],
     modulos: [], defs: null },
   admin: { nome: "Administração", sub: "Só administradores", ic: "roda", inicio: "definicoes",
-    nav: [["sec", "Plataforma"], ["definicoes", "roda", "Definições do Orbit"], ["definicoes/utilizadores", "pessoas", "Utilizadores"]],
+    nav: [["sec", "Plataforma"], ["definicoes", "roda", "Definições do Orbit"], ["definicoes/utilizadores", "pessoas", "Utilizadores"], ["definicoes/empresas", "grelha", "Empresas"]],
     modulos: ["ERPNext Settings", "Users", "Website", "Integrations", "Automation", "Data", "Email", "Printing", "System"], defs: null },
 };
 const APP = APPS[APP_ATUAL] || APPS.crm;
@@ -3828,7 +3900,7 @@ const abrirApp = (chave, url) => {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpProposta, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, DefUtilizadores, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpLista, ErpFicha, ErpProposta, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, DefUtilizadores, DefEmpresas, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -3936,6 +4008,7 @@ const App = {
         <DefFluxos v-else-if="ecra==='definicoes' && partes[1]==='fluxos'" key="fluxos"/>
         <DefFormularios v-else-if="ecra==='definicoes' && partes[1]==='formularios'" key="formularios"/>
         <DefUtilizadores v-else-if="ecra==='definicoes' && partes[1]==='utilizadores'" key="utilizadores"/>
+        <DefEmpresas v-else-if="ecra==='definicoes' && partes[1]==='empresas'" key="empresas"/>
         <DefConsulta v-else-if="ecra==='definicoes' && partes[1]==='caixas'" :chave="partes[1]" :key="partes[1]"/>
         <DefLista v-else-if="ecra==='definicoes'" :chave="partes[1]" :key="partes[1]"/>
         <Tarefas v-else-if="ecra==='tarefas'"/>

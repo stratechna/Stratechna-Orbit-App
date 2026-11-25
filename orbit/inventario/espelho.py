@@ -102,7 +102,8 @@ def _canal(c: dict) -> "frappe.model.document.Document":
     if frappe.db.exists("Canal de Venda", nome):
         doc = frappe.get_doc("Canal de Venda", nome)
     else:
-        company = frappe.defaults.get_global_default("company") or frappe.db.get_value("Company", {}, "name")
+        from orbit.empresas import da_marca
+        company = da_marca(_l(c.get("marca"), 140) if _l(c.get("marca"), 140) and frappe.db.exists("Brand", _l(c.get("marca"), 140)) else None)
         lista = f"Loja · {nome}"
         if not frappe.db.exists("Price List", lista):
             frappe.get_doc({"doctype": "Price List", "price_list_name": lista, "selling": 1, "buying": 0,

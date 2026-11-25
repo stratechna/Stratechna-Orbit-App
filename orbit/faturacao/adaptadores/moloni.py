@@ -139,8 +139,8 @@ class Moloni(Adaptador):
             "categorias": lista("productCategories/getAll", ("category_id", "name")),
         }
 
-    def _serie(self, tipo: str) -> int:
-        nome = (self.cfg.get(f"serie_{tipo}") or "").strip().upper()
+    def _serie(self, tipo: str, series: Optional[dict] = None) -> int:
+        nome = ((series or {}).get(tipo) or self.cfg.get(f"serie_{tipo}") or "").strip().upper()
         if not nome:
             raise ErroFaturacao(f"a ligação não tem série para «{tipo}»")
         if self._series is None:
@@ -293,7 +293,7 @@ class Moloni(Adaptador):
         cliente_id = int(self.garantir_cliente(p.cliente))
         p.cliente.id_externo = str(cliente_id)        # quem chama guarda-o, para não voltar a procurar
         relacionados = None
-        corpo = {"document_set_id": self._serie(p.tipo), "customer_id": cliente_id, "date": p.data,
+        corpo = {"document_set_id": self._serie(p.tipo, p.series), "customer_id": cliente_id, "date": p.data,
                  "expiration_date": p.vencimento or p.data, "our_reference": p.referencia[:60],
                  "notes": p.notas[:1000], "financial_discount": 0, "special_discount": 0,
                  "status": 0 if p.rascunho else 1}
@@ -332,10 +332,10 @@ class Moloni(Adaptador):
             raise ErroFaturacao(f"o Moloni não deu o PDF do documento {id_externo}", permanente=False)
         return url
 
-    def registar_pagamento(self, cliente_id, data, valor, documentos, referencia="", notas="", rascunho=False):
+    def registar_pagamento(self, cliente_id, data, valor, documentos, referencia="", notas="", rascunho=False, series=None):
         if not self.cfg.get("metodo_pagamento_id"):
             raise ErroFaturacao("falta o método de pagamento da ligação para emitir recibos")
-        corpo = {"document_set_id": self._serie("recibo"), "customer_id": int(cliente_id), "date": data,
+        corpo = {"document_set_id": self._serie("recibo", series), "customer_id": int(cliente_id), "date": data,
                  "our_reference": referencia[:60], "notes": notas[:1000], "status": 0 if rascunho else 1,
                  "net_value": round(valor, 2),
                  "payments": [{"payment_method_id": int(self.cfg["metodo_pagamento_id"]), "date": data,

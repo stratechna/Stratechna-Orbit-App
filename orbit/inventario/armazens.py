@@ -12,7 +12,8 @@ GRUPO = "Fornecedores (virtual)"
 
 
 def _empresa():
-    return frappe.defaults.get_global_default("company") or (frappe.get_all("Company", pluck="name") or [None])[0]
+    from orbit.empresas import principal
+    return principal()
 
 
 def nome_do_virtual(supplier: str) -> str | None:

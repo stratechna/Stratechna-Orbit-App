@@ -139,6 +139,18 @@
    "label": "Recibos"
   },
   {
+   "fieldname": "sec_series_marca",
+   "fieldtype": "Section Break",
+   "label": "Séries por marca"
+  },
+  {
+   "fieldname": "series_marca",
+   "fieldtype": "Table",
+   "label": "Séries por marca",
+   "options": "Serie da Marca",
+   "description": "Marcas da mesma empresa com imagem própria: cada marca com as suas séries (no Moloni, a série leva o Template de Identificação da marca). Sem linha para a marca = as séries acima."
+  },
+  {
    "fieldname": "sec_pred",
    "fieldtype": "Section Break",
    "label": "Predefinições do programa",
@@ -247,5 +259,6 @@
   }
  ],
  "sort_field": "modified",
- "sort_order": "DESC"
+ "sort_order": "DESC",
+ "modified": "2026-11-25 12:00:00.000000"
 }

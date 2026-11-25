@@ -86,7 +86,7 @@ _FATURACAO = ["orbit.faturacao.instalar.garantir"]   # DP8, 05-11-2026
 _BOOKING = ["orbit.booking.garantir"]   # O1/I1, 06-11-2026: negócio do CRM ligado à marcação do Booking
 # 10-11-2026: propostas comerciais por cima do Orçamento (orbit/propostas; docs/PLANO-PROPOSTAS-ORBIT.md)
 _PROPOSTAS = ["orbit.propostas.instalar.garantir", "orbit.marcas_artigos.garantir", "orbit.inventario.campos.garantir", "orbit.inventario.encomendas.garantir", "orbit.inventario.armazens.instalar"]
-after_migrate = _FATURACAO + _BOOKING + _PROPOSTAS + _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA + _LINGUA + _EMAILS_CRM + _INTERFACE + _NOTAS + ["orbit.generos.acertar", "orbit.notificacoes_pt.acertar", "orbit.territorios.acertar", "orbit.listas_pt.acertar", "orbit.configuracao_pt.acertar", "orbit.compras.preparar.tudo", "orbit.compras.rascunho.garantir_campos"]
+after_migrate = _FATURACAO + _BOOKING + _PROPOSTAS + _POR_DE_PE + _MARKETING + _MARCACAO + _CAIXAS + _ORGANIZACAO + _MIGRACAO + _ENTRADA + _LINGUA + _EMAILS_CRM + _INTERFACE + _NOTAS + ["orbit.generos.acertar", "orbit.notificacoes_pt.acertar", "orbit.territorios.acertar", "orbit.listas_pt.acertar", "orbit.configuracao_pt.acertar", "orbit.compras.preparar.tudo", "orbit.compras.rascunho.garantir_campos", "orbit.empresas.garantir"]
 after_install = _POR_DE_PE + _MARKETING + _MARCACAO + _ORGANIZACAO + ["orbit.remetentes.garantir"] + _LINGUA + _NOTAS + ["orbit.generos.acertar", "orbit.notificacoes_pt.acertar", "orbit.territorios.acertar", "orbit.listas_pt.acertar", "orbit.configuracao_pt.acertar"]
 
 # Email marketing: a saída das campanhas corre ao minuto (o ritmo por hora
@@ -147,7 +147,9 @@ doc_events = {
     # 17-10-2026: a conta de saída por omissão é o remetente dos avisos — chama-se «Stratechna Orbit»
     "Email Account": {"validate": "orbit.correio_servicos.validar", "on_update": "orbit.remetentes.conta_gravada"},
     # 05-11-2026 (DP8): o documento fiscal só nasce no programa certificado (Moloni, …) — inerte sem Ligacao activa
-    "Sales Invoice": {"validate": "orbit.faturacao.emissao.validar_fatura",
+    # 25-11-2026: várias empresas — a marca fica escrita na venda e escolhe a série do programa certificado
+    "Sales Invoice": {"before_validate": "orbit.empresas.antes_de_validar_venda",
+                      "validate": "orbit.faturacao.emissao.validar_fatura",
                       "on_submit": "orbit.faturacao.emissao.ao_submeter_fatura",
                       "before_cancel": "orbit.faturacao.emissao.antes_de_cancelar_fatura"},
     "Payment Entry": {"on_submit": "orbit.faturacao.emissao.ao_submeter_pagamento"},
@@ -163,7 +165,8 @@ doc_events = {
                   "on_submit": "orbit.propostas.negocio.ao_submeter",
                   "on_change": "orbit.propostas.negocio.ao_mudar",
                   "on_cancel": "orbit.propostas.negocio.ao_mudar"},
-    "Sales Order": {"on_submit": "orbit.propostas.negocio.encomenda_submetida"},
+    "Sales Order": {"before_validate": "orbit.empresas.antes_de_validar_venda",
+                    "on_submit": "orbit.propostas.negocio.encomenda_submetida"},
 }
 
 # 10-11-2026: «Adicionar por referência» e a marca no Orçamento; o modelo de impressão lê orbit_proposta(doc)

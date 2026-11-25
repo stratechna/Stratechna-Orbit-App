@@ -65,6 +65,11 @@ def _marca(doc):
 
 
 def _aplicar_marca(doc, marca):
+    # 25-11-2026: a empresa que fatura a marca (docs/PLANO-ORBIT-VARIAS-EMPRESAS.md)
+    from orbit.empresas import da_marca
+    empresa = da_marca(marca.name)
+    if empresa and doc.company != empresa:
+        doc.company = empresa
     if doc.is_new():
         _serie(doc, marca)
         dias = cint(marca.get("orbit_validade_dias")) or 15

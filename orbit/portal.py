@@ -621,7 +621,7 @@ def registar_tempo(dados):
         cust = frappe.db.get_value("Customer", {"crm_account_id": crm}) if crm else None
     utilizador = d.get("utilizador") if d.get("utilizador") and frappe.db.exists("User", d.get("utilizador")) else None
     nota = (d.get("nota") or "") + (f" [ref:{d['referencia']}]" if d.get("referencia") else "")
-    ts = frappe.get_doc({"doctype": "Timesheet", "company": frappe.get_all("Company", pluck="name")[0],
+    ts = frappe.get_doc({"doctype": "Timesheet", "company": __import__("orbit.empresas", fromlist=["principal"]).principal(),
                          "custom_hd_ticket": bilhete, "parent_project": projeto, "customer": cust,
                          "origem_portal": 1 if d.get("origem_portal") else 0, "note": nota.strip() or None,
                          "user": utilizador,
@@ -980,7 +980,7 @@ def criar_projeto(spec):
     id_conta = _limpo(s.get("id_conta"))
     cust = frappe.db.get_value("Customer", {"crm_account_id": id_conta}) if id_conta else None
     marca = s.get("marca") if s.get("marca") and frappe.db.exists("Brand", s.get("marca")) else None
-    p = frappe.get_doc({"doctype": "Project", "project_name": nome, "company": frappe.get_all("Company", pluck="name")[0],
+    p = frappe.get_doc({"doctype": "Project", "project_name": nome, "company": __import__("orbit.empresas", fromlist=["principal"]).principal(),
                         "status": "Open", "customer": cust, "crm_account_id": id_conta, "dominio": _limpo(s.get("dominio")),
                         "marca": marca, "subscricao_portal": _limpo(str(s.get("subscricao") or "")),
                         "blueprint": _limpo(s.get("blueprint")), "horas_orcamento": flt(s.get("horas_orcamento")),
@@ -1529,7 +1529,8 @@ def _orcamento_portal(dados):
             return {"id": neg, "negocio": neg, "orcamento": None}
         deal = frappe.get_doc("CRM Deal", neg)
         para, parte = N.cliente_do_negocio(deal)
-        empresa = frappe.defaults.get_global_default("company") or frappe.db.get_value("Company", {}, "name")
+        from orbit.empresas import da_marca
+        empresa = da_marca(deal.get("marca"))
         doc = frappe.new_doc("Quotation")
         doc.update({"quotation_to": para, "party_name": parte, "company": empresa, "transaction_date": nowdate(),
                     "orbit_negocio": neg, "orbit_ref_portal": ref, "ignore_pricing_rule": 1, "orbit_imprimir_total": 1,

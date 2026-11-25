@@ -102,6 +102,7 @@ class Pedido:
     origem_id_externo: Optional[str] = None   # nota de crédito: o documento certificado que corrige
     origem_valor: float = 0.0
     motivo: str = ""                           # nota de crédito: porquê
+    series: Optional[dict] = None              # 25-11-2026: séries da marca do documento ({"fatura": "SHX", …})
 
 
 @dataclass
@@ -191,7 +192,8 @@ class Adaptador:
         raise NotImplementedError
 
     def registar_pagamento(self, cliente_id: str, data: str, valor: float, documentos: list[tuple[str, float]],
-                           referencia: str = "", notas: str = "") -> Resultado:
+                           referencia: str = "", notas: str = "", rascunho: bool = False,
+                           series: Optional[dict] = None) -> Resultado:
         raise NotImplementedError
 
     def alterados_desde(self, desde: str) -> list[Resultado]:

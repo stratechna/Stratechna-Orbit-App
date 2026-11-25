@@ -211,14 +211,16 @@ def pode(f) -> str | None:
         return "NIF do fornecedor inválido."
     if (f.moeda or "EUR") != "EUR":
         return f"Moeda {f.moeda}: só EUR por agora."
-    emp = frappe.db.get_value("Company", _empresa(), "tax_id") or ""
+    emp = frappe.db.get_value("Company", _empresa(f), "tax_id") or ""
     if emp and f.destinatario_nif and re.sub(r"\D", "", f.destinatario_nif) != re.sub(r"\D", "", emp):
         return "O destinatário não é a empresa."
     return None
 
 
-def _empresa():
-    return frappe.defaults.get_global_default("company") or frappe.db.get_value("Company", {}, "name")
+def _empresa(f=None):
+    """25-11-2026: a empresa do NIF do adquirente (várias empresas, D5); sem ele, a principal."""
+    from orbit.empresas import por_nif, principal
+    return (por_nif(f.get("destinatario_nif")) if f is not None else None) or principal()
 
 
 def _etiquetas(docs_id):
@@ -242,7 +244,7 @@ def criar(f, etiquetas=None, dados=None, ignorar=False) -> dict:
     if motivo and not (ignorar and not f.fatura_compra):
         return {"ok": False, "motivo": motivo}
     garantir_campos()
-    company = _empresa()
+    company = _empresa(f)
     abbr = F0._abbr(company)
     lido = json.loads(f.resposta or "{}")
     etiquetas = etiquetas if etiquetas is not None else _etiquetas(f.docs_id)

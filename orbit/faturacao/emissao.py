@@ -133,7 +133,7 @@ def emitir(documento: str):
 
 def _emitir_recibo(dc, ad, ensaio):
     pe = frappe.get_doc("Payment Entry", dc.documento)
-    documentos, cliente_id = [], None
+    documentos, cliente_id, marca = [], None, None
     for r in pe.references:
         if r.reference_doctype != "Sales Invoice":
             continue
@@ -141,13 +141,15 @@ def _emitir_recibo(dc, ad, ensaio):
                                       "estado": "Emitido", "tipo": "fatura"}, ["id_externo"], as_dict=True)
         if f:
             documentos.append((f.id_externo, flt(r.allocated_amount)))
+            marca = marca or frappe.db.get_value("Sales Invoice", r.reference_name, "orbit_marca")
             cliente_id = cliente_id or _id_de("Customer", pe.party, ad.nome)
     if not documentos:
         raise ErroFaturacao("o pagamento não está ligado a nenhuma fatura emitida no programa")
     if not cliente_id:
         raise ErroFaturacao(f"o cliente {pe.party} ainda não tem ficha no programa")
     return ad.registar_pagamento(cliente_id, str(pe.posting_date), sum(v for _, v in documentos), documentos,
-                                 referencia=pe.name, notas=pe.get("remarks") or "", rascunho=ensaio)
+                                 referencia=pe.name, notas=pe.get("remarks") or "", rascunho=ensaio,
+                                 series=series_da_marca(da_empresa(dc.company), marca))
 
 
 def periodico():
@@ -214,6 +216,16 @@ def _guardar_ids(si, pedido):
                 frappe.db.set_value(doctype, nome, "orbit_fat_ids", json.dumps(ids), update_modified=False)
 
 
+def series_da_marca(lig, marca) -> dict | None:
+    """25-11-2026: as séries da marca na ligação (Templates de Identificação do Moloni); sem linha = as da ligação."""
+    if not marca:
+        return None
+    for l in lig.get("series_marca") or []:
+        if l.marca == marca:
+            return {t: l.get(f"serie_{t}") for t in ("fatura", "fatura_recibo", "nota_credito", "recibo") if l.get(f"serie_{t}")}
+    return None
+
+
 def pedido_da_fatura(si, lig, rascunho: bool) -> Pedido:
     cust = frappe.get_doc("Customer", si.customer)
     morada = frappe.get_doc("Address", si.customer_address) if si.get("customer_address") else None
@@ -243,7 +255,7 @@ def pedido_da_fatura(si, lig, rascunho: bool) -> Pedido:
         if not origem:
             raise ErroFaturacao(f"a fatura de origem {si.return_against} não está emitida no programa certificado")
         origem_valor = abs(flt(si.grand_total))
-    return Pedido(tipo=tipo, referencia=si.name, data=str(si.posting_date), vencimento=str(si.due_date or si.posting_date),
+    return Pedido(series=series_da_marca(lig, si.get("orbit_marca")), tipo=tipo, referencia=si.name, data=str(si.posting_date), vencimento=str(si.due_date or si.posting_date),
                   cliente=cliente, linhas=linhas, notas=(si.get("remarks") or "")[:1000] if si.get("remarks") != "No Remarks" else "",
                   rascunho=rascunho, origem_id_externo=origem, origem_valor=origem_valor,
                   motivo=si.get("orbit_motivo_nc") or "")

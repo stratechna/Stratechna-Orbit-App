@@ -261,7 +261,11 @@ def processar(docs_id: int, forcar: int = 0):
             tipo_ficheiro = "application/pdf" if dados[:4] == b"%PDF" else tipo_ficheiro
         doc.estado = "A ler"
         lido = _ia(dados, tipo_ficheiro)
-        empresa = frappe.defaults.get_global_default("company") or frappe.db.get_value("Company", {}, "name")
+        # 25-11-2026 (várias empresas, D5): a empresa é a do NIF do adquirente na fatura; emitida por uma empresa do
+        # tenant → é dessa (o conferir vê que é uma venda); sem NIF conhecido → a principal, e o conferir avisa
+        from orbit.empresas import por_nif, principal
+        empresa = por_nif((lido.get("emitente") or {}).get("nif")) or por_nif((lido.get("destinatario") or {}).get("nif")) \
+            or principal()
         estado, motivos, extra = conferir(lido, frappe.db.get_value("Company", empresa, "tax_id") if empresa else "")
         em = lido.get("emitente") or {}
         doc.update({
