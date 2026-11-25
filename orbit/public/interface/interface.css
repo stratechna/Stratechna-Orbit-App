@@ -722,3 +722,4 @@ div.desk-prop{flex-direction:row;justify-content:space-between;color:var(--ink)}
   .cartoes-movel td.cel-sel{order:-2;flex:none}
   .cartoes-movel td.cel-tit~td:not(.cel-tit){font-size:12.5px}
 }
+@media (max-width:760px){.menu-movel{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}}

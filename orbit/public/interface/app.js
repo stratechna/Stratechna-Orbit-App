@@ -2825,6 +2825,18 @@ function textoValor(c, v) {
   return String(v);
 }
 const ESTADO_DOC = { 0: ["Rascunho", "ambar"], 1: ["Submetido", "verde"], 2: ["Cancelado", ""] };
+// 25-11-2026: o estado dos documentos do ERPNext em PT-PT (aparecia «Unpaid», «To Deliver and Bill»…)
+const STATUS_PT = { Draft: "Rascunho", Submitted: "Submetido", Cancelled: "Cancelado", Unpaid: "Por pagar", Paid: "Pago", "Partly Paid": "Pago em parte",
+  Overdue: "Vencido", Return: "Devolução", "Credit Note Issued": "Com nota de crédito", "Debit Note Issued": "Com nota de débito",
+  "Unpaid and Discounted": "Por pagar (descontado)", "Partly Paid and Discounted": "Pago em parte (descontado)", "Overdue and Discounted": "Vencido (descontado)",
+  "Internal Transfer": "Transferência interna", "To Deliver and Bill": "Por entregar e faturar", "To Bill": "Por faturar", "To Deliver": "Por entregar",
+  "To Receive and Bill": "Por receber e faturar", "To Receive": "Por receber", Completed: "Concluído", Closed: "Fechado", "On Hold": "Em espera",
+  Open: "Aberto", Replied: "Respondido", Ordered: "Encomendado", Lost: "Perdido", Expired: "Expirado", Pending: "Pendente", Stopped: "Parado",
+  Delivered: "Entregue", "Partly Delivered": "Entregue em parte", "Not Delivered": "Por entregar", Billed: "Faturado", "Partly Billed": "Faturado em parte",
+  "Not Billed": "Por faturar", Issued: "Emitido", Transferred: "Transferido", Received: "Recebido", "Partially Ordered": "Encomendado em parte",
+  "Partially Received": "Recebido em parte", Approved: "Aprovado", Rejected: "Recusado", Active: "Ativo", Inactive: "Inativo", Left: "Saiu" };
+const COR_STATUS = { Paid: "verde", Completed: "verde", Delivered: "verde", Approved: "verde", Active: "verde", Overdue: "ambar", Unpaid: "azul", "Partly Paid": "azul", Draft: "ambar", "On Hold": "ambar", Rejected: "ambar" };
+const statusPt = (v) => STATUS_PT[v] || v;
 const irErp = (dt, dn) => `#/erp/${encodeURIComponent(dt)}` + (dn ? `/${encodeURIComponent(dn)}` : "");
 
 const ErpModulo = {
@@ -2863,7 +2875,7 @@ const ErpLista = {
     const ordenar = (f) => { ordem.value = ordem.value === f + " desc" ? f + " asc" : f + " desc"; pagina.value = 0; carregar(); };
     const maisLinhas = () => { pagina.value++; carregar(true); };
     const abrir = (n) => { location.hash = irErp(props.doctype, n); };
-    return { meta, linhas, mais, q, colunas, titulo, a, campo, textoValor, ordenar, ordem, maisLinhas, abrir, irErp, ESTADO_DOC, cor, ini, tr };
+    return { meta, linhas, mais, q, colunas, titulo, a, campo, textoValor, ordenar, ordem, maisLinhas, abrir, irErp, ESTADO_DOC, COR_STATUS, statusPt, cor, ini, tr };
   },
   template: `<div v-if="meta">
     <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
@@ -2879,7 +2891,7 @@ const ErpLista = {
         <tr v-for="l in linhas" :key="l.name" @click="abrir(l.name)">
           <td class="cel-tit"><div class="pessoa"><span class="av" :style="{background:cor(l.name)}">{{ ini(l[titulo]||l.name) }}</span><a :href="irErp(doctype,l.name)" @click.stop>{{ tr(doctype, l[titulo] || l.name) }}</a></div><small v-if="titulo && l[titulo] && l[titulo]!==l.name" style="color:var(--ink-3)">{{ tr(doctype, l.name) }}</small></td>
           <td v-for="c in colunas" :key="c">{{ textoValor(campo(c), l[c]) }}</td>
-          <td v-if="meta.submetivel"><span class="etq" :class="ESTADO_DOC[l.docstatus||0][1]">{{ l.status || ESTADO_DOC[l.docstatus||0][0] }}</span></td>
+          <td v-if="meta.submetivel"><span class="etq" :class="COR_STATUS[l.status] || ESTADO_DOC[l.docstatus||0][1]">{{ l.status ? statusPt(l.status) : ESTADO_DOC[l.docstatus||0][0] }}</span></td>
         </tr>
       </tbody></table>
       <div v-if="!linhas.length && !a" class="vazio">Sem registos.</div>
@@ -3202,14 +3214,14 @@ const ErpProposta = {
     const titulo = computed(() => doc.value?.customer_name || doc.value?.party_name || "Nova proposta");
     const curtas = (l) => caractPares(l.orbit_caracteristicas).slice(0, 6);
     const nCaract = (l) => caractPares(l.orbit_caracteristicas).length;
-    return { link, doc, novo, sujo, a, aviso, marcas, versoes, ro, linhas, docstatus, moeda, totais, marcaSel, corMarca, q, sug, procurando, acrescentar, internet, remover,
+    return { statusPt, link, doc, novo, sujo, a, aviso, marcas, versoes, ro, linhas, docstatus, moeda, totais, marcaSel, corMarca, q, sug, procurando, acrescentar, internet, remover,
       gravar, alternativa, submeter, encomenda, pdf, envio, abrirEnvio, enviar, titulo, curtas, nCaract, abertas, irErp, ESTADO_DOC };
   },
   template: `<div v-if="doc" class="pad prop">
     <div class="sub"><a :href="irErp('Quotation')">← Propostas</a> · <a v-if="!novo" :href="irErp('Quotation', doc.name) + '/completa'">ficha completa</a></div>
     <div class="prop-topo">
       <div>
-        <div class="prop-tit"><h1>{{ titulo }}</h1><span v-if="!novo" class="etq" :class="ESTADO_DOC[docstatus][1]">{{ docstatus===0 ? 'Rascunho' : (doc.status || ESTADO_DOC[docstatus][0]) }}</span><span v-if="sujo" class="etq ambar">Por gravar</span></div>
+        <div class="prop-tit"><h1>{{ titulo }}</h1><span v-if="!novo" class="etq" :class="ESTADO_DOC[docstatus][1]">{{ docstatus===0 ? 'Rascunho' : (doc.status ? statusPt(doc.status) : ESTADO_DOC[docstatus][0]) }}</span><span v-if="sujo" class="etq ambar">Por gravar</span></div>
         <div class="sub" v-if="!novo">{{ doc.name }}<template v-if="doc.orbit_versao"> · versão {{ doc.orbit_versao }}</template> · {{ doc.transaction_date }}</div>
         <div v-if="versoes.length" class="prop-versoes" role="tablist" aria-label="Versões desta proposta">
           <a v-for="v in versoes" :key="v.name" role="tab" :aria-selected="v.name===doc.name" :class="{ativo: v.name===doc.name}" :href="irErp('Quotation', v.name)">{{ v.versao }} · {{ v.principal || v.name }} — {{ moeda(v.total) }}</a>
@@ -3456,14 +3468,14 @@ const ErpFicha = {
     };
     const aberta = (s, i) => !(s.collapsible && !fechadas.value[i + ":" + s.label]);
     const alternar = (s, i) => { fechadas.value[i + ":" + s.label] = !fechadas.value[i + ":" + s.label]; };
-    return { meta, doc, novo, sujo, a, aba, abasVis, abasBarra, abaVisivel, escolherAba, condTexto, secEscondida, botao, visivel, roCampo, obrig, secVisivel, tituloDoc, gravar, accao, docstatus, soLeitura, aberta, alternar, ESTADO_DOC, irErp, precisaNome, nomeNovo, cor, ini, criarOps, criarDe, moeda, pdf, aviso, tr };
+    return { statusPt, meta, doc, novo, sujo, a, aba, abasVis, abasBarra, abaVisivel, escolherAba, condTexto, secEscondida, botao, visivel, roCampo, obrig, secVisivel, tituloDoc, gravar, accao, docstatus, soLeitura, aberta, alternar, ESTADO_DOC, irErp, precisaNome, nomeNovo, cor, ini, criarOps, criarDe, moeda, pdf, aviso, tr };
   },
   template: `<div v-if="meta && doc" class="erp-ficha">
     <div class="erp-topo">
       <a class="sub" :href="irErp(doctype)" v-if="!meta.single">← {{ meta.rotulo }}</a>
       <div class="erp-tit"><span class="av" :style="{background:cor(doc.name||'n')}">{{ ini(tituloDoc) }}</span>
         <div class="cresce"><h1>{{ tituloDoc }}</h1><div class="sub">{{ meta.rotulo }}<span v-if="!novo && !meta.single && tituloDoc!==tr(doctype, doc.name)"> · {{ tr(doctype, doc.name) }}</span></div></div>
-        <span v-if="meta.submetivel && !novo" class="etq" :class="ESTADO_DOC[docstatus][1]">{{ doc.status || ESTADO_DOC[docstatus][0] }}</span>
+        <span v-if="meta.submetivel && !novo" class="etq" :class="ESTADO_DOC[docstatus][1]">{{ doc.status ? statusPt(doc.status) : ESTADO_DOC[docstatus][0] }}</span>
         <span v-if="sujo" class="etq ambar">Por gravar</span>
         <div class="erp-accoes">
           <button v-if="!soLeitura && (novo || sujo)" class="btn prim" :disabled="a" @click="gravar">Gravar</button>
@@ -3968,7 +3980,7 @@ const App = {
     const rotaCal = computed(() => partes.value.join("/"));
     // 25-11-2026: a barra de baixo do telemóvel é a de cada app (era a do CRM em todas): 4 destinos + «Menu»
     const MOVEL = computed(() => {
-      const curto = { "Caixa de entrada": "Caixa", "Calendário": "Agenda", "Base de conhecimento": "Artigos", "Faturas de compra": "Compras", "Definições do Orbit": "Definições", "Registo de horas": "Horas" };
+      const curto = { "Caixa de entrada": "Caixa", "Calendário": "Agenda", "Base de conhecimento": "Artigos", "Faturas de compra": "A rever", "Definições do Orbit": "Definições", "Registo de horas": "Horas" };
       let l = NAV.filter((n) => n[0] !== "sec").map((n) => ({ n, rota: n[0], ic: n[1], r: curto[n[2]] || n[2] }));
       if (l.length < 4) l = l.concat(modulosApp.value.filter((m) => m.barra).map((m) => ({ n: ["erp-m/" + encodeURIComponent(m.barra)], rota: "erp-m/" + encodeURIComponent(m.barra), ic: "grelha", r: m.nome })));
       return l.slice(0, 4);
