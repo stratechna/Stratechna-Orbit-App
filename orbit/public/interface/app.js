@@ -2766,8 +2766,65 @@ const ErpTabela = {
 // ── Proposta (Orçamento) no layout de 24-11-2026: marca, produtos com imagem e características, versões ──
 const apiP = (m, a = {}, post = false) => api("orbit.propostas." + m, a, post);
 const caractPares = (t) => (t || "").split("\n").map((l) => l.trim()).filter((l) => l.includes(":")).map((l) => { const i = l.indexOf(":"); return { k: l.slice(0, i).trim(), v: l.slice(i + 1).trim() }; }).filter((x) => x.v);
+// ── Texto rico (24-11-2026: «Introdução» da proposta — parágrafos, negrito, centrado…) ──────────────────────────────
+// Um editor leve sobre contenteditable: grava HTML limpo (só p, br, b/strong, i/em, u, ul/ol/li e o alinhamento
+// em linha), que o PDF da proposta imprime tal como está. O que vinha do editor do Frappe (Quill, `div.ql-editor`)
+// abre sem o invólucro e com o alinhamento das classes `ql-align-*` passado a estilo.
+const RICO_TAGS = new Set(["P", "BR", "B", "STRONG", "I", "EM", "U", "UL", "OL", "LI", "DIV", "SPAN"]);
+function ricoLimpo(html) {
+  const caixa = document.createElement("div");
+  caixa.innerHTML = String(html || "");
+  const qe = caixa.querySelector(":scope > .ql-editor"); if (qe) caixa.innerHTML = qe.innerHTML;
+  const passar = (no) => {
+    [...no.childNodes].forEach((f) => {
+      if (f.nodeType === 3) return;
+      if (f.nodeType !== 1 || ["SCRIPT", "STYLE", "TITLE", "HEAD", "META", "LINK"].includes(f.tagName)) { f.remove(); return; }
+      passar(f);
+      if (!RICO_TAGS.has(f.tagName)) { f.replaceWith(...f.childNodes); return; }
+      const al = (f.style && f.style.textAlign) || ([...(f.classList || [])].find((c) => c.startsWith("ql-align-")) || "").replace("ql-align-", "");
+      [...f.attributes].forEach((a) => f.removeAttribute(a.name));
+      if (["center", "right", "justify"].includes(al)) f.style.textAlign = al;
+      if (f.tagName === "SPAN" && !f.getAttribute("style")) f.replaceWith(...f.childNodes);
+    });
+  };
+  passar(caixa);
+  return caixa.innerHTML.replace(/<p><br><\/p>$/, "").trim();
+}
+const EditorRico = {
+  props: ["modelValue", "ro", "placeholder"], emits: ["update:modelValue"],
+  template: `<div class="rico" :class="{ro}">
+    <div class="rico-barra" v-if="!ro" @mousedown.prevent>
+      <button type="button" title="Negrito" @click="cmd('bold')"><b>N</b></button>
+      <button type="button" title="Itálico" @click="cmd('italic')"><i>I</i></button>
+      <button type="button" title="Sublinhado" @click="cmd('underline')"><u>S</u></button>
+      <span class="rico-sep"></span>
+      <button type="button" title="Alinhar à esquerda" @click="cmd('justifyLeft')">⯇≡</button>
+      <button type="button" title="Centrar" @click="cmd('justifyCenter')">≡</button>
+      <button type="button" title="Alinhar à direita" @click="cmd('justifyRight')">≡⯈</button>
+      <span class="rico-sep"></span>
+      <button type="button" title="Lista com marcas" @click="cmd('insertUnorderedList')">•</button>
+      <button type="button" title="Lista numerada" @click="cmd('insertOrderedList')">1.</button>
+      <span class="rico-sep"></span>
+      <button type="button" title="Tirar a formatação" @click="cmd('removeFormat')">⌫</button>
+    </div>
+    <div ref="caixa" class="rico-texto" :contenteditable="!ro" :data-vazio="placeholder" @input="mudou" @blur="mudou" @paste="colar"></div>
+  </div>`,
+  mounted() { this.$refs.caixa.innerHTML = ricoLimpo(this.modelValue); this.vazio(); },
+  watch: { modelValue(v) { if (document.activeElement !== this.$refs.caixa && ricoLimpo(v) !== this.$refs.caixa.innerHTML) { this.$refs.caixa.innerHTML = ricoLimpo(v); this.vazio(); } } },
+  methods: {
+    cmd(c) { this.$refs.caixa.focus(); try { document.execCommand("defaultParagraphSeparator", false, "p"); } catch (e) {} document.execCommand(c, false, null); this.mudou(); },
+    mudou() { this.vazio(); const h = ricoLimpo(this.$refs.caixa.innerHTML); if (h !== ricoLimpo(this.modelValue)) this.$emit("update:modelValue", h); },
+    vazio() { const c = this.$refs.caixa; c.classList.toggle("rico-vazio", !c.textContent.trim()); },
+    colar(e) {
+      e.preventDefault();
+      const html = e.clipboardData.getData("text/html"), txt = e.clipboardData.getData("text/plain");
+      const limpo = html ? ricoLimpo(html) : txt.split(/\r?\n\r?\n/).map((par) => "<p>" + par.replace(/[&<>]/g, (x) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[x]).replace(/\r?\n/g, "<br>") + "</p>").join("");
+      document.execCommand("insertHTML", false, limpo); this.mudou();
+    },
+  },
+};
 const ErpProposta = {
-  components: { ErpLigacao },
+  components: { ErpLigacao, EditorRico },
   props: ["name"],
   setup(props) {
     const doc = ref(null); const novo = ref(false); const sujo = ref(false); const a = ref(false); const aviso = ref("");
@@ -2885,7 +2942,7 @@ const ErpProposta = {
             <label>Cliente<ErpLigacao v-model="doc.party_name" :alvo="doc.quotation_to" :ro="ro"/></label>
             <label>Ao cuidado de<ErpLigacao v-model="doc.contact_person" alvo="Contact" :ro="ro"/></label>
             <label>Válida até<input type="date" v-model="doc.valid_till" :disabled="ro"></label>
-            <label class="larga">Introdução<textarea rows="2" v-model="doc.orbit_texto_intro" :disabled="ro" placeholder="Na sequência do seu pedido, apresentamos…"></textarea></label>
+            <div class="larga prop-intro"><span class="rotulo-campo">Introdução</span><EditorRico v-model="doc.orbit_texto_intro" :ro="ro" placeholder="Na sequência do seu pedido, apresentamos…"/></div>
           </div>
         </section>
         <section v-if="!ro" class="cartao prop-procura" aria-label="Adicionar produto">
