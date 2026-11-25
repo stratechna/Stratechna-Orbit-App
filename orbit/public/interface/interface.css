@@ -416,7 +416,7 @@ a.icone-btn{color:var(--ink-2);text-decoration:none}a.icone-btn.ativo{background
 a.btn{text-decoration:none;display:inline-flex;align-items:center}
 /* U5: relatórios e cartões de número */
 .erp-numeros{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:16px}
-.erp-numeros>div{padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.erp-numeros>div,.erp-numeros>a{padding:14px 16px;display:flex;flex-direction:column;gap:4px}
 .erp-numeros small{font-size:12px;color:var(--ink-3)}
 .erp-numeros b{font-size:22px}
 .erp-filtros{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px 16px;padding:14px 16px}
@@ -757,3 +757,5 @@ div.desk-prop{flex-direction:row;justify-content:space-between;color:var(--ink)}
   .cartoes-movel tr.contas-docs{padding:8px}.cartoes-movel tr.contas-docs td{flex:1 1 100%}
   .erp-resumo b{font-size:13px}
 }
+.erp-numeros>a:hover{border-color:var(--ink-3)}
+@media (max-width:760px){.erp-numeros{grid-template-columns:repeat(2,minmax(0,1fr))}.erp-numeros b{font-size:18px}.contas-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.contas-kpis .cartao:first-child{grid-column:1/-1}.contas-kpis b{font-size:18px}}
