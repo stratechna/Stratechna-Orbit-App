@@ -6083,3 +6083,383 @@ Close Condition,Condição de fecho
 Condition,Condição
 FCRM Settings,Definições do CRM
 FCRM Note,Nota do CRM
+3D Model,Modelo 3D
+"<a href=""https://docs.frappe.io/framework/user/en/api/rest#1-token-based-authentication"" target=""_blank"" rel=""noopener noreferrer"">
+  Click here to learn about token-based authentication
+</a>","<a href=""https://docs.frappe.io/framework/user/en/api/rest#1-token-based-authentication"" target=""_blank"" rel=""noopener noreferrer"">
+  Clique aqui para saber mais sobre a autenticação por token
+</a>"
+<code>Agent</code> memories are shared with everyone who uses the agent. <code>User</code> memories are visible only to their user.,As memórias de <code>Agent</code> são partilhadas com todos os que usam o agente. As memórias de <code>User</code> só são visíveis para o respetivo utilizador.
+"<code>Imported</code> tools are loaded from a Python module by path. <code>Script</code> tools store code in the database and run it in a <code>safe_exec</code> sandbox. <code>Server</code> tools are extension tools the flow server loaded, mirrored here by the app.",As ferramentas <code>Imported</code> são carregadas a partir de um módulo Python pelo caminho. As ferramentas <code>Script</code> guardam o código na base de dados e executam-no numa sandbox <code>safe_exec</code>. As ferramentas <code>Server</code> são ferramentas de extensão carregadas pelo servidor do Flow e espelhadas aqui pela app.
+"<pre>*  *  *  *  *
+┬  ┬  ┬  ┬  ┬
+│  │  │  │  │
+│  │  │  │  └ day of week (0 - 6) (0 is Sunday)
+│  │  │  └───── month (1 - 12)
+│  │  └────────── day of month (1 - 31)
+│  └─────────────── hour (0 - 23)
+└──────────────────── minute (0 - 59)
+
+---
+
+* - Any value
+/ - Step values
+</pre>","<pre>*  *  *  *  *
+┬  ┬  ┬  ┬  ┬
+│  │  │  │  │
+│  │  │  │  └ dia da semana (0 - 6) (0 é domingo)
+│  │  │  └───── mês (1 - 12)
+│  │  └────────── dia do mês (1 - 31)
+│  └─────────────── hora (0 - 23)
+└──────────────────── minuto (0 - 59)
+
+---
+
+* - Qualquer valor
+/ - Valores de intervalo
+</pre>"
+A cancelled cheque or a bank statement of the new account,Um cheque anulado ou um extrato bancário da nova conta
+API Parameters,Parâmetros da API
+API Resource,Recurso da API
+API URL,URL da API
+API key for the selected AI model provider,Chave de API do fornecedor do modelo de IA selecionado
+"API key for this provider. Leave empty for local servers (Ollama, LM Studio) that don't require authentication.","Chave de API deste fornecedor. Deixar vazio para servidores locais (Ollama, LM Studio) que não exigem autenticação."
+API key to authenticate with this model's endpoint. Needed when no Provider is linked.,Chave de API para autenticar no endpoint deste modelo. Necessária quando não há nenhum fornecedor ligado.
+Additional Discount per Stock Unit,Desconto adicional por unidade de stock
+Adds a clear (×) button to Link fields when Combobox fields are off. Combobox fields always show it.,Acrescenta um botão de limpar (×) aos campos de ligação quando os campos Combobox estão desligados. Os campos Combobox mostram-no sempre.
+Agents this one can hand a task to. Binding one attaches the subagent tool.,Agentes a quem este pode passar uma tarefa. Ligar um acrescenta a ferramenta de subagente.
+Allow expense claims to be raised in a currency other than the company currency,Permitir pedidos de reembolso de despesas numa moeda diferente da moeda da empresa
+Allow users to upload documents first and attach them to a new document using the Upload First workflow.,Permitir que os utilizadores carreguem documentos primeiro e os anexem a um novo documento com o fluxo «Carregar primeiro».
+"Allows clients to fetch metadata from the <code>/.well-known/oauth-authorization-server</code> endpoint. Reference: <a href=""https://datatracker.ietf.org/doc/html/rfc8414"" rel=""noopener noreferrer"">RFC8414</a>","Permite que os clientes obtenham metadados a partir do endpoint <code>/.well-known/oauth-authorization-server</code>. Referência: <a href=""https://datatracker.ietf.org/doc/html/rfc8414"" rel=""noopener noreferrer"">RFC8414</a>"
+"Allows clients to fetch metadata from the <code>/.well-known/oauth-protected-resource</code> endpoint. Reference: <a href=""https://datatracker.ietf.org/doc/html/rfc9728#name-protected-resource-metadata"" rel=""noopener noreferrer"">RFC9728</a>","Permite que os clientes obtenham metadados a partir do endpoint <code>/.well-known/oauth-protected-resource</code>. Referência: <a href=""https://datatracker.ietf.org/doc/html/rfc9728#name-protected-resource-metadata"" rel=""noopener noreferrer"">RFC9728</a>"
+"Allows clients to register themselves without manual intervention. Registration creates a <b>OAuth Client</b> entry. Reference: <a href=""https://datatracker.ietf.org/doc/html/rfc7591"" rel=""noopener noreferrer"">RFC7591</a>","Permite que os clientes se registem sem intervenção manual. O registo cria uma entrada <b>OAuth Client</b>. Referência: <a href=""https://datatracker.ietf.org/doc/html/rfc7591"" rel=""noopener noreferrer"">RFC7591</a>"
+"An island the app builds, by the name its build registers. Leave it empty and the island is built from this page's folder.","Uma ilha que a app constrói, pelo nome com que a sua compilação a regista. Se ficar vazio, a ilha é construída a partir da pasta desta página."
+"Any Flow Model whose Model ID starts with this provider uses these credentials unless it sets its own. For anything else, like Ollama, LM Studio or a gateway, pick OpenAI-compatible endpoint or LiteLLM proxy and set its Base URL.","Qualquer modelo do Flow cujo ID de modelo comece por este fornecedor usa estas credenciais, salvo se definir as suas. Para outros casos, como Ollama, LM Studio ou um gateway, escolha «Endpoint compatível com OpenAI» ou «Proxy LiteLLM» e defina o URL base."
+Anyone chatting with an agent that has this skill can start it by typing /skill: and its name. Agents can load it either way.,Quem conversar com um agente que tenha esta competência pode iniciá-la escrevendo /competência: e o nome. Os agentes podem carregá-la de qualquer forma.
+Apply User Permissions,Aplicar permissões de utilizador
+"Ask stops at every confirmation-gated tool call. Auto lets the helper model approve the calls the user asked for and asks about the rest. Auto-approve runs everything; always so for Trigger sessions, and guest chats start in it.","«Perguntar» para em cada chamada de ferramenta sujeita a confirmação. «Automático» deixa o modelo auxiliar aprovar as chamadas pedidas pelo utilizador e pergunta sobre as restantes. «Aprovar tudo» executa tudo; é sempre assim nas sessões de Acionador, e as conversas de convidados começam neste modo."
+Asset Gross Value,Valor bruto do ativo
+Asset Value After Depreciation,Valor do ativo após amortização
+Auto fetch data on load,Obter dados automaticamente ao carregar
+BOM Creator Material,Material do criador de Lista de Materiais
+BOM Creator Operation,Operação do criador de Lista de Materiais
+BOM Node,Nó da Lista de Materiais
+Boolean,Booleano
+CAD File,Ficheiro CAD
+Can Create,Pode criar
+Characters per chunk for this source. Leave empty to use the default from Flow Knowledge Settings.,Caracteres por bloco nesta fonte. Deixar vazio para usar o valor por omissão das definições de conhecimento do Flow.
+Characters shared between consecutive chunks to preserve context across boundaries.,Caracteres partilhados entre blocos consecutivos para manter o contexto entre as fronteiras.
+Characters shared between consecutive chunks. Leave empty to use the default.,Caracteres partilhados entre blocos consecutivos. Deixar vazio para usar o valor por omissão.
+"Choose how the hourly overtime amount is calculated:
+<ol style=""padding-left:15px""><li>Fixed Hourly Rate: A fixed, manually entered hourly rate.</li>
+<li>Salary Component-Based:
+
+(Sum of selected component amounts) ÷ (Payment Days) ÷ (Standard Daily Hours)</li></ol>","Escolha como é calculado o valor por hora das horas extraordinárias:
+<ol style=""padding-left:15px""><li>Valor por hora fixo: um valor por hora fixo, introduzido manualmente.</li>
+<li>Com base em componentes salariais:
+
+(Soma dos valores dos componentes selecionados) ÷ (Dias de pagamento) ÷ (Horas diárias normais)</li></ol>"
+"Comma separated, for example: Saturday, Sunday","Separados por vírgulas, por exemplo: Saturday, Sunday"
+"Comma-separated fieldnames whose values are indexed, e.g. <code>subject, description, resolution</code>","Nomes de campos separados por vírgulas cujos valores são indexados, por exemplo <code>subject, description, resolution</code>"
+Component properties and references,Propriedades e referências do componente
+Conditions will be applied on all the selected items combined.,As condições são aplicadas a todos os artigos selecionados em conjunto.
+Control how this form looks in search results and shared links.,Controlar o aspeto deste formulário nos resultados de pesquisa e nas ligações partilhadas.
+Conversation this run belongs to.,Conversa a que pertence esta execução.
+Cover,Capa
+Create a record named after the file's value when the import runs.,Criar um registo com o nome do valor do ficheiro quando a importação é executada.
+Created by Scheduler,Criado pelo agendador
+Currency of the outstanding amount. Defaults to the Company currency.,"Moeda do valor em dívida. Por omissão, a moeda da empresa."
+Defaults to the first 140 characters of the introduction.,"Por omissão, os primeiros 140 caracteres da introdução."
+Defaults to the form title.,"Por omissão, o título do formulário."
+Defaults to the page title. Use {{ }} for dynamic data,"Por omissão, o título da página. Usar {{ }} para dados dinâmicos"
+"Defined in code and owned by it: the Desk can enable or disable the agent and switch its model, nothing else.","Definido no código e controlado por ele: no Desk só se pode ativar ou desativar o agente e trocar o modelo, nada mais."
+Defined in code and owned by it: the Desk can only enable or disable the tool.,Definido no código e controlado por ele: no Desk só se pode ativar ou desativar a ferramenta.
+Design Quantity,Quantidade de projeto
+Diesel,Gasóleo
+Difference between the Stock Asset accounts balance and the Stock Balance value accepted while submitting,Diferença entre o saldo das contas de ativos de stock e o valor do saldo de stock aceite ao submeter
+Discount applied in the reference document currency.,Desconto aplicado na moeda do documento de referência.
+DocType of the document that fired the trigger.,DocType do documento que disparou o acionador.
+DocType whose events fire this trigger.,DocType cujos eventos disparam este acionador.
+Document List,Lista de documentos
+Document Number,Número do documento
+Document Resource,Recurso de documento
+Document that fired the trigger.,Documento que disparou o acionador.
+"Does quick side jobs, like chat titles. A cheaper model saves credits.","Faz pequenas tarefas auxiliares, como os títulos das conversas. Um modelo mais barato poupa créditos."
+"Dotted Python path to the <code>Tool</code> object, e.g. <code>frappe.flow.tools.builtins.search_doctypes</code>.","Caminho Python com pontos para o objeto <code>Tool</code>, por exemplo <code>frappe.flow.tools.builtins.search_doctypes</code>."
+Dotted path of a function Flow calls with this run once it ends; cleared once called.,Caminho com pontos de uma função que o Flow chama com esta execução quando termina; é limpo depois de chamado.
+Draw charts the way earlier versions did. Sites updated from an earlier version start with this on.,Desenhar os gráficos como nas versões anteriores. Os sites atualizados a partir de uma versão anterior começam com esta opção ligada.
+Dynamically fetch document using filters,Obter o documento dinamicamente através de filtros
+Each operation makes an item that a later operation can use. The last operation makes the finished good.,Cada operação produz um artigo que uma operação seguinte pode usar. A última operação produz o produto acabado.
+"Each operation produces its own output item and puts it in stock, for example Cut Sheet, then Painted Sheet, then the final Box.","Cada operação produz o seu próprio artigo de saída e coloca-o em stock, por exemplo Folha cortada, depois Folha pintada e, por fim, a Caixa final."
+"Emails the users in Portal users on the schedule below, asking for a status update. Needs email accounts set up for sending and receiving.","Envia e-mails aos utilizadores em «Utilizadores do portal» segundo o calendário abaixo, a pedir uma atualização do estado. Exige contas de e-mail configuradas para enviar e receber."
+Employee Document,Documento do funcionário
+Employee Profile Section,Secção do perfil do funcionário
+Empty uses the size in Print Settings. A receipt size prints one page as tall as the content.,Vazio usa o tamanho das definições de impressão. Um tamanho de talão imprime uma página com a altura do conteúdo.
+"Endpoint for this model, e.g. a self-hosted Ollama (<code>http://localhost:11434</code>) or a proxy. Needed when no Provider is linked.","Endpoint deste modelo, por exemplo um Ollama alojado pelo próprio (<code>http://localhost:11434</code>) ou um proxy. Necessário quando não há nenhum fornecedor ligado."
+"Every agent gets this skill without binding it. Use it for site-wide conventions, and to give the built-in assistant skills.",Todos os agentes recebem esta competência sem a ligar. Usar para convenções de todo o site e para dar competências ao assistente incluído.
+Exclude from BOM,Excluir da Lista de Materiais
+Exported to the app's files,Exportado para os ficheiros da app
+"Extra LiteLLM params sent with every call to this model, e.g. <code>{""provider"": {""zdr"": true}}</code> for OpenRouter's zero data retention. Flow Users can read them, so keep keys out.","Parâmetros adicionais do LiteLLM enviados em cada chamada a este modelo, por exemplo <code>{""provider"": {""zdr"": true}}</code> para a retenção zero de dados do OpenRouter. Os utilizadores do Flow podem lê-los, por isso não coloque chaves aqui."
+Extracted Text,Texto extraído
+Files attached across all runs in this conversation.,Ficheiros anexados em todas as execuções desta conversa.
+Final assistant message when the run completes.,Mensagem final do assistente quando a execução termina.
+Financial digests are sent only to enabled System Users with read access to the company and all records behind the enabled financial sections.,Os resumos financeiros só são enviados aos utilizadores do sistema ativos com acesso de leitura à empresa e a todos os registos por trás das secções financeiras ativas.
+Financial reports will be generated using GL Entry doctypes (should be enabled if Period Closing Voucher is not posted for all years sequentially or missing),Os relatórios financeiros são gerados a partir dos lançamentos do razão (GL Entry) (deve estar ativo se o fecho de período não tiver sido lançado para todos os anos de forma sequencial ou se faltar algum)
+Fixed Components,Componentes fixos
+Flow Agent Knowledge Base,Base de conhecimento do agente do Flow
+Flow Agent Skill,Competência do agente do Flow
+Flow Agent Sub Agent,Subagente do agente do Flow
+Flow Agent Tool,Ferramenta do agente do Flow
+Flow Agent to run when this trigger fires.,Agente do Flow a executar quando este acionador dispara.
+Flow Model used to drive this agent.,Modelo do Flow usado para conduzir este agente.
+"Flow Model used to embed chunks and queries. Its Model ID must be an embedding model, e.g. <code>openai/text-embedding-3-small</code>.","Modelo do Flow usado para gerar os embeddings dos blocos e das consultas. O ID do modelo tem de ser um modelo de embeddings, por exemplo <code>openai/text-embedding-3-small</code>."
+Flow Session Attachment,Anexo da sessão do Flow
+Flow Session Message,Mensagem da sessão do Flow
+Flow Skills this agent can load. Their names and descriptions are listed in its prompt; the agent loads one when a task matches.,Competências do Flow que este agente pode carregar. Os nomes e as descrições são listados na instrução; o agente carrega uma quando uma tarefa corresponde.
+Flow Tools this agent can call.,Ferramentas do Flow que este agente pode chamar.
+"Flow Trigger that started this run, when source is Trigger.","Acionador do Flow que iniciou esta execução, quando a origem é Acionador."
+"For help see <a href=""https://docs.frappe.io/framework/user/en/web-form/customization#custom-css"" target=""_blank"" rel=""noopener noreferrer"">Web Form Custom CSS</a>","Para ajuda, ver <a href=""https://docs.frappe.io/framework/user/en/web-form/customization#custom-css"" target=""_blank"" rel=""noopener noreferrer"">CSS personalizado do formulário web</a>"
+Fraction of Applicable Earnings,Fração dos rendimentos aplicáveis
+"Fraction of one day's salary that is paid for each day of this leave. For example, 0.60 pays 60% of the daily salary for a leave day, and the remaining 40% is deducted as Leave Without Pay. Enter 1 for fully paid and 0 for fully unpaid.","Fração do salário de um dia paga por cada dia desta licença. Por exemplo, 0,60 paga 60% do salário diário por um dia de licença e os restantes 40% são descontados como licença sem vencimento. Introduzir 1 para totalmente paga e 0 para totalmente não paga."
+Frappe UI,Orbit UI
+Full chat transcript across all runs in this conversation.,Transcrição completa da conversa em todas as execuções desta conversa.
+"Gross earnings for one payroll cycle, before deductions. Shown as a row in the break-up; kept as a field because statutory wage ceilings are drawn on it.","Rendimentos brutos de um ciclo de processamento salarial, antes dos descontos. Aparece como uma linha na decomposição; mantém-se como campo porque os tetos salariais legais são calculados sobre ele."
+Guest Chats,Conversas de convidados
+Guest Messages per Hour,Mensagens de convidados por hora
+Guest Token,Token de convidado
+Hash of the key that opens a guest chat with a public agent.,Hash da chave que abre uma conversa de convidado com um agente público.
+Hash of the source document's indexed text; lets re-sync skip unchanged rows.,Hash do texto indexado do documento de origem; permite que a nova sincronização ignore as linhas sem alterações.
+Holidays in the year other than weekly offs,"Feriados do ano, além das folgas semanais"
+"How Link fields to this DocType load their options. Search: fetch matches as the user types. Select: load the whole list once, without a search box (for short lists).","Como os campos de ligação a este DocType carregam as opções. Pesquisa: procura correspondências à medida que o utilizador escreve. Seleção: carrega a lista inteira uma vez, sem caixa de pesquisa (para listas curtas)."
+How far the flow server's log has been mirrored into this session.,Até onde o registo do servidor do Flow foi espelhado nesta sessão.
+How many messages one address may send to public agents in an hour. Leave empty to use the default of 30.,Quantas mensagens um endereço pode enviar a agentes públicos numa hora. Deixar vazio para usar o valor por omissão de 30.
+"How the standard dashboards that ship an Insights version open. Without the Insights app, they open classic.","Como abrem os painéis padrão que trazem uma versão do Insights. Sem a app Insights, abrem na versão clássica."
+How this conversation was started. Trigger sessions are hidden from the chat panel's recent list.,Como esta conversa foi iniciada. As sessões de acionador ficam ocultas da lista de recentes do painel de conversa.
+How this run was started.,Como esta execução foi iniciada.
+Hybrid fuses vector similarity with keyword matching. Vector uses similarity alone.,O modo híbrido junta a semelhança vetorial à correspondência por palavras-chave. O vetorial usa só a semelhança.
+"If <b>Enabled</b> - Reconciliation happens on the <b>Advance Payment posting date</b><br>
+If <b>Disabled</b> - Reconciliation happens on oldest of 2 Dates: <b>Invoice Date</b> or the <b>Advance Payment posting date</b><br>","Se <b>Ativado</b> - A reconciliação é feita na <b>data de lançamento do pagamento adiantado</b><br>
+Se <b>Desativado</b> - A reconciliação é feita na mais antiga de 2 datas: <b>Data da fatura</b> ou <b>data de lançamento do pagamento adiantado</b><br>"
+"If enabled, Frappe exports the form to the module folder.","Se ativado, o Orbit exporta o formulário para a pasta do módulo."
+"If enabled, a weekly job checks the stock ledger entries of the current fiscal year. For each item and warehouse with an incorrect entry, it creates a Repost Item Valuation from that entry.","Se ativado, uma tarefa semanal verifica os movimentos do razão de stock do ano fiscal atual. Para cada artigo e armazém com um movimento incorreto, cria uma reavaliação de stock (Repost Item Valuation) a partir desse movimento."
+"If enabled, candidates who have already applied with the same email address will not be allowed to apply again","Se ativado, os candidatos que já se candidataram com o mesmo endereço de e-mail não poderão candidatar-se novamente"
+"If enabled, do not update serial / batch values in the stock transactions on creation of auto Serial 
+ / Batch Bundle.","Se ativado, não atualiza os valores de série / lote nos movimentos de stock ao criar automaticamente o pacote de série 
+ / lote."
+"If enabled, formula for <b>Qty to Order</b>: <br>
+Required Qty (BOM) - <a href=""https://docs.frappe.io/erpnext/user/manual/en/projected-quantity"" rel=""noopener noreferrer"">Projected Qty</a>. <br> This helps avoid over-ordering.","Se ativado, fórmula da <b>Qtd. a encomendar</b>: <br>
+Qtd. necessária (Lista de Materiais) - <a href=""https://docs.frappe.io/erpnext/user/manual/en/projected-quantity"" rel=""noopener noreferrer"">Qtd. projetada</a>. <br> Ajuda a evitar encomendas em excesso."
+"If enabled, formula for <b>Required Qty</b>: <br>
+Required Qty (BOM) - <a href=""https://docs.frappe.io/erpnext/user/manual/en/projected-quantity"" rel=""noopener noreferrer"">Projected Qty</a>. <br> This helps avoid over-ordering.","Se ativado, fórmula da <b>Qtd. necessária</b>: <br>
+Qtd. necessária (Lista de Materiais) - <a href=""https://docs.frappe.io/erpnext/user/manual/en/projected-quantity"" rel=""noopener noreferrer"">Qtd. projetada</a>. <br> Ajuda a evitar encomendas em excesso."
+"If enabled, the value specified or calculated in this component will not contribute to the earnings or deductions. However, it's value can be referenced by other components that can be added or deducted.","Se ativado, o valor indicado ou calculado nesta componente não contribui para os vencimentos nem para os descontos. No entanto, o seu valor pode ser referido por outras componentes que podem ser somadas ou descontadas."
+"If enabled, the web form can only be used with a Key from a corresponding <b>Web Form Request</b>.","Se ativado, o formulário web só pode ser usado com uma chave de um <b>Pedido de formulário web</b> correspondente."
+"If selected, the value specified or calculated in this component will not contribute to the earnings or deductions. However, it's value can be referenced by other components that can be added or deducted.","Se selecionado, o valor indicado ou calculado nesta componente não contribui para os vencimentos nem para os descontos. No entanto, o seu valor pode ser referido por outras componentes que podem ser somadas ou descontadas."
+"If set, only users with one of these roles can print with this format.","Se definido, só os utilizadores com uma destas funções podem imprimir com este formato."
+Initial Value,Valor inicial
+Inline,Em linha
+Inline: the text went into its turn's message. Retrieval: chunked and embedded (oversized files); the best matches are appended to each later turn. Image: sent to the model as an image.,Em linha: o texto foi incluído na mensagem do seu turno. Recuperação: dividido em blocos e vetorizado (ficheiros demasiado grandes); as melhores correspondências são acrescentadas a cada turno seguinte. Imagem: enviada ao modelo como imagem.
+Input Name,Nome da entrada
+Is Assembly,É montagem
+Is Rate of Depreciation Entered,Taxa de depreciação introduzida
+Is Summary,É resumo
+Item group of the items created from design parts.,Grupo de artigos dos artigos criados a partir das peças do desenho.
+"JSON object of values prefilled in the form, keyed by fieldname. The respondent can edit them. Example: <code>{""first_name"": ""Jane""}</code>","Objeto JSON com valores pré-preenchidos no formulário, indexados pelo nome do campo. Quem responde pode editá-los. Exemplo: <code>{""first_name"": ""Jane""}</code>"
+"JSON object of values set on the document on submission, keyed by fieldname. Not prefilled in the form. Returned with the saved document. Example: <code>{""status"": ""Open""}</code>","Objeto JSON com valores definidos no documento ao submeter, indexados pelo nome do campo. Não são pré-preenchidos no formulário. Devolvidos com o documento gravado. Exemplo: <code>{""status"": ""Open""}</code>"
+"Jinja template rendered into the agent input. Only <code>doc</code> (its fields) and <code>now</code> are in scope, e.g. <code>Summarize {{ doc.doctype }} {{ doc.name }} and suggest next steps: {{ doc.description }}</code>","Modelo Jinja convertido na entrada do agente. Só <code>doc</code> (os seus campos) e <code>now</code> estão disponíveis, p. ex. <code>Summarize {{ doc.doctype }} {{ doc.name }} and suggest next steps: {{ doc.description }}</code>"
+Job Offer Component,Componente da proposta de emprego
+Keep this source in sync with a daily incremental sweep.,Manter esta origem sincronizada com uma passagem incremental diária.
+"Knowledge bases this agent can search. Anyone who can use the agent can read them, whatever their own access.","Bases de conhecimento que este agente pode pesquisar. Quem puder usar o agente pode lê-las, independentemente do seu próprio acesso."
+Last Step,Último passo
+Last time this scheduled trigger fired. Set by the system.,Última vez que este acionador agendado foi executado. Definido pelo sistema.
+Legacy input rows are kept for compatibility. Define new props in the component script.,As linhas de entrada antigas mantêm-se por compatibilidade. Defina as novas propriedades no script do componente.
+"Let people who are not signed in chat with this agent through Flow's guest API. Its tools run as Guest and without asking for approval, as in a trigger's chat, so give it only tools that are safe for anyone to use. Global skills and memory are left out.","Permite que pessoas sem sessão iniciada conversem com este agente através da API de convidados do Flow. As suas ferramentas correm como Convidado e sem pedir aprovação, como na conversa de um acionador, por isso devem atribuir-se só ferramentas seguras para qualquer pessoa. As competências globais e a memória ficam de fora."
+Liability Account,Conta de passivo
+"Liability account credited for employer contributions. Applicable only for Employer Contribution components, where Account is debited as the expense.","Conta de passivo creditada pelas contribuições da entidade patronal. Aplica-se só às componentes de contribuição da entidade patronal, em que a conta é debitada como gasto."
+List of tool calls the agent executed.,Lista das chamadas a ferramentas que o agente executou.
+"LiteLLM model identifier. With a Provider linked, pick or type just the model (e.g. <code>claude-sonnet-4-6</code>); otherwise use <code>provider/model</code> form, e.g. <code>anthropic/claude-sonnet-4-6</code>, <code>openai/gpt-4.1</code>, <code>ollama/llama3.1</code>","Identificador do modelo LiteLLM. Com um fornecedor ligado, escolha ou escreva só o modelo (p. ex. <code>claude-sonnet-4-6</code>); caso contrário, use a forma <code>provider/model</code>, p. ex. <code>anthropic/claude-sonnet-4-6</code>, <code>openai/gpt-4.1</code>, <code>ollama/llama3.1</code>"
+Log position of the approval batch the questions belong to.,Posição no registo do lote de aprovação a que as perguntas pertencem.
+Markdown instructions the agent receives when it loads this skill.,Instruções em Markdown que o agente recebe quando carrega esta competência.
+"Max input tokens. Auto-detected from the model on save; managed by Flow, not user-editable. 0 = unknown.","Máximo de tokens de entrada. Detetado automaticamente a partir do modelo ao gravar; gerido pelo Flow, não editável. 0 = desconhecido."
+Maximum characters per chunk.,Número máximo de caracteres por bloco.
+Maximum number of think → tool → think loops before the run gives up.,Número máximo de ciclos pensar → ferramenta → pensar antes de a execução desistir.
+Maximum time in seconds that a document queued for submission or cancellation can run in the background. Cannot be more than 3600 seconds (1 hour).,"Tempo máximo, em segundos, que um documento em fila para submissão ou cancelamento pode correr em segundo plano. Não pode ser superior a 3600 segundos (1 hora)."
+Merge rows with the same account head in the ledger for Journal Entries and Payment Entries only.,"Juntar as linhas com a mesma conta no razão, só para lançamentos contabilísticos e lançamentos de pagamento."
+Message body. Null for assistant turns that only call tools.,Corpo da mensagem. Nulo nos turnos do assistente que só chamam ferramentas.
+Minimum calendar days required since Date of Joining to apply for this leave,Mínimo de dias de calendário desde a data de admissão para pedir esta licença
+Minimum quantity should be as per Stock UOM,A quantidade mínima deve estar na UdM de stock
+Mode,Modo
+Multipliers that adjust the hourly overtime amount for specific scenarios,Multiplicadores que ajustam o valor por hora das horas extraordinárias em situações específicas
+"Must be positive. If the unit rate would change the opening amount through rounding, the invoice uses quantity 1 and records this quantity in the description.","Tem de ser positivo. Se o preço unitário alterar o valor de abertura por arredondamento, a fatura usa a quantidade 1 e regista esta quantidade na descrição."
+Name shown to AI clients. Defaults to the site's host name.,"Nome apresentado aos clientes de IA. Por omissão, o nome do anfitrião do site."
+Net change from Asset Value Adjustments,Variação líquida resultante dos ajustes de valor do ativo
+No of Rows,N.º de linhas
+Node,Nó
+Node of the assembly this part goes into. 0 means the finished good.,Nó da montagem em que esta peça entra. 0 significa o produto acabado.
+Node of the design part. 0 means the finished good.,Nó da peça do desenho. 0 significa o produto acabado.
+Number of days after the invoice due date before canceling the subscription or marking it as unpaid,Número de dias após o vencimento da fatura antes de cancelar a subscrição ou de a marcar como não paga
+OTP placeholder should be defined as <code>{{ otp }}</code>,O marcador do código OTP deve ser definido como <code>{{ otp }}</code>
+Object,Objeto
+On Error,Em caso de erro
+On Success,Em caso de sucesso
+"One short, self-contained fact.",Um facto curto e autónomo.
+Only show and accept records allowed by the user's User Permissions.,Mostrar e aceitar só os registos permitidos pelas permissões de utilizador do utilizador.
+"Opens in whichever sidebar is on screen instead of switching to its module's. For pages that act on a document from anywhere, such as Print.","Abre na barra lateral que estiver no ecrã, em vez de mudar para a do seu módulo. Para páginas que atuam sobre um documento a partir de qualquer sítio, como Imprimir."
+Operation Time (Minutes),Tempo da operação (minutos)
+Operation of the routing that uses this material.,Operação do roteiro que usa este material.
+"Optional JSON filters selecting which documents to index, e.g. <code>{""status"": ""Resolved""}</code>","Filtros JSON opcionais que selecionam os documentos a indexar, p. ex. <code>{""status"": ""Resolved""}</code>"
+"Optional Python expression; the trigger fires only if it is truthy, e.g. <code>doc.status == ""Open""</code>. Only <code>doc</code> (its fields), <code>utils</code> and <code>len</code> are in scope.","Expressão Python opcional; o acionador só dispara se for verdadeira, p. ex. <code>doc.status == ""Open""</code>. Só <code>doc</code> (os seus campos), <code>utils</code> e <code>len</code> estão disponíveis."
+Optional plain-English summary for human reviewers.,Resumo opcional em linguagem simples para quem revê.
+"Optional. Override the provider's default endpoint, e.g. a proxy or self-hosted gateway.","Opcional. Substitui o endpoint predefinido do fornecedor, p. ex. um proxy ou um gateway alojado internamente."
+Original user input that started the run.,Entrada original do utilizador que iniciou a execução.
+Output Item,Artigo produzido
+Output Item BOM,Lista de Materiais do artigo produzido
+Output Node,Nó produzido
+Output Qty,Qtd. produzida
+Output Quantity,Quantidade produzida
+Output of Operation ID,Produto do ID de operação
+Override the agent's default model for this conversation. Empty falls back to the agent's model.,"Substitui o modelo predefinido do agente nesta conversa. Se vazio, usa o modelo do agente."
+"Owned by the app: exported to `/dock//.json` and re-imported by migrate. This is the app layer, and the layer the other two are laid over. Ordinarily set via the Export to App action rather than by hand, which is why it is writable only in developer mode -- a standard dock with no exported file is an orphan and gets deleted on the next migrate.","Pertence à app: exportado para `/dock//.json` e reimportado pela migração. Esta é a camada da app, aquela sobre a qual as outras duas se sobrepõem. Normalmente define-se pela ação «Exportar para a app» e não à mão, razão pela qual só é editável em modo de programador -- um dock padrão sem ficheiro exportado fica órfão e é eliminado na migração seguinte."
+Parent Node,Nó pai
+Parent Step Branch,Ramo do passo pai
+Part Name,Nome da peça
+Part Node,Nó da peça
+Part number of the top assembly in the design file.,Número de peça da montagem principal no ficheiro de desenho.
+"Partial stock can be reserved. For example, If you have a Sales Order of 100 units and the Available Stock is 90 units then a Stock Reservation Entry will be created for 90 units.","Pode reservar-se stock parcial. Por exemplo, se tiver uma encomenda de venda de 100 unidades e o stock disponível for de 90 unidades, é criada uma reserva de stock de 90 unidades."
+"Path inside the page, e.g. ""payroll"" opens /desk//payroll. No leading slash, query or fragment.","Caminho dentro da página, p. ex. ""payroll"" abre /desk//payroll. Sem barra inicial, parâmetros nem fragmento."
+Pause the run and ask the user to approve each call before this tool executes.,Pausar a execução e pedir ao utilizador que aprove cada chamada antes de esta ferramenta ser executada.
+Payment Term Discount,Desconto das condições de pagamento
+Per Cycle,Por ciclo
+Personal Trigger,Acionador pessoal
+Photos,Fotografias
+Pick a BOM to copy its raw materials into this step. Leave it empty to add the raw materials yourself with Add Raw Materials.,Escolha uma Lista de Materiais para copiar as matérias-primas para este passo. Deixe vazio para acrescentar as matérias-primas manualmente com «Adicionar matérias-primas».
+Picking a template replaces the letter body with the template's text.,Escolher um modelo substitui o corpo da carta pelo texto do modelo.
+Placements in Model,Posicionamentos no modelo
+"Position of this chunk within its source, starting at 0.","Posição deste bloco na sua origem, a começar em 0."
+Process Statement Of Accounts CC,Processar extrato de conta — CC
+Python source. Must define a top-level <code>main</code> function. Executed in a server-script sandbox. Requires server scripts to be enabled in the bench configuration.,Código Python. Tem de definir uma função <code>main</code> ao nível superior. Executado numa sandbox de scripts de servidor. Exige que os scripts de servidor estejam ativados na configuração do bench.
+Quantity Changed,Quantidade alterada
+Quantity from the design file.,Quantidade do ficheiro de desenho.
+Quantity of the output item this operation makes for the whole Work Order,Quantidade do artigo produzido que esta operação faz para toda a ordem de trabalho
+Questions waiting on a user answer. Present only when status is Paused.,Perguntas à espera de resposta do utilizador. Só presente quando o estado é Em pausa.
+Render this page for logged-out visitors. Its layout and script become publicly readable; data it fetches depends on the data source permissions,Mostrar esta página a visitantes sem sessão iniciada. A disposição e o script passam a ser de leitura pública; os dados que obtém dependem das permissões da fonte de dados
+Resource Type,Tipo de recurso
+Retrieval,Recuperação
+Return Against Packed Item,Devolução contra artigo embalado
+"Role, pay, leave, probation and notice print from this offer.","A função, a remuneração, as férias, o período experimental e o aviso prévio são impressos a partir desta oferta."
+"Run each call in a background job, so a slow tool doesn't hold a web worker.","Executar cada chamada numa tarefa em segundo plano, para que uma ferramenta lenta não ocupe um processo web."
+"Run the agent as this user, so its tools act with a defined, least-privilege permission scope. Defaults to the trigger's owner when empty; only System Managers can pick another user. Prefer a purpose-scoped service user over a full administrator.","Executar o agente como este utilizador, para que as ferramentas atuem com um âmbito de permissões definido e mínimo. Se ficar vazio, usa o dono do acionador; só os gestores do sistema podem escolher outro utilizador. Prefira um utilizador de serviço com um fim específico a um administrador completo."
+SCIO Detail,Detalhe SCIO
+"STEP file (.step or .stp) or CSV file. A CSV file needs a Level or Item Number column, a Part Number or Part Name column, and a Quantity column.","Ficheiro STEP (.step ou .stp) ou ficheiro CSV. Um ficheiro CSV precisa de uma coluna Nível ou Número do artigo, uma coluna Número da peça ou Nome da peça e uma coluna Quantidade."
+"STEP, STL or GLB file of a material added in ERPNext, used to place it in the 3D model.","Ficheiro STEP, STL ou GLB de um material acrescentado no ERP, usado para o colocar no modelo 3D."
+Salary slips starting on or after this date will be considered for arrear calculations,Os recibos de vencimento com início nesta data ou depois serão considerados no cálculo de retroativos
+Saved Flow Agent driving this conversation.,Agente do Flow guardado que conduz esta conversa.
+"Scorecard variables can be used, as well as:
+{total_score} (the total score from that period),
+{period_number} (the number of periods to present day)","Podem ser usadas as variáveis da avaliação de fornecedores, bem como:
+{total_score} (a pontuação total desse período),
+{period_number} (o número de períodos até ao presente)"
+Section Type,Tipo de secção
+Select if any of the days selected for request are holidays,Selecionar se algum dos dias selecionados no pedido for feriado
+Set by the system on total rows. A row added by hand is a component.,Definido pelo sistema nas linhas de total. Uma linha acrescentada à mão é um componente.
+"Shipped by an app: the Desk can switch it on or off, nothing else.","Fornecido por uma app: o Desk pode ativá-lo ou desativá-lo, nada mais."
+Short label for this conversation. The flow server titles it from the first message if left blank.,"Título curto desta conversa. Se ficar em branco, o servidor do Flow dá-lhe um título a partir da primeira mensagem."
+"Show all records, not only the ones the user created.","Mostrar todos os registos, não só os criados pelo utilizador."
+Show on Desktop,Mostrar no ambiente de trabalho
+Show respondents a list of their responses.,Mostrar aos inquiridos uma lista das suas respostas.
+Show the Image Field as an avatar in Link field dropdowns.,Mostrar o campo de imagem como avatar nas listas pendentes dos campos de ligação.
+Show this app on the desktop and in the app switcher,Mostrar esta app no ambiente de trabalho e no seletor de apps
+Shown in the browser tab and as the app's icon on the desktop. Use a square PNG or SVG,Aparece no separador do navegador e como ícone da app no ambiente de trabalho. Use um PNG ou SVG quadrado
+Shown to the LLM. Should state what the tool does and how to interpret the return value.,Mostrado ao LLM. Deve indicar o que a ferramenta faz e como interpretar o valor devolvido.
+Shown to the agent in its skill index: what this skill covers and when to load it. Keep it to one line.,Mostrado ao agente no índice de competências: o que esta competência abrange e quando a carregar. Mantenha numa só linha.
+Shown to the agent: what this knowledge base contains and when to search it. Helps the agent decide whether to use it.,Mostrado ao agente: o que esta base de conhecimento contém e quando pesquisar nela. Ajuda o agente a decidir se a deve usar.
+Shows respondent permissions and list settings.,Mostra as permissões dos inquiridos e as definições da lista.
+Size in bytes.,Tamanho em bytes.
+Skip Unchanged Entries,Ignorar entradas sem alterações
+Snake-cased name the LLM sees. Used as the unique identifier.,Nome em snake_case que o LLM vê. Usado como identificador único.
+"Standard 5-field cron, e.g. '0 9 * * 5' for every Friday 09:00.","Cron padrão de 5 campos, p. ex. '0 9 * * 5' para todas as sextas-feiras às 09:00."
+"Started by a Flow User's own trigger, so System Managers do not see it.","Iniciado por um acionador do próprio utilizador do Flow, por isso os gestores do sistema não o veem."
+Stock Entry Detail,Detalhe do movimento de stock
+"Stop reposting an item and warehouse at a later Stock Reconciliation, or when its balance is the same as the saved ledger. Reposts made by stock transactions set this.","Parar o relançamento de um artigo e armazém numa reconciliação de stock posterior, ou quando o saldo é igual ao do razão guardado. Os relançamentos feitos por transações de stock definem isto."
+String,Cadeia de texto
+Studio Component Input,Entrada de componente do Studio
+Studio Page Resource,Recurso de página do Studio
+Studio Page Variable,Variável de página do Studio
+Subcontracted Qty,Qtd. subcontratada
+"System message shown to the LLM. Describe the agent's role, scope, and rules. Jinja tags {{ user }}, {{ full_name }} and {{ today }} are filled in when a session starts.","Mensagem de sistema mostrada ao LLM. Descreva a função do agente, o âmbito e as regras. As etiquetas Jinja {{ user }}, {{ full_name }} e {{ today }} são preenchidas quando começa uma sessão."
+System will notify to increase or decrease quantity or amount,O sistema avisará para aumentar ou diminuir a quantidade ou o valor
+"Tax-exclusive additional discount carried from a source document, per stock unit.","Desconto adicional sem impostos trazido de um documento de origem, por unidade de stock."
+Tell AI agents what this site is for and how your team uses it. Agents receive this text when they connect.,Indique aos agentes de IA para que serve este site e como a equipa o usa. Os agentes recebem este texto quando se ligam.
+The BOM of the finished good gets its operations from this routing.,A lista de materiais do produto acabado obtém as operações deste roteiro.
+The BOM of the finished good is made for this quantity. Part quantities are for one finished good.,A lista de materiais do produto acabado é feita para esta quantidade. As quantidades das peças são para um produto acabado.
+"The Client ID obtained from the Google Cloud Console under <a href=""https://console.cloud.google.com/apis/credentials"" rel=""noopener noreferrer"">
+""APIs &amp; Services"" &gt; ""Credentials""
+</a>","O ID de cliente obtido na Google Cloud Console em <a href=""https://console.cloud.google.com/apis/credentials"" rel=""noopener noreferrer"">
+""APIs e serviços"" &gt; ""Credenciais""
+</a>"
+The DocType this file is being written into.,O DocType em que este ficheiro está a ser escrito.
+The Flow Run that produced this message.,A execução do Flow que produziu esta mensagem.
+"The Print button prints the generated PDF instead of the page preview, so the printout matches the downloaded PDF.","O botão Imprimir imprime o PDF gerado em vez da pré-visualização da página, para que a impressão corresponda ao PDF descarregado."
+The app that defines this agent in code.,A app que define este agente em código.
+The app that owns the component. A component without an app is available in every app.,A app a que pertence o componente. Um componente sem app está disponível em todas as apps.
+The app that ships this skill in its skills folder.,A app que fornece esta competência na sua pasta de competências.
+The app that ships this trigger.,A app que fornece este acionador.
+"The browser API key obtained from the Google Cloud Console under <a href=""https://console.cloud.google.com/apis/credentials"" rel=""noopener noreferrer"">
+""APIs &amp; Services"" &gt; ""Credentials""
+</a>","A chave de API do navegador obtida na Google Cloud Console em <a href=""https://console.cloud.google.com/apis/credentials"" rel=""noopener noreferrer"">
+""APIs e serviços"" &gt; ""Credenciais""
+</a>"
+The date on which Salary Component with Amount will contribute for Earnings/Deduction in Salary Slip.,A data em que a componente salarial com valor contribuirá para os vencimentos/descontos no recibo de vencimento.
+"The depreciation schedule this allocation replaced, restored when the allocation is cancelled","O plano de depreciação que esta afetação substituiu, reposto quando a afetação é cancelada"
+The document this file was filed against.,O documento a que este ficheiro foi associado.
+The flow server log row this message was recorded from.,A linha do registo do servidor do Flow a partir da qual esta mensagem foi registada.
+The flow server's id of this run's latest segment (a resume starts a new one).,"O ID, no servidor do Flow, do segmento mais recente desta execução (retomar inicia um novo)."
+The folder of the app in the studio folder of its Frappe app,A pasta da app na pasta studio da sua app do Orbit
+The frequency at which project progress and company transaction details will be updated. Set it to daily or monthly if you post a lot of transactions. Daily refreshes nightly; Monthly refreshes on the 1st of each month.,A frequência com que o progresso dos projetos e os detalhes das transações da empresa são atualizados. Defina diária ou mensal se lançar muitas transações. A diária atualiza todas as noites; a mensal atualiza no dia 1 de cada mês.
+"The percentage you are allowed to bill more against the amount ordered. For example, if the order value is $100 for an item and tolerance is set as 10%, then you are allowed to bill up to $110","A percentagem que é permitido faturar a mais em relação ao valor encomendado. Por exemplo, se o valor da encomenda for 100 € para um artigo e a tolerância for 10%, é permitido faturar até 110 €"
+The run (turn) this file was sent with.,A execução (vez) com que este ficheiro foi enviado.
+"The script of the component. Its default export declares the props, the emits and the setup function, as in a Vue component.","O script do componente. A exportação por omissão declara as props, os emits e a função setup, como num componente Vue."
+The service agents use to search the web.,O serviço que os agentes usam para pesquisar na web.
+"This is now deprecated, please use the `indexing_refresh_token_secret` field instead.",Isto está obsoleto; use antes o campo `indexing_refresh_token_secret`.
+Thumbs rating the user gave this response.,Avaliação (polegar) que o utilizador deu a esta resposta.
+Tick this on the step that makes this BOM's own item. The other steps make in-between items.,Marque isto no passo que produz o próprio artigo desta lista de materiais. Os outros passos produzem artigos intermédios.
+Time in seconds to retain QR code image on server. Min:<strong>240</strong>,Tempo em segundos durante o qual a imagem do código QR fica no servidor. Mín.: <strong>240</strong>
+"To use Google Indexing, enable <a href=""/desk/google-settings"" rel=""noopener noreferrer"">Google Settings</a>.","Para usar o Google Indexing, ative as <a href=""/desk/google-settings"" rel=""noopener noreferrer"">Definições da Google</a>."
+"To use Slack Channel, add a <a href=""#List/Slack%20Webhook%20URL/List"" rel=""noopener noreferrer"">Slack Webhook URL</a>.","Para usar o canal do Slack, acrescente um <a href=""#List/Slack%20Webhook%20URL/List"" rel=""noopener noreferrer"">URL de Webhook do Slack</a>."
+"Tokens a single run may spend, shared with its sub-agents. Cached reads are not counted. 0 means no limit.","Tokens que uma execução pode gastar, partilhados com os subagentes. As leituras em cache não contam. 0 significa sem limite."
+Tool,Ferramenta
+Tool Call ID,ID da chamada da ferramenta
+Total Number of Booked Depreciations,Número total de depreciações registadas
+Transaction Deletion Record To Delete,Registo de eliminação de transações a eliminar
+Transform,Transformar
+Turns text into vectors for Knowledge's search. Not offered in chats.,Converte texto em vetores para a pesquisa do Conhecimento. Não disponível nas conversas.
+Use placeholders like {{ ctc }} or {{ appointment_date }}.,Use marcadores como {{ ctc }} ou {{ appointment_date }}.
+Use placeholders like {{ ctc }} or {{ appointment_date }}. The Print & Email preview shows the real values.,Use marcadores como {{ ctc }} ou {{ appointment_date }}. A pré-visualização de Imprimir e e-mail mostra os valores reais.
+Use the item as a raw material without its own BOM.,Usar o artigo como matéria-prima sem lista de materiais própria.
+"Use the new Combobox for Link, Autocomplete and MultiSelect fields.","Usar a nova caixa de combinação nos campos Ligação, Preenchimento automático e Seleção múltipla."
+Users can upload a file first and write a document of this DocType from it.,Os utilizadores podem carregar primeiro um ficheiro e escrever a partir dele um documento deste DocType.
+Variable Type,Tipo de variável
+Vector width of the embedding model. Detected automatically when the embedding model is saved.,Dimensão do vetor do modelo de embeddings. Detetada automaticamente quando o modelo de embeddings é guardado.
+Verified On,Verificado em
+Watermark for incremental DocType sync: rows modified after this are re-checked.,Marca de água da sincronização incremental de DocTypes: as linhas alteradas depois disto são verificadas de novo.
+What kind of event fires this trigger.,Que tipo de evento dispara este acionador.
+"What this agent is for, shown to an agent that has it as a sub-agent.","Para que serve este agente, mostrado a um agente que o tenha como subagente."
+When HR last accepted this document,Quando os RH aceitaram este documento pela última vez
+"When role is 'assistant', the list of tool calls the model requested.","Quando a função é 'assistant', a lista de chamadas de ferramentas que o modelo pediu."
+"When role is 'tool', the assistant tool_call.id this result answers.","Quando a função é 'tool', o tool_call.id do assistente a que este resultado responde."
+"When unchecked, only users who can read all employees, such as HR, see the chart","Se estiver desmarcado, só os utilizadores que podem ler todos os funcionários, como os RH, veem o organograma"
+Which lifecycle event of the target DocType fires this trigger.,Que evento do ciclo de vida do DocType de destino dispara este acionador.
+"While making a Purchase Receipt or Purchase Invoice from a Purchase Order, use the exchange rate on its posting date rather than inheriting it from the Purchase Order.","Ao criar uma receção de compra ou uma fatura de compra a partir de uma encomenda de compra, usar a taxa de câmbio da data de lançamento em vez de a herdar da encomenda de compra."
+Whitelisted Methods,Métodos permitidos
+"Who can use this agent directly; empty means every Flow User. As a sub-agent it works for anyone using an agent that has it. Disabling a role also drops it here, which can leave the agent open to every Flow User.","Quem pode usar este agente diretamente; vazio significa todos os utilizadores do Flow. Como subagente, funciona para quem usar um agente que o tenha. Desativar uma função também a retira daqui, o que pode deixar o agente aberto a todos os utilizadores do Flow."
+"Who can use this model; empty means every Flow User. Others pick another model for agents that run on it, but a sub-agent on it works for anyone using its agent. Disabling a role also drops it here, which can leave the model open to every Flow User.","Quem pode usar este modelo; vazio significa todos os utilizadores do Flow. Os outros escolhem outro modelo para os agentes que correm neste, mas um subagente neste modelo funciona para quem usar o respetivo agente. Desativar uma função também a retira daqui, o que pode deixar o modelo aberto a todos os utilizadores do Flow."
+"Who else may view this conversation: only the people it is shared with, or every Flow user. Set from its Share dialog.","Quem mais pode ver esta conversa: só as pessoas com quem é partilhada, ou todos os utilizadores do Flow. Definido na janela Partilhar."
+Work Orders are made larger to cover their BOM's % Process Loss,As ordens de trabalho são aumentadas para cobrir a % de perda no processo da respetiva lista de materiais
+Work Orders include this loss,As ordens de trabalho incluem esta perda
+You can email this offer letter to the applicant once the job offer is submitted.,Pode enviar esta carta de oferta por e-mail ao candidato depois de a oferta de emprego ser submetida.
+"The project number obtained from Google Cloud Console under <a href=""https://console.cloud.google.com/iam-admin/settings"" rel=""noopener noreferrer"">
+""IAM &amp; Admin"" &gt; ""Settings""
+</a>","O número do projeto obtido na Google Cloud Console em <a href=""https://console.cloud.google.com/iam-admin/settings"" rel=""noopener noreferrer"">
+""IAM e administração"" &gt; ""Definições""
+</a>"
+Read Only,Só de leitura
