@@ -16,11 +16,15 @@ async function api(metodo, args = {}, post = false) {
   } else {
     r = await fetch(url + "?" + new URLSearchParams(Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined && v !== null))), op);
   }
-  if (r.status === 403 || r.status === 401) { location.href = "/login?redirect-to=/orbit"; return; }
+  // 25-11-2026: só a sessão perdida (401) volta à entrada. Um 403 é falta de permissão com a sessão válida — mandá-lo
+  // para /login levava a pessoa para a casa dela (o CRM) sem explicação («algumas opções abrem o CRM»).
+  if (r.status === 401) { location.href = "/login?redirect-to=" + encodeURIComponent(location.pathname + location.search + location.hash); return; }
   const j = await r.json().catch(() => ({}));
   if (!r.ok) {
     let msg = "Erro";
     try { msg = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) { msg = j.exception || msg; }
+    if (r.status === 403 && (msg === "Erro" || /PermissionError|Not permitted|Insufficient Permission/i.test(msg)))
+      msg = "Sem permissão para isto. Peça a um administrador do Orbit da sua empresa.";
     toast(String(msg).replace(/<[^>]+>/g, ""));
     throw new Error(msg);
   }
@@ -38,7 +42,7 @@ const PAISES_PT = { Portugal: "Portugal", Spain: "Espanha", France: "França", I
   Netherlands: "Países Baixos", Luxembourg: "Luxemburgo", "United Kingdom": "Reino Unido", Switzerland: "Suíça", Brazil: "Brasil",
   Angola: "Angola", Mozambique: "Moçambique", "Cape Verde": "Cabo Verde" };
 // ── Utilitários ──────────────────────────────────────────────────────────────────────────────────────
-const estado = reactive({ toast: "" });
+const estado = reactive({ toast: "", erroEcra: "" });
 let _t;
 function toast(m) { estado.toast = m; clearTimeout(_t); _t = setTimeout(() => (estado.toast = ""), 3500); }
 const CORES = ["#8a5a44", "#4b7a5a", "#5b6f7a", "#7a4b6e", "#46607e", "#8a7340", "#4f6b6b", "#7a5048"];
@@ -2743,7 +2747,7 @@ const ErpModulo = {
   setup(props) {
     const m = ref(null); const nums = ref([]);
     onMounted(async () => { m.value = await api("erp.menu", { barra: props.barra }); nums.value = await api("erp.numeros", { barra: props.barra }).catch(() => []); });
-    const href = (i) => i.tipo === "doc" ? irErp(i.doctype, i.single ? i.doctype : null) : i.tipo === "rel" ? "#/erp-rel/" + encodeURIComponent(i.relatorio) : "#/erp-desk/" + encodeURIComponent(i.url);
+    const href = (i) => i.tipo === "doc" ? irErp(i.doctype, i.single ? i.doctype : null) : i.tipo === "rel" ? "#/erp-rel/" + encodeURIComponent(i.relatorio) : i.tipo === "mod" ? "#/erp-m/" + encodeURIComponent(i.barra) : "#/erp-desk/" + encodeURIComponent(i.url);
     const valorN = (n) => n.tipo === "Currency" ? new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(n.valor || 0) : new Intl.NumberFormat("pt-PT").format(n.valor || 0);
     return { m, href, nums, valorN };
   },
@@ -3805,9 +3809,11 @@ const APPS = {
 };
 const APP = APPS[APP_ATUAL] || APPS.crm;
 // 23-11-2026 (Vítor): os ícones de cada app são os do Orbit (os da grelha), nunca símbolos genéricos
-const ICONE_APP = { crm: "crm", desk: "desk", projetos: "erp", rh: "rh", gestao: "erp", operacoes: "erp", marketing: "marketing", admin: "orbit",
+// 25-11-2026 (Vítor): Projetos, Gestão, Operações e Administração com o desenho próprio (o mesmo da página inicial),
+// não o edifício genérico do ERP; o Portal com o dele; «Início» (orbit.<domínio>) com o símbolo do Orbit.
+const ICONE_APP = { crm: "crm", desk: "desk", projetos: "projetos", rh: "rh", gestao: "gestao", operacoes: "operacoes", marketing: "marketing", admin: "admin",
   mail: "mail", meet: "meet", chat: "chat", docs: "docs", sign: "sign", booking: "booking", wiki: "wiki", propostas: "propostas",
-  events: "events", social: "social", "secretária": "orbit" };
+  events: "events", social: "social", portal: "portal", inicio: "orbit" };
 const srcApp = (chave) => "/assets/orbit/icons/apps/" + (ICONE_APP[(chave || "").toLowerCase()] || "orbit") + ".svg";
 // Abrir uma app: volta ao separador onde já está (se foi o Orbit a abri-lo), senão abre um novo.
 // 23-11-2026: no telemóvel (ecrã táctil, estreito ou app instalada) abre-se na MESMA janela, como numa app nativa — os
@@ -3826,7 +3832,7 @@ const App = {
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
-    window.addEventListener("hashchange", () => { rota.value = location.hash || "#/inicio"; document.querySelector(".ecra")?.scrollTo(0, 0); });
+    window.addEventListener("hashchange", () => { rota.value = location.hash || "#/inicio"; estado.erroEcra = ""; document.querySelector(".ecra")?.scrollTo(0, 0); });
     onMounted(async () => { ctx.value = await api("contexto"); window.__ctx = ctx.value; contarChat(); setInterval(() => { if (!document.hidden) contarChat(); }, 60000); });
     // 23-11-2026: as não lidas do Chat no menu (mensagens diretas e tópicos dos canais)
     const contarChat = async () => {
@@ -3867,6 +3873,7 @@ const App = {
     });
     const seletor = ref(false);
     const LISTA_APPS = computed(() => [
+      { chave: "inicio", nome: "Início", url: "/" },   // 25-11-2026: a página inicial do Orbit (orbit.<domínio>)
       ...Object.entries(APPS).filter(([k]) => k !== "admin" || ctx.value?.admin !== false).map(([k, a]) => ({ chave: k, nome: a.nome, ic: a.ic })),
       ...((ctx.value?.apps) || []).map((a) => ({ chave: a.nome.toLowerCase(), nome: a.nome, ic: a.icone, url: a.url })),
     ].filter((a, i, l) => l.findIndex((b) => b.chave === a.chave) === i));   // sem repetidos (o Marketing vinha duas vezes)
@@ -3913,6 +3920,9 @@ const App = {
         </div>
       </header>
       <main class="ecra">
+        <div v-if="APP_ATUAL==='admin' && ctx.admin === false" class="vazio">A Administração é só para os administradores do Orbit da sua empresa.<br><a href="/">Voltar ao início</a></div>
+        <div v-else-if="estado.erroEcra" class="vazio">{{ estado.erroEcra }}<br><a href="javascript:history.back()">Voltar</a></div>
+        <template v-else>
         <Inicio v-if="ecra==='inicio'" :ctx="ctx"/>
         <Lista v-else-if="['contactos','empresas','negocios','leads'].includes(ecra)" :objeto="ecra" :key="ecra"/>
         <Ficha v-else-if="ROTAS_DT[ecra]" :doctype="ROTAS_DT[ecra]" :name="partes[1]" :key="ecra+partes[1]"/>
@@ -3948,6 +3958,7 @@ const App = {
         <ErpRelatorio v-else-if="ecra==='erp-rel'" :nome="partes[1]" :key="'r'+partes[1]"/>
         <ErpDesk v-else-if="ecra==='erp-desk'" :url="partes.slice(1).join('/')" :key="'d'+partes.slice(1).join('/')"/>
         <div v-else class="vazio">Página desconhecida. <a href="#/inicio">Início</a></div>
+        </template>
       </main>
     </div>
     <nav class="menu-movel" aria-label="Navegação">
@@ -3960,4 +3971,13 @@ const App = {
 
 const _app = createApp(App).component("AvFoto", AvFoto);
 _app.config.globalProperties.emailDoSite = emailDoSite;
+// 25-11-2026: um ecrã que falha a carregar (ex.: sem permissão) deixava «A carregar…» para sempre — passa a dizer porquê.
+// Só falhas ao ABRIR (setup/mounted): uma falha ao gravar já mostra o aviso e não pode tirar o formulário do ecrã.
+_app.config.errorHandler = (err, inst, info) => {
+  console.error(err);
+  // no Vue de produção o `info` é «…#runtime-<código>»: 0 = setup, m/bm = (before)mounted
+  const i = String(info || ""); const cod = (i.match(/#runtime-(\w+)$/) || [])[1];
+  const aoAbrir = cod ? ["0", "m", "bm"].includes(cod) : /setup function|mounted hook/i.test(i);
+  if (aoAbrir) estado.erroEcra = (err && err.message) || "Não foi possível abrir este ecrã.";
+};
 _app.mount("#app");

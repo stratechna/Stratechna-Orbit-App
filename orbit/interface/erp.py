@@ -98,7 +98,17 @@ def menu(barra: str):
                 secoes.append(atual)
             atual = {"titulo": _tr(i.label or ""), "itens": []}
             continue
-        if i.type != "Link" or not i.link_to or i.link_type in ("Workspace", "Dashboard"):
+        if i.type != "Link" or not i.link_to:
+            continue
+        # 25-11-2026: o que o ecrã antigo mostra e a interface deixava de fora — painéis e ligações a outro módulo
+        if i.link_type == "Dashboard":
+            if frappe.db.exists("Dashboard", i.link_to):
+                atual["itens"].append({"tipo": "desk", "rotulo": _marca(_(i.label or i.link_to)) if (i.label or "") != "Dashboard" else _("Painel"),
+                                       "url": "/desk/dashboard-view/" + i.link_to, "icone": i.icon})
+            continue
+        if i.link_type == "Workspace":
+            if i.link_to != barra and frappe.db.exists("Workspace Sidebar", i.link_to):   # o «Home» é o próprio módulo
+                atual["itens"].append({"tipo": "mod", "rotulo": _marca(_(i.label or i.link_to)), "barra": i.link_to, "icone": i.icon})
             continue
         if i.link_type == "DocType":
             if not frappe.db.exists("DocType", i.link_to) or not frappe.has_permission(i.link_to, "read"):

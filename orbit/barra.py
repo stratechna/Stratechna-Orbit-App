@@ -35,11 +35,11 @@ def apps_do_tenant() -> list[dict]:
     ok = lambda chave: activas is None or chave in activas or "completo" in (activas or set())  # noqa: E731
     icone = lambda s: f"{base}/assets/orbit/icons/apps/{s}.svg"  # noqa: E731
     nova = bool(frappe.conf.get("orbit_interface_nova"))
-    itens = [{"chave": "inicio", "nome": "Início", "url": f"{base}/desk", "icone": icone("orbit")}]
+    itens = [{"chave": "inicio", "nome": "Início", "url": f"{base}/", "icone": icone("orbit")}]
     if nova:
         for chave, nome, sim, pre in (("crm", "CRM", "crm", "crm"), ("desk", "Desk", "desk", "helpdesk"),
-                                      ("projetos", "Projetos", "erp", None), ("rh", "RH", "rh", None),
-                                      ("gestao", "Gestão", "erp", None), ("operacoes", "Operações", "erp", None),
+                                      ("projetos", "Projetos", "projetos", None), ("rh", "RH", "rh", None),
+                                      ("gestao", "Gestão", "gestao", None), ("operacoes", "Operações", "operacoes", None),
                                       ("marketing", "Marketing", "marketing", "marketing")):
             if pre and not ok(pre):
                 continue

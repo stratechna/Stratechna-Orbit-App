@@ -159,7 +159,7 @@ def _apps():
         except (KeyError, IndexError):
             continue
         out.append({"nome": a["nome"], "url": url, "icone": icones.get(a["nome"], "grelha")})
-    out.append({"nome": "Secretária", "url": "/app", "icone": "grelha"})
+    # 25-11-2026: a «Secretária» (/app) deu lugar ao «Início» (orbit.<domínio>), posto à cabeça pela interface
     return out
 
 

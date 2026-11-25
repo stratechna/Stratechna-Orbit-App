@@ -29,7 +29,11 @@ PERFIS = {
     "Gestão": ["System Manager", "Sales Manager", "Sales User", "Agent Manager", "Agent", "Projects Manager",
                "Projects User", "Accounts Manager", "Accounts User", "HR Manager", "HR User", "Purchase Manager",
                "Purchase User", "Stock Manager", "Stock User", "Marketing Manager", "Wiki Approver",
-               "Knowledge Base Editor", "Report Manager", "Gestor de Correio", "Employee"],
+               "Knowledge Base Editor", "Report Manager", "Gestor de Correio", "Employee",
+               # 25-11-2026: sem estes a administração não gravava Artigos (números de série), Produção, Qualidade,
+               # Site, Manutenção nem Viaturas — o ERPNext só deixa escrever o Artigo ao Item Manager
+               "Item Manager", "Manufacturing Manager", "Manufacturing User", "Quality Manager", "Website Manager",
+               "Maintenance Manager", "Maintenance User", "Fleet Manager"],
     "Comercial": ["Sales User", "Sales Manager", "Marketing Manager", "Projects User", "Wiki Approver", "Employee"],
     "Apoio ao cliente": ["Agent", "Agent Manager", "Knowledge Base Editor", "Projects User", "Sales User",
                          "Wiki Approver", "Employee"],
@@ -37,7 +41,7 @@ PERFIS = {
     "Contabilidade": ["Accounts User", "Accounts Manager", "Purchase User", "Sales User", "Employee", "Wiki Approver"],
     "Produção": ["Projects User", "Wiki Approver", "Employee"],
     "Operações": ["Projects User", "Projects Manager", "Stock User", "Purchase User", "Sales User", "Agent",
-                  "Wiki Approver", "Employee"],
+                  "Wiki Approver", "Employee", "Item Manager"],   # 25-11: editar os produtos (série, lote, stock)
 }
 
 
@@ -101,7 +105,9 @@ FUNCOES_POR_APP = {
     "desk": {"Agent", "Agent Manager", "Knowledge Base Editor"},
     "projects": {"Projects User", "Projects Manager"},
     "rh": {"HR User", "HR Manager"},
-    "erp": {"Accounts User", "Accounts Manager", "Purchase User", "Purchase Manager", "Stock User", "Stock Manager"},
+    "erp": {"Accounts User", "Accounts Manager", "Purchase User", "Purchase Manager", "Stock User", "Stock Manager",
+            "Item Manager", "Manufacturing Manager", "Manufacturing User", "Quality Manager", "Maintenance Manager",
+            "Maintenance User", "Fleet Manager"},
     "wiki": {"Wiki Approver"},
     "mail": {"Gestor de Correio"},
 }
