@@ -120,6 +120,7 @@ def enviar_stock(doctype, name):
             continue
         try:
             pid = ad.garantir_artigo(_linha_artigo(sle.item_code, sle.valuation_rate))
+            ad.garantir_controlo_stock(pid)
             mid = ad.inserir_movimento(pid, flt(sle.actual_qty), armazem, str(sle.posting_date),
                                        f"orbit:{doctype}:{name}")
             _registar(lig.name, "movimento", "Stock Ledger Entry", sle.name, mid or f"orbit-{sle.name}", "Orbit")
@@ -352,8 +353,22 @@ def _receber_vendas(lig, ad, desde, erros):
                 doc.due_date = str(full.get("expiration_date") or full.get("date") or nowdate())[:10]
             doc.flags.orbit_do_programa = True
             doc.insert(ignore_permissions=True)
-            doc.submit()
-            _registar(lig.name, tipo, doctype, doc.name, did, "Programa")
+            nota = ""
+            frappe.db.savepoint("orbit_venda")
+            try:
+                doc.submit()
+            except frappe.ValidationError as e:
+                # sem stock no Orbit para o que o programa já vendeu: entra sem mexer no stock e fica para acertar
+                if doctype != "Sales Invoice" or not doc.update_stock:
+                    raise
+                frappe.db.rollback(save_point="orbit_venda")
+                doc.reload()
+                doc.update_stock = 0
+                doc.remarks = ((doc.remarks or "") + "\nVeio do programa certificado sem stock suficiente no Orbit — acertar o inventário.").strip()
+                doc.save(ignore_permissions=True)
+                doc.submit()
+                nota = f"sem stock no Orbit: {str(e)[:150]}"
+            _registar(lig.name, tipo, doctype, doc.name, did, "Programa", nota=nota)
             frappe.db.commit()
             n += 1
         except Exception as e:  # noqa: BLE001
@@ -516,6 +531,7 @@ def aplicar_primeira(ligacao: str):
     for d in comparar_stock(ligacao)["diferencas"]:
         try:
             pid = ad.garantir_artigo(_linha_artigo(d["artigo"]))
+            ad.garantir_controlo_stock(pid)
             ad.inserir_movimento(pid, d["acerto"], _armazem_externo(lig, d["armazem"]), nowdate(),
                                  "orbit:acerto-inicial")
             feitos += 1

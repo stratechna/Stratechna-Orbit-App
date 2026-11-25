@@ -407,6 +407,24 @@ class Moloni(Adaptador):
                 return p
         return None
 
+    def garantir_controlo_stock(self, product_id: str) -> None:
+        """Um artigo criado sem controlo de stock (antes de se ligar a sincronização) passa a ter controlo — sem isso
+        o Moloni recusa os movimentos («5 product_id»)."""
+        p = self._post("products/getOne", {"product_id": int(product_id)})
+        p = (p[0] if isinstance(p, list) and p else p) or {}
+        if not p or int(p.get("has_stock") or 0) == 1:
+            return
+        corpo = {"product_id": int(product_id), "category_id": int(p.get("category_id") or self.cfg.get("categoria_id") or 0),
+                 "type": int(p.get("type") or 1), "name": p.get("name"), "reference": p.get("reference"),
+                 "price": p.get("price") or 0, "unit_id": int(p.get("unit_id") or self.cfg.get("unidade_id") or 0),
+                 "has_stock": 1, "stock": 0}
+        if p.get("taxes"):
+            corpo["taxes"] = [{"tax_id": t.get("tax_id"), "value": t.get("value"), "order": t.get("order", 0),
+                               "cumulative": t.get("cumulative", 0)} for t in p["taxes"]]
+        else:
+            corpo["exemption_reason"] = p.get("exemption_reason") or self.cfg.get("motivo_isencao") or "M07"
+        self._valido(self._post("products/update", corpo), f"o controlo de stock do artigo {p.get('reference')}")
+
     def movimentos_stock(self, dia: str, armazem_id: Optional[str] = None) -> list[dict]:
         """Movimentos de stock de um dia (AAAA-MM-DD), todos os armazéns ou um."""
         dados = {"date": dia}
@@ -451,6 +469,7 @@ class Moloni(Adaptador):
             "country_id": PAISES.get((pais or "PT").upper(), 1), "language_id": 1, "phone": telefone,
             "maturity_date_id": int(self.cfg["prazo_id"]), "payment_method_id": int(self.cfg["metodo_pagamento_id"]),
             "delivery_method_id": int(self.cfg["metodo_envio_id"]), "discount": 0, "credit_limit": 0, "payment_day": 0,
+            "qty_copies_document": 1,
         }), f"o fornecedor {nome}")
         return str(res["supplier_id"])
 
