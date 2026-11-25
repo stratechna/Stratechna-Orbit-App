@@ -898,7 +898,7 @@ const Duplicados = {
 const Importar = {
   props: ["objeto"], emits: ["fechar", "feito"],
   setup(props, { emit }) {
-    const passo = ref(1); const an = ref(null); const mapa = ref({}); const modo = ref("atualizar"); const res = ref(null); const ocupado = ref(false);
+    const passo = ref(1); const an = ref(null); const mapa = ref({}); const modo = ref("atualizar"); const res = ref(null); const ocupado = ref(false); const marcador = ref("");
     const POST = async (metodo, args) => {
       const r = await fetch(`/api/method/orbit.interface.importar.${metodo}`, { method: "POST", headers: { "X-Frappe-CSRF-Token": window.csrf_token, "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(args) });
       const j = await r.json().catch(() => ({})); if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(m); throw new Error(m); } return j.message; };
@@ -908,10 +908,10 @@ const Importar = {
         const j = await r.json().catch(() => ({})); if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(m); return; }
         an.value = j.message; mapa.value = { ...an.value.sugestao }; passo.value = 2; } finally { ocupado.value = false; } };
     const correr = async (simular) => { ocupado.value = true;
-      try { res.value = await POST("executar", { codigo: an.value.codigo, mapeamento: JSON.stringify(mapa.value), modo: modo.value, simular: simular ? 1 : 0 });
+      try { res.value = await POST("executar", { codigo: an.value.codigo, mapeamento: JSON.stringify(mapa.value), modo: modo.value, simular: simular ? 1 : 0, marcador: marcador.value || null });
         passo.value = simular ? 3 : 4; if (!simular) emit("feito"); } finally { ocupado.value = false; } };
     const usados = computed(() => Object.values(mapa.value).filter(Boolean));
-    return { passo, an, mapa, modo, res, ocupado, enviar, correr, usados, TITULOS };
+    return { passo, an, mapa, modo, res, ocupado, enviar, correr, usados, TITULOS, marcador };
   },
   template: `<div class="modal-fundo" @click.self="$emit('fechar')"><div class="modal" style="max-width:860px">
     <header><b>Importar {{ TITULOS[objeto].toLowerCase() }}</b><button class="btn sm" @click="$emit('fechar')">Fechar</button></header>
@@ -925,6 +925,7 @@ const Importar = {
         </tbody></table></div>
         <div style="display:flex;gap:14px;align-items:center;margin-top:12px;flex-wrap:wrap"><span class="sub">Se já existir (mesmo email; empresas: mesmo NIPC ou nome):</span>
           <label><input type="radio" value="atualizar" v-model="modo"> atualizar</label><label><input type="radio" value="ignorar" v-model="modo"> ignorar</label>
+          <label v-if="objeto!=='negocios'" style="display:flex;gap:6px;align-items:center">Marcador <input class="ed-campo" v-model="marcador" placeholder="(opcional)" style="width:160px"></label>
           <button class="btn prim" style="margin-left:auto" @click="correr(true)" :disabled="ocupado || !usados.length">{{ ocupado ? 'A simular…' : 'Simular' }}</button></div></template>
       <template v-if="(passo===3 || passo===4) && res">
         <p><b>{{ res.simulado ? 'Simulação (nada foi gravado)' : 'Importação feita' }}:</b> {{ res.novos }} novos · {{ res.atualizados }} atualizados · {{ res.ignorados }} ignorados · {{ res.n_erros }} com erro</p>
@@ -1203,6 +1204,8 @@ const Lista = {
     const carregarSalvas = async () => (salvas.value = await apiVis("vistas", { objeto: props.objeto }));
     onMounted(async () => { meta.value = await apiVis("metadados", { objeto: props.objeto });
       if (marca.value && !(meta.value?.marcas || []).includes(marca.value)) marca.value = "";
+      // 25-11-2026: vindo dos Marcadores do Marketing — a lista abre filtrada por esse marcador
+      try { const mk = JSON.parse(sessionStorage.getItem("orbit.crm.marcador") || "null"); if (mk) { sessionStorage.removeItem("orbit.crm.marcador"); filtros.value = [["_user_tags", "contem", mk.m]]; } } catch (e) {}
       carregarSalvas(); carregar(); });
     watch(q, () => { clearTimeout(tq); tq = setTimeout(recarregar, 300); });
     const escolherFixa = (v) => { salvaAtiva.value = null; vista.value = v; filtros.value = []; recarregar(); };
@@ -1228,13 +1231,16 @@ const Lista = {
     const valor = (l, c) => CAMPOS_USER.includes(c) ? (l[c + "_nome"] || l[c] || "") : c === "status" ? (l.estado || l.status) : c === "deal_value" ? eur(l[c]) : CAMPOS_DATA.includes(c) ? data(l[c], false) : (l[c] ?? "");
     const abrir = (l) => (location.hash = link(DT_LISTA[props.objeto], l.name));
     const todos = computed({ get: () => linhas.value.length && sel.value.length === linhas.value.length, set: (v) => (sel.value = v ? linhas.value.map((l) => l.name) : []) });
-    const opsMassa = computed(() => { const o = [["responsavel", "Atribuir responsável"]]; if (["negocios", "leads"].includes(props.objeto)) o.push(["estado", props.objeto === "negocios" ? "Mudar a fase" : "Mudar o estado"]);
+    const opsMassa = computed(() => { const o = [["responsavel", "Atribuir responsável"], ["marcar", "Pôr marcador…"], ["desmarcar", "Tirar marcador…"]]; if (["negocios", "leads"].includes(props.objeto)) o.push(["estado", props.objeto === "negocios" ? "Mudar a fase" : "Mudar o estado"]);
       if (["contactos", "empresas"].includes(props.objeto)) o.push(["ciclo", "Mudar a fase do ciclo de vida"]); if (meta.value?.pode_apagar) o.push(["apagar", "Apagar"]); return o; });
     const opcoesMassa = computed(() => { const m = massa.value.acao; const campo = m === "responsavel" ? (props.objeto === "negocios" ? "deal_owner" : props.objeto === "leads" ? "lead_owner" : "orbit_responsavel") : m === "estado" ? "status" : m === "ciclo" ? "orbit_ciclo" : null;
       return campo ? (campoMeta(campo).opcoes || []) : []; });
     const aplicarMassa = async () => {
       const m = massa.value; if (!m.acao) return;
       if (m.acao === "apagar" && !confirm(`Apagar ${sel.value.length} registo(s)? Não se desfaz.`)) return;
+      if (["marcar", "desmarcar"].includes(m.acao)) { if (!String(m.valor || "").trim()) { toast("Escreva o marcador"); return; }
+        const r = await apiSeg("marcar", { doctype: DT_LISTA[props.objeto], nomes: JSON.stringify(sel.value), marcador: m.valor, tirar: m.acao === "desmarcar" ? 1 : 0 }, true);
+        toast(`${r.mudados} registo(s) ${m.acao === "marcar" ? "marcados" : "desmarcados"} com «${r.marcador}»`); massa.value = { acao: "", valor: "" }; carregar(); return; }
       // lote 2: passar a «perdido» em massa pede o motivo uma vez e aplica-o a todos
       if (m.acao === "estado" && ["negocios", "leads"].includes(props.objeto)) { const p = await perdidos(); const dtM = props.objeto === "negocios" ? "CRM Deal" : "CRM Lead";
         if ((dtM === "CRM Deal" ? p.negocio : p.lead).includes(m.valor)) { const mot = await pedirMotivo("Motivo de perda para " + sel.value.length + " registo(s)"); if (!mot) return;
@@ -1307,6 +1313,7 @@ const Lista = {
       {{ sel.length }} selecionado(s) ·
       <select class="btn sm" v-model="massa.acao" @change="massa.valor=''"><option value="">Ação…</option><option v-for="o in opsMassa" :key="o[0]" :value="o[0]">{{ o[1] }}</option></select>
       <select v-if="opcoesMassa.length" class="btn sm" v-model="massa.valor"><option value="">— nenhum —</option><option v-for="o in opcoesMassa" :key="o.v" :value="o.v">{{ o.r }}</option></select>
+      <input v-if="['marcar','desmarcar'].includes(massa.acao)" class="btn sm" v-model="massa.valor" placeholder="Marcador">
       <button class="btn sm prim" @click="aplicarMassa" :disabled="!massa.acao">Aplicar</button>
       <button class="btn sm" @click="exportar(true)">Exportar seleção</button>
     </div>
@@ -3086,7 +3093,7 @@ const GraficoBarras = {
     const fmt = (v) => props.moeda ? moedaEUR(v) : new Intl.NumberFormat("pt-PT").format(v || 0);
     return { g, CORES, fmt };
   },
-  template: `<div><svg :viewBox="'0 0 ' + Math.max(g.labels.length*48, 300) + ' 170'" preserveAspectRatio="none" style="width:100%;height:170px;display:block">
+  template: `<div style="overflow-x:auto"><svg :viewBox="'0 0 ' + Math.max(g.labels.length*48, 300) + ' 170'" preserveAspectRatio="none" :style="{width:'100%',height:'170px',display:'block',minWidth: Math.max(g.labels.length*34, 280)+'px'}">
       <template v-for="(l,i) in g.labels" :key="i"><template v-for="(sr,k) in g.series" :key="k">
         <rect :x="i*48 + 6 + k*(36/g.series.length)" :width="36/g.series.length - 2" :y="140 - Math.abs(Number(sr.values[i])||0)/g.max*130" :height="Math.abs(Number(sr.values[i])||0)/g.max*130" :fill="CORES[k]" rx="2"><title>{{ sr.name ? sr.name + ': ' : '' }}{{ fmt(sr.values[i]) }}</title></rect></template>
         <text :x="i*48+24" y="160" text-anchor="middle" font-size="10" fill="var(--ink-3)">{{ String(l).slice(0,8) }}</text></template></svg>
@@ -3134,12 +3141,15 @@ const ErpContas = {
     const maxFaixa = computed(() => Math.max(1, ...(r.value?.faixas || []).map((f) => f.valor)));
     const receber = (x, fatura) => { try { sessionStorage.setItem("orbit.recibo", JSON.stringify({ cliente: x.entidade, fatura: fatura || null })); } catch (e) {}
       location.hash = irErp("Payment Entry", "novo"); };
+    // 25-11-2026: «Pagar» uma fatura de compra (o pagamento do ERPNext já preenchido, como «Criar → Pagamento»)
+    const pagar = async (d) => { const r = await api("erp.criar_de", { doctype: "Purchase Invoice", name: d.name, destino: "pe" }, true);
+      try { sessionStorage.setItem("orbit.erp.novo", JSON.stringify(r.doc)); } catch (e) {} location.hash = irErp("Payment Entry", "novo") + "/completa"; };
     const csv = () => { const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
       const t = [[r.value.rotulo, "Em dívida", "Vencido", "Faturas", "Dias de atraso", "Vencimento mais antigo"].map(esc).join(";")]
         .concat(lista.value.map((x) => [x.nome, x.divida, x.vencido, x.documentos, x.atraso, x.mais_antiga].map(esc).join(";"))).join("\n");
       const b = new Blob(["﻿" + t], { type: "text/csv;charset=utf-8" }); const u = URL.createObjectURL(b);
       const el = document.createElement("a"); el.href = u; el.download = r.value.titulo + ".csv"; el.click(); URL.revokeObjectURL(u); };
-    return { r, lista, aberto, docs, abrir, m, q, so, empresa, marca, maxFaixa, receber, csv, irErp, data };
+    return { r, lista, aberto, docs, abrir, m, q, so, empresa, marca, maxFaixa, receber, pagar, csv, irErp, data };
   },
   template: `<div v-if="r">
     <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">
@@ -3173,7 +3183,7 @@ const ErpContas = {
           <td style="text-align:right"><span v-if="x.vencido" class="etq ambar">{{ m(x.vencido) }} · {{ x.atraso }} d</span><span v-else class="sub">—</span></td>
           <td style="text-align:right">{{ x.documentos }}</td>
           <td class="sub">{{ x.mais_antiga ? data(x.mais_antiga,false) : '—' }}</td>
-          <td style="text-align:right" @click.stop><button v-if="lado==='receber'" class="btn sm" @click="receber(x)">Receber</button></td>
+          <td style="text-align:right" @click.stop><button v-if="lado==='receber'" class="btn sm" @click="receber(x)">Receber</button><button v-else class="btn sm" @click="abrir(x)">Pagar…</button></td>
         </tr>
         <tr v-if="aberto===x.entidade" class="contas-docs"><td colspan="6">
           <div v-if="!docs[x.entidade]" class="sub">A carregar…</div>
@@ -3183,6 +3193,7 @@ const ErpContas = {
               <span class="sub">Vence {{ d.vencimento ? data(d.vencimento,false) : '—' }}<span v-if="d.atraso" class="etq ambar" style="margin-left:6px">{{ d.atraso }} d de atraso</span></span>
               <span style="text-align:right"><b>{{ m(d.divida) }}</b><small class="sub"> de {{ m(d.total) }}</small></span>
               <button v-if="lado==='receber' && !d.devolucao" class="btn sm" @click.prevent.stop="receber(x, d.name)">Receber</button>
+              <button v-if="lado==='pagar' && !d.devolucao" class="btn sm" @click.prevent.stop="pagar(d)">Pagar</button>
             </a>
             <a :href="irErp(r.entidade_doctype, x.entidade)" class="sub" style="font-size:12px;padding:6px 2px">Ficha de {{ x.nome }} →</a>
           </div>
@@ -3303,6 +3314,142 @@ const RhAusencias = {
           <td v-for="x in dias" :key="x.n" :class="{fds:x.fds, fer: feriado(x)}"><a v-if="em(p,x)" :href="irErp('Leave Application', em(p,x).name)" class="aus-dia" :class="{pend: !em(p,x).aprovada, meio: em(p,x).meio_dia}" :title="em(p,x).tipo + (em(p,x).aprovada ? '' : ' (por aprovar)')"></a></td></tr></tbody></table></div></div>`,
 };
 
+// ── Marketing na interface nova (25-11-2026): segmentos, marcadores, modelos, ciclo das campanhas e automações, base legal.
+// O motor é o de orbit.marketing.* (segmentação S1–S8, docs/PLANO-SEGMENTACAO-EMAIL-MARKETING.md); aqui só o ecrã.
+const apiSeg = (m, a = {}, post = false) => api("orbit.marketing.segmentos." + m, a, post);
+const docMetodo = async (doctype, name, method, args = {}) => {
+  const r = await fetch("/api/method/run_doc_method", { method: "POST", headers: { "X-Frappe-CSRF-Token": window.csrf_token, Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ dt: doctype, dn: name, method, args: JSON.stringify(args) }) });
+  const j = await r.json().catch(() => ({})); if (!r.ok) { let m = "Erro"; try { m = JSON.parse(JSON.parse(j._server_messages)[0]).message; } catch (e) {} toast(String(m).replace(/<[^>]+>/g, "")); throw new Error(m); }
+  return j.message;
+};
+const MktSegmentos = {
+  setup() {
+    const l = ref(null), op = ref(null), ed = ref(null), conta = ref(null), verQuem = ref(false), a = ref(false); let tc;
+    const carregar = async () => { l.value = await apiSeg("lista"); }; onMounted(async () => { op.value = await apiSeg("opcoes"); carregar(); });
+    const tipoDe = (r) => { for (const g of op.value?.grupos || []) { const x = g.regras.find((y) => y.regra === r); if (x) return x.tipo; } return "texto"; };
+    const valoresDe = (r) => (op.value?.valores || {})[r] || [];
+    const novo = () => { ed.value = { antigo: null, nome: "", descricao: "", logica: "Todas", marcador_auto: "", regras: [{ regra: "", valor: "", negar: 0 }], marca: "" }; contar(); };
+    const abrir = async (s) => { const d = await apiSeg("obter", { nome: s.name }); ed.value = { antigo: d.nome, nome: d.nome, descricao: d.descricao || "", logica: d.logica, marcador_auto: d.marcador_auto || "", regras: d.regras.length ? d.regras : [{ regra: "", valor: "", negar: 0 }], marca: "" }; contar(); };
+    const contar = () => { clearTimeout(tc); tc = setTimeout(async () => { const e = ed.value; if (!e) return;
+      conta.value = await apiSeg("contar", { regras: JSON.stringify(e.regras.filter((r) => r.regra)), logica: e.logica, marca: e.marca || null }).catch(() => null); }, 400); };
+    watch(() => ed.value && JSON.stringify([ed.value.regras, ed.value.logica, ed.value.marca]), contar);
+    const gravar = async () => { const e = ed.value; a.value = true;
+      try { await apiSeg("guardar", { nome: e.nome, regras: JSON.stringify(e.regras.filter((r) => r.regra)), logica: e.logica, descricao: e.descricao, marcador_auto: e.marcador_auto, antigo: e.antigo }, true);
+        toast("Segmento gravado"); ed.value = null; carregar(); } finally { a.value = false; } };
+    const apagar = async () => { if (!confirm(`Apagar o segmento «${ed.value.antigo}»?`)) return; await apiSeg("apagar", { nome: ed.value.antigo }, true); toast("Apagado"); ed.value = null; carregar(); };
+    const desc = (r) => (r.negar ? "não " : "") + r.regra + (r.valor ? ": " + r.valor : "");
+    return { l, op, ed, conta, verQuem, a, tipoDe, valoresDe, novo, abrir, gravar, apagar, desc, link };
+  },
+  template: `<div>
+    <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><h1>Segmentos</h1><div class="sub">Quem recebe cada campanha, por regras e por marcadores.</div></div>
+      <div class="acoes-lista"><button class="btn prim" @click="novo">+ Novo segmento</button><a class="btn" href="#/mkt-marcadores">Marcadores</a></div></div>
+    <div v-if="!l" class="carregar">A carregar…</div><div v-else-if="!l.length" class="vazio">Ainda não há segmentos.</div>
+    <div v-else class="tabela-wrap cartoes-movel"><table><thead><tr><th>Segmento</th><th>Regras</th><th style="text-align:right">Podem receber</th><th>Marcador automático</th></tr></thead><tbody>
+      <tr v-for="s in l" :key="s.name" @click="abrir(s)"><td class="cel-tit"><b>{{ s.name }}</b><div v-if="s.descricao" class="sub" style="font-size:12px">{{ s.descricao }}</div></td>
+        <td style="white-space:normal">{{ (s.regras||[]).map(desc).join(s.logica==='Qualquer' ? ' ou ' : ' e ') || 'Todos' }}</td><td style="text-align:right"><b>{{ s.podem_receber }}</b></td><td>{{ s.marcador_auto || '—' }}</td></tr></tbody></table></div>
+    <div v-if="ed" class="modal-fundo" @click.self="ed=null"><div class="modal" style="max-width:820px"><header><b>{{ ed.antigo ? 'Segmento' : 'Novo segmento' }}</b><button class="btn sm" @click="ed=null">Fechar</button></header>
+      <form class="reg-form" @submit.prevent="gravar">
+        <div class="reg-linha3" style="grid-template-columns:1fr 2fr"><label class="erp-campo"><span>Nome<span class="obrig">*</span></span><input v-model="ed.nome" required></label><label class="erp-campo"><span>Descrição</span><input v-model="ed.descricao"></label></div>
+        <div class="seg-logica">Entra quem cumpre <select v-model="ed.logica"><option value="Todas">todas</option><option value="Qualquer">qualquer uma</option></select> das regras:</div>
+        <div v-for="(r,i) in ed.regras" :key="i" class="seg-regra">
+          <select v-model="r.regra" @change="r.valor=''"><option value="" disabled>Regra…</option><optgroup v-for="g in op.grupos" :key="g.titulo" :label="g.titulo"><option v-for="x in g.regras" :key="x.regra" :value="x.regra">{{ x.regra }}</option></optgroup></select>
+          <select v-model.number="r.negar" class="seg-neg"><option :value="0">é</option><option :value="1">não é</option></select>
+          <template v-if="r.regra && tipoDe(r.regra)!=='nenhum'">
+            <select v-if="tipoDe(r.regra)==='lista'" v-model="r.valor"><option value="" disabled>Valor…</option><option v-for="v in valoresDe(r.regra)" :key="v" :value="v">{{ v }}</option></select>
+            <input v-else v-model="r.valor" :type="tipoDe(r.regra)==='numero' ? 'number' : 'text'" placeholder="Valor"></template><span v-else></span>
+          <button type="button" class="reg-ic" title="Tirar a regra" @click="ed.regras.splice(i,1)">×</button></div>
+        <a href="javascript:void 0" class="sub" style="font-size:12px" @click="ed.regras.push({regra:'',valor:'',negar:0})">+ Regra</a>
+        <div v-if="op.marcas.length > 1" class="reg-linha3" style="grid-template-columns:1fr 2fr"><label class="erp-campo"><span>Contar para a marca</span><select v-model="ed.marca"><option value="">Todas</option><option v-for="m in op.marcas" :key="m" :value="m">{{ m }}</option></select></label></div>
+        <div class="seg-conta" v-if="conta"><b>{{ conta.no_segmento }}</b> no segmento · <b>{{ conta.podem_receber }}</b> podem receber · {{ conta.fora.sem_base }} sem base legal · {{ conta.fora.recusou }} recusaram · {{ conta.fora.saiu }} saíram
+          <a v-if="conta.amostra.length" href="javascript:void 0" @click="verQuem=!verQuem">{{ verQuem ? 'Esconder' : 'Ver quem' }}</a></div>
+        <div v-if="verQuem && conta" class="tabela-wrap" style="margin:0;max-height:260px"><table><tbody><tr v-for="x in conta.amostra" :key="x.doctype+x.name" style="cursor:default">
+          <td><a :href="link(x.doctype,x.name)" target="_blank">{{ x.nome || x.email }}</a><div class="sub" style="font-size:12px">{{ x.email }}<template v-if="x.organizacao"> · {{ x.organizacao }}</template></div></td>
+          <td><span class="etq" :class="x.pode ? 'verde' : 'ambar'">{{ x.pode ? 'pode receber' : x.estado }}</span></td><td class="sub">{{ (x.marcadores||[]).join(', ') }}</td></tr></tbody></table></div>
+        <label class="erp-campo"><span>Pôr o marcador em quem entrar (opcional)</span><input v-model="ed.marcador_auto" placeholder="ex.: Clientes de 2026" list="marcadores-seg"><datalist id="marcadores-seg"><option v-for="v in (op.valores['Tem o marcador']||[])" :key="v" :value="v"></option></datalist></label>
+        <div class="reg-botoes"><button v-if="ed.antigo" type="button" class="btn" style="margin-right:auto" @click="apagar">Apagar</button><button type="button" class="btn" @click="ed=null">Cancelar</button><button class="btn prim" :disabled="a">Gravar</button></div>
+      </form></div></div>
+  </div>`,
+};
+const MktMarcadores = {
+  setup() { const l = ref(null); onMounted(async () => { l.value = (await apiSeg("marcadores")).marcadores; });
+    const ver = (m, dt) => { try { sessionStorage.setItem("orbit.crm.marcador", JSON.stringify({ dt, m })); } catch (e) {} location.href = "/orbit?app=crm#/" + ({ Contact: "contactos", "CRM Lead": "leads", "CRM Organization": "empresas" }[dt]); };
+    return { l, ver }; },
+  template: `<div><div class="pad" style="padding-bottom:12px"><h1>Marcadores</h1><div class="sub">Etiquetas que se põem nos contactos, leads e organizações — à mão, na importação, em massa ou por um segmento.</div></div>
+    <div v-if="!l" class="carregar">A carregar…</div><div v-else-if="!l.length" class="vazio">Ainda não há marcadores. Põem-se na ficha («Marcadores»), nas listas («Pôr marcador») ou na importação.</div>
+    <div v-else class="tabela-wrap cartoes-movel"><table><thead><tr><th>Marcador</th><th style="text-align:right">Contactos</th><th style="text-align:right">Leads</th><th style="text-align:right">Organizações</th></tr></thead><tbody>
+      <tr v-for="x in l" :key="x.marcador" style="cursor:default"><td class="cel-tit"><span class="etq">{{ x.marcador }}</span></td>
+        <td style="text-align:right"><a href="javascript:void 0" @click="ver(x.marcador,'Contact')">{{ x.contactos }}</a></td><td style="text-align:right"><a href="javascript:void 0" @click="ver(x.marcador,'CRM Lead')">{{ x.leads }}</a></td><td style="text-align:right"><a href="javascript:void 0" @click="ver(x.marcador,'CRM Organization')">{{ x.organizacoes }}</a></td></tr></tbody></table></div></div>`,
+};
+const MktModelos = {
+  setup() { const l = ref(null), ver = ref(null); onMounted(async () => { l.value = await api("orbit.marketing.page.modelos_de_email.modelos_de_email.galeria"); });
+    const usar = (m) => { try { sessionStorage.setItem("orbit.erp.novo", JSON.stringify({ doctype: "Campanha de Marketing", modelo: m.chave })); } catch (e) {} location.hash = irErp("Campanha de Marketing", "novo"); };
+    return { l, ver, usar }; },
+  template: `<div><div class="pad" style="padding-bottom:12px"><h1>Modelos de email</h1><div class="sub">Os modelos, já com a sua marca. Escolha a ver.</div></div>
+    <div v-if="!l" class="carregar">A carregar…</div>
+    <div v-else class="mkt-galeria"><div v-for="m in l" :key="m.chave" class="cartao mkt-modelo"><div class="mkt-mini" @click="ver=m"><iframe sandbox="" :srcdoc="m.html" tabindex="-1"></iframe></div>
+      <div style="padding:10px 12px"><b>{{ m.nome }}</b><div class="sub" style="font-size:12px">{{ m.para }}</div>
+        <div style="display:flex;gap:6px;margin-top:8px"><button class="btn sm" @click="ver=m">Ver</button><button class="btn sm prim" @click="usar(m)">Usar numa campanha</button></div></div></div></div>
+    <div v-if="ver" class="modal-fundo" @click.self="ver=null"><div class="modal" style="max-width:760px"><header><b>{{ ver.nome }}</b><span style="display:flex;gap:6px"><button class="btn sm prim" @click="usar(ver)">Usar</button><button class="btn sm" @click="ver=null">Fechar</button></span></header>
+      <iframe sandbox="" :srcdoc="ver.html" style="width:100%;height:75vh;border:0;background:#f2f2f0"></iframe></div></div></div>`,
+};
+// O ciclo da campanha e da automação (os botões que o ecrã antigo põe pelo script do formulário)
+const MktCiclo = {
+  props: ["doctype", "doc"], emits: ["recarregar"],
+  setup(props, { emit }) {
+    const campanha = props.doctype === "Campanha de Marketing"; const vol = ref(null); const prev = ref(null); const a = ref(false);
+    onMounted(async () => { if (campanha && props.doc.name) vol.value = await docMetodo(props.doctype, props.doc.name, "volume").catch(() => null); });
+    const passo = async (m, args, msg) => { a.value = true; try { await docMetodo(props.doctype, props.doc.name, m, args || {}); if (msg) toast(msg); emit("recarregar"); } finally { a.value = false; } };
+    const previsualizar = async () => { prev.value = await docMetodo(props.doctype, props.doc.name, "previsualizar"); };
+    const quantos = async () => { const n = await docMetodo(props.doctype, props.doc.name, "contar"); toast("Se saísse agora: " + n + " destinatários"); };
+    const rejeitar = () => { const m = prompt("Motivo da rejeição"); if (m) passo("rejeitar", { motivo: m }, "Devolvida a rascunho"); };
+    const agendar = () => { const q = prompt("Sair em (AAAA-MM-DD HH:MM)", (props.doc.agendar_para || "").slice(0, 16)); if (q) passo("agendar", { quando: q.length === 16 ? q + ":00" : q }, "Saída marcada"); };
+    const teste = () => { const p = prompt("Enviar o teste para (email)", window.__ctx?.utilizador || ""); if (p) passo("enviar_teste", { para: p }, "Teste enviado"); };
+    const montar = () => { if ((props.doc.blocos || []).length && !confirm("Os blocos atuais são substituídos pelos do modelo. Continuar?")) return; passo("montar_blocos", {}, "Blocos montados a partir do modelo"); };
+    const COR = { Rascunho: "", "Para aprovação": "ambar", Aprovada: "azul", "A enviar": "ambar", Pausada: "ambar", Enviada: "verde", Cancelada: "", Activa: "verde" };
+    return { campanha, vol, prev, a, passo, previsualizar, quantos, rejeitar, agendar, teste, montar, COR };
+  },
+  template: `<div class="mkt-ciclo"><span class="etq" :class="COR[doc.estado]">{{ doc.estado }}</span>
+    <span v-if="vol && vol.limite" class="sub" style="font-size:12px">Envios este mês: {{ vol.usado }} de {{ vol.limite }}</span>
+    <span class="mkt-botoes">
+      <button class="btn sm" @click="previsualizar">Pré-visualizar</button>
+      <template v-if="campanha"><button class="btn sm" @click="quantos">Quantos recebem</button>
+        <button v-if="doc.estado==='Rascunho'" class="btn sm" @click="montar">Montar a partir do modelo</button>
+        <template v-if="['Rascunho','Para aprovação','Aprovada'].includes(doc.estado)"><button class="btn sm" @click="teste">Enviar teste</button><button class="btn sm" @click="agendar">Marcar a saída</button></template></template>
+      <button v-if="doc.estado==='Rascunho'" class="btn sm prim" :disabled="a" @click="passo('submeter',null,'Enviada para aprovação')">Enviar para aprovação</button>
+      <button v-if="doc.estado==='Para aprovação'" class="btn sm prim" :disabled="a" @click="passo('aprovar',null, campanha ? 'Aprovada' : 'Activa')">{{ campanha ? 'Aprovar' : 'Aprovar e ativar' }}</button>
+      <button v-if="(campanha ? ['Para aprovação','Aprovada'] : ['Para aprovação']).includes(doc.estado)" class="btn sm" @click="rejeitar">Rejeitar</button>
+      <button v-if="!campanha && doc.estado==='Activa'" class="btn sm" @click="passo('pausar',null,'Pausada')">Pausar</button>
+      <button v-if="doc.estado==='Pausada'" class="btn sm" @click="passo('retomar',null,'Retomada')">Retomar</button>
+      <button v-if="!campanha && doc.estado==='Pausada'" class="btn sm" @click="passo('editar')">Devolver a rascunho</button>
+      <button v-if="campanha && !['Enviada','Cancelada'].includes(doc.estado)" class="btn sm" @click="confirm('Cancelar a campanha?') && passo('cancelar',null,'Cancelada')">Cancelar</button></span>
+    <div v-if="prev" class="modal-fundo" @click.self="prev=null"><div class="modal" style="max-width:760px"><header><b>{{ prev.assunto || 'Sem linha de assunto' }}</b><button class="btn sm" @click="prev=null">Fechar</button></header>
+      <div v-if="prev.simula" class="aviso" style="margin:10px 16px">Em simulação: nada sai.<template v-if="prev.falta && prev.falta.length"> Falta: {{ prev.falta.join('; ') }}.</template></div>
+      <iframe sandbox="" :srcdoc="prev.html" style="width:100%;height:72vh;border:0;background:#f2f2f0"></iframe></div></div></div>`,
+};
+// A mensagem a desenhar-se enquanto se escreve (como o «Como fica» do ecrã antigo)
+const MktComoFica = {
+  props: ["doc"],
+  setup(props) { const m = ref(null); let t; const desenhar = () => { clearTimeout(t); t = setTimeout(async () => { m.value = await api("orbit.marketing.mensagem.previsualizar_rascunho", { doc: JSON.stringify(props.doc) }, true).catch(() => m.value); }, 700); };
+    onMounted(desenhar); watch(() => JSON.stringify(props.doc), desenhar); return { m }; },
+  template: `<section class="cartao erp-sec"><header><b>Como fica</b><span class="sub" v-if="m">{{ m.assunto ? 'Assunto: ' + m.assunto : 'Sem linha de assunto' }}</span></header>
+    <iframe v-if="m" sandbox="" :srcdoc="m.html" class="mkt-como"></iframe><div v-else class="carregar">A desenhar…</div></section>`,
+};
+// Base legal automática (Definições do Marketing): ver quem passaria a poder receber, e só depois aplicar
+const MktBaseLegal = {
+  setup() { const p = ref(null), a = ref(false);
+    const ver = async () => { a.value = true; try { p.value = await api("orbit.marketing.base_legal.previsao"); } finally { a.value = false; } };
+    const aplicar = async () => { if (!confirm(`Aplicar a ${p.value.total} registo(s)?`)) return; a.value = true; try { const r = await api("orbit.marketing.base_legal.aplicar", {}, true); toast(r.aplicados + " registo(s) atualizados"); p.value = null; } finally { a.value = false; } };
+    return { p, a, ver, aplicar, link }; },
+  template: `<section class="cartao erp-sec"><header><b>Base legal automática</b></header><div style="padding:0 16px 14px">
+    <p class="sub" style="font-size:13px;margin:0 0 8px">Quem é cliente (comprou) ou empresa com NIPC e email profissional pode receber sem consentimento expresso. Veja primeiro quem passaria a poder receber.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" :disabled="a" @click="ver">Ver quem passaria a poder receber</button><button v-if="p && p.total" class="btn prim" :disabled="a" @click="aplicar">Aplicar ({{ p.total }})</button></div>
+    <template v-if="p"><div class="sub" style="margin:8px 0">{{ p.total }} registo(s): {{ p.b2b }} por serem empresas (b2b), {{ p.cliente }} por serem clientes.</div>
+      <div class="tabela-wrap" style="margin:0;max-height:300px"><table><thead><tr><th>Registo</th><th>Organização</th><th>Base</th><th>Antes</th></tr></thead><tbody>
+        <tr v-for="x in p.linhas" :key="x.doctype+x.name" style="cursor:default"><td><a :href="link(x.doctype,x.name)" target="_blank">{{ x.email }}</a></td><td>{{ x.organizacao || '—' }}<span v-if="x.nif" class="sub"> · {{ x.nif }}</span></td><td><span class="etq">{{ x.base }}</span></td><td class="sub">{{ x.antes }}</td></tr></tbody></table></div></template>
+  </div></section>`,
+};
+
 const ErpModulo = {
   props: ["barra"],
   setup(props) {
@@ -3320,7 +3467,8 @@ const ErpModulo = {
         if (sx.itens.length > 10) { const meio = Math.ceil(sx.itens.length / 2);
           out.push({ ...sx, titulo: t + " · 1", itens: sx.itens.slice(0, meio) }, { ...sx, titulo: t + " · 2", itens: sx.itens.slice(meio), resumos: [] }); }
         else out.push({ ...sx, titulo: t }); } return out; });
-    return { m, href, nums, valorN, res, moeda, secoes };
+    const guardarFiltro = (i) => { try { sessionStorage.setItem("orbit.erp.filtro", JSON.stringify({ doctype: i.doctype, filtros: i.filtros })); } catch (e) {} };
+    return { m, href, nums, valorN, res, moeda, secoes, guardarFiltro };
   },
   template: `<div v-if="m" class="pad">
     <h1>{{ m.titulo }}</h1><div class="sub" style="margin-bottom:16px">Documentos, configuração e relatórios deste módulo</div>
@@ -3332,7 +3480,7 @@ const ErpModulo = {
           <span><small>Em dívida</small><b>{{ res[l] && moeda(res[l].divida) }}</b></span>
           <span :class="{alerta: res[l] && res[l].vencido > 0}"><small>Vencido</small><b>{{ res[l] && moeda(res[l].vencido) }}</b></span>
           <span><small>{{ l==='receber' ? 'Faturas por receber' : 'Faturas por pagar' }}</small><b>{{ res[l] && res[l].documentos }}</b></span></a>
-        <div class="erp-itens"><a v-for="i in s.itens" :key="i.rotulo" :href="href(i)" :class="{destaque: i.tipo==='nativo'}">{{ i.rotulo }}</a></div>
+        <div class="erp-itens"><a v-for="i in s.itens" :key="i.rotulo" :href="href(i)" :class="{destaque: i.tipo==='nativo'}" @click="i.filtros && guardarFiltro(i)">{{ i.rotulo }}</a></div>
       </section>
     </div></div><div v-else class="vazio">A carregar…</div>`,
 };
@@ -3518,7 +3666,10 @@ const ErpLigacao = {
     const txt = ref(props.modelValue || ""); const ops = ref([]); const aberto = ref(false); const campo = ref(null); const pos = ref({}); let tq;
     watch(() => props.modelValue, (v) => { if (v !== txt.value) txt.value = v || ""; });
     // a lista flutua por cima da página (dentro de uma tabela com deslocamento ficava cortada)
-    const posicionar = () => { const r = campo.value?.getBoundingClientRect(); if (r) pos.value = { position: "fixed", left: r.left + "px", top: (r.bottom + 4) + "px", width: Math.max(r.width, 260) + "px", right: "auto" }; };
+    // N9 (25-11): a lista nunca sai pela margem (no telemóvel saía pela direita) nem por baixo do ecrã
+    const posicionar = () => { const r = campo.value?.getBoundingClientRect(); if (!r) return; const w = Math.min(Math.max(r.width, 260), window.innerWidth - 16);
+      const esq = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)); const baixo = window.innerHeight - r.bottom < 240 && r.top > 240;
+      pos.value = { position: "fixed", left: esq + "px", width: w + "px", right: "auto", ...(baixo ? { top: "auto", bottom: (window.innerHeight - r.top + 4) + "px" } : { top: (r.bottom + 4) + "px" }) }; };
     const procurar = () => { clearTimeout(tq); tq = setTimeout(async () => { if (!props.alvo) return; ops.value = await api("erp.procurar", props.filtros ? { doctype: props.alvo, txt: txt.value, filtros: props.filtros } : { doctype: props.alvo, txt: txt.value }); posicionar(); aberto.value = true; }, 200); };
     const escolher = (o) => { txt.value = o.v; emit("update:modelValue", o.v); aberto.value = false; };
     const sair = () => setTimeout(() => { aberto.value = false; if (txt.value !== (props.modelValue || "")) emit("update:modelValue", txt.value || null); }, 150);
@@ -3565,7 +3716,7 @@ const ErpCampo = {
     const idLista = "ac-" + Math.random().toString(36).slice(2);
     // Assinatura: desenhada num quadro, gravada como imagem (data URL), como o ecrã antigo
     const quadro = ref(null); let aDesenhar = false;
-    const ponto = (e) => { const r = quadro.value.getBoundingClientRect(); const t = e.touches?.[0] || e; return [t.clientX - r.left, t.clientY - r.top]; };
+    const ponto = (e) => { const c = quadro.value; const r = c.getBoundingClientRect(); const t = e.touches?.[0] || e; return [(t.clientX - r.left) * c.width / r.width, (t.clientY - r.top) * c.height / r.height]; };
     const comecar = (e) => { if (props.ro) return; aDesenhar = true; const g = quadro.value.getContext("2d"); g.lineWidth = 2; g.lineCap = "round"; g.strokeStyle = "#161a1d"; g.beginPath(); g.moveTo(...ponto(e)); };
     const tracar = (e) => { if (!aDesenhar) return; e.preventDefault(); const g = quadro.value.getContext("2d"); g.lineTo(...ponto(e)); g.stroke(); };
     const acabar = () => { if (!aDesenhar) return; aDesenhar = false; v.value = quadro.value.toDataURL("image/png"); };
@@ -3602,7 +3753,7 @@ const ErpCampo = {
     </div>
     <div v-else-if="c.fieldtype==='Signature'" class="erp-assinatura">
       <img v-if="v && (ro || !quadro)" :src="v" alt="Assinatura">
-      <template v-if="!ro"><canvas ref="quadro" width="420" height="140" @mousedown="comecar" @mousemove="tracar" @mouseup="acabar" @mouseleave="acabar" @touchstart="comecar" @touchmove="tracar" @touchend="acabar"></canvas>
+      <template v-if="!ro"><canvas ref="quadro" width="420" height="140" style="max-width:100%;touch-action:none" @mousedown="comecar" @mousemove="tracar" @mouseup="acabar" @mouseleave="acabar" @touchstart="comecar" @touchmove="tracar" @touchend="acabar"></canvas>
         <div><img v-if="v" :src="v" alt="" class="erp-ass-atual"><button class="btn sm" type="button" @click="limparAss">Limpar</button></div></template>
     </div>
     <template v-else-if="c.fieldtype==='Autocomplete'"><input v-model="v" :disabled="ro" :list="idLista"><datalist :id="idLista"><option v-for="o in sugestoes" :key="o" :value="o"/></datalist></template>
@@ -4362,9 +4513,9 @@ const RegistoLateral = {
         <label v-for="p in pessoas" :key="p.email" class="chk-col"><input type="checkbox" :value="p.email" v-model="escolher" :disabled="ext.atribuidos.some(x=>x.utilizador===p.email)"> {{ p.nome }}</label>
         <div class="reg-botoes"><button class="btn sm" @click="escolher=null">Cancelar</button><button class="btn sm prim" :disabled="!escolher.length" @click="atribuir(escolher)">Atribuir</button></div></div>
     </section>
-    <section v-if="ver('etiquetas')"><div class="bloco-tit">Etiquetas</div>
+    <section v-if="ver('etiquetas')"><div class="bloco-tit">{{ ['Contact','CRM Lead','CRM Organization'].includes(doctype) ? 'Marcadores' : 'Etiquetas' }}</div>
       <div class="reg-chips"><span v-for="t in ext.etiquetas" :key="t" class="reg-chip etq">{{ t }}<button v-if="ext.pode.escrever" @click="porTag(t,true)" title="Tirar">×</button></span></div>
-      <div v-if="ext.pode.escrever" class="reg-tag"><input v-model="tag" placeholder="+ Etiqueta" @input="procurarTag" @keydown.enter.prevent="porTag(tag)">
+      <div v-if="ext.pode.escrever" class="reg-tag"><input v-model="tag" :placeholder="['Contact','CRM Lead','CRM Organization'].includes(doctype) ? '+ Marcador' : '+ Etiqueta'" @input="procurarTag" @keydown.enter.prevent="porTag(tag)">
         <div v-if="sug.length" class="cartao reg-sug"><div v-for="s in sug" :key="s" @mousedown.prevent="porTag(s)">{{ s }}</div></div></div>
     </section>
     <section v-if="ver('anexos')" @dragover.prevent @drop.prevent="largar"><div class="bloco-tit">Anexos <span class="sub" style="font-weight:400">{{ ext.anexos.length }}<template v-if="ext.pode.escrever"> · <a href="javascript:void 0" @click="entrada.click()">{{ a ? 'A carregar…' : '+ Anexar' }}</a></template></span></div>
@@ -4589,7 +4740,7 @@ const ErpFicha = {
       const r = await api("erp.documento", { doctype: props.doctype, name: props.name === "novo" ? undefined : props.name });
       // U3: «Criar →» deixa o documento seguinte preparado (ex.: encomenda → fatura)
       let preparado = null; try { preparado = JSON.parse(sessionStorage.getItem("orbit.erp.novo") || "null"); } catch (e) {}
-      if (props.name === "novo" && preparado && preparado.doctype === props.doctype) { r.doc = preparado; sessionStorage.removeItem("orbit.erp.novo"); }
+      if (props.name === "novo" && preparado && preparado.doctype === props.doctype) { r.doc = Object.assign(r.doc || {}, preparado); sessionStorage.removeItem("orbit.erp.novo"); }
       doc.value = r.doc; novo.value = r.novo; podeGravar.value = r.novo ? meta.value.pode.create : r.pode_gravar; sujo.value = !!(preparado && r.novo);
       memoItens = Object.fromEntries((doc.value.items || []).map((l) => [l.name, l.item_code]));
       ultimaAss = assinatura();
@@ -4649,7 +4800,9 @@ const ErpFicha = {
       return out;
     });
     const docstatus = computed(() => doc.value?.docstatus || 0);
-    const soLeitura = computed(() => !podeGravar.value || docstatus.value === 2);
+    // Marketing: campanha/automação só se editam em rascunho (como o script do ecrã antigo)
+    const MKT = ["Campanha de Marketing", "Automacao de Marketing"];
+    const soLeitura = computed(() => !podeGravar.value || docstatus.value === 2 || (MKT.includes(props.doctype) && !novo.value && doc.value && doc.value.estado && doc.value.estado !== "Rascunho"));
     const roCampo = (c) => soLeitura.value || c.read_only || (docstatus.value === 1 && !c.allow_on_submit) || (c.read_only_depends_on && avaliar(c.read_only_depends_on, doc.value));
     const obrig = (c) => c.reqd || (c.mandatory_depends_on && avaliar(c.mandatory_depends_on, doc.value));
     const visivel = (c) => {
@@ -4751,6 +4904,7 @@ const ErpFicha = {
         <div class="total"><small>Total</small><b>{{ moeda(doc.rounded_total || doc.grand_total) }}</b></div>
         <div v-if="docstatus===1 && doc.outstanding_amount !== undefined"><small>Em dívida</small><b>{{ moeda(doc.outstanding_amount) }}</b></div>
       </div>
+      <MktCiclo v-if="['Campanha de Marketing','Automacao de Marketing'].includes(doctype) && !novo" :doctype="doctype" :doc="doc" :key="'mc'+doc.modified" @recarregar="carregar"/>
       <div v-if="atalhos.length" class="erp-atalhos"><button v-for="x in atalhos" :key="x[0]" class="reg-chip" @click="irAtalho(x)">{{ x[0] }} →</button></div>
       <div v-if="aviso" class="aviso" style="margin-top:8px">{{ aviso }}</div>
       <div v-if="precisaNome" class="erp-campo" style="max-width:420px;margin-top:10px"><label>Nome do registo<span class="obrig">*</span></label><input v-model="nomeNovo"></div>
@@ -4777,6 +4931,8 @@ const ErpFicha = {
         </section>
       </template>
     </div>
+    <div class="erp-corpo" v-if="doctype==='Campanha de Marketing'"><MktComoFica :doc="doc"/></div>
+    <div class="erp-corpo" v-if="doctype==='Definicoes de Marketing'"><MktBaseLegal/></div>
     <div v-if="ext && !novo && !meta.single" class="erp-registo">
       <div class="cartao erp-registo-principal">
         <div class="vistas" style="padding:0 14px"><button :class="{ativo: separador==='conversa'}" @click="separador='conversa'">Comentários</button><button :class="{ativo: separador==='historico'}" @click="separador='historico'">Histórico</button><button :class="{ativo: separador==='ligacoes'}" @click="separador='ligacoes'">Ligações</button></div>
@@ -4987,7 +5143,7 @@ const ErpRelatorio = {
       <template v-if="r">
         <div v-if="r.resumo.length" class="erp-totais cartao" style="margin:14px 0"><div v-for="s in r.resumo" :key="s.rotulo"><small>{{ s.rotulo }}</small><b :style="{color: s.cor==='Red'?'var(--acao)':s.cor==='Green'?'var(--verde)':'inherit'}">{{ s.tipo==='Currency' ? moedaR(s.valor) : s.valor }}</b></div></div>
         <div v-if="grafico" class="cartao erp-grafico">
-          <svg :viewBox="'0 0 ' + Math.max(grafico.labels.length*48, 300) + ' 170'" preserveAspectRatio="none">
+          <svg :viewBox="'0 0 ' + Math.max(grafico.labels.length*48, 300) + ' 170'" preserveAspectRatio="none" :style="{minWidth: Math.max(grafico.labels.length*34, 280)+'px'}">
             <template v-for="(l,i) in grafico.labels" :key="i"><template v-for="(sr,k) in grafico.series" :key="k">
               <rect :x="i*48 + 6 + k*(36/grafico.series.length)" :width="36/grafico.series.length - 2" :y="140 - Math.abs(Number(sr.values[i])||0)/grafico.max*130" :height="Math.abs(Number(sr.values[i])||0)/grafico.max*130" :fill="CORES_G[k]" rx="2"><title>{{ sr.name }}: {{ sr.values[i] }}</title></rect></template>
               <text :x="i*48+24" y="160" text-anchor="middle" font-size="10" fill="var(--ink-3)">{{ String(l).slice(0,8) }}</text></template>
@@ -5183,10 +5339,11 @@ const APPS = {
       ["sec", "Stock"], ["erp-stock", "cubo", "Inventário"]],
     modulos: ["Selling", "Buying", "Stock", "Assets", "Manufacturing", "Subcontracting", "Quality"], defs: ["Vendas e faturação"] },
   // 22-11-2026: o Marketing com o mesmo aspecto das outras apps (os ecrãs dele são da secretária, mostrados cá dentro).
-  marketing: { nome: "Marketing", sub: "Campanhas e envios", ic: "megafone", inicio: "erp-desk/%2Fdesk%2Fcampanha-de-marketing",
-    nav: [["sec", "Campanhas"], ["erp-desk/%2Fdesk%2Fcampanha-de-marketing", "megafone", "Campanhas"], ["erp-desk/%2Fdesk%2Fsegmento-de-marketing", "pessoas", "Segmentos"],
-      ["erp-desk/%2Fdesk%2Fmodelos-de-email", "mail", "Modelos de email"], ["sec", "Envios"], ["erp-desk/%2Fdesk%2Fenvio-de-marketing", "caixa", "Envios"],
-      ["erp-desk/%2Fdesk%2Fsupressao-de-marketing", "nota", "Supressões"]],
+  marketing: { nome: "Marketing", sub: "Campanhas e envios", ic: "megafone", inicio: "erp/Campanha de Marketing",
+    // 25-11-2026: tudo no ecrã novo (antes era a secretária antiga dentro do Orbit)
+    nav: [["sec", "Campanhas"], ["erp/Campanha de Marketing", "megafone", "Campanhas"], ["erp/Automacao de Marketing", "relogio", "Automações"], ["mkt-modelos", "mail", "Modelos de email"],
+      ["sec", "Público"], ["mkt-segmentos", "pessoas", "Segmentos"], ["mkt-marcadores", "nota", "Marcadores"], ["erp/Assunto de Marketing", "livro", "Assuntos de interesse"],
+      ["sec", "Envios"], ["erp/Envio de Marketing", "caixa", "Envios"], ["erp/Supressao de Marketing", "nota", "Supressões"], ["erp/Definicoes de Marketing", "roda", "Definições"]],
     modulos: [], defs: null },
   admin: { nome: "Administração", sub: "Só administradores", ic: "roda", inicio: "definicoes",
     nav: [["sec", "Plataforma"], ["definicoes", "roda", "Definições do Orbit"], ["definicoes/utilizadores", "pessoas", "Utilizadores"], ["definicoes/empresas", "grelha", "Empresas"]],
@@ -5213,7 +5370,7 @@ const abrirApp = (chave, url) => {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpPainel, ErpContas, ErpImportar, RhAprovar, RhAusencias, ErpLista, ErpFicha, ErpProposta, ErpEmitir, ErpRecibo, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, DefUtilizadores, DefEmpresas, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpPainel, ErpContas, ErpImportar, RhAprovar, RhAusencias, MktSegmentos, MktMarcadores, MktModelos, ErpLista, ErpFicha, ErpProposta, ErpEmitir, ErpRecibo, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, DefUtilizadores, DefEmpresas, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -5360,6 +5517,9 @@ const App = {
         <ErpStock v-else-if="ecra==='erp-stock'" :artigo="partes[1]" :key="'s'+(partes[1]||'')"/>
         <ErpPessoas v-else-if="ecra==='pessoas'"/>
         <RhAprovar v-else-if="ecra==='rh-aprovar'"/>
+        <MktSegmentos v-else-if="ecra==='mkt-segmentos'"/>
+        <MktMarcadores v-else-if="ecra==='mkt-marcadores'"/>
+        <MktModelos v-else-if="ecra==='mkt-modelos'"/>
         <RhAusencias v-else-if="ecra==='rh-ausencias'"/>
         <Compras v-else-if="ecra==='compras'" :nome="partes[1]" :key="'c'+(partes[1]||'')"/>
         <ErpRelatorio v-else-if="ecra==='erp-rel'" :nome="partes[1]" :key="'r'+partes[1]"/>
@@ -5384,7 +5544,7 @@ const App = {
 };
 
 const _app = createApp(App).component("AvFoto", AvFoto).component("RegistoMenu", RegistoMenu).component("RegistoLateral", RegistoLateral)
-  .component("RegistoHistorico", RegistoHistorico).component("RegistoLigacoes", RegistoLigacoes).component("RegistoArea", RegistoArea).component("TarefaForm", TarefaForm).component("NotaForm", NotaForm).component("ChamadaForm", ChamadaForm).component("EditorRico", EditorRico).component("ConversaRegisto", ConversaRegisto);
+  .component("RegistoHistorico", RegistoHistorico).component("RegistoLigacoes", RegistoLigacoes).component("RegistoArea", RegistoArea).component("TarefaForm", TarefaForm).component("NotaForm", NotaForm).component("ChamadaForm", ChamadaForm).component("MktCiclo", MktCiclo).component("MktComoFica", MktComoFica).component("MktBaseLegal", MktBaseLegal).component("EditorRico", EditorRico).component("ConversaRegisto", ConversaRegisto);
 _app.config.globalProperties.emailDoSite = emailDoSite;
 // 25-11-2026: um ecrã que falha a carregar (ex.: sem permissão) deixava «A carregar…» para sempre — passa a dizer porquê.
 // Só falhas ao ABRIR (setup/mounted): uma falha ao gravar já mostra o aviso e não pode tirar o formulário do ecrã.

@@ -21,11 +21,11 @@ OPS = {"igual": "=", "diferente": "!=", "contem": "like", "vazio": "is", "preenc
 
 # lista → [(campo, rótulo, tipo, origem das opções)]
 FILTRAVEIS = {
-    "contactos": [("orbit_responsavel", "Responsável", "user", None), ("orbit_ciclo", "Fase do ciclo de vida", "select", None),
+    "contactos": [("_user_tags", "Marcador", "texto", None), ("orbit_responsavel", "Responsável", "user", None), ("orbit_ciclo", "Fase do ciclo de vida", "select", None),
                   ("origem", "Origem", "link", "CRM Lead Source"), ("company_name", "Empresa", "texto", None),
                   ("email_id", "Email", "texto", None), ("mkt_estado", "Marketing por email", "select", None),
                   ("orbit_ultima_atividade", "Última atividade", "data", None), ("creation", "Criado", "data", None)],
-    "empresas": [("orbit_responsavel", "Responsável", "user", None), ("orbit_ciclo", "Fase do ciclo de vida", "select", None),
+    "empresas": [("_user_tags", "Marcador", "texto", None), ("orbit_responsavel", "Responsável", "user", None), ("orbit_ciclo", "Fase do ciclo de vida", "select", None),
                  ("industry", "Setor", "link", "CRM Industry"), ("territory", "Território", "link", "CRM Territory"),
                  ("tipo_conta", "Tipo de conta", "select", None), ("estado_conta", "Estado da conta", "select", None),
                  ("marca", "Marca", "link", "Brand"), ("orbit_ultima_atividade", "Última atividade", "data", None),
@@ -35,7 +35,7 @@ FILTRAVEIS = {
                  ("organization", "Empresa", "texto", None), ("deal_value", "Valor", "numero", None),
                  ("expected_closure_date", "Fecho previsto", "data", None), ("orbit_ultima_atividade", "Última atividade", "data", None),
                  ("creation", "Criado", "data", None)],
-    "leads": [("lead_owner", "Responsável", "user", None), ("status", "Estado", "link", "CRM Lead Status"),
+    "leads": [("_user_tags", "Marcador", "texto", None), ("lead_owner", "Responsável", "user", None), ("status", "Estado", "link", "CRM Lead Status"),
               ("source", "Origem", "link", "CRM Lead Source"), ("organization", "Empresa", "texto", None),
               ("marca", "Marca", "link", "Brand"), ("orbit_ultima_atividade", "Última atividade", "data", None),
               ("creation", "Criado", "data", None)],
@@ -101,7 +101,7 @@ def traduzir(objeto: str, filtros) -> list:
             continue
         campo, op = f[0], f[1]
         valor = f[2] if len(f) > 2 else None
-        if campo not in ok or op not in OPS or not (meta.has_field(campo) or campo == "creation"):
+        if campo not in ok or op not in OPS or not (meta.has_field(campo) or campo in ("creation", "_user_tags")):
             continue
         if op == "vazio":
             out.append([campo, "is", "not set"])
@@ -122,7 +122,7 @@ def metadados(objeto: str):
     from orbit.interface.api import _rotulo_estado, _nome_user
     campos = []
     for campo, rot, tipo, origem in FILTRAVEIS.get(objeto, []):
-        if not (meta.has_field(campo) or campo == "creation"):
+        if not (meta.has_field(campo) or campo in ("creation", "_user_tags")):
             continue
         opcoes = None
         if tipo == "user":

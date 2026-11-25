@@ -204,7 +204,7 @@ def _aplicar(objeto, doc, d, novo):
 
 
 @frappe.whitelist(methods=["POST"])
-def executar(codigo: str, mapeamento: str, modo: str = "atualizar", simular: int = 1):
+def executar(codigo: str, mapeamento: str, modo: str = "atualizar", simular: int = 1, marcador: str = None):
     """`mapeamento` = {índice da coluna: campo}; `modo` = atualizar | ignorar (registos que já existem)."""
     dados = frappe.cache.get_value(f"orbit:importar:{frappe.session.user}:{codigo}")
     if not dados:
@@ -219,6 +219,7 @@ def executar(codigo: str, mapeamento: str, modo: str = "atualizar", simular: int
     if not frappe.has_permission(dt, "create"):
         frappe.throw("Sem permissão para criar.", frappe.PermissionError)
     novos, atualizados, ignorados, erros = 0, 0, 0, []
+    gravados = []   # 25-11-2026 (segmentação S1–S8): o «Marcador» da importação vai para os importados
     frappe.flags.orbit_sem_recuperar = True
     for n, linha in enumerate(dados["linhas"], start=2):
         d = {campo: (linha[i] if i < len(linha) else "") for i, campo in mapa.items()}
@@ -238,6 +239,7 @@ def executar(codigo: str, mapeamento: str, modo: str = "atualizar", simular: int
             else:
                 doc.insert()
                 novos += 1
+            gravados.append(doc.name)
         except Exception as e:  # noqa: BLE001
             frappe.db.rollback(save_point="orbit_importar")
             msg = re.sub(r"<[^>]+>", "", str(e))[:160] or e.__class__.__name__
@@ -249,5 +251,9 @@ def executar(codigo: str, mapeamento: str, modo: str = "atualizar", simular: int
     else:
         frappe.db.commit()
         frappe.cache.delete_value(f"orbit:importar:{frappe.session.user}:{codigo}")
+        if (marcador or "").strip() and gravados and dt in ("Contact", "CRM Lead", "CRM Organization"):
+            from orbit.marketing.segmentos import marcar
+            marcar(dt, gravados, marcador)
+            frappe.db.commit()
     return {"simulado": bool(int(simular)), "novos": novos, "atualizados": atualizados, "ignorados": ignorados,
             "erros": erros[:200], "n_erros": len(erros)}

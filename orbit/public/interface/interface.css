@@ -842,3 +842,16 @@ tr.por-ler td b,tr.por-ler td{font-weight:600}
 .gantt-barra.g-Completed{background:#4b7a5a}.gantt-barra.g-Overdue{background:var(--acao)}.gantt-barra.g-Working{background:#46607e}.gantt-barra.g-Open{background:#8a7340}
 @media (max-width:760px){.gantt-linha{grid-template-columns:120px minmax(240px,1fr)}.gantt-esc{margin-left:120px}.aus-quadro,.gantt{margin:0 16px 16px}}
 .erp-atalhos{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.erp-atalhos .reg-chip{cursor:pointer;font:inherit;font-size:12.5px}.erp-atalhos .reg-chip:hover{border-color:var(--ink-3)}
+
+/* ── 25-11-2026: Marketing (segmentos, modelos, ciclo) e restos do N9 ── */
+.seg-logica{font-size:13px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.seg-regra{display:grid;grid-template-columns:minmax(0,1.4fr) 90px minmax(0,1fr) 28px;gap:6px;align-items:center}
+.seg-regra select,.seg-regra input{width:100%;box-sizing:border-box}
+.seg-conta{padding:10px 12px;border-radius:8px;background:var(--surface-2);font-size:13px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.mkt-galeria{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;padding:0 24px 24px}
+.mkt-modelo{overflow:hidden}.mkt-mini{height:220px;overflow:hidden;cursor:pointer;background:#f2f2f0;position:relative}
+.mkt-mini iframe{width:680px;height:880px;border:0;transform:scale(.36);transform-origin:0 0;pointer-events:none}
+.mkt-ciclo{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.mkt-botoes{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+.mkt-como{width:100%;max-width:680px;height:900px;border:1px solid var(--line);border-radius:8px;background:#f2f2f0;display:block;margin:0 16px 16px}
+.assinatura canvas,canvas[ref=quadro]{max-width:100%;touch-action:none}
+@media (max-width:760px){.seg-regra{grid-template-columns:minmax(0,1fr) 80px 28px}.seg-regra>*:nth-child(3){grid-column:1/3}.mkt-botoes{margin-left:0}.mkt-como{margin:0;height:640px}.mkt-galeria{padding:0 16px 16px}}

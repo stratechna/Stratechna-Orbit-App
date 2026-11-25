@@ -136,8 +136,12 @@ def menu(barra: str):
         if i.link_type == "DocType":
             if not frappe.db.exists("DocType", i.link_to) or not frappe.has_permission(i.link_to, "read"):
                 continue
-            atual["itens"].append({"tipo": "doc", "rotulo": _marca(_(i.label or i.link_to)), "doctype": i.link_to,
-                                   "single": frappe.get_meta(i.link_to).issingle, "icone": i.icon})
+            item = {"tipo": "doc", "rotulo": _marca(_(i.label or i.link_to)), "doctype": i.link_to,
+                    "single": frappe.get_meta(i.link_to).issingle, "icone": i.icon}
+            # 25-11-2026: «Nota de crédito/débito» abria a lista de todas as faturas — passa a abrir só as devoluções
+            if (i.label or "") in ("Credit Note", "Debit Note") and frappe.get_meta(i.link_to).has_field("is_return"):
+                item["filtros"] = [["is_return", "=", 1]]
+            atual["itens"].append(item)
         elif i.link_type == "Report":
             # U5 (21-11): os relatórios abrem na interface (#/erp-rel/<nome>)
             if frappe.db.exists("Report", i.link_to) and frappe.has_permission("Report", "read"):
