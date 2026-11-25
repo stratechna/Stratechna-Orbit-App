@@ -17,10 +17,10 @@ app_license = "agpl-3.0"
 # SUBIR ESTE NÚMERO sempre que se mexer no CSS ou no JS.
 # 20-11-2026: «Rever texto» (orbit-corrector.js; corrector.py) — também carregado por www/crm.html e www/helpdesk
 app_include_js = ["/assets/orbit/js/orbit.js?v=37", "/assets/orbit/js/orbit-corrector.js?v=3", "/api/method/orbit.barra.barra_js?app=inicio"]
-app_include_css = "/assets/orbit/css/orbit.css?v=37"
+app_include_css = "/assets/orbit/css/orbit.css?v=38"
 # As cores tambem nas paginas publicas — a entrada e a primeira coisa que
 # alguem ve, e e servida pelo lado do site e nao pela secretaria.
-web_include_css = "/assets/orbit/css/orbit.css?v=37"
+web_include_css = "/assets/orbit/css/orbit.css?v=38"
 # 17-10-2026: na página de entrada, seguir para o portal (entrada única) quando o tenant o tem ligado
 web_include_js = ["/assets/orbit/js/entrada.js?v=10", "/api/method/orbit.barra.barra_js?app=wiki"]
 
@@ -156,8 +156,14 @@ doc_events = {
     # 10-11-2026: marca → série/timbre/textos, linhas de transporte e montagem, IVA (orbit/propostas/regras.py)
     # 10-11-2026: a marca do artigo pelo prefixo da referência (A… JFusados, N… Arnox) → armazém da marca
     "Item": {"before_validate": "orbit.marcas_artigos.antes_de_validar_artigo"},
-    "Quotation": {"before_insert": "orbit.propostas.regras.antes_de_inserir",
-                  "before_validate": "orbit.propostas.regras.antes_de_validar"},
+    "Quotation": {"before_insert": ["orbit.propostas.regras.antes_de_inserir", "orbit.propostas.negocio.antes_de_inserir"],
+                  "before_validate": "orbit.propostas.regras.antes_de_validar",
+                  # 25-11-2026: o orçamento abre ou liga a um negócio do CRM e o negócio segue-o
+                  "after_insert": "orbit.propostas.negocio.depois_de_inserir",
+                  "on_submit": "orbit.propostas.negocio.ao_submeter",
+                  "on_change": "orbit.propostas.negocio.ao_mudar",
+                  "on_cancel": "orbit.propostas.negocio.ao_mudar"},
+    "Sales Order": {"on_submit": "orbit.propostas.negocio.encomenda_submetida"},
 }
 
 # 10-11-2026: «Adicionar por referência» e a marca no Orçamento; o modelo de impressão lê orbit_proposta(doc)

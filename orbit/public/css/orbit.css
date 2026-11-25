@@ -12,6 +12,13 @@
  */
 
 /* ── Barra de cima: símbolo maior, com o nome ao lado ───────────────────── */
+/* 25-11-2026 (Vítor): a barra fica presa em cima ao rolar e era transparente — via-se a página a passar por trás.
+   Fundo da própria barra do Frappe (claro e escuro) e um filete por baixo. */
+.desktop-navbar {
+	background: var(--navbar-bg, var(--bg-color, #fff)) !important;
+	box-shadow: 0 1px 0 var(--border-color, rgba(0, 0, 0, .08));
+	z-index: 30;
+}
 .desktop-navbar .navbar-home {
 	display: flex;
 	align-items: center;

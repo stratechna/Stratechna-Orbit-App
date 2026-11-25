@@ -1746,9 +1746,14 @@ const Ficha = {
       carregarAssin();
       apiTm("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (tempo.value = r)).catch(() => {});
       apiV("do_registo", { doctype: props.doctype, name: props.name }).then((r) => (vendas.value = r)).catch(() => {});
+      if (props.doctype === "CRM Deal") apiP("negocio.do_negocio", { negocio: props.name }).then((r) => (orcs.value = r)).catch(() => {});
       carregarConv();
     };
     const vendas = ref(null);
+    // 25-11-2026: orçamentos do negócio (docs/PLANO-ORCAMENTO-NEGOCIO-ORBIT.md)
+    const orcs = ref(null);
+    const criarOrcamento = () => { try { sessionStorage.setItem("orbit.novoOrcamento", props.name); } catch (e) {} location.hash = irErp("Quotation", "novo"); };
+    const COR_ORC = { Rascunho: "", Enviado: "azul", Respondido: "azul", Encomendado: "verde", "Parcialmente encomendado": "verde", Perdido: "verm", Anulado: "", Expirado: "" };
     const conv = ref(null); const convForm = ref(null); const aConverter = ref(false);
     const carregarConv = async () => { if (props.doctype === "CRM Lead") conv.value = await api("sugestao_conversao", { lead: props.name }); };
     const abrirConversao = async () => { if (!conv.value) await carregarConv();
@@ -1828,7 +1833,7 @@ const Ficha = {
     const ic = (t) => IC_EVENTO[t] || IC_EVENTO.nota;
     const marcarEmail = () => { window.__ref_email = (f.value && f.value.email_principal) || ""; };
     const novoEmail = ref(false);
-    return { tornarPrincipal, PAISES_PT, alternarCheck, alternarMarca, edMorada, editarMorada, gravarMorada, novoEmail, conv, convForm, aConverter, abrirConversao, converter, pode, assocAberta, assocQ, assocRes, abrirAssoc, procurarAssoc, ligarAssoc, tirarAssoc, vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
+    return { orcs, criarOrcamento, COR_ORC, irErp, tornarPrincipal, PAISES_PT, alternarCheck, alternarMarca, edMorada, editarMorada, gravarMorada, novoEmail, conv, convForm, aConverter, abrirConversao, converter, pode, assocAberta, assocQ, assocRes, abrirAssoc, procurarAssoc, ligarAssoc, tirarAssoc, vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
       grupos, mudarFase, NOMES, tit, sub, link, data, eur, ic, cor, ESTADO_COR };
   },
   template: `
@@ -1980,6 +1985,11 @@ const Ficha = {
         <div class="bloco-tit">Tempo <a class="sub" style="font-weight:400" href="#/tempo" @click="registarTempo">+ Registar</a></div>
         <div class="assoc"><b>{{ fmtH(tempo.mes) }} este mês</b><small>{{ fmtH(tempo.tres_meses) }} nos últimos 3 meses</small></div>
         <div v-for="(u,i) in tempo.ultimos" :key="i" class="sub" style="font-size:12px;margin:2px 0 6px">{{ fmtH(u.hours) }} · {{ data(u.from_time,false) }} — {{ (u.description||'').slice(0,60) }}</div>
+      </template>
+      <template v-if="doctype==='CRM Deal' && orcs && orcs.erp">
+        <div class="bloco-tit">Orçamentos <a v-if="orcs.pode_criar" class="sub" style="font-weight:400" href="javascript:void(0)" @click="criarOrcamento">+ Criar orçamento</a></div>
+        <div v-if="!orcs.itens.length" class="sub" style="font-size:13px">—</div>
+        <div v-for="x in orcs.itens" :key="x.name" class="assoc"><a :href="irErp('Quotation', x.name)" style="text-decoration:none;color:inherit"><b>{{ x.name }}<span v-if="x.versao"> · {{ x.versao }}</span></b></a><small><span class="etq" :class="COR_ORC[x.estado]" style="font-size:11px">{{ x.estado }}</span> · {{ eur(x.valor_negocio || x.sem_iva) }}<span v-if="x.valor_negocio"> (negócio)</span> · {{ data(x.data,false) }} · <a :href="x.pdf" target="_blank">PDF</a><a v-if="x.link_portal" :href="x.link_portal" target="_blank"> · {{ x.ref_portal }}</a></small></div>
       </template>
       <template v-if="vendas && vendas.tem_cliente">
         <div class="bloco-tit">Propostas <a v-if="vendas.nova_proposta" class="sub" style="font-weight:400" :href="vendas.nova_proposta" target="_blank">+ Nova</a></div>
@@ -2797,7 +2807,7 @@ const ErpLigacao = {
     watch(() => props.modelValue, (v) => { if (v !== txt.value) txt.value = v || ""; });
     // a lista flutua por cima da página (dentro de uma tabela com deslocamento ficava cortada)
     const posicionar = () => { const r = campo.value?.getBoundingClientRect(); if (r) pos.value = { position: "fixed", left: r.left + "px", top: (r.bottom + 4) + "px", width: Math.max(r.width, 260) + "px", right: "auto" }; };
-    const procurar = () => { clearTimeout(tq); tq = setTimeout(async () => { if (!props.alvo) return; ops.value = await api("erp.procurar", { doctype: props.alvo, txt: txt.value }); posicionar(); aberto.value = true; }, 200); };
+    const procurar = () => { clearTimeout(tq); tq = setTimeout(async () => { if (!props.alvo) return; ops.value = await api("erp.procurar", props.filtros ? { doctype: props.alvo, txt: txt.value, filtros: props.filtros } : { doctype: props.alvo, txt: txt.value }); posicionar(); aberto.value = true; }, 200); };
     const escolher = (o) => { txt.value = o.v; emit("update:modelValue", o.v); aberto.value = false; };
     const sair = () => setTimeout(() => { aberto.value = false; if (txt.value !== (props.modelValue || "")) emit("update:modelValue", txt.value || null); }, 150);
     const foco = ref(false);
@@ -3023,7 +3033,11 @@ const ErpProposta = {
     const carregar = async () => {
       const [r, ms] = await Promise.all([api("erp.documento", { doctype: "Quotation", name: props.name === "novo" ? undefined : props.name }), apiP("versoes.marcas")]);
       marcas.value = ms || []; doc.value = r.doc; novo.value = r.novo; podeGravar.value = r.novo ? true : r.pode_gravar;
-      if (novo.value) { doc.value.quotation_to = doc.value.quotation_to || "Customer"; if (doc.value.orbit_imprimir_total == null) doc.value.orbit_imprimir_total = 1; }
+      if (novo.value) { doc.value.quotation_to = doc.value.quotation_to || "Customer"; if (doc.value.orbit_imprimir_total == null) doc.value.orbit_imprimir_total = 1;
+        // 25-11-2026: «Criar orçamento» na ficha do negócio — vem com o negócio, o cliente, o contacto e a marca
+        let ng = null; try { ng = sessionStorage.getItem("orbit.novoOrcamento"); sessionStorage.removeItem("orbit.novoOrcamento"); } catch (e) {}
+        if (ng) { const d = await apiP("negocio.dados_para_orcamento", { negocio: ng }).catch(() => null);
+          if (d) Object.keys(d).forEach((k) => { if (d[k]) doc.value[k] = d[k]; }); } }
       versoes.value = r.novo ? [] : (await apiP("versoes.versoes", { name: props.name }) || []);
       await nextTick(); sujo.value = false; ultima = assin();
     };
@@ -3099,7 +3113,7 @@ const ErpProposta = {
     const titulo = computed(() => doc.value?.customer_name || doc.value?.party_name || "Nova proposta");
     const curtas = (l) => caractPares(l.orbit_caracteristicas).slice(0, 6);
     const nCaract = (l) => caractPares(l.orbit_caracteristicas).length;
-    return { doc, novo, sujo, a, aviso, marcas, versoes, ro, linhas, docstatus, moeda, totais, marcaSel, corMarca, q, sug, procurando, acrescentar, internet, remover,
+    return { link, doc, novo, sujo, a, aviso, marcas, versoes, ro, linhas, docstatus, moeda, totais, marcaSel, corMarca, q, sug, procurando, acrescentar, internet, remover,
       gravar, alternativa, submeter, encomenda, pdf, envio, abrirEnvio, enviar, titulo, curtas, nCaract, abertas, irErp, ESTADO_DOC };
   },
   template: `<div v-if="doc" class="pad prop">
@@ -3131,6 +3145,7 @@ const ErpProposta = {
             <label>Cliente<ErpLigacao v-model="doc.party_name" :alvo="doc.quotation_to" :ro="ro"/></label>
             <label>Ao cuidado de<ErpLigacao v-model="doc.contact_person" alvo="Contact" :ro="ro"/></label>
             <label>Válida até<input type="date" v-model="doc.valid_till" :disabled="ro"></label>
+            <label>Negócio<ErpLigacao v-model="doc.orbit_negocio" alvo="CRM Deal" :ro="ro || !!doc.orbit_proposta_base" :filtros="JSON.stringify({status: ['not in', ['Won','Lost']]})"/><small class="sub" v-if="!doc.orbit_negocio && !ro">Vazio = nasce um negócio novo ao gravar</small><a v-else-if="doc.orbit_negocio" class="sub" :href="link('CRM Deal', doc.orbit_negocio)">Abrir o negócio</a></label>
             <div class="larga prop-intro"><span class="rotulo-campo">Introdução</span><EditorRico v-model="doc.orbit_texto_intro" :ro="ro" placeholder="Na sequência do seu pedido, apresentamos…"/></div>
           </div>
         </section>

@@ -1456,3 +1456,100 @@ def acertar_linguas(pessoas):
         contas[r] = contas.get(r, 0) + 1
     frappe.db.commit()
     return contas
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Propostas do portal → orçamento no Orbit (25-11-2026, docs/PLANO-ORCAMENTO-NEGOCIO-ORBIT.md N3)
+# A proposta do portal é a fonte; o orçamento é o espelho dela e é ele que abre ou liga ao negócio.
+# Chave: `orbit_ref_portal` = referência da proposta (P-2026-0012). Rascunho enquanto a proposta está em aberto
+# (as linhas e o valor acompanham o portal); ganha → submetido e «Ordered»; perdida → submetido e «Lost».
+# ═══════════════════════════════════════════════════════════════════════════
+def _artigo_portal(codigo, nome):
+    codigo = (codigo or "").strip()[:140] or "SERVICO-PORTAL"
+    if frappe.db.exists("Item", codigo):
+        return codigo
+    grupo = "Services" if frappe.db.exists("Item Group", "Services") else \
+        frappe.db.get_value("Item Group", {"is_group": 0}, "name")
+    uom = frappe.db.get_single_value("Stock Settings", "stock_uom") or "Nos"
+    frappe.get_doc({"doctype": "Item", "item_code": codigo, "item_name": (nome or codigo)[:140], "description": nome or codigo,
+                    "item_group": grupo, "stock_uom": uom, "is_stock_item": 0, "include_item_in_manufacturing": 0,
+                    "is_sales_item": 1, "is_purchase_item": 0}).insert(ignore_permissions=True)
+    return codigo
+
+
+def _linhas_portal(doc, linhas):
+    doc.set("items", [])
+    for l in linhas or []:
+        cod = _artigo_portal(l.get("codigo"), l.get("nome"))
+        preco = flt(l.get("preco"))
+        doc.append("items", {"item_code": cod, "item_name": (l.get("nome") or cod)[:140],
+                             "description": l.get("descricao") or l.get("nome") or cod,
+                             "qty": flt(l.get("quantidade")) or 1, "rate": preco, "price_list_rate": preco,
+                             "orbit_observacoes": _limpo(l.get("nota"))})
+    if not doc.items:
+        cod = _artigo_portal("SERVICO-PORTAL", "Serviços da proposta")
+        doc.append("items", {"item_code": cod, "qty": 1, "rate": 0, "price_list_rate": 0})
+
+
+@frappe.whitelist()
+def orcamento_portal(dados):
+    _so_portal()
+    from frappe.utils import add_days, getdate, nowdate
+    from orbit.propostas import negocio as N
+    d = _dados(dados) or {}
+    ref = _limpo(d.get("Referencia"))
+    if not ref:
+        frappe.throw("Falta a referência da proposta.")
+    sem_erp = not frappe.db.exists("DocType", "Quotation")
+    q = None if sem_erp else frappe.db.get_value("Quotation", {"orbit_ref_portal": ref, "docstatus": ["<", 2]}, "name",
+                                                 order_by="creation desc")
+    if q:
+        doc = frappe.get_doc("Quotation", q)
+        neg = doc.orbit_negocio
+    else:
+        neg = _limpo(d.get("Negocio"))
+        if neg and not frappe.db.exists("CRM Deal", neg):
+            neg = frappe.db.get_value("CRM Deal", {"zoho_id": neg}) or None
+        if not neg:
+            neg = criar_deal(dados)["id"]
+        if sem_erp:
+            atualizar_deal(neg, {k: v for k, v in d.items() if k in ("Stage", "Amount", "Closing_Date", "Lost_Reason", "Lost_Notes")})
+            return {"id": neg, "negocio": neg, "orcamento": None}
+        deal = frappe.get_doc("CRM Deal", neg)
+        para, parte = N.cliente_do_negocio(deal)
+        empresa = frappe.defaults.get_global_default("company") or frappe.db.get_value("Company", {}, "name")
+        doc = frappe.new_doc("Quotation")
+        doc.update({"quotation_to": para, "party_name": parte, "company": empresa, "transaction_date": nowdate(),
+                    "orbit_negocio": neg, "orbit_ref_portal": ref, "ignore_pricing_rule": 1, "orbit_imprimir_total": 1,
+                    "orbit_marca": deal.get("marca") if deal.get("marca") and frappe.db.exists("Brand", deal.get("marca")) else None})
+        cont = next((c.contact for c in deal.get("contacts") or [] if c.is_primary), None)
+        if cont:
+            doc.contact_person = cont
+    if doc.docstatus == 0:
+        if "Linhas" in d or doc.is_new():
+            _linhas_portal(doc, d.get("Linhas"))
+        if "Amount" in d:
+            doc.orbit_valor_negocio = flt(d.get("Amount"))
+        if d.get("Link"):
+            doc.orbit_link_portal = d["Link"][:140]
+        fecho = d.get("Closing_Date")
+        hoje = getdate(doc.transaction_date or nowdate())
+        doc.valid_till = fecho if fecho and getdate(fecho) >= hoje else add_days(hoje, 30)
+        doc.flags.ignore_permissions = True
+        doc.save() if not doc.is_new() else doc.insert()
+    # a fase que o portal indica manda no negócio (como antes); o valor vem dos orçamentos
+    fase = d.get("Stage")
+    if fase:
+        atualizar_deal(neg, {k: v for k, v in d.items() if k in ("Stage", "Closing_Date", "Lost_Reason", "Lost_Notes")})
+    final = FASES.get(fase, fase) if fase else None
+    if final in ("Won", "Lost") and doc.docstatus == 0:
+        try:
+            doc.flags.ignore_permissions = True
+            doc.submit()
+        except Exception:
+            frappe.log_error(title=f"Orçamento do portal {ref}: submeter")
+    if final in ("Won", "Lost") and doc.docstatus == 1 and doc.status != ("Ordered" if final == "Won" else "Lost"):
+        doc.db_set("status", "Ordered" if final == "Won" else "Lost", update_modified=False)
+    N.actualizar(neg)
+    frappe.db.commit()
+    return {"id": neg, "negocio": neg, "orcamento": doc.name}
