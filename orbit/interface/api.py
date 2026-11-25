@@ -906,7 +906,7 @@ def caixa(grupo: str = "todos", conta: str = "", minhas: int = 0):
                                  fields=["name", "subject", "raised_by", "status", "modified", "_assign"],
                                  order_by="modified desc", limit=50):
             out.append({"tipo": "ticket", "grupo": "equipa", "id": t.name, "titulo": t.subject, "quem": t.raised_by, "email": t.raised_by,
-                        "data": t.modified, "estado": _rotulo_estado(t.status), "url": f"/helpdesk/tickets/{t.name}",
+                        "data": t.modified, "estado": _rotulo_estado(t.status), "url": f"/orbit?app=desk#/ticket/{t.name}",
                         "atribuido": bool(t._assign and t._assign != "[]"), "responsavel": _resp(t._assign)})
     filtros = {"communication_medium": "Email", "communication_type": "Communication",
                "communication_date": [">", add_days(now_datetime(), -30)],

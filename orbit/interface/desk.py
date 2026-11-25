@@ -18,7 +18,7 @@ TIPOS_PT = {"Unspecified": "Não indicado", "Question": "Pergunta", "Bug": "Erro
 SLA_PT = {"First Response Due": "À espera da 1.ª resposta", "Resolution Due": "À espera da resolução", "Failed": "Prazo falhado",
           "Fulfilled": "Cumprido", "Paused": "Em pausa"}
 _CAMPOS = ["name", "subject", "status", "priority", "ticket_type", "agent_group", "_assign", "raised_by", "contact", "customer",
-           "opening_date", "modified", "response_by", "resolution_by", "first_responded_on", "agreement_status"]
+           "opening_date", "modified", "response_by", "resolution_by", "first_responded_on", "agreement_status", "_seen"]
 
 
 def _guarda():
@@ -61,12 +61,16 @@ def _linha(t, nomes_user):
             "marca": t.get("orbit_marca"), "responsavel": resp, "responsavel_nome": nomes_user(resp) if resp else "",
             "cliente": t.contact or t.raised_by, "email": t.raised_by, "aberto": t.opening_date, "atividade": t.modified,
             "prazo": t.resolution_by if t.first_responded_on else t.response_by, "sla": SLA_PT.get(t.agreement_status, t.agreement_status),
-            "atrasado": bool(t.agreement_status == "Failed")}
+            "atrasado": bool(t.agreement_status == "Failed"),
+            # lote 3 (25-11): «por ler» a negrito, como no Helpdesk (quem já abriu fica em _seen)
+            "por_ler": frappe.session.user not in (t.get("_seen") or ""), "tipo": t.ticket_type,
+            "pausa": _categoria(t.status) == "Paused"}
 
 
 @frappe.whitelist()
 def tickets(vista: str = "abertos", q: str = "", equipa: str = "", estado: str = "", prioridade: str = "", marca: str = "",
-            pagina: int = 0):
+            pagina: int = 0, responsavel: str = "", tipo: str = "", cliente: str = "", desde: str = "", ate: str = "",
+            ordem: str = "atividade"):
     _guarda()
     from orbit.interface.api import _nome_user
     meta = frappe.get_meta("HD Ticket")
@@ -80,10 +84,23 @@ def tickets(vista: str = "abertos", q: str = "", equipa: str = "", estado: str =
         f.append(["priority", "=", prioridade])
     if marca and meta.has_field("orbit_marca"):
         f.append(["orbit_marca", "=", marca])
+    # lote 3 (25-11): filtros e ordem como na lista do Helpdesk
+    if responsavel:
+        f.append(["_assign", "like", f'%"{responsavel}"%'] if responsavel != "-" else ["_assign", "in", ["", "[]", None]])
+    if tipo:
+        f.append(["ticket_type", "=", tipo])
+    if cliente:
+        f.append(["customer", "=", cliente])
+    if desde:
+        f.append(["opening_date", ">=", desde])
+    if ate:
+        f.append(["opening_date", "<=", ate])
+    from orbit.interface.desk_mais import ORDENS
+    ordem_sql = ORDENS.get(ordem, "modified desc")
     q = (q or "").strip()
     ou = [["subject", "like", f"%{q}%"], ["raised_by", "like", f"%{q}%"], ["name", "like", f"%{q}%"]] if q else None
     pg = max(cint(pagina), 0)
-    linhas = frappe.get_list("HD Ticket", filters=f, or_filters=ou, fields=campos, order_by="modified desc",
+    linhas = frappe.get_list("HD Ticket", filters=f, or_filters=ou, fields=campos, order_by=ordem_sql,
                              limit_start=pg * 50, limit_page_length=51)
     contagens = {v: len(frappe.get_list("HD Ticket", filters=_filtros(v), pluck="name", limit=2000))
                  for v in ("abertos", "meus", "sem_resposta", "fora_prazo")}

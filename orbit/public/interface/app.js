@@ -1339,7 +1339,31 @@ const AvFoto = {
 const DeskTickets = {
   setup() {
     let v0 = "abertos"; try { v0 = localStorage.getItem("orbit.desk.vista") || v0; } catch (e) {}
-    const vista = ref(v0); const q = ref(""); const f = ref({ equipa: "", estado: "", prioridade: "", marca: "" });
+    const vista = ref(v0); const q = ref(""); const f = ref({ equipa: "", estado: "", prioridade: "", marca: "", responsavel: "", tipo: "", desde: "", ate: "", ordem: "atividade" });
+    // lote 3 (25-11): selecção e acções em massa, colunas, «Novo ticket», actualização automática, prazos em contagem
+    const sel = ref([]); const massa = ref({ acao: "", valor: "" }); const novoT = ref(null); const maisF = ref(false); const verCols = ref(false);
+    const COLS = [["cliente", "Cliente"], ["estado", "Estado"], ["prioridade", "Prioridade"], ["equipa", "Equipa"], ["responsavel", "Responsável"], ["prazo", "Prazo"], ["atividade", "Última atividade"]];
+    let esc0 = []; try { esc0 = JSON.parse(localStorage.getItem("orbit.desk.cols.escondidas") || "[]"); } catch (e) {}
+    const escondidas = ref(esc0); const ver = (c) => !escondidas.value.includes(c);
+    const alternarCol = (c) => { escondidas.value = ver(c) ? escondidas.value.concat([c]) : escondidas.value.filter((x) => x !== c); try { localStorage.setItem("orbit.desk.cols.escondidas", JSON.stringify(escondidas.value)); } catch (e) {} };
+    const agoraT = ref(Date.now()); let relT = setInterval(() => { agoraT.value = Date.now(); if (!document.hidden && modoRef && modoRef.value === "lista" && !sel.value.length) carregar(); }, 60000);
+    onUnmounted(() => clearInterval(relT));
+    const falta = (t) => { if (!t.prazo) return ""; const ms = new Date(String(t.prazo).replace(" ", "T")) - agoraT.value; const h = Math.round(Math.abs(ms) / 36e5);
+      const txt = h >= 48 ? Math.round(h / 24) + " d" : h >= 1 ? h + " h" : Math.max(1, Math.round(Math.abs(ms) / 6e4)) + " min"; return ms < 0 ? "atrasado " + txt : "faltam " + txt; };
+    const todosSel = computed({ get: () => !!(d.value && d.value.linhas.length && sel.value.length === d.value.linhas.length), set: (v) => (sel.value = v ? d.value.linhas.map((x) => x.name) : []) });
+    const OPS_MASSA = [["atribuir", "Atribuir a"], ["estado", "Mudar o estado"], ["prioridade", "Mudar a prioridade"], ["equipa", "Mudar a equipa"], ["tipo", "Mudar o tipo"], ["apagar", "Apagar"]];
+    const opcoesMassa = computed(() => { const m = meta.value || {}; return { atribuir: m.agentes || [], estado: m.estados || [], prioridade: m.prioridades || [], equipa: (m.equipas || []).map((x) => ({ v: x, r: x })), tipo: m.tipos || [] }[massa.value.acao] || []; });
+    const aplicarMassa = async () => { const m = massa.value; if (!m.acao) return; if (m.acao === "apagar" && !confirm(`Apagar ${sel.value.length} ticket(s)? Não se desfaz.`)) return;
+      const r = await api("desk_mais.em_massa", { nomes: JSON.stringify(sel.value), acao: m.acao, valor: m.valor }, true);
+      toast(`${r.feitos} atualizado(s)` + (r.falhas.length ? ` · ${r.falhas.length} falharam` : "")); sel.value = []; massa.value = { acao: "", valor: "" }; carregar(); };
+    const exportar = () => { const esc = (x) => `"${String(x ?? "").replace(/"/g, '""')}"`;
+      const t = [["N.º", "Assunto", "Cliente", "Estado", "Prioridade", "Equipa", "Responsável", "Prazo", "Última atividade"].map(esc).join(";")]
+        .concat((d.value?.linhas || []).filter((x) => !sel.value.length || sel.value.includes(x.name)).map((x) => [x.name, x.assunto, x.cliente, x.estado_pt, x.prioridade_pt, x.equipa, x.responsavel_nome, x.prazo, x.atividade].map(esc).join(";"))).join("\n");
+      const b = new Blob(["\ufeff" + t], { type: "text/csv;charset=utf-8" }); const u = URL.createObjectURL(b); const el = document.createElement("a"); el.href = u; el.download = "tickets.csv"; el.click(); URL.revokeObjectURL(u); };
+    const procurarC = ref([]); let tqc;
+    const procurarContacto = () => { clearTimeout(tqc); tqc = setTimeout(async () => { procurarC.value = await api("desk_mais.clientes_e_contactos", { q: novoT.value.email }).catch(() => []); }, 250); };
+    const criarTicket = async () => { const r = await api("desk_mais.criar", { dados: JSON.stringify(novoT.value) }, true); novoT.value = null; toast("Ticket #" + r.name + " criado"); location.hash = "#/ticket/" + r.name; };
+    let modoRef = null;
     const d = ref(null); const meta = ref(null); const pagina = ref(0); let tq;
     const carregar = async (junta = false) => {
       const r = await api("desk.tickets", { vista: vista.value, q: q.value, pagina: pagina.value, ...f.value });
@@ -1353,7 +1377,7 @@ const DeskTickets = {
     const abrir = (t) => { location.hash = "#/ticket/" + encodeURIComponent(t.name); };
     // 23-11-2026 (K1): funil por estado, com arrastar; para Resolvido/Fechado pede-se a resolução
     let m0 = "lista"; try { m0 = localStorage.getItem("orbit.desk.modo") || m0; } catch (e) {}
-    const modo = ref(m0); const fn = ref(null); const arr = ref(null); const resolver = ref(null);
+    const modo = ref(m0); modoRef = modo; const fn = ref(null); const arr = ref(null); const resolver = ref(null);
     const carregarFunil = async () => { fn.value = await api("desk.funil", { q: q.value, ...f.value, meus: vista.value === "meus" ? 1 : 0 }); };
     const mudarModo = (m) => { modo.value = m; try { localStorage.setItem("orbit.desk.modo", m); } catch (e) {} if (m === "funil") carregarFunil(); };
     if (m0 === "funil") onMounted(carregarFunil);
@@ -1368,11 +1392,13 @@ const DeskTickets = {
       await api("desk.mudar_estado", { nome: resolver.value.t.name, estado: resolver.value.estado, nota: resolver.value.nota }, true);
       toast("#" + resolver.value.t.name + " → " + resolver.value.r); resolver.value = null; carregarFunil();
     };
-    return { vista, q, f, d, meta, pagina, carregar, escolher, VISTAS_D, data, abrir, modo, mudarModo, fn, arr, largar, resolver, confirmar };
+    return { vista, q, f, d, meta, pagina, carregar, escolher, VISTAS_D, data, abrir, modo, mudarModo, fn, arr, largar, resolver, confirmar,
+      sel, massa, novoT, maisF, verCols, COLS, ver, alternarCol, falta, todosSel, OPS_MASSA, opcoesMassa, aplicarMassa, exportar, procurarC, procurarContacto, criarTicket };
   },
   template: `
   <div>
     <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap"><div><h1>Tickets</h1><div class="sub">Pedidos de atendimento do Desk.</div></div>
+      <div class="acoes-lista"><button class="btn prim" @click="novoT={email:'',assunto:'',descricao:'',prioridade:'',tipo:'',equipa:'',responsavel:''}">+ Novo ticket</button><button class="btn" @click="exportar">Exportar</button></div>
       <div class="vistas" style="padding:0;margin:0"><button :class="{ativo: modo==='lista'}" @click="mudarModo('lista')">Lista</button><button :class="{ativo: modo==='funil'}" @click="mudarModo('funil')">Funil</button></div></div>
     <div class="vistas" v-if="modo==='lista'">
       <button v-for="v in VISTAS_D" :key="v[0]" :class="{ativo: vista===v[0]}" @click="escolher(v[0])">{{ v[1] }}<span v-if="d && d.contagens[v[0]] != null" class="sub"> {{ d.contagens[v[0]] }}</span></button>
@@ -1383,6 +1409,23 @@ const DeskTickets = {
       <select v-if="meta.marcas.length" class="filtro" v-model="f.marca"><option value="">Todas as marcas</option><option v-for="m in meta.marcas" :key="m" :value="m">{{ m }}</option></select>
       <select class="filtro" v-model="f.estado"><option value="">Todos os estados</option><option v-for="e in meta.estados" :key="e.v" :value="e.v">{{ e.r }}</option></select>
       <select class="filtro" v-model="f.prioridade"><option value="">Todas as prioridades</option><option v-for="e in meta.prioridades" :key="e.v" :value="e.v">{{ e.r }}</option></select>
+      <button class="filtro" @click="maisF=!maisF">{{ maisF ? '− Menos filtros' : '+ Filtros' }}</button>
+      <template v-if="maisF">
+        <select class="filtro" v-model="f.responsavel"><option value="">Qualquer responsável</option><option value="-">Sem responsável</option><option v-for="a in meta.agentes" :key="a.v" :value="a.v">{{ a.r }}</option></select>
+        <select class="filtro" v-model="f.tipo"><option value="">Todos os tipos</option><option v-for="e in meta.tipos" :key="e.v" :value="e.v">{{ e.r }}</option></select>
+        <label class="filtro" style="display:flex;gap:4px;align-items:center">Aberto de <input type="date" v-model="f.desde" style="border:0;background:none;color:inherit"></label>
+        <label class="filtro" style="display:flex;gap:4px;align-items:center">até <input type="date" v-model="f.ate" style="border:0;background:none;color:inherit"></label>
+      </template>
+      <select class="filtro" v-model="f.ordem" style="margin-left:auto"><option value="atividade">Última atividade</option><option value="abertura">Mais recentes</option><option value="abertura_asc">Mais antigos</option><option value="prazo">Prazo mais próximo</option><option value="prioridade">Prioridade</option></select>
+      <span class="filtro-novo"><button class="filtro" @click="verCols=!verCols">Colunas ▾</button>
+        <div v-if="verCols" class="cartao pop-filtro" style="right:0;left:auto;min-width:200px"><label v-for="c in COLS" :key="c[0]" class="chk-col"><input type="checkbox" :checked="ver(c[0])" @change="alternarCol(c[0])"> {{ c[1] }}</label></div></span>
+    </div>
+    <div v-if="sel.length" class="selec" style="margin:0 24px;border-radius:10px 10px 0 0;flex-wrap:wrap">
+      {{ sel.length }} selecionado(s) ·
+      <select class="btn sm" v-model="massa.acao" @change="massa.valor=''"><option value="">Ação…</option><option v-for="o in OPS_MASSA" :key="o[0]" :value="o[0]">{{ o[1] }}</option></select>
+      <select v-if="opcoesMassa.length" class="btn sm" v-model="massa.valor"><option value="">— escolher —</option><option v-for="o in opcoesMassa" :key="o.v" :value="o.v">{{ o.r }}</option></select>
+      <button class="btn sm prim" @click="aplicarMassa" :disabled="!massa.acao || (massa.acao!=='apagar' && !massa.valor)">Aplicar</button>
+      <button class="btn sm" @click="exportar">Exportar seleção</button>
     </div>
     <div v-if="modo==='funil'" class="funil-desk">
       <div v-if="!fn" class="carregar">A carregar…</div>
@@ -1404,18 +1447,32 @@ const DeskTickets = {
           <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn prim" :disabled="!resolver.nota.trim()" @click="confirmar">Confirmar</button></div></div></div></div>
     </div>
     <div class="tabela-wrap cartoes-movel" v-else><table>
-      <thead><tr><th style="width:70px">N.º</th><th>Assunto</th><th>Cliente</th><th>Estado</th><th>Prioridade</th><th>Equipa</th><th>Responsável</th><th>Prazo</th><th>Última atividade</th></tr></thead>
-      <tbody><tr v-for="t in d?.linhas||[]" :key="t.name" @click="abrir(t)" style="cursor:pointer">
+      <thead><tr><th style="width:34px"><input type="checkbox" v-model="todosSel"></th><th style="width:70px">N.º</th><th>Assunto</th><th v-if="ver('cliente')">Cliente</th><th v-if="ver('estado')">Estado</th><th v-if="ver('prioridade')">Prioridade</th><th v-if="ver('equipa')">Equipa</th><th v-if="ver('responsavel')">Responsável</th><th v-if="ver('prazo')">Prazo</th><th v-if="ver('atividade')">Última atividade</th></tr></thead>
+      <tbody><tr v-for="t in d?.linhas||[]" :key="t.name" @click="abrir(t)" style="cursor:pointer" :class="{'por-ler': t.por_ler}">
+        <td @click.stop class="cel-sel"><input type="checkbox" :value="t.name" v-model="sel"></td>
         <td class="sub">#{{ t.name }}</td><td class="cel-tit"><b>{{ t.assunto }}</b><div class="sub" style="font-size:12px" v-if="t.marca">{{ t.marca }}</div></td>
-        <td><span class="pessoa"><AvFoto :email="t.email" :nome="t.cliente" :tam="24"/>{{ t.cliente }}</span></td>
-        <td><span class="etq" :class="{Open:'azul',Replied:'roxo',Paused:'ambar',Resolved:'verde',Closed:''}[t.estado]">{{ t.estado_pt }}</span></td>
-        <td><span class="etq" :class="{Urgent:'ambar',High:'ambar'}[t.prioridade]">{{ t.prioridade_pt }}</span></td>
-        <td>{{ t.equipa || '—' }}</td><td>{{ t.responsavel_nome || '—' }}</td>
-        <td><span :class="t.atrasado ? 'etq ambar' : 'sub'">{{ t.prazo ? data(t.prazo) : '—' }}</span></td><td class="sub">{{ data(t.atividade) }}</td></tr></tbody></table>
+        <td v-if="ver('cliente')"><span class="pessoa"><AvFoto :email="t.email" :nome="t.cliente" :tam="24"/>{{ t.cliente }}</span></td>
+        <td v-if="ver('estado')"><span class="etq" :class="{Open:'azul',Replied:'roxo',Paused:'ambar',Resolved:'verde',Closed:''}[t.estado]">{{ t.estado_pt }}</span></td>
+        <td v-if="ver('prioridade')"><span class="etq" :class="{Urgent:'ambar',High:'ambar'}[t.prioridade]">{{ t.prioridade_pt }}</span></td>
+        <td v-if="ver('equipa')">{{ t.equipa || '—' }}</td><td v-if="ver('responsavel')">{{ t.responsavel_nome || '—' }}</td>
+        <td v-if="ver('prazo')"><span v-if="t.pausa" class="etq">Em pausa</span><span v-else-if="t.prazo && !['Resolved','Closed'].includes(t.estado)" :class="t.atrasado || falta(t).startsWith('atrasado') ? 'etq ambar' : 'sub'" :title="data(t.prazo)">{{ falta(t) }}</span><span v-else class="sub">{{ t.sla || '—' }}</span></td>
+        <td v-if="ver('atividade')" class="sub">{{ data(t.atividade) }}</td></tr></tbody></table>
       <div v-if="d && !d.linhas.length" class="vazio">Nenhum ticket nesta vista.</div>
       <div v-if="!d" class="carregar">A carregar…</div>
       <div class="mais-linhas" v-if="d && d.mais"><button class="btn sm" @click="pagina++; carregar(true)">Mostrar mais</button></div>
     </div>
+    <div v-if="novoT" class="modal-fundo" @click.self="novoT=null"><div class="modal" style="max-width:600px"><header><b>Novo ticket</b><button class="btn sm" @click="novoT=null">Fechar</button></header>
+      <form class="reg-form" @submit.prevent="criarTicket">
+        <div class="erp-campo" style="position:relative"><span>Email do cliente<span class="obrig">*</span></span><input v-model="novoT.email" type="email" required placeholder="Procurar contacto ou escrever o email" @input="procurarContacto">
+          <div v-if="procurarC.length" class="cartao reg-sug"><div v-for="c in procurarC" :key="c.email" @mousedown.prevent="novoT.email=c.email; procurarC=[]">{{ c.nome }} · <span class="sub">{{ c.email }}</span></div></div></div>
+        <label class="erp-campo"><span>Assunto<span class="obrig">*</span></span><input v-model="novoT.assunto" required></label>
+        <div class="erp-campo"><span>Descrição</span><EditorRico v-model="novoT.descricao"/></div>
+        <div class="reg-linha3"><label class="erp-campo"><span>Prioridade</span><select v-model="novoT.prioridade"><option value="">—</option><option v-for="e in meta.prioridades" :key="e.v" :value="e.v">{{ e.r }}</option></select></label>
+          <label class="erp-campo"><span>Tipo</span><select v-model="novoT.tipo"><option value="">—</option><option v-for="e in meta.tipos" :key="e.v" :value="e.v">{{ e.r }}</option></select></label>
+          <label class="erp-campo"><span>Equipa</span><select v-model="novoT.equipa"><option value="">—</option><option v-for="e in meta.equipas" :key="e" :value="e">{{ e }}</option></select></label></div>
+        <label class="erp-campo"><span>Responsável</span><select v-model="novoT.responsavel"><option value="">— ninguém —</option><option v-for="a in meta.agentes" :key="a.v" :value="a.v">{{ a.r }}</option></select></label>
+        <div class="reg-botoes"><button type="button" class="btn" @click="novoT=null">Cancelar</button><button class="btn prim">Criar ticket</button></div>
+      </form></div></div>
   </div>`,
 };
 // ── Conversa interna num registo, com @menções (23-11-2026) ──────────────────────────────────────────────────────
@@ -1536,6 +1593,42 @@ const DeskTicket = {
   props: ["nome"],
   setup(props) {
     const t = ref(null); const meta = ref(null); const modo = ref("responder"); const texto = ref(""); const cc = ref(""); const aEnviar = ref(false);
+    // lote 3 (25-11): resposta completa (De, Para, Cc, Bcc, formatação, anexos, acções do modelo, rascunho), responder a um email,
+    // dividir, fundir, apagar, assunto/cliente/campos do modelo editáveis, histórico, atribuir a várias pessoas
+    const r3 = ref({ conta: "", para: "", bcc: "", html: "", anexos: [], acoes: [], verMais: false, citar: null });
+    const contas = ref([]); const ext3 = ref(null); const extR = ref(null); const separ = ref("tudo"); const edAssunto = ref(null); const fundir = ref(null); const anexoIn3 = ref(null);
+    const chaveR = () => "orbit.desk.rascunho." + props.nome;
+    try { const g = JSON.parse(localStorage.getItem(chaveR()) || "null"); if (g) Object.assign(r3.value, g); } catch (e) {}
+    watch(() => [r3.value.html, r3.value.para, r3.value.bcc, cc.value], () => { try { if (String(r3.value.html || "").replace(/<[^>]+>/g, "").trim()) localStorage.setItem(chaveR(), JSON.stringify({ html: r3.value.html, para: r3.value.para, bcc: r3.value.bcc })); else localStorage.removeItem(chaveR()); } catch (e) {} });
+    const carregarExt3 = async () => { ext3.value = await api("desk_mais.extra", { nome: props.nome }).catch(() => null); extR.value = await apiR("extras", { doctype: "HD Ticket", name: props.nome }).catch(() => null); };
+    onMounted(async () => { contas.value = await api("desk_mais.contas_envio").catch(() => []); r3.value.conta = r3.value.conta || (contas.value[0] || {}).conta || ""; carregarExt3(); });
+    const enviar3 = async () => {
+      const txt = String(r3.value.html || "").replace(/<[^>]+>/g, "").trim(); if (!txt || aEnviar.value) return; aEnviar.value = true;
+      try { const corpo = r3.value.html + (r3.value.citar ? `<br><blockquote type="cite">${r3.value.citar}</blockquote>` : "");
+        const r = await api("desk_mais.responder", { nome: props.nome, html: corpo, para: r3.value.para || null, cc: cc.value, bcc: r3.value.bcc, conta: r3.value.conta || null,
+          anexos: r3.value.anexos.length ? JSON.stringify(r3.value.anexos.map((x) => x.id)) : null, acoes: r3.value.acoes.length ? JSON.stringify(r3.value.acoes) : null }, true);
+        toast("Resposta enviada ao cliente" + (r.acoes && r.acoes.erro ? " — as ações do modelo falharam" : "")); r3.value = { ...r3.value, html: "", anexos: [], acoes: [], citar: null, para: "", bcc: "" }; cc.value = "";
+        try { localStorage.removeItem(chaveR()); } catch (e) {} carregar(); carregarExt3(); }
+      catch (e) {} finally { aEnviar.value = false; } };
+    const juntarAnexos3 = async (ev) => { for (const fi of [...(ev.target.files || [])]) {
+        const fd = new FormData(); fd.append("file", fi, fi.name); fd.append("is_private", 1); fd.append("doctype", "HD Ticket"); fd.append("docname", props.nome);
+        const rr = await fetch("/api/method/upload_file", { method: "POST", body: fd, headers: { "X-Frappe-CSRF-Token": window.csrf_token, Accept: "application/json" } });
+        const j = await rr.json().catch(() => ({})); if (j.message) r3.value.anexos.push({ id: j.message.name, nome: fi.name }); else toast("Não foi possível anexar " + fi.name); }
+      ev.target.value = ""; };
+    const responderA = (m, todos) => { modo.value = "responder"; const eu = (window.__ctx?.utilizador || "").toLowerCase(); const sep = (x) => String(x || "").split(/[,;]/).map((y) => y.trim()).filter(Boolean);
+      r3.value.para = m.enviado ? (m.para || "") : [m.de].concat(todos ? sep(m.para) : []).filter((x) => x && !x.toLowerCase().includes(eu)).join(", ");
+      if (todos) { cc.value = m.cc || ""; r3.value.verMais = true; } r3.value.citar = m.html; nextTick(() => document.querySelector(".desk-resposta")?.scrollIntoView({ behavior: "smooth", block: "end" })); };
+    const dividir = async (m) => { const a = prompt("Assunto do novo ticket", t.value.assunto); if (!a) return; const r = await api("desk_mais.dividir", { comunicacao: m.id, assunto: a }, true); toast("Novo ticket criado a partir deste email"); if (r.novo) location.hash = "#/ticket/" + (r.novo.name || r.novo); else carregar(); };
+    const fazerFundir = async () => { const dst = String(fundir.value.destino || "").replace("#", "").trim(); if (!dst) return;
+      if (!confirm(`Fundir o #${props.nome} no #${dst}? As mensagens passam para o #${dst} e este fecha.`)) return;
+      await api("desk_mais.fundir", { origem: props.nome, destino: dst }, true); fundir.value = null; toast("Tickets fundidos"); location.hash = "#/ticket/" + dst; };
+    const apagarTicket = async () => { if (!confirm(`Apagar o ticket #${props.nome}? Não se desfaz.`)) return; await api("desk_mais.apagar", { nome: props.nome }, true); toast("Ticket apagado"); location.hash = "#/tickets"; };
+    const gravarAssunto = async () => { const v = (edAssunto.value || "").trim(); edAssunto.value = null; if (!v || v === t.value.assunto) return; await api("desk_mais.mudar", { nome: props.nome, campo: "subject", valor: v }, true); toast("Assunto mudado"); carregar(); };
+    const mudar3 = async (campo, valor) => { await api("desk_mais.mudar", { nome: props.nome, campo, valor }, true); toast("Gravado"); carregar(); carregarExt3(); };
+    const linhaVis = computed(() => (t.value?.linha || []).filter((m) => separ.value === "tudo" || (separ.value === "emails" ? m.tipo === "email" : m.tipo === "comentario")));
+    const menu3 = ref(false); const fecharMenu3 = () => (menu3.value = false);
+    onMounted(() => document.addEventListener("click", fecharMenu3)); onUnmounted(() => document.removeEventListener("click", fecharMenu3));
+    const copiar3 = async () => { try { await navigator.clipboard.writeText(location.href); toast("Ligação copiada"); } catch (e) { toast(location.href); } };
     const ck = ref({ itens: [], modelos: [] }); const novoPonto = ref(""); const tm = ref({ total: 0, linhas: [] });
     const resolver = ref(null); const parar = ref(null); const agora = ref(Date.now()); let rel;
     const carregar = async () => { t.value = await api("desk.ticket", { nome: props.nome }); nextTick(() => { const m = document.querySelector(".desk-linha"); if (m) m.scrollTop = m.scrollHeight; }); };
@@ -1562,7 +1655,8 @@ const DeskTicket = {
       resolver.value = null; toast("Ticket resolvido — o cliente recebe o inquérito em dia útil"); carregar();
     };
     const atribuir = async (agente) => { await api("desk.atribuir", { nome: props.nome, agente }, true); toast(agente ? "Atribuído" : "Sem responsável"); carregar(); };
-    const modelo = async (r) => { if (!r) return; const x = await api("desk.resposta_modelo", { nome: r, ticket: props.nome }); const tmp = document.createElement("div"); tmp.innerHTML = (x && (x.message || x.response || x)) || ""; texto.value = (texto.value ? texto.value + "\n\n" : "") + (tmp.innerText || "").trim(); };
+    const modelo = async (r) => { if (!r) return; const x = await api("desk_mais.resposta_modelo", { nome: r, ticket: props.nome });
+      r3.value.html = (r3.value.html || "") + ((x && x.message) || ""); r3.value.acoes = (x && x.actions) || []; if (r3.value.acoes.length) toast(r3.value.acoes.length + " ação(ões) do modelo correm ao enviar"); };
     // checklist
     const gravarCk = async () => { ck.value.itens = (await api("desk.gravar_checklist", { nome: props.nome, itens: JSON.stringify(ck.value.itens) }, true)).itens; };
     const marcarPonto = (i) => { i.feito = !i.feito; i.por = i.feito ? (window.__ctx?.utilizador || "") : ""; i.em = i.feito ? new Date().toISOString() : ""; gravarCk(); };
@@ -1585,7 +1679,8 @@ const DeskTicket = {
     const fmtH = (h) => { const m = Math.round(Number(h || 0) * 60); return Math.floor(m / 60) + " h " + String(m % 60).padStart(2, "0"); };
     const corEstado = (e) => ({ Open: "azul", Replied: "roxo", Paused: "ambar", Resolved: "verde", Closed: "" })[e] || "";
     const estrelas = (r) => r == null ? "" : r >= 0.9 ? "Bom" : r >= 0.5 ? "Razoável" : "Mau";
-    return { t, meta, modo, texto, cc, aEnviar, enviar, mudar, mudarEstado, resolver, confirmarResolver, atribuir, modelo, data, link,
+    return { r3, contas, ext3, extR, separ, edAssunto, fundir, anexoIn3, enviar3, juntarAnexos3, responderA, dividir, fazerFundir, apagarTicket, gravarAssunto, mudar3, linhaVis, menu3, copiar3, carregarExt3,
+      t, meta, modo, texto, cc, aEnviar, enviar, mudar, mudarEstado, resolver, confirmarResolver, atribuir, modelo, data, link,
       ck, novoPonto, marcarPonto, juntarPonto, tirarPonto, aplicarModelo, feitos, inicio, decorrido, iniciar, pararCron, parar, registar, tm, fmtH, corEstado, estrelas, catDe };
   },
   template: `
@@ -1593,7 +1688,9 @@ const DeskTicket = {
     <div style="font-size:13px"><a href="#/tickets">← Tickets</a></div>
     <div class="desk-cab">
       <div style="min-width:0"><div class="sub" style="font-size:13px">#{{ t.name }} · aberto {{ data(t.aberto) }} · {{ t.email }}</div>
-        <h1>{{ t.assunto }}</h1>
+        <h1 v-if="edAssunto===null" @click="t.pode_editar && (edAssunto=t.assunto)" :title="t.pode_editar ? 'Mudar o assunto' : ''" :style="{cursor: t.pode_editar ? 'text' : 'default'}">{{ t.assunto }}</h1>
+        <input v-else class="ed-campo" v-model="edAssunto" style="width:100%;font-size:18px;font-weight:600;margin:4px 0" @keydown.enter="gravarAssunto" @keydown.esc="edAssunto=null" @blur="gravarAssunto" autofocus>
+        <div v-if="ext3 && ext3.fundido_em" class="aviso" style="margin:6px 0">Fundido no <a :href="'#/ticket/'+ext3.fundido_em">#{{ ext3.fundido_em }}</a>.</div>
         <div class="desk-chips"><span class="etq" :class="corEstado(t.estado)">{{ (meta.estados.find(e=>e.v===t.estado)||{}).r || t.estado }}</span>
           <span class="etq" :class="{Urgent:'ambar',High:'ambar'}[t.prioridade]">{{ (meta.prioridades.find(e=>e.v===t.prioridade)||{}).r || t.prioridade }}</span>
           <span :class="t.atrasado ? 'etq ambar' : 'etq'">{{ t.sla || 'Sem SLA' }}</span>
@@ -1603,14 +1700,19 @@ const DeskTicket = {
         <button v-else class="btn cron-a-correr" @click="pararCron">⏹ {{ decorrido }} · Parar</button>
         <button v-if="t.categoria !== 'Resolved'" class="btn prim" @click="mudarEstado('Resolved')">Resolver</button>
         <button v-else class="btn" @click="mudarEstado('Open')">Reabrir</button>
+        <span class="reg-menu" @click.stop><button class="btn" @click="menu3=!menu3" aria-label="Mais ações">⋯</button>
+          <div v-if="menu3" class="cartao reg-menu-lista" @click="menu3=false"><button @click="fundir={destino:''}">Fundir noutro ticket…</button><button @click="copiar3">Copiar a ligação</button><button class="perigo" @click="apagarTicket">Apagar o ticket…</button></div></span>
       </div>
     </div>
     <div class="desk-grelha">
       <div class="cartao desk-conversa">
-        <div class="desk-linha">
-          <div v-if="!t.linha.length" class="vazio">Ainda sem mensagens.</div>
-          <div v-for="m in t.linha" :key="m.tipo+m.id" class="cartao msg" :class="{nossa: m.enviado, interno: m.tipo==='comentario'}">
+        <div class="vistas" style="padding:0 14px"><button :class="{ativo:separ==='tudo'}" @click="separ='tudo'">Tudo</button><button :class="{ativo:separ==='emails'}" @click="separ='emails'">Emails</button><button :class="{ativo:separ==='comentarios'}" @click="separ='comentarios'">Comentários</button><button :class="{ativo:separ==='historico'}" @click="separ='historico'">Histórico</button></div>
+        <div v-if="separ==='historico'" style="padding:14px"><RegistoHistorico doctype="HD Ticket" :name="t.name" :key="'h'+t.name"/></div>
+        <div class="desk-linha" v-else>
+          <div v-if="!linhaVis.length" class="vazio">Ainda sem mensagens.</div>
+          <div v-for="m in linhaVis" :key="m.tipo+m.id" class="cartao msg" :class="{nossa: m.enviado, interno: m.tipo==='comentario'}">
             <header><b>{{ m.tipo==='comentario' ? '🔒 ' + m.quem + ' (interno)' : (m.enviado ? 'Respondemos' : (m.quem || m.de)) }}</b><span>{{ data(m.quando) }}</span></header>
+            <div v-if="m.tipo==='email' && t.pode_editar" class="msg-acoes"><button @click="responderA(m,false)">Responder</button><button @click="responderA(m,true)">Responder a todos</button><button v-if="!m.enviado" @click="dividir(m)">Dividir em novo ticket</button></div>
             <div v-if="m.tipo==='email' && !m.enviado" class="sub" style="font-size:12px;margin-bottom:6px">De {{ m.de }}</div>
             <EmailCorpo :html="m.html"/>
             <div v-if="m.anexos && m.anexos.length" class="anexos-mail"><a v-for="a in m.anexos" :key="a.url" class="etq" :href="a.url" target="_blank">📎 {{ a.nome }}</a></div>
@@ -1621,10 +1723,20 @@ const DeskTicket = {
           <div class="vistas" style="padding:0"><button :class="{ativo: modo==='responder'}" @click="modo='responder'">Responder ao cliente</button><button :class="{ativo: modo==='comentar'}" @click="modo='comentar'">Conversa interna</button>
             <select v-if="modo==='responder' && meta.respostas.length" class="btn sm" style="margin-left:auto" @change="modelo($event.target.value); $event.target.value=''"><option value="">Resposta-modelo…</option><option v-for="r in meta.respostas" :key="r.name" :value="r.name">{{ r.title || r.name }}</option></select></div>
           <template v-if="modo==='responder'">
-            <input class="ed-campo" v-model="cc" placeholder="Cc (opcional)" style="width:100%;margin:8px 0 0">
-            <textarea v-model="texto" rows="5" placeholder="Escreva a resposta ao cliente…" @keydown.meta.enter="enviar" @keydown.ctrl.enter="enviar"></textarea>
-            <div class="fl-linha" style="justify-content:flex-end"><span class="sub" style="font-size:12px;margin-right:auto">Sai por email e fica no ticket · ⌘↵ envia</span>
-              <button class="btn prim" :disabled="!texto.trim() || aEnviar" @click="enviar">{{ aEnviar ? 'A enviar…' : 'Enviar resposta' }}</button></div>
+            <div class="desk-env">
+              <label v-if="contas.length > 1">De<select v-model="r3.conta"><option v-for="c in contas" :key="c.conta" :value="c.conta">{{ c.email }}</option></select></label>
+              <label>Para<input v-model="r3.para" :placeholder="t.email + ' (o cliente do ticket)'"></label>
+              <a v-if="!r3.verMais" href="javascript:void 0" class="sub" style="font-size:12px" @click="r3.verMais=true">+ Cc / Bcc</a>
+              <template v-else><label>Cc<input v-model="cc"></label><label>Bcc<input v-model="r3.bcc"></label></template>
+            </div>
+            <div v-if="r3.citar" class="aviso" style="margin:6px 0;display:flex;justify-content:space-between">Com a mensagem citada <a href="javascript:void 0" @click="r3.citar=null">tirar</a></div>
+            <EditorRico v-model="r3.html" placeholder="Escreva a resposta ao cliente…"/>
+            <div class="fl-linha" style="flex-wrap:wrap;gap:6px">
+              <button type="button" class="btn sm" @click="anexoIn3.click()">📎 Anexar</button><input ref="anexoIn3" type="file" multiple style="display:none" @change="juntarAnexos3">
+              <span v-for="(x,k) in r3.anexos" :key="x.id" class="reg-chip">{{ x.nome }}<button type="button" @click="r3.anexos.splice(k,1)">×</button></span>
+              <span v-if="r3.acoes.length" class="etq" :title="r3.acoes.map(a=>a.action_type+': '+a.label).join('\n')">{{ r3.acoes.length }} ação(ões) do modelo</span>
+              <span class="sub" style="font-size:12px;margin-left:auto">Rascunho guardado neste aparelho</span>
+              <button class="btn prim" :disabled="aEnviar" @click="enviar3">{{ aEnviar ? 'A enviar…' : 'Enviar resposta' }}</button></div>
           </template>
           <ConversaRegisto v-else doctype="HD Ticket" :nome="t.name" :key="'cv'+t.name" :compacto="true"/>
         </div>
@@ -1636,7 +1748,13 @@ const DeskTicket = {
           <label class="desk-prop">Tipo<select class="ed-campo" :value="t.tipo" :disabled="!t.pode_editar" @change="mudar('ticket_type',$event.target.value)"><option value="">—</option><option v-for="e in meta.tipos" :key="e.v" :value="e.v">{{ e.r }}</option></select></label>
           <label class="desk-prop">Equipa<select class="ed-campo" :value="t.equipa" :disabled="!t.pode_editar" @change="mudar('agent_group',$event.target.value)"><option value="">—</option><option v-for="e in meta.equipas" :key="e" :value="e">{{ e }}</option></select></label>
           <label class="desk-prop" v-if="meta.marcas.length">Marca<select class="ed-campo" :value="t.marca" :disabled="!t.pode_editar" @change="mudar('orbit_marca',$event.target.value)"><option value="">—</option><option v-for="m in meta.marcas" :key="m" :value="m">{{ m }}</option></select></label>
-          <label class="desk-prop">Responsável<select class="ed-campo" :value="(t.responsaveis[0]||{}).v || ''" :disabled="!t.pode_editar" @change="atribuir($event.target.value)"><option value="">— ninguém —</option><option v-for="a in meta.agentes" :key="a.v" :value="a.v">{{ a.r }}</option></select></label>
+          <label class="desk-prop" v-if="false">Responsável<select class="ed-campo" :value="(t.responsaveis[0]||{}).v || ''" :disabled="!t.pode_editar" @change="atribuir($event.target.value)"><option value="">— ninguém —</option><option v-for="a in meta.agentes" :key="a.v" :value="a.v">{{ a.r }}</option></select></label>
+        </div>
+        <div class="cartao desk-bloco" v-if="extR"><RegistoLateral doctype="HD Ticket" :name="t.name" :ext="extR" :partes="['atribuir','etiquetas','anexos']" @mudou="carregar"/></div>
+        <div class="cartao desk-bloco" v-if="ext3 && ext3.campos.length"><div class="bloco-tit" style="margin-top:0">Campos do ticket</div>
+          <label v-for="c in ext3.campos" :key="c.campo" class="desk-prop">{{ c.rotulo }}<span v-if="c.obrigatorio" class="obrig">*</span>
+            <select v-if="c.opcoes" class="ed-campo" :value="c.valor||''" :disabled="!t.pode_editar" @change="mudar3(c.campo,$event.target.value)"><option value="">—</option><option v-for="o in c.opcoes" :key="o" :value="o">{{ o }}</option></select>
+            <input v-else class="ed-campo" :type="c.tipo==='Date'?'date':['Int','Float','Currency'].includes(c.tipo)?'number':'text'" :value="c.valor||''" :disabled="!t.pode_editar" @change="mudar3(c.campo,$event.target.value)"></label>
         </div>
         <div class="cartao desk-bloco"><div class="bloco-tit" style="margin-top:0;display:flex;justify-content:space-between">Pontos a resolver <span class="sub" v-if="ck.itens.length">{{ feitos }}/{{ ck.itens.length }}</span></div>
           <div v-if="ck.itens.length" class="ck-barra"><i :style="{width: (100*feitos/ck.itens.length)+'%'}"></i></div>
@@ -1659,7 +1777,9 @@ const DeskTicket = {
           <template v-if="t.contacto"><a :href="link('Contact', t.contacto.name)" class="pessoa"><AvFoto :email="t.contacto.email_id || t.email" :nome="t.contacto.full_name" :tam="28"/><b>{{ t.contacto.full_name }}</b></a>
             <div class="sub" style="font-size:12px;margin-top:4px">{{ [t.contacto.email_id, t.contacto.mobile_no || t.contacto.phone, t.contacto.company_name].filter(Boolean).join(' · ') }}</div></template>
           <div v-else class="sub">{{ t.email }}</div>
-          <div v-if="t.cliente" class="sub" style="margin-top:4px">Cliente: {{ t.cliente }}</div>
+          <label class="desk-prop" style="margin-top:6px">Cliente<select class="ed-campo" :value="t.cliente||''" :disabled="!t.pode_editar" @change="mudar3('customer',$event.target.value)"><option value="">—</option><option v-for="c in (ext3&&ext3.clientes)||[]" :key="c" :value="c">{{ c }}</option></select></label>
+          <template v-if="ext3 && ext3.recentes.length"><div class="bloco-tit">Outros tickets deste cliente</div>
+            <a v-for="r in ext3.recentes" :key="r.name" :href="'#/ticket/'+r.name" class="reg-anexo"><span><b>#{{ r.name }} {{ r.assunto }}</b><small class="sub">{{ data(r.quando,false) }}</small></span></a></template>
         </div>
       </aside>
     </div>
@@ -1672,6 +1792,10 @@ const DeskTicket = {
         <textarea class="ed-campo" v-model="parar.descricao" rows="3" style="width:100%;box-sizing:border-box;margin-top:8px" placeholder="O que foi feito…"></textarea>
         <p class="sub" style="font-size:12px;margin:6px 0 0">Fica no Tempo do Orbit, ligado a este ticket e ao cliente.</p>
         <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn prim" @click="registar(parar.manual)" :disabled="!parar.descricao.trim()">Registar</button></div></div></div></div>
+    <div v-if="fundir" class="modal-fundo" @click.self="fundir=null"><div class="modal" style="max-width:440px"><header><b>Fundir o #{{ t.name }} noutro ticket</b><button class="btn sm" @click="fundir=null">Fechar</button></header>
+      <form class="reg-form" @submit.prevent="fazerFundir"><label class="erp-campo"><span>N.º do ticket que fica</span><input v-model="fundir.destino" placeholder="ex.: 1234" required autofocus></label>
+        <p class="sub" style="font-size:12px;margin:0">As mensagens deste ticket passam para o outro e este fica fechado como «fundido».</p>
+        <div class="reg-botoes"><button class="btn prim">Fundir</button></div></form></div></div>
   </div>
   <div v-else class="carregar">A carregar…</div>`,
 };
@@ -2284,7 +2408,7 @@ const Caixa = {
       para.value = conv.value.para || "";
       nextTick(() => { const m = document.querySelector(".msgs"); if (m) m.scrollTop = m.scrollHeight; });
     };
-    const abrir = (i) => { if (i.tipo === "mail") { abrirMail(i); return; } if (i.tipo === "ticket") { window.open(i.url, "_blank"); return; } location.hash = "#/caixa/" + encodeURIComponent(i.id); };
+    const abrir = (i) => { if (i.tipo === "mail") { abrirMail(i); return; } if (i.tipo === "ticket") { location.hash = "#/ticket/" + encodeURIComponent(i.id || String(i.url || "").split("/").pop()); return; } location.hash = "#/caixa/" + encodeURIComponent(i.id); };
     watch(() => props.abrirId, (id) => { if (id) abrirConversa(id); });
     let relChat;
     onMounted(async () => { if (canal.value.grupo === "chat") canal.value = { grupo: "equipa", conta: "" };
