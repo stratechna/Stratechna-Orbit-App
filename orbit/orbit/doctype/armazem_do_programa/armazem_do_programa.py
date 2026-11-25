@@ -1,5 +1,5 @@
 from frappe.model.document import Document
 
 
-class ArmazemDoPrograma(Document):
+class ArmazemdoPrograma(Document):
     pass
