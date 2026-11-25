@@ -224,4 +224,28 @@ def ticket_por_destinatario(doc, method=None):
         if marca and _equipa_da_marca(marca):
             frappe.db.set_value("HD Ticket", doc.reference_name, {"agent_group": marca, "orbit_marca": marca},
                                 update_modified=False)
+            _entregar_a_equipa(doc.reference_name, marca)
             return
+
+
+def _entregar_a_equipa(ticket: str, equipa: str) -> None:
+    """25-11-2026 (Vítor: «sem rotação — Stratechna e Webgate com o Vítor, MBontime com a Margot»): quando um bilhete
+    sai da Triagem para a equipa da marca, passa a quem a regra de atribuição dessa equipa indica (a regra da Triagem
+    já o tinha entregue a outra pessoa). Uma regra por equipa, com uma só pessoa."""
+    try:
+        regra = next((r for r in frappe.get_all("Assignment Rule", filters={"document_type": "HD Ticket", "disabled": 0},
+                                                 fields=["name", "assign_condition"])
+                      if f"agent_group == '{equipa}'" in (r.assign_condition or "")), None)
+        if not regra:
+            return
+        quem = frappe.get_all("Assignment Rule User", filters={"parent": regra.name}, pluck="user", order_by="idx asc")
+        if not quem:
+            return
+        from frappe.desk.form.assign_to import _add, clear
+        atuais = frappe.parse_json(frappe.db.get_value("HD Ticket", ticket, "_assign") or "[]") or []
+        if atuais == [quem[0]]:
+            return
+        clear("HD Ticket", ticket, ignore_permissions=True)
+        _add({"doctype": "HD Ticket", "name": ticket, "assign_to": [quem[0]]}, ignore_permissions=True)
+    except Exception:  # noqa: BLE001 — a atribuição nunca pode estragar a receção do email
+        frappe.log_error(title="Orbit: entregar o bilhete à equipa da marca", message=frappe.get_traceback())
