@@ -276,7 +276,9 @@ DOCTYPES_CONTAB = {"Account", "Journal Entry", "Journal Entry Template", "GL Ent
                    "Fiscal Year", "Period Closing Voucher", "Budget", "Accounting Dimension", "Finance Book",
                    "Accounting Period", "Payment Reconciliation", "Bank Reconciliation Tool", "Bank Clearance",
                    "Process Period Closing Voucher", "Accounts Settings", "Chart of Accounts Importer",
-                   "Exchange Rate Revaluation", "Repost Accounting Ledger", "Unreconcile Payment", "Ledger Merge"}
+                   "Exchange Rate Revaluation", "Repost Accounting Ledger", "Unreconcile Payment", "Ledger Merge",
+                   "Process Payment Reconciliation", "Repost Payment Ledger"}
+PAINEIS_CONTAB = {"Accounts", "Asset"}   # o «Painel» das Contas é lucros e perdas, balanço…
 RELATORIOS_CONTAB = {"General Ledger", "Trial Balance", "Balance Sheet", "Profit and Loss Statement", "Cash Flow",
                      "Consolidated Financial Statement", "Trial Balance for Party", "Financial Ratios",
                      "Dimension-wise Accounts Balance Report", "Budget Variance Report", "Accounts Payable Summary",
