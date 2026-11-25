@@ -137,7 +137,7 @@ self.addEventListener('push', function (e) {
   try { d = e.data ? e.data.json() : {}; } catch (x) { d = { titulo: 'Orbit', texto: e.data ? e.data.text() : '' }; }
   e.waitUntil(self.registration.showNotification(d.titulo || 'Stratechna Orbit', {
     body: d.texto || '', tag: d.tag || undefined, renotify: !!d.tag, data: { url: d.url || '/orbit' },
-    icon: '/assets/orbit/pwa/crm-192.png', badge: '/assets/orbit/pwa/crm-192.png' }));
+    icon: '/assets/orbit/pwa/orbit-192.png?v=4', badge: '/assets/orbit/pwa/orbit-192.png?v=4' }));
 });
 self.addEventListener('notificationclick', function (e) {
   e.notification.close();
@@ -172,9 +172,9 @@ def manifesto(app: str = "orbit"):
     m = {"id": "/orbit", "name": "Stratechna Orbit", "short_name": "Orbit",
          "start_url": "/orbit", "scope": "/", "display": "standalone", "lang": "pt-PT",
          "background_color": "#161a1d", "theme_color": "#161a1d",
-         "icons": [{"src": "/assets/orbit/pwa/orbit-192.png?v=3", "sizes": "192x192", "type": "image/png", "purpose": "any"},
-                   {"src": "/assets/orbit/pwa/orbit-512.png?v=3", "sizes": "512x512", "type": "image/png", "purpose": "any"},
-                   {"src": "/assets/orbit/pwa/orbit-maskable-512.png?v=3", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}
+         "icons": [{"src": "/assets/orbit/pwa/orbit-192.png?v=4", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+                   {"src": "/assets/orbit/pwa/orbit-512.png?v=4", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+                   {"src": "/assets/orbit/pwa/orbit-maskable-512.png?v=4", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}
     frappe.response["type"] = "download"
     frappe.response["filename"] = "orbit.webmanifest"
     frappe.response["content_type"] = "application/manifest+json"
@@ -184,7 +184,8 @@ def manifesto(app: str = "orbit"):
 
 CABECA_APP = (
     '<link rel="manifest" href="/api/method/orbit.interface.push.manifesto">'
-    '<link rel="apple-touch-icon" href="/assets/orbit/pwa/orbit-180.png?v=3">'
+    '<link rel="apple-touch-icon" href="/assets/orbit/pwa/orbit-180.png?v=4">'
+    '<link rel="icon" type="image/svg+xml" href="/assets/orbit/pwa/orbit.svg?v=4">'
     '<meta name="apple-mobile-web-app-title" content="Orbit">'
     '<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">'
     '<meta name="theme-color" content="#161a1d">'

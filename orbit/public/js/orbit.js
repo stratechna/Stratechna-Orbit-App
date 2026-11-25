@@ -1169,7 +1169,7 @@ try { if (window.self !== window.top && window.top.location.pathname.indexOf("/o
 		if ( ! h || document.querySelector( 'link[rel="manifest"]' ) ) { return; }
 		var junta = function ( tag, attrs ) { var e = document.createElement( tag ); for ( var k in attrs ) { e.setAttribute( k, attrs[ k ] ); } h.appendChild( e ); };
 		junta( 'link', { rel: 'manifest', href: '/api/method/orbit.interface.push.manifesto' } );
-		if ( ! document.querySelector( 'link[rel="apple-touch-icon"]' ) ) { junta( 'link', { rel: 'apple-touch-icon', href: '/assets/orbit/pwa/orbit-180.png?v=3' } ); }
+		if ( ! document.querySelector( 'link[rel="apple-touch-icon"]' ) ) { junta( 'link', { rel: 'apple-touch-icon', href: '/assets/orbit/pwa/orbit-180.png?v=4' } ); }
 		junta( 'meta', { name: 'apple-mobile-web-app-title', content: 'Orbit' } );
 		junta( 'meta', { name: 'apple-mobile-web-app-capable', content: 'yes' } );
 		junta( 'meta', { name: 'mobile-web-app-capable', content: 'yes' } );

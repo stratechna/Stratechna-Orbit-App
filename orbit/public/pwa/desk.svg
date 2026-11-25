@@ -1,12 +1,7 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <rect width="512" height="512" rx="72" fill="#22303d"/>
-  <g transform="translate(60.0 60.0) scale(0.7656)"
-     stroke-linecap="round" stroke-linejoin="round">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none"><rect width="512" height="512" rx="96" fill="#ffffff"/><g transform="translate(256 256) scale(1.18) translate(-264 -256)" stroke-linecap="round" stroke-linejoin="round">
 
 
-  <path d="M 128 288 a 128 128 0 0 1 256 0" stroke="#8a9bab" stroke-width="32"/>
-  <path d="M 128 284 v 48" stroke="#8a9bab" stroke-width="32"/>
-  <path d="M 384 284 v 48" stroke="#ea5c55" stroke-width="32"/>
-  </g>
-</svg>
+  <path d="M 128 288 a 128 128 0 0 1 256 0" stroke="#22303d" stroke-width="38"/>
+  <path d="M 128 284 v 48" stroke="#22303d" stroke-width="38"/>
+  <path d="M 384 284 v 48" stroke="#d4151f" stroke-width="38"/>
+  </g></svg>
