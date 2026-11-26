@@ -841,7 +841,14 @@ try { if (window.self !== window.top && window.top.location.pathname.indexOf("/o
 
 		const visiveis = icones.filter((i) => !i.hidden && !i.parent_icon);
 		const usados = new Set();
+		// 26-11-2026: a Administração (bloco «Sistema») só aparece a quem é administrador do Orbit (System Manager);
+		// os módulos dela contam como usados para não irem parar a «Operações».
+		const eAdmin = frappe.session.user === "Administrator" || (frappe.user_roles || []).includes("System Manager");
 		const grupos = (novaLigada() ? GRUPOS_NOVOS : GRUPOS).map((g) => {
+			if (g.app && g.app[0] === "admin" && !eAdmin) {
+				g.itens.forEach((r) => usados.add(r));
+				return { ...g, membros: [] };
+			}
 			const membros = g.itens
 				.map((r) => visiveis.find((i) => i.label === r))
 				.filter(Boolean);
