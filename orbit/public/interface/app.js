@@ -4351,13 +4351,74 @@ const ErpRecibo = {
     <div style="padding:0 24px 24px"><RegistoArea v-if="name && name!=='novo'" doctype="Payment Entry" :name="name" :key="'ra'+name"/></div>
   </div>`,
 };
+// 26-11-2026 (Vítor): o cliente da proposta procura-se em todo o lado (clientes do ERP e CRM) e cria-se quando falta
+const ClienteProcura = {
+  props: ["modelValue", "ro"], emits: ["update:modelValue", "contacto"],
+  setup(props, { emit }) {
+    const txt = ref(props.modelValue || ""), ops = ref([]), aberto = ref(false), campo = ref(null), pos = ref({}), novo = ref(null), a = ref(false); let tq;
+    watch(() => props.modelValue, (v) => { if (v !== txt.value) txt.value = v || ""; });
+    const posicionar = () => { const r = campo.value?.getBoundingClientRect(); if (!r) return; const w = Math.min(Math.max(r.width, 320), window.innerWidth - 16);
+      pos.value = { position: "fixed", left: Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + "px", width: w + "px", top: (r.bottom + 4) + "px", maxHeight: Math.max(200, window.innerHeight - r.bottom - 20) + "px" }; };
+    const procurar = () => { clearTimeout(tq); tq = setTimeout(async () => { ops.value = await api("clientes_venda.procurar", { q: txt.value }).catch(() => []); posicionar(); aberto.value = true; }, 200); };
+    const escolher = async (o) => { aberto.value = false;
+      if (o.tipo === "cliente") { txt.value = o.name; emit("update:modelValue", o.name); return; }
+      a.value = true; try { const r = await api("clientes_venda.usar", { doctype: o.doctype, name: o.name }, true); txt.value = r.customer; emit("update:modelValue", r.customer); if (r.contacto) emit("contacto", r.contacto); toast("Cliente «" + r.customer + "» pronto"); } finally { a.value = false; } };
+    const criar = async () => { a.value = true; try { const r = await api("clientes_venda.usar", { dados: JSON.stringify(novo.value) }, true); txt.value = r.customer; emit("update:modelValue", r.customer); novo.value = null; toast("Cliente criado"); } finally { a.value = false; } };
+    const sair = () => setTimeout(() => { aberto.value = false; }, 180);
+    return { txt, ops, aberto, campo, pos, novo, a, procurar, escolher, criar, sair, irErp };
+  },
+  template: `<div class="erp-ligacao">
+    <input ref="campo" v-model="txt" :disabled="ro" placeholder="Procurar cliente, empresa ou contacto…" @focus="procurar" @input="procurar" @blur="sair" autocomplete="off">
+    <a v-if="modelValue" class="ir" :href="irErp('Customer', modelValue)" title="Abrir o cliente">↗</a>
+    <div v-if="aberto" class="cartao erp-ops cli-ops" :style="pos">
+      <div v-for="o in ops" :key="o.doctype+o.name" class="linha" @mousedown.prevent="escolher(o)"><div class="cresce"><b>{{ o.titulo }}</b><small>{{ o.sub }}<template v-if="o.tipo==='crm'"> · passa a cliente ao escolher</template></small></div></div>
+      <div v-if="!ops.length" class="sub" style="padding:8px 10px;font-size:13px">{{ txt ? 'Nenhum cliente, empresa ou contacto com «' + txt + '».' : 'Escreva para procurar.' }}</div>
+      <div class="linha cli-novo" @mousedown.prevent="novo={nome:txt,tipo:'Empresa',nif:'',email:'',telefone:''}; aberto=false">+ Criar cliente{{ txt ? ' «' + txt + '»' : '' }}</div>
+    </div>
+    <div v-if="novo" class="modal-fundo" @click.self="novo=null"><div class="modal" style="max-width:460px"><header><b>Novo cliente</b><button class="btn sm" @click="novo=null">Fechar</button></header>
+      <form class="reg-form" @submit.prevent="criar"><label class="erp-campo"><span>Nome<span class="obrig">*</span></span><input v-model="novo.nome" required autofocus></label>
+        <div class="reg-linha3" style="grid-template-columns:1fr 1fr"><label class="erp-campo"><span>Tipo</span><select v-model="novo.tipo"><option>Empresa</option><option>Particular</option></select></label><label class="erp-campo"><span>NIF</span><input v-model="novo.nif"></label></div>
+        <div class="reg-linha3" style="grid-template-columns:1fr 1fr"><label class="erp-campo"><span>Email</span><input type="email" v-model="novo.email"></label><label class="erp-campo"><span>Telemóvel</span><input type="tel" v-model="novo.telefone"></label></div>
+        <div class="reg-botoes"><button class="btn prim" :disabled="a">Criar e usar</button></div></form></div></div>
+  </div>`,
+};
+// O produto lido de uma página (ou da IA) para rever antes de criar o artigo
+const ProdutoRever = {
+  props: ["p", "marca"], emits: ["fechar", "criado", "ia"],
+  setup(props, { emit }) {
+    const d = ref({ referencia: props.p.referencia || "", titulo: props.p.titulo || "", descricao: props.p.descricao || "",
+      caracteristicas: (props.p.caracteristicas || []).map((x) => Array.isArray(x) ? (x[0] ? x[0] + ": " : "") + x[1] : x).join("\n"), imagem: (props.p.imagens || [])[0] || "", preco: props.p.preco || 0 });
+    const a = ref(false);
+    const criar = async () => { if (!d.value.referencia.trim()) { toast("Indique a referência do artigo"); return; } a.value = true;
+      try { const g = await api("orbit.propostas.referencia.gravar_artigo", { dados: JSON.stringify({ ...d.value, marca: props.marca, fonte: props.p.fonte }) }, true);
+        emit("criado", { ...g, preco: Number(d.value.preco) || 0, caracteristicas: g.orbit_caracteristicas }); } finally { a.value = false; } };
+    const usarExistente = () => emit("criado", { item_code: props.p.existente.artigo, item_name: props.p.existente.titulo, image: (props.p.existente.imagens || [])[0], preco: props.p.existente.preco, caracteristicas: (props.p.existente.caracteristicas || []).map((x) => (x[0] ? x[0] + ": " : "") + x[1]).join("\n") });
+    return { d, a, criar, usarExistente };
+  },
+  template: `<div class="modal-fundo" @click.self="$emit('fechar')"><div class="modal" style="max-width:820px"><header><b>Produto {{ p.ia ? 'lido pela IA' : 'lido da página' }}</b><button class="btn sm" @click="$emit('fechar')">Fechar</button></header>
+    <div class="reg-form">
+      <div v-if="!p.lido" class="aviso" style="margin:0">Não foi possível ler a página ({{ (p.falta||[]).join(', ') }}).</div>
+      <div v-else-if="(p.falta||[]).length && !p.ia" class="aviso" style="margin:0">A página não diz: {{ p.falta.join(', ') }}. Pode completar à mão ou pedir à IA.</div>
+      <div v-if="p.existente" class="aviso" style="margin:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">Já existe o artigo «{{ p.existente.titulo }}» com esta referência. <button class="btn sm prim" @click="usarExistente">Usar o que existe</button></div>
+      <div class="prod-rever"><div class="prod-imgs"><img v-if="d.imagem" :src="d.imagem" alt=""><div class="prod-mini"><img v-for="i in p.imagens||[]" :key="i" :src="i" :class="{ativo: i===d.imagem}" @click="d.imagem=i" alt=""></div></div>
+        <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+          <div class="reg-linha3" style="grid-template-columns:1fr 2fr"><label class="erp-campo"><span>Referência<span class="obrig">*</span></span><input v-model="d.referencia"></label><label class="erp-campo"><span>Nome</span><input v-model="d.titulo"></label></div>
+          <label class="erp-campo"><span>Descrição</span><textarea v-model="d.descricao" rows="3"></textarea></label>
+          <label class="erp-campo"><span>Características (uma por linha, «nome: valor»)</span><textarea v-model="d.caracteristicas" rows="5"></textarea></label>
+          <div class="reg-linha3" style="grid-template-columns:1fr 2fr"><label class="erp-campo"><span>Preço de venda (€)</span><input type="number" step="0.01" v-model.number="d.preco"></label><span class="sub" style="font-size:12px;align-self:end">{{ p.fabricante ? 'Fabricante: ' + p.fabricante : '' }}<template v-if="p.preco"> · preço na página: {{ p.preco }} {{ p.moeda || '' }}</template></span></div>
+        </div></div>
+      <div class="reg-botoes"><button v-if="!p.ia" class="btn" style="margin-right:auto" @click="$emit('ia')">Completar com a IA · créditos</button>
+        <button class="btn" @click="$emit('fechar')">Cancelar</button><button class="btn prim" :disabled="a" @click="criar">Criar o artigo e acrescentar</button></div>
+    </div></div></div>`,
+};
+
 const ErpProposta = {
-  components: { ErpLigacao, EditorRico },
+  components: { ErpLigacao, EditorRico, ClienteProcura, ProdutoRever },
   props: ["name"],
   setup(props) {
     const doc = ref(null); const novo = ref(false); const sujo = ref(false); const a = ref(false); const aviso = ref("");
     const marcas = ref([]); const versoes = ref([]); const podeGravar = ref(true);
-    const q = ref(""); const sug = ref([]); const procurando = ref(false); let tq;
+    const q = ref(""); const sug = ref([]); const procurando = ref(false); const fab = ref(""); let tq;
     const abertas = ref({}); const envio = ref(null);
     const carregar = async () => {
       const [r, ms] = await Promise.all([api("erp.documento", { doctype: "Quotation", name: props.name === "novo" ? undefined : props.name }), apiP("versoes.marcas")]);
@@ -4395,7 +4456,13 @@ const ErpProposta = {
     };
     watch(() => assin(), (s) => { if (s === ultima) return; ultima = s; clearTimeout(tr0); tr0 = setTimeout(recalcular, 450); });
     // procurar produtos: ERP primeiro; internet só a pedido
-    watch(q, () => { clearTimeout(tq); if (q.value.trim().length < 2) { sug.value = []; return; } tq = setTimeout(async () => { sug.value = await apiP("versoes.sugestoes", { txt: q.value, marca: doc.value?.orbit_marca }) || []; }, 250); });
+    const rever = ref(null); const eUrl = computed(() => /^https?:\/\//i.test(q.value.trim()));
+    const lerPagina = async () => { procurando.value = true; try { rever.value = await apiP("url_produto.ler", { url: q.value.trim() }); } finally { procurando.value = false; } };
+    const lerComIa = async () => { const u = (rever.value && rever.value.url) || q.value.trim(); if (!confirm("A IA lê a página e preenche o que falta. Gasta créditos de IA da conta.")) return; procurando.value = true;
+      try { const r = await apiP("url_produto.ler_com_ia", { url: u, marca: doc.value?.orbit_marca }); const ant = rever.value || {};
+        rever.value = { ...r, referencia: r.referencia || ant.referencia, titulo: r.titulo || ant.titulo, imagens: (r.imagens && r.imagens.length ? r.imagens : ant.imagens) || [], caracteristicas: (r.caracteristicas && r.caracteristicas.length ? r.caracteristicas : ant.caracteristicas) || [] }; } finally { procurando.value = false; } };
+    const depoisDeCriar = (g) => { acrescentar(g); rever.value = null; toast("Artigo criado e acrescentado"); };
+    watch(q, () => { clearTimeout(tq); if (q.value.trim().length < 2 || eUrl.value) { sug.value = []; if (eUrl.value) tq = setTimeout(lerPagina, 400); return; } tq = setTimeout(async () => { sug.value = await apiP("versoes.sugestoes", { txt: q.value, marca: doc.value?.orbit_marca }) || []; }, 250); });
     const acrescentar = (p) => {
       doc.value.items = doc.value.items || [];
       const n = linhas.value.length;
@@ -4405,15 +4472,13 @@ const ErpProposta = {
     };
     const internet = async () => {
       if (!q.value.trim()) { toast("Escreva a referência"); return; }
-      if (!confirm("Procurar «" + q.value + "» na internet? Gasta créditos de IA da conta.")) return;
+      if (!confirm("Procurar " + (fab.value.trim() ? "«" + fab.value.trim() + " " + q.value.trim() + "»" : "«" + q.value + "»") + " na internet? Gasta créditos de IA da conta.")) return;
       procurando.value = true;
       try {
-        const r = await apiP("referencia.procurar_internet", { referencia: q.value, marca: doc.value?.orbit_marca });
+        const r = await apiP("referencia.procurar_internet", { referencia: q.value.trim(), fabricante: fab.value.trim(), marca: doc.value?.orbit_marca });
         const p = r?.produto; if (!p) { toast("Não encontrado na internet"); return; }
-        const g = await apiP("referencia.gravar_artigo", { dados: JSON.stringify({ referencia: q.value, titulo: p.titulo, descricao: p.descricao,
-          caracteristicas: (p.caracteristicas || []).map((x) => (x[0] ? x[0] + ": " : "") + x[1]).join("\n"), imagem: (p.imagens || [])[0], marca: doc.value?.orbit_marca, fonte: p.fonte }) }, true);
-        acrescentar({ ...g, preco: p.preco, caracteristicas: g.orbit_caracteristicas });
-        toast("Acrescentado — reveja as características");
+        // 26-11-2026 (Vítor): nada se cria sem a pessoa ver — abre a revisão com «Criar o artigo e acrescentar»
+        rever.value = { lido: true, ia: true, referencia: q.value.trim(), titulo: p.titulo, descricao: p.descricao, caracteristicas: p.caracteristicas || [], imagens: p.imagens || [], preco: p.preco, fabricante: p.fabricante || fab.value.trim(), fonte: p.fonte, falta: [], existente: r.existente };
       } finally { procurando.value = false; }
     };
     const remover = (l) => { doc.value.items = doc.value.items.filter((x) => x !== l); };
@@ -4442,7 +4507,7 @@ const ErpProposta = {
     const titulo = computed(() => doc.value?.customer_name || doc.value?.party_name || "Nova proposta");
     const curtas = (l) => caractPares(l.orbit_caracteristicas).slice(0, 6);
     const nCaract = (l) => caractPares(l.orbit_caracteristicas).length;
-    return { statusPt, link, doc, novo, sujo, a, aviso, marcas, versoes, ro, linhas, docstatus, moeda, totais, marcaSel, corMarca, q, sug, procurando, acrescentar, internet, remover,
+    return { fab, rever, eUrl, lerPagina, lerComIa, depoisDeCriar, statusPt, link, doc, novo, sujo, a, aviso, marcas, versoes, ro, linhas, docstatus, moeda, totais, marcaSel, corMarca, q, sug, procurando, acrescentar, internet, remover,
       gravar, alternativa, submeter, encomenda, pdf, envio, abrirEnvio, enviar, titulo, curtas, nCaract, abertas, irErp, ESTADO_DOC };
   },
   template: `<div v-if="doc" class="pad prop">
@@ -4471,7 +4536,7 @@ const ErpProposta = {
             <div class="prop-chips"><button v-for="m in marcas" :key="m.name" type="button" :disabled="ro" :class="{ativo: doc.orbit_marca===m.name}" :style="doc.orbit_marca===m.name ? {borderColor: corMarca(m)} : {}" @click="doc.orbit_marca=m.name"><span :style="{background: corMarca(m)}"></span>{{ m.name }}</button></div></div>
           <div class="prop-campos">
             <label>Proposta para<select v-model="doc.quotation_to" :disabled="ro"><option value="Customer">Cliente</option><option value="Lead">Lead</option><option value="Prospect">Potencial cliente</option></select></label>
-            <label>Cliente<ErpLigacao v-model="doc.party_name" :alvo="doc.quotation_to" :ro="ro"/></label>
+            <label>{{ doc.quotation_to==='Customer' ? 'Cliente' : doc.quotation_to==='Lead' ? 'Lead' : 'Potencial cliente' }}<ClienteProcura v-if="doc.quotation_to==='Customer'" v-model="doc.party_name" :ro="ro" @contacto="(c)=>{ if(!doc.contact_person) doc.contact_person=c }"/><ErpLigacao v-else v-model="doc.party_name" :alvo="doc.quotation_to" :ro="ro"/></label>
             <label>Ao cuidado de<ErpLigacao v-model="doc.contact_person" alvo="Contact" :ro="ro"/></label>
             <label>Válida até<input type="date" v-model="doc.valid_till" :disabled="ro"></label>
             <label>Negócio<ErpLigacao v-model="doc.orbit_negocio" alvo="CRM Deal" :ro="ro || !!doc.orbit_proposta_base" :filtros="JSON.stringify({status: ['not in', ['Won','Lost']]})"/><small class="sub" v-if="!doc.orbit_negocio && !ro">Vazio = nasce um negócio novo ao gravar</small><a v-else-if="doc.orbit_negocio" class="sub" :href="link('CRM Deal', doc.orbit_negocio)">Abrir o negócio</a></label>
@@ -4481,7 +4546,9 @@ const ErpProposta = {
         <section v-if="!ro" class="cartao prop-procura" aria-label="Adicionar produto">
           <div class="prop-procura-linha">
             <label class="cresce"><span class="so-leitor">Referência, EAN ou nome</span><input v-model="q" placeholder="Adicionar produto — referência, EAN ou nome…" autocomplete="off"></label>
-            <button type="button" class="btn" :disabled="procurando" @click="internet">{{ procurando ? 'A procurar…' : 'Procurar na internet · créditos de IA' }}</button>
+            <button v-if="eUrl" type="button" class="btn prim" :disabled="procurando" @click="lerPagina">{{ procurando ? 'A ler a página…' : 'Ler o produto desta página' }}</button>
+            <label v-if="!eUrl" class="prop-fab"><span class="so-leitor">Marca do produto</span><input v-model="fab" placeholder="Marca do produto (opcional)" autocomplete="off"></label>
+            <button v-if="!eUrl" type="button" class="btn" :disabled="procurando" @click="internet">{{ procurando ? 'A procurar…' : 'Procurar na internet · créditos de IA' }}</button>
           </div>
           <div v-if="sug.length" class="prop-sug">
             <button v-for="s in sug" :key="s.item_code" type="button" class="prop-sug-item" @click="acrescentar(s)">
@@ -4490,7 +4557,8 @@ const ErpProposta = {
               <span v-if="s.preco" class="prop-sug-preco">{{ moeda(s.preco) }}</span>
             </button>
           </div>
-          <div v-else-if="q.trim().length>=2" class="sub">Nada nos artigos do ERP com «{{ q }}». Pode procurar na internet.</div>
+          <div v-else-if="eUrl" class="sub">{{ procurando ? 'A ler a página do produto…' : 'Endereço colado: lê-se a página (sem custos) e revê-se antes de criar o artigo.' }}</div>
+          <div v-else-if="q.trim().length>=2" class="sub">Nada nos artigos do ERP com «{{ q }}». Pode procurar na internet ou colar o endereço da página do produto.</div>
           <div v-else class="sub">Procura nos artigos do ERP pela referência (nossa ou do fornecedor), EAN ou nome — com a imagem e as características.</div>
         </section>
         <article v-for="(l, i) in linhas" :key="l.name || i" class="cartao prop-linha" :aria-label="'Linha ' + (i+1)">
@@ -4557,6 +4625,7 @@ const ErpProposta = {
       </div>
     </div></div>
     <div style="padding:0 24px 24px"><RegistoArea v-if="name && name!=='novo'" doctype="Quotation" :name="name" :key="'ra'+name"/></div>
+    <ProdutoRever v-if="rever" :p="rever" :marca="doc.orbit_marca" @fechar="rever=null" @criado="depoisDeCriar" @ia="lerComIa"/>
   </div><div v-else class="vazio">A carregar…</div>`,
 };
 

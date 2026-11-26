@@ -197,13 +197,22 @@ def procurar(referencia: str, marca: str | None = None):
 
 
 @frappe.whitelist()
-def procurar_internet(referencia: str, marca: str | None = None):
-    """Só a pedido: a IA do portal procura a referência na internet (gasta créditos de IA da conta)."""
+def procurar_internet(referencia: str, marca: str | None = None, fabricante: str | None = None):
+    """Só a pedido: a IA do portal procura a referência na internet (gasta créditos de IA da conta).
+
+    26-11-2026 (Vítor): com a marca do produto (fabricante) e a referência ou o EAN a IA acerta no produto;
+    `marca` é a marca da Stratechna/cliente que vende (conta dos créditos), não a do produto."""
     frappe.has_permission("Quotation", "create", throw=True)
-    produto = _portal("internet", (referencia or "").strip(), marca)
+    ref = (referencia or "").strip()
+    fab = (fabricante or "").strip()
+    alvo = (f"EAN {ref}" if ref.isdigit() and 8 <= len(ref) <= 14 else f"referência {ref}")
+    pedido = f"Produto da marca {fab}, {alvo}" if fab else ref
+    produto = _portal("internet", pedido, marca)
     if produto:
         produto["a_confirmar"] = 1
-    return {"produto": produto}
+        if fab and not produto.get("fabricante"):
+            produto["fabricante"] = fab
+    return {"produto": produto, "existente": _artigo_existente(ref) if ref else None}
 
 
 def _artigo_existente(referencia: str):
