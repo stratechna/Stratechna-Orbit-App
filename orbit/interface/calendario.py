@@ -69,19 +69,25 @@ def _pedido(metodo: str, url: str, user: str, pwd: str, corpo: str = None, cab: 
 CAMPO_FORA = "orbit_caldav_fora"
 CASA_FORA = "orbit_caldav_fora_casa"      # valor por omissão da pessoa: a «calendar-home-set» encontrada
 FORNECEDORES = [
-    # (sufixo do MX, nome, servidor CalDAV ou None se não houver CalDAV com palavra-passe, onde se cria a palavra-passe)
+    # (sufixos do MX, nome, servidor CalDAV (None = sem CalDAV com palavra-passe), onde se cria a palavra-passe de
+    #  aplicação, IMAP (host, porta), SMTP (host, porta; 465 = SSL, 587 = STARTTLS))
     (("zoho.eu",), "Zoho", "https://calendar.zoho.eu",
-     "Zoho › A minha conta › Segurança › Palavras-passe específicas de aplicações (accounts.zoho.eu)"),
+     "Zoho › A minha conta › Segurança › Palavras-passe específicas de aplicações (accounts.zoho.eu)",
+     ("imap.zoho.eu", 993), ("smtp.zoho.eu", 465)),
     (("zoho.com",), "Zoho", "https://calendar.zoho.com",
-     "Zoho › A minha conta › Segurança › Palavras-passe específicas de aplicações (accounts.zoho.com)"),
+     "Zoho › A minha conta › Segurança › Palavras-passe específicas de aplicações (accounts.zoho.com)",
+     ("imap.zoho.com", 993), ("smtp.zoho.com", 465)),
     (("zoho.in",), "Zoho", "https://calendar.zoho.in",
-     "Zoho › A minha conta › Segurança › Palavras-passe específicas de aplicações (accounts.zoho.in)"),
+     "Zoho › A minha conta › Segurança › Palavras-passe específicas de aplicações (accounts.zoho.in)",
+     ("imap.zoho.in", 993), ("smtp.zoho.in", 465)),
     (("icloud.com", "me.com"), "iCloud", "https://caldav.icloud.com",
-     "appleid.apple.com › Iniciar sessão e segurança › Palavras-passe específicas de apps"),
+     "appleid.apple.com › Iniciar sessão e segurança › Palavras-passe específicas de apps",
+     ("imap.mail.me.com", 993), ("smtp.mail.me.com", 587)),
     (("messagingengine.com",), "Fastmail", "https://caldav.fastmail.com",
-     "Fastmail › Definições › Privacidade e segurança › Palavras-passe de aplicações"),
-    (("google.com", "googlemail.com"), "Google", None, None),
-    (("outlook.com", "office365.us"), "Microsoft 365", None, None),
+     "Fastmail › Definições › Privacidade e segurança › Palavras-passe de aplicações",
+     ("imap.fastmail.com", 993), ("smtp.fastmail.com", 465)),
+    (("google.com", "googlemail.com"), "Google", None, None, None, None),
+    (("outlook.com", "office365.us"), "Microsoft 365", None, None, None, None),
 ]
 
 
@@ -154,10 +160,57 @@ def _fornecedor_fora(user: str):
         forcado = (frappe.conf.get("orbit_calendario_fora") or {}).get(dominio)
         mx = [forcado] if forcado else _mx(dominio)
         frappe.cache.set_value(chave, mx, expires_in_sec=86400 if mx else 600)
-    for sufixos, nome, servidor, onde in FORNECEDORES:
+    for sufixos, nome, servidor, onde, imap, smtp in FORNECEDORES:
         if any(h == s or h.endswith("." + s) for h in mx for s in sufixos):
-            return {"nome": nome, "servidor": servidor, "onde": onde}
+            return {"nome": nome, "servidor": servidor, "onde": onde, "imap": imap, "smtp": smtp}
     return None
+
+
+def _conta_crm(user: str):
+    """A conta de email «Orbit CRM · <caixa>» desta caixa no Frappe (Definições › Conta de e-mail), se tiver
+    palavra-passe — é a mesma caixa, já ligada uma vez; não se pede outra vez."""
+    for nome in frappe.get_all("Email Account", filters={"email_id": user, "enable_incoming": 1}, pluck="name"):
+        from frappe.utils.password import get_decrypted_password
+        pwd = get_decrypted_password("Email Account", nome, "password", raise_exception=False)
+        if pwd:
+            return nome, pwd
+    return None, None
+
+
+def credencial_caixa(user: str):
+    """A credencial da caixa para tudo o que o /orbit faz como a pessoa (calendário, correio, envio):
+    {'fora': fornecedor|None, 'pwd', 'origem', 'imap': (host, porta, ssl), 'smtp': (host, porta)}.
+    Caixa do BDS: a palavra-passe da caixa (`orbit_caldav`). Caixa de fora: a palavra-passe de aplicação ligada aqui
+    (`orbit_caldav_fora`) ou, sem ela, a da conta de email do CRM da mesma caixa."""
+    forn = _fornecedor_fora(user)
+    if not forn:
+        return {"fora": None, "pwd": _senha(user), "origem": "orbit", "imap": None, "smtp": None}
+    from frappe.utils.password import get_decrypted_password
+    pwd = get_decrypted_password("User", user, CAMPO_FORA, raise_exception=False)
+    origem = "orbit_fora" if pwd else None
+    imap = (forn["imap"][0], forn["imap"][1], True) if forn["imap"] else None
+    if not pwd and not frappe.cache.get_value(f"orbit:caixa:crm-recusada:{user}"):
+        nome, pwd = _conta_crm(user)
+        if pwd:
+            origem = "crm"
+            srv = frappe.db.get_value("Email Account", nome, ["email_server", "incoming_port", "use_ssl"], as_dict=True)
+            if srv and srv.email_server:
+                imap = (srv.email_server, cint(srv.incoming_port) or 993, bool(srv.use_ssl) or cint(srv.incoming_port) == 993)
+    return {"fora": forn, "pwd": pwd, "origem": origem, "imap": imap, "smtp": forn["smtp"]}
+
+
+def recusada(user: str, cred: dict):
+    """O fornecedor (ou o Orbit Mail) recusou a credencial: esquece a que é nossa; a do CRM não se apaga (é a da conta
+    de email), fica posta de lado 1 h para o ecrã pedir a palavra-passe de aplicação."""
+    if cred.get("origem") == "orbit":
+        _esquecer(user)
+    elif cred.get("origem") == "orbit_fora":
+        from frappe.utils.password import remove_encrypted_password
+        remove_encrypted_password("User", user, CAMPO_FORA)
+        frappe.defaults.clear_user_default(CASA_FORA, user=user)
+    elif cred.get("origem") == "crm":
+        frappe.cache.set_value(f"orbit:caixa:crm-recusada:{user}", 1, expires_in_sec=3600)
+    frappe.db.commit()
 
 
 def _propfind(url, user, pwd, prop, depth="0"):
@@ -212,36 +265,43 @@ def ligar_fora(pwd: str):
     if n >= 5:
         frappe.throw("Demasiadas tentativas. Espere 10 minutos.")
     frappe.cache.set_value(chave, n + 1, expires_in_sec=600)
-    estado, casa = _descobrir_casa(forn["servidor"], user, (pwd or "").strip())
+    pwd = (pwd or "").strip()
+    estado, casa = _descobrir_casa(forn["servidor"], user, pwd)
     if estado == "recusada":
         frappe.throw(f"O {forn['nome']} não aceitou essa palavra-passe. Use uma palavra-passe de aplicação, não a de entrada.")
     if estado != "ok":
         frappe.throw(f"Não encontrei o calendário no {forn['nome']}. Tente de novo dentro de momentos.")
     from frappe.utils.password import set_encrypted_password
-    set_encrypted_password("User", user, (pwd or "").strip(), CAMPO_FORA)
+    set_encrypted_password("User", user, pwd, CAMPO_FORA)
     frappe.defaults.set_user_default(CASA_FORA, casa, user=user)
     frappe.cache.delete_value(chave)
+    frappe.cache.delete_value(f"orbit:caixa:crm-recusada:{user}")
     return {"ok": True}
 
 
 def _fonte(user: str):
     """De onde vem o calendário da pessoa: {'tipo': 'orbit'|'fora', 'casa', 'pwd', 'fornecedor'}."""
-    forn = _fornecedor_fora(user)
+    cred = credencial_caixa(user)
+    forn = cred["fora"]
     if not forn:
-        return {"tipo": "orbit", "casa": _base(user), "pwd": _senha(user), "fornecedor": None}
-    from frappe.utils.password import get_decrypted_password
-    pwd = get_decrypted_password("User", user, CAMPO_FORA, raise_exception=False) if forn["servidor"] else None
+        return {"tipo": "orbit", "casa": _base(user), "pwd": cred["pwd"], "fornecedor": None, "cred": cred}
+    pwd = cred["pwd"] if forn["servidor"] else None
     casa = frappe.defaults.get_user_default(CASA_FORA, user=user) if pwd else None
-    return {"tipo": "fora", "casa": casa, "pwd": pwd if casa else None, "fornecedor": forn}
+    if pwd and not casa:
+        try:
+            estado, casa = _descobrir_casa(forn["servidor"], user, pwd)
+        except Exception:  # noqa: BLE001
+            estado, casa = "falhou", None
+        if estado == "ok":
+            frappe.defaults.set_user_default(CASA_FORA, casa, user=user)
+        elif estado == "recusada":
+            recusada(user, cred)
+            pwd = None
+    return {"tipo": "fora", "casa": casa, "pwd": pwd if casa else None, "fornecedor": forn, "cred": cred}
 
 
 def _esquecer_fonte(user: str, fonte: dict):
-    if fonte["tipo"] == "orbit":
-        _esquecer(user)
-    else:
-        from frappe.utils.password import remove_encrypted_password
-        remove_encrypted_password("User", user, CAMPO_FORA)
-        frappe.defaults.clear_user_default(CASA_FORA, user=user)
+    recusada(user, fonte["cred"])
 
 
 def ao_entrar(login_manager=None):
@@ -261,9 +321,12 @@ def ao_entrar(login_manager=None):
 
 @frappe.whitelist(methods=["POST"])
 def ligar(pwd: str):
-    """«Ligar o calendário»: confirma a palavra-passe da caixa no SOGo e guarda-a."""
+    """«Ligar o calendário»: confirma a palavra-passe da caixa no SOGo e guarda-a. Numa caixa de fora é a palavra-passe
+    de aplicação do fornecedor (`ligar_fora`)."""
     _guarda()
     user = frappe.session.user
+    if _fornecedor_fora(user):
+        return ligar_fora(pwd)
     chave = f"orbit:calendario:tentativas:{user}"
     n = cint(frappe.cache.get_value(chave))
     if n >= 5:

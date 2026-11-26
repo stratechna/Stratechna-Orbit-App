@@ -6,6 +6,8 @@ têm o «lido» de cada um.
 
 A palavra-passe é a da caixa, que o Orbit já guarda cifrada para o calendário (`calendario._senha`). Se não a tiver,
 ou se o servidor a recusar, as funções respondem `{"ligar": true}` e o ecrã pede-a uma vez (`calendario.ligar`).
+Caixas de fora (Zoho…, 26-11-2026): a credencial vem de `calendario.credencial_caixa` — a palavra-passe de aplicação
+ligada no Orbit ou a da conta de email do CRM da mesma caixa — e o IMAP/SMTP é o do fornecedor.
 """
 from __future__ import annotations
 
@@ -40,19 +42,37 @@ class _SemLigacao(Exception):
     pass
 
 
+def _cred():
+    from orbit.interface.calendario import credencial_caixa
+    return credencial_caixa(frappe.session.user)
+
+
 def _ligar():
-    from orbit.interface.calendario import _senha
+    from orbit.interface.calendario import recusada
     user = frappe.session.user
-    pwd = _senha(user)
-    if not pwd or "@" not in user:
+    if "@" not in user:
         raise _SemLigacao()
-    host, porta, ssl = _servidor(user)
+    cred = _cred()
+    if not cred["pwd"] or (cred["fora"] and not cred["imap"]):
+        raise _SemLigacao()
+    host, porta, ssl = cred["imap"] or _servidor(user)
     m = imaplib.IMAP4_SSL(host, porta, timeout=20) if ssl else imaplib.IMAP4(host, porta, timeout=20)
     try:
-        m.login(user, pwd)
+        m.login(user, cred["pwd"])
     except imaplib.IMAP4.error:
+        if cred["fora"]:
+            recusada(user, cred)
         raise _SemLigacao()
     return m
+
+
+def _pedir():
+    """Resposta «ligar» com o que o ecrã deve pedir (caixa de fora: palavra-passe de aplicação do fornecedor)."""
+    try:
+        forn = _cred()["fora"]
+    except Exception:  # noqa: BLE001
+        forn = None
+    return {"nome": forn["nome"], "liga": bool(forn["servidor"]), "onde": forn["onde"]} if forn else None
 
 
 def _sair(m):
@@ -163,7 +183,7 @@ def pastas_da_caixa(pasta: str):
     try:
         m = _ligar()
     except _SemLigacao:
-        return {"ligar": True, "pastas": []}
+        return {"ligar": True, "fora": _pedir(), "pastas": []}
     try:
         _validar(m, pasta)
         caixa = _caixa(pasta)
@@ -204,7 +224,7 @@ def mover(pasta: str, uid: str, destino: str):
     try:
         m = _ligar()
     except _SemLigacao:
-        return {"ligar": True}
+        return {"ligar": True, "fora": _pedir()}
     try:
         _validar(m, pasta)
         _validar(m, destino)
@@ -222,7 +242,7 @@ def arquivar(pasta: str, uid: str):
     try:
         m = _ligar()
     except _SemLigacao:
-        return {"ligar": True}
+        return {"ligar": True, "fora": _pedir()}
     try:
         _validar(m, pasta)
         _mover(m, pasta, uid, _destino(m, pasta, "Arquivo", criar=True))
@@ -238,7 +258,7 @@ def apagar(pasta: str, uid: str):
     try:
         m = _ligar()
     except _SemLigacao:
-        return {"ligar": True}
+        return {"ligar": True, "fora": _pedir()}
     try:
         _validar(m, pasta)
         lixo = _destino(m, pasta, "Trash", criar=True)
@@ -280,7 +300,7 @@ def pastas():
     try:
         m = _ligar()
     except _SemLigacao:
-        return {"ligar": True, "pastas": []}
+        return {"ligar": True, "fora": _pedir(), "pastas": []}
     try:
         user = frappe.session.user
         out = []
@@ -302,7 +322,7 @@ def lista(pasta: str, pagina: int = 0, so_por_ler: int = 0):
     try:
         m = _ligar()
     except _SemLigacao:
-        return {"ligar": True, "itens": []}
+        return {"ligar": True, "fora": _pedir(), "itens": []}
     try:
         _validar(m, pasta)
         m.select(_q(pasta), readonly=True)
@@ -374,7 +394,7 @@ def mensagem(pasta: str, uid: str):
     try:
         m = _ligar()
     except _SemLigacao:
-        return {"ligar": True}
+        return {"ligar": True, "fora": _pedir()}
     try:
         _validar(m, pasta)
         m.select(_q(pasta))
@@ -405,7 +425,7 @@ def marcar(pasta: str, uid: str, lida: int = 1):
     try:
         m = _ligar()
     except _SemLigacao:
-        return {"ligar": True}
+        return {"ligar": True, "fora": _pedir()}
     try:
         _validar(m, pasta)
         m.select(_q(pasta))
@@ -466,8 +486,7 @@ def enviar(pasta: str, uid: str, modo: str = "responder", para: str = "", cc: st
     try:
         m = _ligar()
     except _SemLigacao:
-        return {"ligar": True}
-    from orbit.interface.calendario import _senha
+        return {"ligar": True, "fora": _pedir()}
     user = frappe.session.user
     try:
         _validar(m, pasta)
@@ -519,11 +538,18 @@ def enviar(pasta: str, uid: str, modo: str = "responder", para: str = "", cc: st
                 if fn or (p.get("Content-Disposition") or "").lower().startswith("attachment"):
                     mt, st = (p.get_content_type() or "application/octet-stream").split("/", 1)
                     msg.add_attachment(p.get_payload(decode=True) or b"", maintype=mt, subtype=st, filename=_dec(fn) or "anexo")
-        host, _porta, _ssl = _servidor(user)
         destinos = [e for _n, e in getaddresses([para, cc or ""]) if e]
-        with smtplib.SMTP(host, 587, timeout=30) as s:
-            s.starttls()
-            s.login(user, _senha(user))
+        cred = _cred()
+        if cred["fora"]:
+            host, porta = cred["smtp"]
+            s = smtplib.SMTP_SSL(host, porta, timeout=30) if porta == 465 else smtplib.SMTP(host, porta, timeout=30)
+        else:
+            host, porta = _servidor(user)[0], 587
+            s = smtplib.SMTP(host, porta, timeout=30)
+        with s:
+            if porta != 465:
+                s.starttls()
+            s.login(user, cred["pwd"])
             s.send_message(msg, from_addr=de, to_addrs=destinos)
         # cópia nos Enviados da caixa e a original marcada
         try:
@@ -546,7 +572,7 @@ def destinatarios(pasta: str, uid: str, modo: str = "responder"):
     try:
         m = _ligar()
     except _SemLigacao:
-        return {"ligar": True}
+        return {"ligar": True, "fora": _pedir()}
     try:
         _validar(m, pasta)
         m.select(_q(pasta), readonly=True)

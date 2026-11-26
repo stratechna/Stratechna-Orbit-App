@@ -2415,7 +2415,7 @@ const Caixa = {
       if (canal.value.grupo === "chat") { itens.value = []; return; }
       if (canal.value.grupo === "correio") {
         const r = await api("correio.lista", { pasta: pastaSel.value || canal.value.conta });
-        if (r.ligar) { correio.value = { ligar: true, pastas: [] }; itens.value = []; return; }
+        if (r.ligar) { correio.value = { ligar: true, fora: r.fora || null, pastas: [] }; itens.value = []; return; }
         itens.value = r.itens; return;
       }
       itens.value = await api("caixa", { grupo: canal.value.grupo, conta: canal.value.conta });
@@ -2493,9 +2493,11 @@ const Caixa = {
       <template v-if="correio && !correio.ligar">
         <button v-for="p in correio.pastas" :key="p.pasta" :class="{ativo:ativo('correio',p.pasta)}" @click="escolher('correio',p.pasta)" :title="p.email"><span class="txt">{{ p.pessoal ? 'Entrada' : p.nome }}<small v-if="!p.pessoal" class="sub"> · partilhada</small></span><span class="n" v-if="p.por_ler">{{ p.por_ler }}</span></button>
       </template>
+      <div v-else-if="correio && correio.ligar && correio.fora && !correio.fora.liga" class="sub" style="font-size:12px;padding:4px 10px">A sua caixa está no {{ correio.fora.nome }}, que não se liga com uma palavra-passe. Peça à Stratechna para a ligar.</div>
       <form v-else-if="correio && correio.ligar" class="ligar-caixa" @submit.prevent="ligarCaixa">
-        <p class="sub" style="font-size:12px;margin:0 0 6px">Para ver o seu correio aqui, confirme uma vez a palavra-passe da sua caixa. Fica guardada cifrada no seu Orbit.</p>
-        <input type="password" v-model="pwdCaixa" autocomplete="current-password" placeholder="Palavra-passe da caixa" class="filtro" style="border-style:solid;width:100%">
+        <p v-if="correio.fora" class="sub" style="font-size:12px;margin:0 0 6px">A sua caixa está no {{ correio.fora.nome }}. Para ver o correio e o calendário aqui, crie uma <b>palavra-passe de aplicação</b> em {{ correio.fora.onde }} e escreva-a aqui (a de entrada no {{ correio.fora.nome }} não serve). Fica guardada cifrada no seu Orbit.</p>
+        <p v-else class="sub" style="font-size:12px;margin:0 0 6px">Para ver o seu correio aqui, confirme uma vez a palavra-passe da sua caixa. Fica guardada cifrada no seu Orbit.</p>
+        <input type="password" v-model="pwdCaixa" :autocomplete="correio.fora ? 'off' : 'current-password'" :placeholder="correio.fora ? 'Palavra-passe de aplicação do ' + correio.fora.nome : 'Palavra-passe da caixa'" class="filtro" style="border-style:solid;width:100%">
         <button class="btn sm prim" style="margin-top:6px" :disabled="!pwdCaixa || aLigar">{{ aLigar ? 'A ligar…' : 'Ligar a caixa' }}</button>
       </form>
       <div v-else class="sub" style="font-size:12px;padding:4px 10px">A carregar…</div>
