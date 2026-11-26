@@ -787,3 +787,90 @@ def primeiro_livre(pessoas: str, duracao: int = 60, desde: str = None, dias: int
                     c += timedelta(minutes=15)
         t = (t + timedelta(days=1)).replace(hour=0, minute=0)
     return {"inicio": None}
+
+
+# ── Booking: a agenda de uma pessoa pelo Orbit do tenant dela (26-11-2026, pedido do Vítor) ─────────────────────
+# O Stratechna Booking (no portal) lia a via «orbit» sempre no Orbit da Stratechna e, para uma caixa de fora,
+# precisava de uma segunda palavra-passe (CalDAV do Zoho). Agora pede ao Orbit do tenant, pela ponte do Apps02
+# (verbo `agenda-pessoa`), e este usa a credencial que a pessoa já tem: a da caixa do Orbit Mail (SOGo, lido pela
+# base de dados, sem palavra-passe) ou a da caixa de fora (`credencial_caixa`). Só horas — nunca títulos — e só se
+# escrevem/apagam eventos com UID do Booking (…@booking.stratechna.com).
+
+def _pessoa_valida(email: str) -> str:
+    email = (email or "").strip().lower()
+    nome = frappe.db.get_value("User", {"name": email, "enabled": 1}, "name")
+    if not nome:
+        raise frappe.ValidationError(f"«{email}» não é uma pessoa activa deste Orbit")
+    return nome
+
+
+def pessoa_ocupado(email: str, de: str, ate: str) -> dict:
+    """Blocos ocupados {inicio, fim} (hora de Lisboa, sem fuso) na agenda da pessoa e nos Event do Orbit."""
+    from zoneinfo import ZoneInfo
+    from orbit import marcacao
+    user = _pessoa_valida(email)
+    ini, fi = get_datetime(de), get_datetime(ate)
+    blocos = []
+    forn = _fornecedor_fora(user)
+    if not forn:
+        blocos += marcacao._ocupado_no_sogo(user, ini, fi)
+    else:
+        fonte = _fonte(user)
+        if not fonte["pwd"]:
+            raise frappe.ValidationError(f"A agenda do {forn['nome']} desta pessoa ainda não está ligada no Orbit.")
+        cals = _calendarios(user, fonte["pwd"], fonte["casa"])
+        if cals is None:
+            _esquecer_fonte(user, fonte)
+            raise frappe.ValidationError(f"O {forn['nome']} recusou a credencial desta pessoa.")
+        tz = ZoneInfo(TZ)
+        a, b = ini.replace(tzinfo=tz), fi.replace(tzinfo=tz)
+        faixa = (f'<c:time-range start="{a.astimezone(ZoneInfo("UTC")).strftime("%Y%m%dT%H%M%SZ")}" '
+                 f'end="{b.astimezone(ZoneInfo("UTC")).strftime("%Y%m%dT%H%M%SZ")}"/>')
+        corpo = ('<?xml version="1.0"?><c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">'
+                 '<d:prop><c:calendar-data/></d:prop><c:filter><c:comp-filter name="VCALENDAR">'
+                 f'<c:comp-filter name="VEVENT">{faixa}</c:comp-filter></c:comp-filter></c:filter></c:calendar-query>')
+        for c in cals:
+            r = _pedido("REPORT", _abs(c["href"]), user, fonte["pwd"], corpo, {"Depth": "1"}, timeout=30)
+            if r.status_code != 207:
+                raise frappe.ValidationError(f"O calendário «{c['nome']}» respondeu {r.status_code}.")
+            for resp in ET.fromstring(r.content).findall("d:response", NS):
+                dados = resp.findtext("d:propstat/d:prop/c:calendar-data", namespaces=NS)
+                if not dados:
+                    continue
+                for ev in _ics_eventos(dados, a, b):
+                    if ev["dia_todo"] or ev["uid"].lower().endswith("@booking.stratechna.com"):
+                        continue   # o que o próprio Booking lá pôs não conta duas vezes
+                    blocos.append({"inicio": get_datetime(ev["inicio"]), "fim": get_datetime(ev["fim"])})
+    blocos += marcacao._ocupado_no_frappe(user, ini, fi)
+    juntos = marcacao._juntar([{"inicio": get_datetime(x["inicio"]), "fim": get_datetime(x["fim"])} for x in blocos])
+    return {"ok": True, "ocupado": [{"inicio": _iso(x["inicio"]), "fim": _iso(x["fim"])} for x in juntos]}
+
+
+def pessoa_escrever(email: str, uid: str, ics: str = "", apagar: int = 0) -> dict:
+    """Põe (PUT) ou tira (DELETE) um evento do Booking na agenda da pessoa, com a credencial dela."""
+    user = _pessoa_valida(email)
+    if not re.fullmatch(r"[A-Za-z0-9._-]{1,120}@booking\.stratechna\.com", uid or ""):
+        raise frappe.ValidationError("Só se escrevem eventos do Booking.")
+    fonte = _fonte(user)
+    if not fonte["pwd"]:
+        raise frappe.ValidationError("A agenda desta pessoa ainda não está ligada no Orbit (falta a palavra-passe "
+                                     "da caixa ou a de aplicação do fornecedor).")
+    cals = _calendarios(user, fonte["pwd"], fonte["casa"])
+    if cals is None:
+        _esquecer_fonte(user, fonte)
+        raise frappe.ValidationError("O calendário recusou a credencial desta pessoa.")
+    alvo = next((c for c in cals if c["pessoal"]), None) or next((c for c in cals if c["escreve"]), None)
+    if not alvo:
+        raise frappe.ValidationError("Não encontrei um calendário onde possa escrever.")
+    url = _abs(alvo["href"]).rstrip("/") + "/" + requests.utils.quote(uid, safe="@.-_") + ".ics"
+    if cint(apagar):
+        r = _pedido("DELETE", url, user, fonte["pwd"])
+        ok = r.status_code in (200, 204, 404, 410)
+    else:
+        if "BEGIN:VCALENDAR" not in (ics or "")[:200] or len(ics) > 100000:
+            raise frappe.ValidationError("Evento inválido.")
+        r = _pedido("PUT", url, user, fonte["pwd"], ics, {"Content-Type": "text/calendar; charset=utf-8"})
+        ok = r.status_code in (200, 201, 204)
+    if not ok:
+        raise frappe.ValidationError(f"O calendário devolveu {r.status_code}.")
+    return {"ok": True, "calendario": alvo["nome"]}
