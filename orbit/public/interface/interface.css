@@ -37,6 +37,18 @@ a{color:var(--link)}
 .nav .conta{margin-left:auto;font-size:11px;background:var(--acao);color:#fff;border-radius:10px;padding:1px 7px}
 .nav svg{width:17px;height:17px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .nav .fim{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px;border-top:1px solid rgba(255,255,255,.08)}
+/* 26-11-2026: a conta é um botão com menu (mãozinha e menu ao clicar) */
+.nav button.fim{margin-top:auto;border-radius:0 0 7px 7px;padding:10px;border-top:1px solid rgba(255,255,255,.08)}
+.nav button.fim:hover,.nav button.fim.ativo{background:var(--nav-hover);color:#fff}
+.nav .fim-nome{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.25}
+.nav .fim-nome small{display:block;color:#7f939d;font-size:12px}
+.menu-conta{position:absolute;left:10px;right:10px;bottom:62px;z-index:60;padding:6px;color:var(--ink)}
+.menu-conta-quem{padding:6px 10px 8px;border-bottom:1px solid var(--line);margin-bottom:4px;overflow:hidden}
+.menu-conta-quem small{display:block;color:var(--ink-3);font-size:12px;overflow:hidden;text-overflow:ellipsis}
+.menu-conta a{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;color:var(--ink);text-decoration:none;cursor:pointer}
+.menu-conta a:hover{background:var(--surface-2)}
+.menu-conta a.sair{color:var(--acao);border-top:1px solid var(--line);border-radius:0 0 7px 7px;margin-top:4px}
+.menu-conta svg{stroke:currentColor}
 .av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:600;color:#fff;flex:none}
 /* topo */
 .main{display:flex;flex-direction:column;min-width:0}

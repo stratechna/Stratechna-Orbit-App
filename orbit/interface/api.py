@@ -60,13 +60,36 @@ _PT = {"Urgent": "Urgente", "High": "Alta", "Medium": "Média", "Low": "Baixa", 
        "Paused": "Em pausa", "Resolved": "Resolvido", "Closed": "Fechado"}
 
 
-def _rotulo_estado(s):
+def _rotulo_origem(s):
+    """O nome de origem de uma fase/estado, traduzido (sem o nome à vista escolhido no Orbit)."""
     if not s:
         return ""
     t = _(s)
     if t == s and (frappe.local.lang or "pt").startswith("pt"):
         return _PT.get(s, s)
     return t
+
+
+def _rotulos_proprios():
+    """Nomes à vista escolhidos nas Definições (fases e estados das leads, `orbit_rotulo`), uma vez por pedido."""
+    m = getattr(frappe.local, "orbit_rotulos", None)
+    if m is None:
+        m = {}
+        for dt in ("CRM Lead Status", "CRM Deal Status"):
+            try:
+                if frappe.get_meta(dt).has_field("orbit_rotulo"):
+                    m.update({r.name: r.orbit_rotulo for r in frappe.get_all(dt, fields=["name", "orbit_rotulo"])
+                              if r.orbit_rotulo})
+            except Exception:  # noqa: BLE001
+                pass
+        frappe.local.orbit_rotulos = m
+    return m
+
+
+def _rotulo_estado(s):
+    if not s:
+        return ""
+    return _rotulos_proprios().get(s) or _rotulo_origem(s)
 
 
 def _compras_por_rever():

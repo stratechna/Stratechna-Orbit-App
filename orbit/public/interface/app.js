@@ -2834,7 +2834,8 @@ const DefLista = {
     const d = ref(null); const ed = ref(null); const nova = ref(null); const arr = ref(null);
     const carregar = async () => { d.value = await apiDef("lista", { chave: props.chave }); };
     onMounted(carregar);
-    const editar = (l) => { ed.value = { nome: l.name, valores: Object.fromEntries(d.value.campos.map((c) => [c.campo, l[c.campo] ?? ""])) }; };
+    // 26-11-2026: nas fases e nos estados das leads o nome que se escreve é o nome à vista (o interno não muda)
+    const editar = (l) => { ed.value = { nome: l.name, valores: Object.fromEntries(d.value.campos.map((c) => [c.campo, (d.value.nome_rotulo && c.campo === d.value.nome && d.value.rotulos[l.name]) || (l[c.campo] ?? "")])) }; };
     const gravar = async () => { await apiDef("gravar", { chave: props.chave, nome: ed.value.nome, valores: JSON.stringify(ed.value.valores) }, true); ed.value = null; toast("Gravado"); carregar(); };
     const comecarNova = () => { nova.value = Object.fromEntries(d.value.campos.map((c) => [c.campo, c.tipo === "Check" ? 0 : (c.opcoes && c.opcoes.length && c.tipo === "Select" ? c.opcoes[0] : "")])); };
     const criar = async () => { await apiDef("criar", { chave: props.chave, valores: JSON.stringify(nova.value) }, true); nova.value = null; toast("Criado"); carregar(); };
@@ -2862,7 +2863,7 @@ const DefLista = {
         <tr v-for="l in d.linhas" :key="l.name" :draggable="d.ordenavel && !ed" @dragstart="arr=l.name" @dragover.prevent @drop.prevent="largar(l.name)" :class="{'def-ed': ed && ed.nome===l.name}">
           <td v-if="d.ordenavel" class="sub" style="cursor:grab">⋮⋮</td>
           <template v-if="ed && ed.nome===l.name"><td v-for="c in d.campos" :key="c.campo"><select v-if="c.opcoes" v-model="ed.valores[c.campo]"><option v-for="o in c.opcoes" :value="o">{{ o || '—' }}</option></select>
-            <input v-else-if="c.tipo==='Check'" type="checkbox" v-model="ed.valores[c.campo]" :true-value="1" :false-value="0"><input v-else v-model="ed.valores[c.campo]" :type="c.tipo==='Int'?'number':'text'" :disabled="d.nome_fixo && c.campo===d.nome" :title="d.nome_fixo && c.campo===d.nome ? 'Nome interno fixo (usado pelo Orbit)' : ''"></td>
+            <input v-else-if="c.tipo==='Check'" type="checkbox" v-model="ed.valores[c.campo]" :true-value="1" :false-value="0"><input v-else v-model="ed.valores[c.campo]" :type="c.tipo==='Int'?'number':'text'" :disabled="d.nome_fixo && c.campo===d.nome" :title="d.nome_fixo && c.campo===d.nome ? 'Nome interno fixo (usado pelo Orbit)' : (d.nome_rotulo && c.campo===d.nome ? 'Nome que aparece no Orbit (vazio volta ao de origem)' : '')"></td>
             <td><button class="btn sm prim" @click="gravar">Gravar</button> <button class="btn sm" @click="ed=null">Cancelar</button></td></template>
           <template v-else><td v-for="c in d.campos" :key="c.campo" style="white-space:normal;max-width:360px">{{ mostra(l,c) }}</td>
             <td style="text-align:right"><button class="btn sm" v-if="d.pode_editar" @click="editar(l)">Editar</button> <button class="btn sm" v-if="d.pode_apagar" @click="apagar(l)">Apagar</button></td></template>
@@ -5663,6 +5664,10 @@ const App = {
       const m = modulosApp.value[0]; if (m) location.hash = m.barra ? "#/erp-m/" + encodeURIComponent(m.barra) : "#/" + (APP.nav.find((n) => n[0] !== "sec") || ["inicio"])[0];
     });
     const seletor = ref(false);
+    // 26-11-2026: a conta no fundo da barra abre um menu (era só texto, sem nada ao clicar)
+    const menuConta = ref(false);
+    window.addEventListener("click", (e) => { if (menuConta.value && !e.target.closest(".fim, .menu-conta")) menuConta.value = false; });
+    window.addEventListener("keydown", (e) => { if (e.key === "Escape") menuConta.value = false; });
     const LISTA_APPS = computed(() => [
       { chave: "inicio", nome: "Início", url: "/" },   // 25-11-2026: a página inicial do Orbit (orbit.<domínio>)
       ...Object.entries(APPS).filter(([k]) => k !== "admin" || ctx.value?.admin !== false).map(([k, a]) => ({ chave: k, nome: a.nome, ic: a.ic })),
@@ -5678,7 +5683,7 @@ const App = {
       if (l.length < 4) l = l.concat(modulosApp.value.filter((m) => m.barra).map((m) => ({ n: ["erp-m/" + encodeURIComponent(m.barra)], rota: "erp-m/" + encodeURIComponent(m.barra), ic: "grelha", r: m.nome })));
       return l.slice(0, 4);
     });
-    return { gaveta, MOVEL, ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal, APP, APP_ATUAL, modulosApp, seletor, LISTA_APPS, irApp, ativoNav, srcApp };
+    return { gaveta, MOVEL, ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal, APP, APP_ATUAL, modulosApp, seletor, LISTA_APPS, irApp, ativoNav, srcApp, menuConta };
   },
   template: `
   <div class="app" v-if="ctx">
@@ -5695,7 +5700,15 @@ const App = {
       <div class="so-gaveta"><h6>Conta</h6>
         <a :href="'#/definicoes'" style="text-decoration:none"><button tabindex="-1"><Icone n="roda"/>Definições — {{ APP.nome }}</button></a>
         <button @click="tema"><Icone n="lua"/>Claro / escuro</button></div>
-      <div class="fim"><div class="av" style="background:#5b6f7a">{{ ctx.iniciais }}</div><div style="min-width:0">{{ ctx.nome }}<br><a href="/?cmd=web_logout" style="color:#7f939d;font-size:12px">Sair</a></div></div>
+      <div class="cartao menu-conta" v-if="menuConta" role="menu">
+        <div class="menu-conta-quem"><b>{{ ctx.nome }}</b><small>{{ ctx.utilizador }}</small></div>
+        <a role="menuitem" :href="'/desk/user/' + encodeURIComponent(ctx.utilizador)" target="_blank"><Icone n="pessoas"/>A minha conta</a>
+        <a role="menuitem" href="#/definicoes" @click="menuConta=false"><Icone n="roda"/>Definições — {{ APP.nome }}</a>
+        <a role="menuitem" href="javascript:void 0" @click="tema(); menuConta=false"><Icone n="lua"/>Claro / escuro</a>
+        <a role="menuitem" href="/"><Icone n="grelha"/>Início do Orbit</a>
+        <a role="menuitem" href="/?cmd=web_logout" class="sair">Sair</a>
+      </div>
+      <button type="button" class="fim" :class="{ativo: menuConta}" @click="menuConta=!menuConta" :aria-expanded="menuConta" aria-haspopup="menu" title="A sua conta"><span class="av" style="background:#5b6f7a">{{ ctx.iniciais }}</span><span class="fim-nome">{{ ctx.nome }}<small>A sua conta</small></span></button>
     </nav>
     <div class="main">
       <header class="topo">

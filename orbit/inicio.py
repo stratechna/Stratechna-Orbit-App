@@ -139,6 +139,7 @@ def _despesas():
 def _crm(periodo: str, dinheiro: bool):
 	if not _existe("CRM Deal"):
 		return None
+	from orbit.interface.api import _rotulo_estado   # 26-11-2026: o nome à vista escolhido nas Definições
 	estados = frappe.get_all("CRM Deal Status", fields=["name", "type", "position"], order_by="position asc")
 	tipo = {e.name: e.type for e in estados}
 	abertos_n = [e.name for e in estados if e.type in ("Open", "Ongoing")]
@@ -168,7 +169,7 @@ def _crm(periodo: str, dinheiro: bool):
 		if e.type not in ("Open", "Ongoing"):
 			continue
 		n, v = contar([e.name])
-		funil.append({"etapa": frappe._(e.name), "n": n, "valor": v if dinheiro else None})
+		funil.append({"etapa": _rotulo_estado(e.name), "n": n, "valor": v if dinheiro else None})
 	novos = [cint(frappe.db.count("CRM Deal", {"creation": ["between", [a, add_days(b, 1)]]})) for a, b in _meses(7)]
 	parados = frappe.db.sql("""select name, organization, modified from `tabCRM Deal`
 		where status in %(s)s and modified < %(d)s order by modified asc limit 5""",

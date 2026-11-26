@@ -39,6 +39,18 @@ CONF = {
 
 
 _NOME_FIXO = ("fases", "estados-leads", "tipos-ticket", "prioridades")   # o Desk usa os nomes ingleses; Won/Lost/Ready to Close… são usados pelo código (loja → CRM, funil)
+# 26-11-2026 (Inês, JF): nas fases e nos estados das leads o nome muda-se — fica guardado como «nome à vista»
+# (`orbit_rotulo`), que é o que o /orbit mostra em todo o lado; o nome interno continua o mesmo, porque o código usa-o.
+_COM_ROTULO = {"fases": "CRM Deal Status", "estados-leads": "CRM Lead Status"}
+
+
+def instalar() -> None:
+    """Campo «Nome à vista (Orbit)» nas fases dos negócios e nos estados das leads (idempotente; after_migrate)."""
+    from frappe.custom.doctype.custom_field.custom_field import create_custom_field
+    for dt in _COM_ROTULO.values():
+        if frappe.db.exists("DocType", dt) and not frappe.db.exists("Custom Field", {"dt": dt, "fieldname": "orbit_rotulo"}):
+            create_custom_field(dt, {"fieldname": "orbit_rotulo", "label": "Nome à vista (Orbit)", "fieldtype": "Data",
+                                     "insert_after": "type", "description": "Vazio = o nome de origem, traduzido."})
 
 
 def _guarda():
@@ -84,7 +96,8 @@ def lista(chave: str):
     for l in linhas:
         l["__name"] = l.name
     from orbit.interface.api import _rotulo_estado
-    return {"titulo": c["titulo"], "ordenavel": bool(c.get("ordem")), "nome": c["nome"], "nome_fixo": chave in _NOME_FIXO,
+    return {"titulo": c["titulo"], "ordenavel": bool(c.get("ordem")), "nome": c["nome"],
+            "nome_fixo": chave in _NOME_FIXO and chave not in _COM_ROTULO, "nome_rotulo": chave in _COM_ROTULO,
             "campos": [{"campo": x[0], "rotulo": x[1], "tipo": x[2], "opcoes": _opcoes(meta, x[0], x[2])} for x in campos],
             "linhas": linhas, "pode_criar": frappe.has_permission(c["dt"], "create"),
             "pode_editar": frappe.has_permission(c["dt"], "write"), "pode_apagar": frappe.has_permission(c["dt"], "delete"),
@@ -109,8 +122,14 @@ def gravar(chave: str, nome: str, valores: str):
     valores = json.loads(valores) if isinstance(valores, str) else valores
     doc = frappe.get_doc(c["dt"], nome)
     _aplicar(doc, c, valores)
-    doc.save()
     novo = (valores.get(c["nome"]) or "").strip() if c["nome"] in valores else ""
+    if chave in _COM_ROTULO and doc.meta.has_field("orbit_rotulo"):
+        # o nome escrito fica como nome à vista; igual ao de origem (ou vazio) = sem nome próprio
+        from orbit.interface.api import _rotulo_origem
+        doc.orbit_rotulo = "" if not novo or novo in (nome, _rotulo_origem(nome)) else novo
+        doc.save()
+        return {"ok": True, "nome": nome}
+    doc.save()
     if novo and novo != nome and chave in _NOME_FIXO:
         frappe.throw("O nome interno desta fase/estado é usado pelo Orbit (lojas, funil, relatórios) e não muda; "
                      "no ecrã aparece em português.")
