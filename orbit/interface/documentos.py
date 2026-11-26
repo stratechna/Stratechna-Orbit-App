@@ -25,7 +25,11 @@ def _base() -> str:
 
 
 def _pedir(metodo: str, caminho: str, params=None, timeout=25, **kw):
-    user, pwd = _credenciais()
+    # Caixa do BDS: a palavra-passe da caixa; caixa de fora (Zoho…, 26-11-2026): a credencial da caixa no fornecedor,
+    # que o Docs confirma no IMAP do fornecedor (backend stratechna_caixa).
+    from orbit.interface.calendario import credencial_caixa
+    user = frappe.session.user
+    pwd = credencial_caixa(user)["pwd"]
     if not pwd:
         return None
     r = requests.request(metodo, _base() + caminho, params=params, auth=(user, pwd), timeout=timeout,
