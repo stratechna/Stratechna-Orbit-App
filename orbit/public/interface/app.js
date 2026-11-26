@@ -5668,6 +5668,10 @@ const App = {
     const menuConta = ref(false);
     window.addEventListener("click", (e) => { if (menuConta.value && !e.target.closest(".fim, .menu-conta")) menuConta.value = false; });
     window.addEventListener("keydown", (e) => { if (e.key === "Escape") menuConta.value = false; });
+    // 26-11-2026: no Frappe 16 sair só se faz por POST (o «/?cmd=web_logout» por GET dava 403 «Não permitido»)
+    const sair = () => { menuConta.value = false;
+      fetch("/api/method/logout", { method: "POST", credentials: "same-origin", headers: { "X-Frappe-CSRF-Token": window.csrf_token || "", Accept: "application/json" } })
+        .finally(() => location.replace("/login")); };
     const LISTA_APPS = computed(() => [
       { chave: "inicio", nome: "Início", url: "/" },   // 25-11-2026: a página inicial do Orbit (orbit.<domínio>)
       ...Object.entries(APPS).filter(([k]) => k !== "admin" || ctx.value?.admin !== false).map(([k, a]) => ({ chave: k, nome: a.nome, ic: a.ic })),
@@ -5683,7 +5687,7 @@ const App = {
       if (l.length < 4) l = l.concat(modulosApp.value.filter((m) => m.barra).map((m) => ({ n: ["erp-m/" + encodeURIComponent(m.barra)], rota: "erp-m/" + encodeURIComponent(m.barra), ic: "grelha", r: m.nome })));
       return l.slice(0, 4);
     });
-    return { gaveta, MOVEL, ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal, APP, APP_ATUAL, modulosApp, seletor, LISTA_APPS, irApp, ativoNav, srcApp, menuConta };
+    return { gaveta, MOVEL, ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal, APP, APP_ATUAL, modulosApp, seletor, LISTA_APPS, irApp, ativoNav, srcApp, menuConta, sair };
   },
   template: `
   <div class="app" v-if="ctx">
@@ -5706,7 +5710,7 @@ const App = {
         <a role="menuitem" href="#/definicoes" @click="menuConta=false"><Icone n="roda"/>Definições — {{ APP.nome }}</a>
         <a role="menuitem" href="javascript:void 0" @click="tema(); menuConta=false"><Icone n="lua"/>Claro / escuro</a>
         <a role="menuitem" href="/"><Icone n="grelha"/>Início do Orbit</a>
-        <a role="menuitem" href="/?cmd=web_logout" class="sair">Sair</a>
+        <a role="menuitem" href="javascript:void 0" class="sair" @click="sair">Sair</a>
       </div>
       <button type="button" class="fim" :class="{ativo: menuConta}" @click="menuConta=!menuConta" :aria-expanded="menuConta" aria-haspopup="menu" title="A sua conta"><span class="av" style="background:#5b6f7a">{{ ctx.iniciais }}</span><span class="fim-nome">{{ ctx.nome }}<small>A sua conta</small></span></button>
     </nav>
