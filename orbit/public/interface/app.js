@@ -214,7 +214,7 @@ const Calendario = {
     };
     const agoraTop = computed(() => { const n = new Date(); return ((n.getHours() * 60 + n.getMinutes()) - HORA0 * 60) / 60 * ALT; });
     const ehHoje = (dia) => isoDia(dia) === isoDia(new Date());
-    const ligar = async () => { await apiCal("ligar", { pwd: pwd.value }, true); pwd.value = ""; toast("Calendário ligado"); carregar(); };
+    const ligar = async () => { await apiCal(d.value?.fora ? "ligar_fora" : "ligar", { pwd: pwd.value }, true); pwd.value = ""; toast("Calendário ligado"); carregar(); };
     const hm = (iso) => iso.length > 10 ? iso.slice(11, 16) : "";
     const abrirNova = (dia = null, hora = null) => {
       const base = dia ? new Date(dia) : new Date(); const h = hora ?? Math.min(Math.max(new Date().getHours() + 1, 9), 18);
@@ -252,13 +252,25 @@ const Calendario = {
       <div class="cal-nav"><button class="btn sm" @click="mover(-1)">‹</button><button class="btn sm" @click="hoje">Hoje</button><button class="btn sm" @click="mover(1)">›</button><b>{{ titulo }}</b></div>
       <button class="btn prim" @click="abrirNova()" :disabled="d && !d.ligado">+ Nova reunião</button>
     </div>
-    <div class="equipa-cal" v-if="d && d.ligado && equipa.length"><span class="sub">Ver também:</span>
+    <div class="equipa-cal" v-if="d && d.ligado && !d.fora && equipa.length"><span class="sub">Ver também:</span>
       <label v-for="p in equipa" :key="p.email" class="chip-eq" :style="{borderColor:p.cor, background: verEquipa.includes(p.email) ? p.cor : 'transparent', color: verEquipa.includes(p.email) ? '#fff' : 'var(--ink)'}">
         <input type="checkbox" :value="p.email" v-model="verEquipa" style="display:none">{{ p.nome }}</label>
       <span class="sub" style="font-size:12px" v-for="em in verEquipa.filter(x => modos[x] === 'nenhum')" :key="'n'+em">{{ (equipa.find(p => p.email === em) || {}).nome || em }} não partilha a agenda</span>
       <label class="sub partilha-cal" title="Como os colegas vêem a sua agenda aqui e no Orbit Mail">A minha agenda para a equipa:
         <select v-model="partilha" @change="mudarPartilha"><option value="nenhum">Sem partilha</option><option value="livre">Livre/ocupado</option><option value="tudo">Tudo (com as marcações)</option></select></label></div>
-    <div v-if="d && !d.ligado" class="cartao aviso-cal">
+    <div v-if="d && !d.ligado && d.fora" class="cartao aviso-cal">
+      <template v-if="d.fora.liga">
+        <b>Ligar o calendário do {{ d.fora.nome }}</b>
+        <p class="sub">A sua caixa ({{ d.utilizador }}) está no {{ d.fora.nome }}, por isso o calendário lê-se lá. Crie uma <b>palavra-passe de aplicação</b> em {{ d.fora.onde }} e escreva-a aqui — a palavra-passe de entrada no {{ d.fora.nome }} não serve. Fica guardada cifrada no seu Orbit e só serve o seu calendário.</p>
+        <form @submit.prevent="ligar" style="display:flex;gap:8px;flex-wrap:wrap"><input type="password" v-model="pwd" autocomplete="off" :placeholder="'Palavra-passe de aplicação do ' + d.fora.nome" class="filtro" style="border-style:solid;min-width:240px"><button class="btn prim" :disabled="!pwd">Ligar</button></form>
+      </template>
+      <template v-else>
+        <b>Calendário do {{ d.fora.nome }}</b>
+        <p class="sub">A sua caixa ({{ d.utilizador }}) está no {{ d.fora.nome }}, que não se liga com uma palavra-passe. Peça à Stratechna para ligar o seu calendário.</p>
+      </template>
+      <p class="sub" style="font-size:12px;margin-bottom:0">Entretanto vê aqui as reuniões do Orbit (CRM e Booking).</p>
+    </div>
+    <div v-if="d && !d.ligado && !d.fora" class="cartao aviso-cal">
       <b>Ligar o calendário do Orbit Mail</b>
       <p class="sub">Para ver e marcar reuniões na sua agenda, confirme uma vez a palavra-passe da sua caixa de correio ({{ d.utilizador }}). Fica guardada cifrada no seu Orbit e só serve o seu calendário. Quem entra no Orbit com a palavra-passe da caixa fica ligado sozinho.</p>
       <form @submit.prevent="ligar" style="display:flex;gap:8px;flex-wrap:wrap"><input type="password" v-model="pwd" autocomplete="current-password" placeholder="Palavra-passe da caixa" class="filtro" style="border-style:solid;min-width:240px"><button class="btn prim" :disabled="!pwd">Ligar</button></form>

@@ -9,6 +9,8 @@ as agendas de todos os clientes.
   da pessoa, ao entrar no Orbit (`ao_entrar`, gancho on_login) ou pelo «Ligar o calendário» do ecrã (`ligar`).
 * Se o SOGo a recusar (mudou de palavra-passe), apaga-se e o ecrã volta a pedir.
 * Também aparecem os Event do Frappe (reuniões do Booking, do CRM), sem repetir os que nasceram aqui.
+* Caixas de fora (Zoho, iCloud, Fastmail — 26-11-2026): o calendário lê-se no fornecedor com uma palavra-passe de
+  aplicação (`ligar_fora`, campo `orbit_caldav_fora`); ver «Caixas de fora» abaixo.
 """
 from __future__ import annotations
 
@@ -58,6 +60,190 @@ def _pedido(metodo: str, url: str, user: str, pwd: str, corpo: str = None, cab: 
                             timeout=timeout)
 
 
+# ── Caixas de fora (26-11-2026, pedido do Vítor): calendário lido onde a caixa está ────────────────────────────
+# O SOGo só tem contas para as caixas do BDS. Uma caixa no Zoho (ex.: comercial2@arnox.pt, N7 do plano das entradas)
+# não tem agenda no Orbit Mail e nenhuma palavra-passe a ligava: o cartão pedia-a sem fim. Agora o Orbit reconhece a
+# caixa de fora pelo MX do domínio e lê/escreve o calendário dela directamente no fornecedor, por CalDAV, com uma
+# palavra-passe de aplicação escrita pela própria pessoa. Fica cifrada num campo próprio (`orbit_caldav_fora`) — nunca
+# no `orbit_caldav`, que o correio e o Docs usam como palavra-passe da caixa do BDS.
+CAMPO_FORA = "orbit_caldav_fora"
+CASA_FORA = "orbit_caldav_fora_casa"      # valor por omissão da pessoa: a «calendar-home-set» encontrada
+FORNECEDORES = [
+    # (sufixo do MX, nome, servidor CalDAV ou None se não houver CalDAV com palavra-passe, onde se cria a palavra-passe)
+    (("zoho.eu",), "Zoho", "https://calendar.zoho.eu",
+     "Zoho › A minha conta › Segurança › Palavras-passe específicas de aplicações (accounts.zoho.eu)"),
+    (("zoho.com",), "Zoho", "https://calendar.zoho.com",
+     "Zoho › A minha conta › Segurança › Palavras-passe específicas de aplicações (accounts.zoho.com)"),
+    (("zoho.in",), "Zoho", "https://calendar.zoho.in",
+     "Zoho › A minha conta › Segurança › Palavras-passe específicas de aplicações (accounts.zoho.in)"),
+    (("icloud.com", "me.com"), "iCloud", "https://caldav.icloud.com",
+     "appleid.apple.com › Iniciar sessão e segurança › Palavras-passe específicas de apps"),
+    (("messagingengine.com",), "Fastmail", "https://caldav.fastmail.com",
+     "Fastmail › Definições › Privacidade e segurança › Palavras-passe de aplicações"),
+    (("google.com", "googlemail.com"), "Google", None, None),
+    (("outlook.com", "office365.us"), "Microsoft 365", None, None),
+]
+
+
+def _mx(dominio: str) -> list[str]:
+    """Os servidores MX de um domínio, pelo resolvedor do sistema (o contentor não tem o dnspython)."""
+    import socket
+    import struct
+    servidores = []
+    try:
+        for l in open("/etc/resolv.conf"):
+            if l.startswith("nameserver"):
+                servidores.append(l.split()[1])
+    except OSError:
+        pass
+    pid = uuid.uuid4().int & 0xFFFF
+    q = struct.pack(">HHHHHH", pid, 0x0100, 1, 0, 0, 0) + b"".join(
+        bytes([len(p)]) + p.encode() for p in dominio.strip(".").split(".")) + b"\0" + struct.pack(">HH", 15, 1)
+
+    def nome(buf, i):
+        partes, saltou, fim = [], False, None
+        for _ in range(64):
+            n = buf[i]
+            if n == 0:
+                i += 1
+                break
+            if n & 0xC0 == 0xC0:
+                if not saltou:
+                    fim = i + 2
+                i, saltou = ((n & 0x3F) << 8) | buf[i + 1], True
+                continue
+            partes.append(buf[i + 1:i + 1 + n].decode(errors="replace"))
+            i += 1 + n
+        return ".".join(partes).lower(), (fim if saltou else i)
+
+    for ns in (servidores or ["127.0.0.11"])[:3]:
+        try:
+            s = socket.socket(socket.AF_INET6 if ":" in ns else socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(3)
+            s.sendto(q, (ns, 53))
+            buf = s.recv(4096)
+            s.close()
+            if struct.unpack(">H", buf[:2])[0] != pid:
+                continue
+            qd, an = struct.unpack(">HH", buf[4:8])
+            i = 12
+            for _ in range(qd):
+                _, i = nome(buf, i)
+                i += 4
+            out = []
+            for _ in range(an):
+                _, i = nome(buf, i)
+                tipo, _, _, tam = struct.unpack(">HHIH", buf[i:i + 10])
+                i += 10
+                if tipo == 15:
+                    out.append((struct.unpack(">H", buf[i:i + 2])[0], nome(buf, i + 2)[0]))
+                i += tam
+            return [h for _, h in sorted(out)]
+        except Exception:  # noqa: BLE001
+            continue
+    return []
+
+
+def _fornecedor_fora(user: str):
+    """O fornecedor da caixa, se o correio dela não for nosso (MX de um fornecedor conhecido); None = caixa do BDS.
+    Guardado 1 dia na cache. `orbit_calendario_fora` no site_config ({domínio: "zoho.eu"…}) ganha ao MX."""
+    dominio = user.rsplit("@", 1)[-1].lower()
+    chave = f"orbit:calendario:mx:{dominio}"
+    mx = frappe.cache.get_value(chave)
+    if mx is None:
+        forcado = (frappe.conf.get("orbit_calendario_fora") or {}).get(dominio)
+        mx = [forcado] if forcado else _mx(dominio)
+        frappe.cache.set_value(chave, mx, expires_in_sec=86400 if mx else 600)
+    for sufixos, nome, servidor, onde in FORNECEDORES:
+        if any(h == s or h.endswith("." + s) for h in mx for s in sufixos):
+            return {"nome": nome, "servidor": servidor, "onde": onde}
+    return None
+
+
+def _propfind(url, user, pwd, prop, depth="0"):
+    """PROPFIND que segue os redireccionamentos sem trocar de método (o requests passa-os a GET)."""
+    corpo = f'<?xml version="1.0"?><d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop>{prop}</d:prop></d:propfind>'
+    for _ in range(5):
+        r = requests.request("PROPFIND", url, data=corpo.encode(), auth=(user, pwd), allow_redirects=False, timeout=20,
+                             headers={"Content-Type": "application/xml; charset=utf-8", "Depth": depth})
+        if r.status_code in (301, 302, 303, 307, 308) and r.headers.get("Location"):
+            url = requests.compat.urljoin(url, r.headers["Location"])
+            continue
+        return r, url
+    return r, url
+
+
+def _descobrir_casa(servidor: str, user: str, pwd: str):
+    """current-user-principal → calendar-home-set. Devolve (estado, url): estado 'ok', 'recusada' ou 'falhou'."""
+    principal = None
+    for inicio in (servidor + "/.well-known/caldav", servidor + "/"):
+        r, url = _propfind(inicio, user, pwd, "<d:current-user-principal/>")
+        if r.status_code in (401, 403):
+            return "recusada", None
+        if r.status_code == 207:
+            h = ET.fromstring(r.content).findtext(".//d:current-user-principal/d:href", namespaces=NS)
+            if h:
+                principal = requests.compat.urljoin(url, h.strip())
+                break
+    if not principal:
+        return "falhou", None
+    r, url = _propfind(principal, user, pwd, "<c:calendar-home-set/>")
+    if r.status_code in (401, 403):
+        return "recusada", None
+    if r.status_code != 207:
+        return "falhou", None
+    h = ET.fromstring(r.content).findtext(".//c:calendar-home-set/d:href", namespaces=NS)
+    if not h:
+        return "falhou", None
+    return "ok", requests.compat.urljoin(url, h.strip())
+
+
+@frappe.whitelist(methods=["POST"])
+def ligar_fora(pwd: str):
+    """«Ligar o calendário do Zoho» (ou iCloud, Fastmail): confirma a palavra-passe de aplicação no fornecedor,
+    encontra o calendário e guarda os dois."""
+    _guarda()
+    user = frappe.session.user
+    forn = _fornecedor_fora(user)
+    if not forn or not forn["servidor"]:
+        frappe.throw("Este calendário não se liga com uma palavra-passe.")
+    chave = f"orbit:calendario:tentativas:{user}"
+    n = cint(frappe.cache.get_value(chave))
+    if n >= 5:
+        frappe.throw("Demasiadas tentativas. Espere 10 minutos.")
+    frappe.cache.set_value(chave, n + 1, expires_in_sec=600)
+    estado, casa = _descobrir_casa(forn["servidor"], user, (pwd or "").strip())
+    if estado == "recusada":
+        frappe.throw(f"O {forn['nome']} não aceitou essa palavra-passe. Use uma palavra-passe de aplicação, não a de entrada.")
+    if estado != "ok":
+        frappe.throw(f"Não encontrei o calendário no {forn['nome']}. Tente de novo dentro de momentos.")
+    from frappe.utils.password import set_encrypted_password
+    set_encrypted_password("User", user, (pwd or "").strip(), CAMPO_FORA)
+    frappe.defaults.set_user_default(CASA_FORA, casa, user=user)
+    frappe.cache.delete_value(chave)
+    return {"ok": True}
+
+
+def _fonte(user: str):
+    """De onde vem o calendário da pessoa: {'tipo': 'orbit'|'fora', 'casa', 'pwd', 'fornecedor'}."""
+    forn = _fornecedor_fora(user)
+    if not forn:
+        return {"tipo": "orbit", "casa": _base(user), "pwd": _senha(user), "fornecedor": None}
+    from frappe.utils.password import get_decrypted_password
+    pwd = get_decrypted_password("User", user, CAMPO_FORA, raise_exception=False) if forn["servidor"] else None
+    casa = frappe.defaults.get_user_default(CASA_FORA, user=user) if pwd else None
+    return {"tipo": "fora", "casa": casa, "pwd": pwd if casa else None, "fornecedor": forn}
+
+
+def _esquecer_fonte(user: str, fonte: dict):
+    if fonte["tipo"] == "orbit":
+        _esquecer(user)
+    else:
+        from frappe.utils.password import remove_encrypted_password
+        remove_encrypted_password("User", user, CAMPO_FORA)
+        frappe.defaults.clear_user_default(CASA_FORA, user=user)
+
+
 def ao_entrar(login_manager=None):
     """on_login: guarda a palavra-passe com que a pessoa entrou (é a da caixa) para o calendário da interface."""
     try:
@@ -100,11 +286,12 @@ def _credenciais():
     return user, pwd
 
 
-def _calendarios(user, pwd):
+def _calendarios(user, pwd, casa=None):
     corpo = ('<?xml version="1.0"?><d:propfind xmlns:d="DAV:" xmlns:a="http://apple.com/ns/ical/" '
              'xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop><d:displayname/><d:resourcetype/><a:calendar-color/>'
              '<d:current-user-privilege-set/></d:prop></d:propfind>')
-    r = _pedido("PROPFIND", _base(user), user, pwd, corpo, {"Depth": "1"})
+    casa = casa or _base(user)
+    r = _pedido("PROPFIND", casa, user, pwd, corpo, {"Depth": "1"})
     if r.status_code in (401, 403):
         return None
     r.raise_for_status()
@@ -118,8 +305,8 @@ def _calendarios(user, pwd):
         nome = prop.findtext("d:displayname", namespaces=NS) or href.rstrip("/").rsplit("/", 1)[-1]
         cor = (prop.findtext("a:calendar-color", namespaces=NS) or "").strip()[:7] or "#46607e"
         escreve = any(p.tag.endswith("write") or p.tag.endswith("all") for p in prop.findall("d:current-user-privilege-set/d:privilege/*", NS))
-        out.append({"href": href, "nome": nome, "cor": cor, "escreve": escreve,
-                    "pessoal": href.rstrip("/").endswith("/personal")})
+        out.append({"href": requests.compat.urljoin(casa, href) if not href.startswith("/SOGo/") else href,
+                    "nome": nome, "cor": cor, "escreve": escreve, "pessoal": href.rstrip("/").endswith("/personal")})
     out.sort(key=lambda c: (not c["pessoal"], c["nome"].lower()))
     return out
 
@@ -162,16 +349,18 @@ def eventos(inicio: str, fim: str):
     from zoneinfo import ZoneInfo
     ini = get_datetime(inicio).replace(tzinfo=ZoneInfo(TZ))
     fi = get_datetime(fim).replace(tzinfo=ZoneInfo(TZ))
-    user, pwd = _credenciais()
+    user = frappe.session.user
+    fonte = _fonte(user)
+    pwd = fonte["pwd"]
     out, cals, ligado = [], [], False
     if pwd:
         try:
-            cals = _calendarios(user, pwd)
+            cals = _calendarios(user, pwd, fonte["casa"])
         except Exception:  # noqa: BLE001
             frappe.log_error(title="orbit.interface.calendario: PROPFIND")
             cals = []
         if cals is None:          # a palavra-passe mudou: pedir de novo
-            _esquecer(user)
+            _esquecer_fonte(user, fonte)
             frappe.db.commit()
             cals = []
         else:
@@ -184,11 +373,14 @@ def eventos(inicio: str, fim: str):
     vistos = set()
     for c in cals:
         try:
-            r = _pedido("REPORT", _abs(c["href"]), user, pwd, corpo, {"Depth": "1"}, timeout=30)
+            url_cal = _abs(c["href"])
+            r = _pedido("REPORT", url_cal, user, pwd, corpo, {"Depth": "1"}, timeout=30)
             if r.status_code != 207:
                 continue
             for resp in ET.fromstring(r.content).findall("d:response", NS):
                 href = resp.findtext("d:href", namespaces=NS) or ""
+                if fonte["tipo"] == "fora":
+                    href = requests.compat.urljoin(url_cal, href)
                 dados = resp.findtext("d:propstat/d:prop/c:calendar-data", namespaces=NS)
                 if not dados:
                     continue
@@ -217,7 +409,11 @@ def eventos(inicio: str, fim: str):
                     "cor": "#b45309", "origem": "orbit",
                     "ref": [e.reference_doctype, e.reference_docname] if e.reference_docname else None})
     out.sort(key=lambda x: x["inicio"])
-    return {"ligado": ligado, "calendarios": cals, "eventos": out, "utilizador": user}
+    forn = fonte["fornecedor"]
+    fora = None
+    if forn:
+        fora = {"nome": forn["nome"], "liga": bool(forn["servidor"]), "onde": forn["onde"]}
+    return {"ligado": ligado, "calendarios": cals, "eventos": out, "utilizador": user, "fora": fora}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -228,7 +424,9 @@ def criar(titulo: str, inicio: str, fim: str, calendario: str = None, convidados
     _guarda()
     import icalendar
     from zoneinfo import ZoneInfo
-    user, pwd = _credenciais()
+    user = frappe.session.user
+    fonte = _fonte(user)
+    pwd = fonte["pwd"]
     if not pwd:
         frappe.throw("Ligue primeiro o calendário.")
     titulo = (titulo or "").strip()[:200]
@@ -237,8 +435,10 @@ def criar(titulo: str, inicio: str, fim: str, calendario: str = None, convidados
     ini, fi = get_datetime(inicio), get_datetime(fim)
     if fi <= ini:
         frappe.throw("O fim tem de ser depois do início.")
-    cals = _calendarios(user, pwd) or []
-    alvo = next((c for c in cals if c["href"] == calendario and c["escreve"]), None) or next((c for c in cals if c["pessoal"]), None)
+    cals = _calendarios(user, pwd, fonte["casa"]) or []
+    alvo = (next((c for c in cals if c["href"] == calendario and c["escreve"]), None)
+            or next((c for c in cals if c["pessoal"]), None)
+            or (next((c for c in cals if c["escreve"]), None) if fonte["tipo"] == "fora" else None))
     if not alvo:
         frappe.throw("Não encontrei um calendário onde possa escrever.")
     emails = [e for e in re.findall(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+", convidados or "") if e.lower() != user.lower()][:30]
@@ -292,8 +492,12 @@ def criar(titulo: str, inicio: str, fim: str, calendario: str = None, convidados
 def apagar(href: str):
     """Apaga um evento da agenda da pessoa (só os do calendário dela; o SOGo avisa os convidados)."""
     _guarda()
-    user, pwd = _credenciais()
-    if not pwd or not href.startswith(f"/SOGo/dav/{user}/Calendar/"):
+    user = frappe.session.user
+    fonte = _fonte(user)
+    pwd = fonte["pwd"]
+    dentro = (href.startswith(f"/SOGo/dav/{user}/Calendar/") if fonte["tipo"] == "orbit"
+              else bool(fonte["casa"]) and href.startswith(fonte["casa"]) and ".." not in href)
+    if not pwd or not dentro:
         frappe.throw("Sem permissão.", frappe.PermissionError)
     r = _pedido("DELETE", _abs(href), user, pwd)
     if r.status_code not in (200, 204, 404):
@@ -434,7 +638,7 @@ def disponibilidade(pessoas: str, inicio: str, fim: str):
     partilha que cada um escolheu: sem partilha → nada; livre/ocupado → só os blocos; tudo → com o assunto."""
     _guarda()
     user, pwd = _credenciais()
-    if not pwd:
+    if not pwd or _fornecedor_fora(user):   # caixa de fora: sem conta no Orbit Mail para ler a equipa
         return {"ligado": False}
     ini, fi = get_datetime(inicio), get_datetime(fim)
     lista = [e.strip().lower() for e in (pessoas or "").split(",") if "@" in e][:12]
@@ -483,9 +687,11 @@ def primeiro_livre(pessoas: str, duracao: int = 60, desde: str = None, dias: int
     """O primeiro horário em que a pessoa e os colegas indicados estão todos livres, em dias úteis, 9h–13h e 14h–18h30
     (o horário da casa), em passos de 15 min."""
     _guarda()
-    user, pwd = _credenciais()
-    if not pwd:
+    user = frappe.session.user
+    fonte = _fonte(user)
+    if not fonte["pwd"]:
         frappe.throw("Ligue primeiro o calendário.")
+    pwd = fonte["pwd"]
     dur = max(cint(duracao), 15)
     ini = get_datetime(desde) if desde else now_datetime()
     ini = ini.replace(second=0, microsecond=0)
@@ -493,9 +699,16 @@ def primeiro_livre(pessoas: str, duracao: int = 60, desde: str = None, dias: int
     fim = ini + timedelta(days=max(cint(dias), 1))
     todos = [user] + [e.strip().lower() for e in (pessoas or "").split(",") if "@" in e and e.strip().lower() != user][:10]
     blocos = []
-    for e in todos:
-        oc = _ocupado(e, ini, fim, user, pwd) or []
-        blocos += [(get_datetime(b["inicio"]), get_datetime(b["fim"])) for b in oc]
+    if fonte["tipo"] == "fora":
+        # Caixa de fora: só a própria agenda (lida no fornecedor); os colegas estão no Orbit Mail, onde ela não entra.
+        todos = [user]
+        for ev in eventos(_iso(ini), _iso(fim))["eventos"]:
+            if not ev.get("dia_todo"):
+                blocos.append((get_datetime(ev["inicio"]), get_datetime(ev["fim"])))
+    else:
+        for e in todos:
+            oc = _ocupado(e, ini, fim, user, pwd) or []
+            blocos += [(get_datetime(b["inicio"]), get_datetime(b["fim"])) for b in oc]
     janelas = [((9, 0), (13, 0)), ((14, 0), (18, 30))]
     t = ini
     while t < fim:
