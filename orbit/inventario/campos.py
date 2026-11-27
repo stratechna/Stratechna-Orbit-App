@@ -25,7 +25,7 @@ ITEM = [
     # 27-11-2026: título, descrições, categorias e etiquetas editáveis — o que se muda à mão no Orbit vai para a loja
     # e o importador deixa de o escrever por cima (orbit/inventario/manuais.py)
     {"fieldname": "orbit_categorias_loja", "fieldtype": "Small Text", "label": "Categorias na loja",
-     "insert_after": "orbit_altura", "no_copy": 1, "description": "Uma por linha, com o nome exacto da categoria da loja."},
+     "insert_after": "orbit_altura", "read_only": 0, "no_copy": 1, "description": "Uma por linha, com o nome exacto da categoria da loja."},
     {"fieldname": "orbit_campos_manuais", "fieldtype": "Small Text", "label": "Editado à mão no Orbit",
      "insert_after": "orbit_categorias_loja", "no_copy": 1,
      "description": "Campos mudados aqui: o importador já não os escreve por cima e a loja recebe o valor do Orbit. Apague a linha para voltar ao importador."},
