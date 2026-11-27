@@ -43,6 +43,16 @@ def _texto(html, n=280):
     return t[:n] + ("…" if len(t) > n else "")
 
 
+def _texto_chat(html, n=1500):
+    """O registo do Chat em texto com as linhas (quem e a que horas, cada mensagem), sem o «Abrir no Chat»."""
+    import html as _h
+    t = re.sub(r"^<p><a [^>]*>Abrir no Chat</a></p>\s*", "", html or "")
+    t = re.sub(r"<br\s*/?>|</p>", "\n", t)
+    t = _h.unescape(re.sub(r"<[^>]+>", "", t))
+    t = re.sub(r"\n{3,}", "\n\n", t).strip()
+    return t[:n] + ("…" if len(t) > n else "")
+
+
 def _iniciais(nome):
     p = [x for x in re.split(r"\s+", (nome or "").strip()) if x]
     return ((p[0][0] if p else "?") + (p[-1][0] if len(p) > 1 else "")).upper()
@@ -723,6 +733,20 @@ def cronologia(doctype: str, name: str, tipo: str = ""):
                           "texto": _texto(c.content, 400), "privado": bool(c.orbit_privado_de),
                           "lido": bool(c.read_by_recipient)})
 
+    # 27-11-2026: o Stratechna Chat (orbit/chat_crm.py) — um registo por tópico, por ficha e por dia
+    chat_nomes = set()
+    for dt, n in pares:
+        chat_nomes |= set(frappe.get_all("Communication", filters={"reference_doctype": dt, "reference_name": n,
+                                                                   "communication_medium": "Chat"}, pluck="name"))
+    if chat_nomes and tipo in ("", "chat"):
+        # get_all: o registo do Chat não tem caixa de correio e a regra do Frappe para quem tem caixas («email_account in
+        # (…)») escondia-o; vê-o quem pode abrir a ficha (D5) — a leitura da ficha já foi verificada acima
+        for c in frappe.get_all("Communication", filters={"name": ["in", list(chat_nomes)], "communication_medium": "Chat"},
+                                 fields=["name", "subject", "sender_full_name", "communication_date", "content"], limit=300):
+            itens.append({"tipo": "chat", "id": c.name, "data": c.communication_date, "titulo": c.subject or "Chat",
+                          "quem": c.sender_full_name, "texto": _texto_chat(c.content),
+                          "endereco": (re.search(r'href="([^"]+)"', c.content or "") or [None, None])[1]})
+
     def por_ref(dt_alvo, campos, ref_dt="reference_doctype", ref_dn="reference_docname"):
         out = []
         for dt, n in pares:
@@ -768,7 +792,11 @@ def cronologia(doctype: str, name: str, tipo: str = ""):
     contagem = {}
     for i in itens:
         contagem[i["tipo"]] = contagem.get(i["tipo"], 0) + 1
-    return {"proximos": proximos, "passado": passado[:200], "contagem": contagem}
+    chat = []
+    if tipo in ("", "chat"):
+        from orbit import chat_crm
+        chat = chat_crm.da_ficha(doctype, name, rel)
+    return {"proximos": proximos, "passado": passado[:200], "contagem": contagem, "chat": chat}
 
 
 @frappe.whitelist(methods=["POST"])

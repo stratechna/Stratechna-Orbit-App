@@ -102,7 +102,7 @@ const ICONES = {
 const Icone = { props: ["n"], template: `<svg viewBox="0 0 24 24" v-html="html"></svg>`, computed: { html() { return ICONES[this.n] || ""; } } };
 const IC_EVENTO = { email: ["mail", "var(--cinza-bg)", "var(--ink-2)"], nota: ["nota", "var(--ambar-bg)", "var(--ambar)"], tarefa: ["tarefa", "var(--ambar-bg)", "var(--ambar)"],
   chamada: ["tel", "var(--verde-bg)", "var(--verde)"], reuniao: ["cal", "var(--azul-bg)", "var(--azul)"], ticket: ["ticket", "var(--cinza-bg)", "var(--ink-2)"],
-  comentario: ["chat", "var(--roxo-bg)", "var(--roxo)"] };
+  comentario: ["chat", "var(--roxo-bg)", "var(--roxo)"], chat: ["chat", "var(--azul-bg)", "var(--azul)"] };
 
 
 // ── Corpo de um email: numa moldura própria (sem scripts), com o histórico citado recolhido ─────────────
@@ -803,6 +803,29 @@ const Chat = {
     const conv = ref(null); const sel = ref(null); const msgs = ref(null); const texto = ref(""); const pwd = ref(""); const novoTopico = ref("");
     const pessoas = ref([]); const novaDm = ref(""); let rel;
     const novoCanal = ref(null); const novaConversa = ref(null); const menuCanal = ref(null); const editCanal = ref(null);
+    // 27-11-2026: o Chat no CRM (orbit/chat_crm.py; docs/PLANO-CHAT-NO-CRM.md) — tópico ligado a fichas, sugestões, por arrumar
+    const crm = ref(null); const ligarCrm = ref(null); const arrumar = ref(null); const nArrumar = ref(0);
+    const TIPOS_CRM = { "CRM Deal": "Negócio", "CRM Organization": "Empresa", "Contact": "Contacto", "CRM Lead": "Lead" };
+    const carregarCrm = async () => {
+      crm.value = null; const s = sel.value; if (!s || s.ids || !s.topico) return;
+      const texto = (msgs.value || []).slice(-40).map((m) => m.texto).join("\n");
+      try { const r = await api("orbit.chat_crm.do_topico", { canal: s.canal, topico: s.topico, texto });
+        if (sel.value === s) crm.value = r; } catch (e) { crm.value = null; }
+    };
+    const procurarCrm = async () => { const l = ligarCrm.value; clearTimeout(l.t);
+      l.t = setTimeout(async () => { const r = l.q.trim().length >= 2 ? await api("pesquisa", { q: l.q }) : [];
+        l.res = r.filter((x) => TIPOS_CRM[x.doctype]); }, 250); };
+    const ligarA = async (x) => { const s = sel.value;
+      const r = await api("orbit.chat_crm.ligar", { canal: s.canal, canal_nome: s.nomeCanal, topico: s.topico, doctype: x.doctype, name: x.name }, true);
+      ligarCrm.value = null; toast(r.ja ? "Já estava ligado" : "Tópico ligado — a conversa aparece na atividade da ficha"); carregarCrm(); };
+    const desligarCrm = async (l) => { if (!confirm("Desligar este tópico de «" + l.titulo + "»? As conversas do Chat saem da atividade da ficha; no Chat nada muda.")) return;
+      await api("orbit.chat_crm.desligar", { id: l.id }, true); toast("Tópico desligado"); carregarCrm(); };
+    const contarArrumar = async () => { try { nArrumar.value = (await api("orbit.chat_crm.por_arrumar")).length; } catch (e) { nArrumar.value = 0; } };
+    const abrirArrumar = async () => { arrumar.value = { itens: await api("orbit.chat_crm.por_arrumar"), em: null, q: "", res: [] }; };
+    const procurarArrumar = async () => { const a = arrumar.value; clearTimeout(a.t);
+      a.t = setTimeout(async () => { const r = a.q.trim().length >= 2 ? await api("pesquisa", { q: a.q }) : []; a.res = r.filter((x) => TIPOS_CRM[x.doctype]); }, 250); };
+    const arrumarEm = async (m, x) => { await api("orbit.chat_crm.arrumar", x ? { id: m.id, doctype: x.doctype, name: x.name } : { id: m.id, ignorar: 1 }, true);
+      toast(x ? "Guardado em " + x.titulo : "Mensagem posta de lado"); await abrirArrumar(); contarArrumar(); };
     const arquivarCanal = async (c) => { menuCanal.value = null;
       if (!confirm("Arquivar o canal #" + c.nome + "? Deixa de aparecer a todos; as mensagens ficam guardadas no Chat.")) return;
       await apiC("arquivar_canal", { canal: c.id }, true); toast("Canal arquivado"); if (sel.value && sel.value.canal === c.id) sel.value = null; carregarConv(); };
@@ -818,11 +841,12 @@ const Chat = {
     const carregarMsgs = async (rolar = true) => {
       if (!sel.value) return;
       const a = sel.value.ids ? { ids: sel.value.ids.join(",") } : { canal: sel.value.canal, topico: sel.value.topico || "" };
-      const r = await apiC("mensagens", a); const novo = !msgs.value || r.mensagens.length !== msgs.value.length; msgs.value = r.mensagens;
+      const r = await apiC("mensagens", a); const novo = !msgs.value || r.mensagens.length !== msgs.value.length; const primeira = !msgs.value; msgs.value = r.mensagens;
+      if (primeira) carregarCrm();
       if (rolar && novo) nextTick(() => { const m = document.querySelector(".chat-msgs"); if (m) m.scrollTop = m.scrollHeight; });
     };
     const abrir = (x) => { sel.value = x; msgs.value = null; carregarMsgs(); };
-    onMounted(async () => { await carregarConv(); if (conv.value?.ligado) pessoas.value = await apiC("pessoas");
+    onMounted(async () => { await carregarConv(); contarArrumar(); if (conv.value?.ligado) pessoas.value = await apiC("pessoas");
       rel = setInterval(() => { if (document.hidden) return; carregarConv(); carregarMsgs(); }, 15000); });
     const sair = () => clearInterval(rel);
     window.addEventListener("hashchange", sair, { once: true });
@@ -838,12 +862,14 @@ const Chat = {
     const hora = (ts) => { const d = new Date(ts * 1000); return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit" }) + " " + d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }); };
     const titulo = computed(() => !sel.value ? "" : sel.value.ids ? sel.value.nome : `${sel.value.nomeCanal}${sel.value.topico ? " › " + sel.value.topico : ""}`);
     return { conv, sel, msgs, texto, pwd, abrir, ligar, enviar, hora, titulo, textoChat, cor, ini, novoTopico, pessoas, novaDm, abrirDm,
-      novoCanal, novaConversa, criarCanal, comecarConversa, menuCanal, editCanal, arquivarCanal, gravarCanal };
+      novoCanal, novaConversa, criarCanal, comecarConversa, menuCanal, editCanal, arquivarCanal, gravarCanal,
+      crm, ligarCrm, procurarCrm, ligarA, link, desligarCrm, TIPOS_CRM, nArrumar, arrumar, abrirArrumar, procurarArrumar, arrumarEm };
   },
   template: `
   <div class="caixa chat">
     <aside class="canais">
       <template v-if="conv && conv.ligado">
+        <button v-if="nArrumar" class="chat-arrumar" @click="abrirArrumar">📌 Chat por arrumar <span class="n">{{ nArrumar }}</span></button>
         <h6 class="chat-h6">Canais<button class="chat-mais" title="Criar canal" aria-label="Criar canal" @click="novoCanal={nome:'',descricao:'',privado:false,pessoas:[]}">+</button></h6>
         <template v-for="c in conv.canais" :key="c.id">
           <div class="chat-canal"><button :class="{ativo: sel && !sel.ids && sel.canal===c.id && !sel.topico}" @click="abrir({canal:c.id, nomeCanal:c.nome})"><span class="ponto" :style="{background:c.cor||'var(--ink-3)'}"></span><span class="txt"># {{ c.nome }}</span><span class="n" v-if="c.por_ler">{{ c.por_ler }}</span></button>
@@ -864,6 +890,15 @@ const Chat = {
         <form @submit.prevent="ligar" style="display:flex;gap:8px;flex-wrap:wrap"><input type="password" v-model="pwd" autocomplete="current-password" placeholder="Palavra-passe do Chat" class="filtro" style="border-style:solid;min-width:240px"><button class="btn prim" :disabled="!pwd">Ligar</button></form></div></div>
       <template v-else-if="sel">
         <header><div><h2>{{ titulo }}</h2></div></header>
+        <div v-if="crm && sel.topico && !sel.ids" class="chat-crm">
+          <template v-if="!crm.publico"><span class="sub">🔒 Canal privado — as conversas deste canal não entram no CRM.</span></template>
+          <template v-else>
+            <span v-for="l in crm.ligacoes" :key="l.id" class="etq azul" style="display:inline-flex;gap:6px;align-items:center">🔗 <a :href="link(l.doctype, l.name)" style="color:inherit">{{ l.titulo }}</a> <span class="sub">({{ l.tipo }})</span><button class="chat-x" :aria-label="'Desligar de ' + l.titulo" @click="desligarCrm(l)">×</button></span>
+            <template v-if="!crm.ligacoes.length && crm.sugestoes.length"><span class="sub">Ligar este tópico a</span>
+              <button v-for="x in crm.sugestoes" :key="x.doctype+x.name" class="btn sm" @click="ligarA(x)">{{ x.titulo }} <span class="sub">({{ x.tipo }})</span></button><span class="sub">?</span></template>
+            <button class="btn sm" @click="ligarCrm={q:'', res:[], t:null}">{{ crm.ligacoes.length ? '+ Ligar a outra ficha' : 'Ligar ao CRM' }}</button>
+          </template>
+        </div>
         <div class="msgs chat-msgs">
           <div v-if="!msgs" class="carregar">A carregar…</div>
           <div v-for="m in msgs||[]" :key="m.id" class="chat-msg" :class="{meu:m.meu}">
@@ -891,6 +926,21 @@ const Chat = {
       <form class="reg-form" @submit.prevent="gravarCanal"><label class="erp-campo"><span>Nome</span><input v-model="editCanal.nome" required></label>
         <label class="erp-campo"><span>Descrição</span><input v-model="editCanal.descricao"></label>
         <div class="reg-botoes"><button class="btn prim">Gravar</button></div></form></div></div>
+    <div v-if="ligarCrm" class="modal-fundo" @click.self="ligarCrm=null"><div class="modal" style="max-width:520px"><header><div><b>Ligar ao CRM</b><div class="sub">{{ titulo }} — tudo o que se disse e se disser neste tópico entra na atividade da ficha.</div></div><button class="btn sm" @click="ligarCrm=null">Fechar</button></header>
+      <div class="reg-form"><input v-model="ligarCrm.q" class="filtro" style="border-style:solid;width:100%" placeholder="Procurar negócio, empresa, contacto ou lead…" autofocus @input="procurarCrm">
+        <div v-for="x in ligarCrm.res" :key="x.doctype+x.name" class="assoc-op" @click="ligarA(x)"><b>{{ x.titulo }}</b><small>{{ TIPOS_CRM[x.doctype] }}<template v-if="x.sub"> · {{ x.sub }}</template></small></div>
+        <div v-if="ligarCrm.q.length>=2 && !ligarCrm.res.length" class="sub" style="font-size:12px">Nada encontrado.</div>
+        <small class="sub">Só os canais públicos entram no CRM; as mensagens diretas nunca. Quem pode abrir a ficha vê as conversas.</small></div></div></div>
+    <div v-if="arrumar" class="modal-fundo" @click.self="arrumar=null"><div class="modal" style="max-width:620px"><header><div><b>Chat por arrumar</b><div class="sub">Mensagens com a reacção :crm: em que não se encontrou a ficha. Escolha onde ficam.</div></div><button class="btn sm" @click="arrumar=null">Fechar</button></header>
+      <div class="reg-form">
+        <div v-if="!arrumar.itens.length" class="vazio">Nada por arrumar.</div>
+        <div v-for="m in arrumar.itens" :key="m.id" class="cartao" style="padding:10px 12px;margin-bottom:8px">
+          <div class="sub" style="font-size:12px"># {{ m.canal }} › {{ m.topico }} · {{ m.autor }} · <a :href="m.endereco" target="_blank" rel="noopener">Abrir no Chat</a></div>
+          <div class="chat-txt" v-html="textoChat(m.texto)"></div>
+          <div v-if="arrumar.em===m.id" class="assoc-procura" style="margin-top:6px"><input v-model="arrumar.q" placeholder="Procurar a ficha…" @input="procurarArrumar">
+            <div v-for="x in arrumar.res" :key="x.doctype+x.name" class="assoc-op" @click="arrumarEm(m,x)"><b>{{ x.titulo }}</b><small>{{ TIPOS_CRM[x.doctype] }}</small></div></div>
+          <div v-else style="display:flex;gap:6px;margin-top:6px"><button class="btn sm prim" @click="arrumar.em=m.id; arrumar.q=''; arrumar.res=[]">Guardar numa ficha</button><button class="btn sm" @click="arrumarEm(m,null)">Não guardar</button></div>
+        </div></div></div></div>
     <div v-if="novaConversa" class="modal-fundo" @click.self="novaConversa=null"><div class="modal" style="max-width:520px"><header><b>Nova conversa em #{{ novaConversa.nomeCanal }}</b><button class="btn sm" @click="novaConversa=null">Fechar</button></header>
       <form class="reg-form" @submit.prevent="comecarConversa">
         <label class="erp-campo"><span>Tópico<span class="obrig">*</span></span><input v-model="novaConversa.topico" required autofocus maxlength="60" placeholder="ex.: encomenda da Casa X"></label>
@@ -2118,7 +2168,7 @@ const Ficha = {
     const trocarFoto = async (ev) => { const fi = ev.target.files?.[0]; if (!fi) return;
       const url = await carregarFicheiro(fi, { doctype: props.doctype, docname: props.name, privado: 0 }); await apiA("imagem", { doctype: props.doctype, name: props.name, url }, true); toast("Imagem gravada"); ev.target.value = ""; carregar(); };
     const tirarFoto = async () => { await apiA("imagem", { doctype: props.doctype, name: props.name, url: "" }, true); toast("Imagem retirada"); carregar(); };
-    return { tarefaAberta, notaAberta, chamada, resposta, fixadasL, agendadosL, abrirItem, depoisAtividade, ligar, responder, agendadoAcao, novoNegocio, novoContacto, gravarContacto, fotoIn, trocarFoto, tirarFoto, ext, carregarExt, apagarRegisto, orcs, criarOrcamento, COR_ORC, irErp, tornarPrincipal, PAISES_PT, alternarCheck, alternarMarca, edMorada, editarMorada, gravarMorada, novoEmail, conv, convForm, aConverter, abrirConversao, converter, pode, assocAberta, assocQ, assocRes, abrirAssoc, procurarAssoc, ligarAssoc, tirarAssoc, vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
+    return { textoChat, tarefaAberta, notaAberta, chamada, resposta, fixadasL, agendadosL, abrirItem, depoisAtividade, ligar, responder, agendadoAcao, novoNegocio, novoContacto, gravarContacto, fotoIn, trocarFoto, tirarFoto, ext, carregarExt, apagarRegisto, orcs, criarOrcamento, COR_ORC, irErp, tornarPrincipal, PAISES_PT, alternarCheck, alternarMarca, edMorada, editarMorada, gravarMorada, novoEmail, conv, convForm, aConverter, abrirConversao, converter, pode, assocAberta, assocQ, assocRes, abrirAssoc, procurarAssoc, ligarAssoc, tirarAssoc, vendas, COR_V, tempo, registarTempo, fmtH, assin, assinar, carregarAssin, COR_EST, docs, verDoc, marcarEmail, f, cron, filtro, ed, valorEd, editar, gravar, notaTxt, tarefaTxt, tarefaData, modo, enviarNota, enviarTarefa, procurar, abrirEmail, email,
       grupos, mudarFase, NOMES, tit, sub, link, data, eur, ic, cor, ESTADO_COR };
   },
   template: `
@@ -2222,6 +2272,7 @@ const Ficha = {
         <button :class="{ativo:filtro==='tarefas'}" @click="filtro='tarefas'">Tarefas</button>
         <button :class="{ativo:filtro==='reunioes'}" @click="filtro='reunioes'">Reuniões</button>
         <button :class="{ativo:filtro==='tickets'}" @click="filtro='tickets'">Tickets</button>
+        <button :class="{ativo:filtro==='chat'}" @click="filtro='chat'">Chat <span class="sub">{{ cron?.contagem?.chat || '' }}</span></button>
         <button :class="{ativo:filtro==='anexos'}" @click="filtro='anexos'">Anexos <span class="sub">{{ ext?.anexos?.length || '' }}</span></button>
         <button :class="{ativo:filtro==='historico'}" @click="filtro='historico'">Histórico</button>
       </div>
@@ -2237,6 +2288,9 @@ const Ficha = {
       <div v-for="n in fixadasL" :key="n.id" class="cartao nota-fixa" @click="notaAberta={id:n.id}"><b>📌 {{ n.titulo }}</b><div class="rico-ver" v-html="n.html"></div><small class="sub">{{ n.quem }} · {{ data(n.quando) }}</small></div>
       <div v-if="!cron" class="carregar">A carregar…</div>
       <template v-else>
+        <div v-if="filtro==='chat'" class="cartao" style="padding:12px 14px;margin-bottom:12px"><b>Conversas no Chat</b>
+          <div v-if="!(cron.chat||[]).length" class="sub" style="font-size:13px;margin-top:4px">Nenhum tópico do Chat ligado. No <a href="#/chat">Chat</a>, abra o tópico e carregue em «Ligar ao CRM»; uma mensagem solta guarda-se com a reacção :crm:.</div>
+          <div v-for="c in cron.chat||[]" :key="c.id" style="display:flex;gap:8px;align-items:center;margin-top:6px;font-size:13px"><span># {{ c.canal }} › <b>{{ c.topico }}</b><span v-if="!c.propria" class="sub"> · {{ c.tipo }} {{ c.ficha }}</span></span><a :href="c.endereco" target="_blank" rel="noopener" class="btn sm" style="margin-left:auto">Abrir no Chat</a></div></div>
         <template v-if="cron.proximos.length"><div class="mes">Próximo</div>
           <div class="evento" v-for="i in cron.proximos" :key="i.tipo+i.id"><div class="ic" :style="{background:ic(i.tipo)[1],color:ic(i.tipo)[2]}"><Icone :n="ic(i.tipo)[0]"/></div>
             <div class="cartao corpo abre" @click="abrirItem(i)"><header><b>{{ i.titulo }}</b><span :class="i.atrasada?'etq ambar':'sub'">{{ i.atrasada ? 'Atrasada · ' : '' }}{{ data(i.data) }}</span></header><p v-if="i.texto">{{ i.texto }}</p><p v-if="i.quem" class="sub">{{ i.quem }}</p></div></div>
@@ -2248,7 +2302,9 @@ const Ficha = {
               <header><b><template v-if="i.tipo==='email'">{{ i.sentido==='Sent' ? 'Email enviado: ' : 'Email recebido: ' }}</template>{{ i.titulo }}</b>
                 <span class="sub">{{ data(i.data) }}<template v-if="i.duracao"> · {{ Math.round(i.duracao/60) }} min</template></span></header>
               <p v-if="i.tipo==='email'" class="sub" style="margin-top:2px">{{ i.sentido==='Sent' ? 'Para ' + (i.para||'') : 'De ' + (i.quem||'') }}<template v-if="i.conta"> · {{ i.conta }}</template> <span v-if="i.privado" class="priv">· só para si</span> <span v-if="i.sentido==='Sent' && i.lido" class="etq verde" style="font-size:11px">Aberto</span></p>
-              <p v-if="i.texto">{{ i.texto }}</p>
+              <div v-if="i.tipo==='chat'" class="chat-txt" style="white-space:normal;font-size:13px" v-html="textoChat(i.texto)"></div>
+              <p v-else-if="i.texto">{{ i.texto }}</p>
+              <p v-if="i.tipo==='chat' && i.endereco" class="sub"><a :href="i.endereco" target="_blank" rel="noopener" @click.stop>Abrir no Chat</a></p>
               <p v-if="i.tipo!=='email' && i.quem" class="sub">{{ i.quem }}</p>
               <span v-if="i.tipo==='ticket'" class="etq" :class="i.resolvido?'verde':'ambar'">{{ i.estado }}</span>
             </div></div>

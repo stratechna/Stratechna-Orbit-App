@@ -222,8 +222,20 @@ def listar(doctype, name):
             _juntar(emails, _lista("Communication", fields=campos_email,
                                    filters=base + [["Communication Link", "link_doctype", "=", dt],
                                                    ["Communication Link", "link_name", "in", ns]]))
+        # 27-11-2026: as conversas do Stratechna Chat ligadas à ficha (orbit/chat_crm.py) — meio «Chat»
+        # get_all: sem caixa de correio, a regra do Frappe «email_account in (…)» escondia-os; as fichas (refs) já
+        # vêm das listas com as permissões de quem abre (D5: vê quem pode abrir a ficha)
+        _juntar(emails, frappe.get_all("Communication", fields=campos_email, limit_page_length=_LIMITE,
+                                       filters=[["reference_doctype", "=", dt], ["reference_name", "in", ns],
+                                                ["communication_medium", "=", "Chat"]]))
     for e in emails.values():
         if e.reference_doctype == "HD Ticket":
+            continue
+        if e.communication_medium == "Chat":
+            o, lig = origem(e.reference_doctype, e.reference_name)
+            itens.append({"tipo": "email", "data": _quando(e.communication_date or e.creation),
+                          "titulo": e.subject or "Chat", "detalhe": "Chat · " + cstr(e.sender_full_name or ""),
+                          "texto": _texto(e.content), "origem": o, "ligacao": lig})
             continue
         enviado = e.sent_or_received == "Sent"
         meio = {"Event": "Convite", "Phone": "Telefone", "Chat": "Chat", "SMS": "SMS"}.get(e.communication_medium, "")

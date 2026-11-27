@@ -928,3 +928,9 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .chat-menu{position:relative}.chat-menu-ops{position:absolute;right:0;top:26px;z-index:30;padding:4px;min-width:200px;display:flex;flex-direction:column}
 .chat-menu-ops button{border:0;background:none;text-align:left;padding:7px 10px;border-radius:6px;cursor:pointer;color:var(--ink);font:inherit}
 .chat-menu-ops button:hover{background:var(--surface-2,#eef1f3)}.chat-menu-ops button.perigo{color:var(--accent,#b20009)}
+
+/* 27-11-2026: o Chat no CRM — barra do tópico (fichas ligadas, sugestões) e «Chat por arrumar» */
+.chat-crm{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 16px 8px;border-bottom:1px solid var(--line,#e5e7eb);font-size:13px}
+.chat-x{border:0;background:none;cursor:pointer;color:inherit;font-size:14px;line-height:1;padding:0 2px}
+.chat-arrumar{display:flex;align-items:center;gap:6px;width:calc(100% - 16px);margin:6px 8px;padding:7px 10px;border:1px solid var(--ambar,#b45309);border-radius:8px;background:var(--ambar-bg,#fff7ed);color:var(--ink);cursor:pointer;font:inherit;font-size:13px}
+.chat-arrumar .n{margin-left:auto}

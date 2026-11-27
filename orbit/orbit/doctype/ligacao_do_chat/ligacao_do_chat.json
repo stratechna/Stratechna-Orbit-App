@@ -1,0 +1,39 @@
+{
+ "doctype": "DocType",
+ "name": "Ligacao do Chat",
+ "module": "Orbit",
+ "custom": 0,
+ "engine": "InnoDB",
+ "track_changes": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "creation": "2026-11-27 18:00:00.000000",
+ "modified": "2026-11-27 18:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "autoname": "hash",
+ "title_field": "topico",
+ "description": "O que se diz no Stratechna Chat e entra no CRM (docs/PLANO-CHAT-NO-CRM.md): um tópico ligado a uma ficha (C1) ou uma mensagem guardada pela reacção :crm: (C2). Sem ficha = «Chat por arrumar».",
+ "fields": [
+  {"fieldname": "tipo", "fieldtype": "Select", "label": "Tipo", "options": "Tópico\nMensagem", "default": "Tópico", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "canal_id", "fieldtype": "Int", "label": "Canal (id no Chat)", "reqd": 1},
+  {"fieldname": "canal", "fieldtype": "Data", "label": "Canal", "in_list_view": 1},
+  {"fieldname": "topico", "fieldtype": "Data", "label": "Tópico", "length": 140, "in_list_view": 1},
+  {"fieldname": "mensagem_id", "fieldtype": "Int", "label": "Mensagem (id no Chat)", "description": "Só nas mensagens guardadas pela reacção :crm:"},
+  {"fieldname": "col1", "fieldtype": "Column Break"},
+  {"fieldname": "ref_doctype", "fieldtype": "Link", "label": "Tipo de ficha", "options": "DocType"},
+  {"fieldname": "ref_name", "fieldtype": "Dynamic Link", "label": "Ficha", "options": "ref_doctype", "in_list_view": 1},
+  {"fieldname": "ref_titulo", "fieldtype": "Data", "label": "Nome da ficha"},
+  {"fieldname": "ligado_por", "fieldtype": "Link", "label": "Ligado por", "options": "User"},
+  {"fieldname": "ignorada", "fieldtype": "Check", "label": "Ignorada", "description": "Mensagem por arrumar que alguém decidiu não guardar"},
+  {"fieldname": "sec_estado", "fieldtype": "Section Break", "label": "Estado"},
+  {"fieldname": "texto", "fieldtype": "Small Text", "label": "Texto (mensagem guardada)"},
+  {"fieldname": "autor", "fieldtype": "Data", "label": "Quem escreveu"},
+  {"fieldname": "sincronizado", "fieldtype": "Datetime", "label": "Última leitura"}
+ ],
+ "permissions": [
+  {"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1, "report": 1, "export": 1},
+  {"role": "Sales Manager", "read": 1, "write": 1, "create": 1, "delete": 1, "report": 1},
+  {"role": "Sales User", "read": 1, "write": 1, "create": 1, "delete": 1}
+ ]
+}

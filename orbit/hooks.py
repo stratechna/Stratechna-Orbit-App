@@ -97,6 +97,8 @@ after_install = _POR_DE_PE + _MARKETING + _MARCACAO + _ORGANIZACAO + ["orbit.rem
 scheduler_events = {
     "cron": {
         "* * * * *": ["orbit.marketing.envio.processar"],
+        # 27-11-2026: o Stratechna Chat no CRM — tópicos ligados e reacções :crm: (orbit/chat_crm.py)
+        "*/2 * * * *": ["orbit.chat_crm.periodico"],
         # 05-11-2026 (DP8): faturação certificada — repetir o que ficou por emitir e ler anulações do programa
         "*/15 * * * *": ["orbit.faturacao.emissao.periodico", "orbit.faturacao.sincronizacao.periodico", "orbit.interface.trabalho.lembretes",
                          "orbit.interface.desk.enviar_inqueritos"],
