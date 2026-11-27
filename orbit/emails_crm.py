@@ -202,7 +202,8 @@ def _alvos(email: str):
     ganho/perdido) › contacto; ligacoes = [(doctype, nome), …] com contactos, leads, negócios e organizações.
     Antes de 20-11 só se procuravam negócios pela organização e só em curso: um negócio sem organização (as compras
     das lojas) ou já ganho nunca recebia os emails, que iam para o Contacto — onde o CRM não os mostra."""
-    from orbit.portal import ESTADOS_FECHADOS
+    from orbit.portal import estados_fechados
+    ESTADOS_FECHADOS = estados_fechados()
     e = (email or "").strip().lower()
     if not e:
         return None, []

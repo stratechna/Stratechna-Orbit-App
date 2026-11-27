@@ -165,7 +165,14 @@ def _crm(periodo: str, dinheiro: bool):
 	g12, _ = contar(ganhos_n, ano, nowdate())
 	p12, _ = contar(perdidos_n, ano, nowdate())
 	funil = []
+	try:   # 27-11-2026: vários funis — as etapas são as do funil por omissão (os números somam todos)
+		from orbit.funis import fases as _fases_funil
+		do_funil = {s.name for s in _fases_funil()}
+	except Exception:  # noqa: BLE001
+		do_funil = None
 	for e in estados:
+		if do_funil is not None and e.name not in do_funil:
+			continue
 		if e.type not in ("Open", "Ongoing"):
 			continue
 		n, v = contar([e.name])

@@ -21,14 +21,25 @@ def _posicoes():
             frappe.get_all("CRM Deal Status", fields=["name", "position", "type"])}
 
 
+def _primeira_fase():
+    from orbit.funis import primeira
+    return primeira() or "Qualification"
+
+
 def _avancar(deal, fase):
-    """Muda a fase só se for para a frente; Won/Lost são finais (o que se mudou à mão fica)."""
+    """Muda a fase só se for para a frente; ganho/perdido são finais (o que se mudou à mão fica).
+    27-11-2026: vários funis — `fase` («Won», «Proposal/Quotation»…) passa à fase equivalente do funil do negócio;
+    ganho/perdido decide-se pelo tipo da fase."""
+    from orbit import funis as F
     pos = _posicoes()
-    if fase not in pos or deal.status in FINAIS:
+    pedida_tipo = pos.get(fase, (0, fase if fase in FINAIS else None))[1]
+    fase = F.equivalente(deal.get("orbit_funil"), fase)
+    if not fase or fase not in pos or pos.get(deal.status, (0, None))[1] in FINAIS:
         return False
-    if fase not in FINAIS and pos.get(deal.status, (0,))[0] >= pos[fase][0]:
+    if pedida_tipo not in FINAIS and pos.get(deal.status, (0,))[0] >= pos[fase][0]:
         return False
     deal.status = fase
+    fase = pedida_tipo if pedida_tipo in FINAIS else fase
     if fase == "Won":
         deal.probability = 100
         deal.closed_date = nowdate()
@@ -79,7 +90,7 @@ def _actualizar(negocio, fase=None):
     mudou = False
     v = valor(negocio)
     abertos = [q for q in orcamentos(negocio) if q.status not in ("Lost", "Cancelled", "Expired")]
-    if deal.status not in FINAIS and flt(deal.deal_value) != v and abertos:      # tudo perdido: fica o último valor
+    if _posicoes().get(deal.status, (0, None))[1] not in FINAIS and flt(deal.deal_value) != v and abertos:      # tudo perdido: fica o último valor
         deal.deal_value = v
         mudou = True
     if fase:
@@ -129,7 +140,7 @@ def depois_de_inserir(doc, method=None):
     org = organizacao(doc)
     deal = frappe.get_doc({
         "doctype": "CRM Deal",
-        "status": (frappe.get_all("CRM Deal Status", pluck="name", order_by="position asc", limit=1) or ["Qualification"])[0],
+        "status": _primeira_fase(),
         "organization": org,
         "deal_owner": doc.owner if frappe.db.exists("User", doc.owner) and doc.owner != "Administrator" else None,
         "deal_value": flt(doc.get("orbit_valor_negocio")) or flt(doc.net_total),

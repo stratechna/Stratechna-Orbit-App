@@ -146,7 +146,7 @@ def _negocios(cache: dict) -> dict:
     saida: dict = {}
     if frappe.db.exists("DocType", "CRM Deal"):
         meta = frappe.get_meta("CRM Deal")
-        cols = ["name", "status", "modified", "lead"] + [c for c in ("lost_reason", "closed_date") if meta.has_field(c)]
+        cols = ["name", "status", "modified", "lead"] + [c for c in ("lost_reason", "closed_date", "orbit_funil") if meta.has_field(c)]
         deals = {d.name: d for d in frappe.get_all("CRM Deal", fields=cols, limit_page_length=0)}
         tipos = {}
         if frappe.db.exists("DocType", "CRM Deal Status"):
@@ -155,7 +155,7 @@ def _negocios(cache: dict) -> dict:
         def _info(d):
             return {"fase": d.status, "tipo": tipos.get(d.status) or ("Won" if d.status == "Won" else
                                                                      "Lost" if d.status == "Lost" else "Open"),
-                    "em": d.get("closed_date") or d.modified, "motivo": d.get("lost_reason")}
+                    "em": d.get("closed_date") or d.modified, "motivo": d.get("lost_reason"), "funil": d.get("orbit_funil")}
         for r in frappe.get_all("CRM Contacts", filters={"parenttype": "CRM Deal"}, fields=["parent", "contact"],
                                 limit_page_length=0):
             if r.parent in deals and r.contact:
@@ -254,10 +254,12 @@ def _cumpre(r: dict, regra: str, valor: str, cache: dict) -> bool:
     if regra == "Sem atividade há mais de N dias":
         u = r.get("ultima_atividade")
         return not u or getdate(u) < getdate(add_days(nowdate(), -cint(v)))
-    if regra in ("Tem negócio aberto na fase", "Ganhou negócio nos últimos N dias", "Perdeu negócio (motivo)"):
+    if regra in ("Tem negócio aberto na fase", "Tem negócio aberto no funil", "Ganhou negócio nos últimos N dias", "Perdeu negócio (motivo)"):
         ns = _negocios(cache).get((r["doctype"], r["name"]), [])
         if regra == "Tem negócio aberto na fase":
             return any(n["tipo"] not in ("Won", "Lost") and (not baixo or (n["fase"] or "").lower() == baixo) for n in ns)
+        if regra == "Tem negócio aberto no funil":   # 27-11-2026: vários funis
+            return any(n["tipo"] not in ("Won", "Lost") and (not baixo or (n["funil"] or "").lower() == baixo) for n in ns)
         if regra == "Ganhou negócio nos últimos N dias":
             return any(n["tipo"] == "Won" and getdate(n["em"]) >= getdate(add_days(nowdate(), -(cint(v) or 365)))
                        for n in ns)

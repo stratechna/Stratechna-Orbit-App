@@ -79,6 +79,8 @@ def indice():
     _guarda()
     out = []
     for k, c in CONF.items():
+        if k == "fases" and frappe.db.exists("DocType", "Funil"):
+            continue   # 27-11-2026: as fases dos negócios editam-se em Definições › CRM › Funis (cada funil as suas)
         if frappe.db.exists("DocType", c["dt"]) and frappe.has_permission(c["dt"], "read"):
             out.append({"chave": k, "titulo": c["titulo"], "grupo": c["grupo"], "n": frappe.db.count(c["dt"])})
     return out

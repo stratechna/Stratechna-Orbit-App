@@ -74,12 +74,28 @@ def definicao(doctype: str):
     escolha = [f.fieldname for f in m.fields if f.fieldtype == "Select" and f.options and not f.hidden and len([o for o in f.options.split("\n") if o]) <= 12]
     datas = [f.fieldname for f in m.fields if f.fieldtype in ("Date", "Datetime") and not f.hidden]
     return {"campos": campos, "submetivel": bool(m.is_submittable), "arvore": bool(m.is_tree),
+            "processo": PROCESSO.get(doctype),
             "kanban": (["status"] if "status" in escolha else []) + [c for c in escolha if c != "status"], "calendario": datas, "pode": {
         "apagar": frappe.has_permission(doctype, "delete"), "escrever": frappe.has_permission(doctype, "write"),
         "submeter": bool(m.is_submittable and frappe.has_permission(doctype, "submit")),
         "cancelar": bool(m.is_submittable and frappe.has_permission(doctype, "cancel")),
         "exportar": frappe.has_permission(doctype, "export") or frappe.has_permission(doctype, "read"),
         "imprimir": frappe.has_permission(doctype, "print") or frappe.has_permission(doctype, "read")}}
+
+
+# 27-11-2026 (N5 do plano dos funis): o funil do PROCESSO destes documentos — colunas do estado pela ordem do caminho
+# (as de fim que já não interessam ficam de fora); o estado muda pelas acções do documento, não arrastando.
+PROCESSO = {
+    "Purchase Order": ["Draft", "On Hold", "To Receive and Bill", "To Receive", "To Bill", "Completed"],
+    "Sales Order": ["Draft", "On Hold", "To Deliver and Bill", "To Deliver", "To Bill", "Completed"],
+    "Supplier Quotation": ["Draft", "Submitted", "Ordered", "Expired"],
+    "Request for Quotation": ["Draft", "Submitted"],
+    "Quotation": ["Draft", "Open", "Replied", "Partially Ordered", "Ordered", "Lost", "Expired"],
+    "Purchase Invoice": ["Draft", "Unpaid", "Overdue", "Partly Paid", "Paid", "Debit Note Issued", "Return"],
+    "Sales Invoice": ["Draft", "Unpaid", "Overdue", "Partly Paid", "Paid", "Credit Note Issued", "Return"],
+    "Purchase Receipt": ["Draft", "To Bill", "Completed"],
+    "Delivery Note": ["Draft", "To Bill", "Completed"],
+}
 
 
 @frappe.whitelist()

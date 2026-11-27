@@ -16,7 +16,12 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, flt, get_first_day, get_last_day, getdate, now_datetime, nowdate, strip_html
 
-FECHADOS = ("Won", "Lost")
+FECHADOS = ("Won", "Lost")   # tipos; os nomes das fases fechadas de todos os funis vêm de _fechados() (27-11-2026)
+
+
+def _fechados():
+    from orbit.funis import fechadas
+    return fechadas() or list(FECHADOS)
 
 
 def ligada() -> bool:
@@ -255,9 +260,10 @@ def inicio():
     eventos = frappe.get_list("Event", filters={"starts_on": ["between", [f"{hoje} 00:00:00", f"{add_days(hoje, 1)} 23:59:59"]]},
                               fields=["name", "subject", "starts_on", "ends_on", "location", "reference_doctype",
                                       "reference_docname", "google_meet_link"], order_by="starts_on asc", limit=10)
-    abertos = frappe.get_list("CRM Deal", filters={"status": ["not in", FECHADOS]}, fields=["name", "deal_value", "modified",
+    abertos = frappe.get_list("CRM Deal", filters={"status": ["not in", _fechados()]}, fields=["name", "deal_value", "modified",
                               "titulo", "organization", "status", "lead_name"], limit=1000)
-    ganhos = frappe.get_list("CRM Deal", filters={"status": "Won", "closed_date": ["between", [get_first_day(hoje), get_last_day(hoje)]]},
+    from orbit.funis import ganhas as _ganhas
+    ganhos = frappe.get_list("CRM Deal", filters={"status": ["in", _ganhas() or ["Won"]], "closed_date": ["between", [get_first_day(hoje), get_last_day(hoje)]]},
                              fields=["deal_value"], limit=1000)
     limite = add_days(now_datetime(), -14)
     parados = sorted([d for d in abertos if d.modified < limite], key=lambda d: d.modified)[:6]
@@ -312,7 +318,7 @@ def lista(objeto: str, vista: str = "todos", q: str = "", pagina: int = 0, ordem
         campo_at = "orbit_ultima_atividade" if meta.has_field("orbit_ultima_atividade") else "modified"
         filtros[campo_at] = ["<", add_days(now_datetime(), -30)]
     elif vista == "abertos" and objeto == "negocios":
-        filtros["status"] = ["not in", FECHADOS]
+        filtros["status"] = ["not in", _fechados()]
     if estado and objeto in ("negocios", "leads"):
         filtros["status"] = estado
     # H7: filtros à escolha e colunas da vista (lista branca em orbit/interface/vistas.py)
@@ -572,7 +578,10 @@ def ficha(doctype: str, name: str):
         sub = " · ".join(x for x in [doc.website, doc.territory] if x)
     elif doctype == "CRM Lead":
         sub = " · ".join(x for x in [doc.organization, _rotulo_estado(doc.status)] if x)
-    estados = frappe.get_all("CRM Deal Status", fields=["name", "type", "color"], order_by="position asc") if doctype == "CRM Deal" else []
+    # 27-11-2026: só as fases do funil do negócio
+    from orbit.funis import fases as _fases_funil
+    estados = [frappe._dict(name=s.name, type=s.type, color=s.color) for s in _fases_funil(doc.get("orbit_funil"))] \
+        if doctype == "CRM Deal" else []
     for s in estados:
         s.rotulo = _rotulo_estado(s.name)
     return {"doctype": doctype, "name": name, "titulo": titulo, "sub": sub, "iniciais": _iniciais(titulo),
@@ -606,6 +615,9 @@ def _prop_campo(doc, meta, f, pode_editar: bool) -> dict:
     opcoes = None
     if f.fieldtype == "Select":
         opcoes = (f.options or "").split("\n")
+    elif f.fieldtype == "Link" and f.options == "CRM Deal Status" and doc.doctype == "CRM Deal":
+        from orbit.funis import fases as _fases_funil   # 27-11-2026: só as fases do funil do negócio
+        opcoes = [s.name for s in _fases_funil(doc.get("orbit_funil"))]
     elif f.fieldtype == "Link" and f.options and f.options != "User":
         try:
             if frappe.db.count(f.options) <= 300:
@@ -811,14 +823,21 @@ def procurar_emails(doctype: str, name: str):
 
 # ── Funil ───────────────────────────────────────────────────────────────────────────────────────────────
 @frappe.whitelist()
-def funil(responsavel: str = "", marca: str = ""):
+def funil(responsavel: str = "", marca: str = "", funil: str = ""):
+    """27-11-2026: vários funis — colunas só com as fases do funil escolhido (vazio = o por omissão); `funis` para o
+    seletor (só os desta marca e os sem marca). Os perdidos não aparecem como cartões (a coluna fica para os largar)."""
     _guarda()
-    estados = frappe.get_all("CRM Deal Status", fields=["name", "type", "color", "position"], order_by="position asc")
-    filtros = {"status": ["not in", ["Lost"]]}
+    from orbit import funis as F
+    from orbit.interface.marcas import lista as _marcas
+    vis = F.visiveis(marca or None)
+    if not funil or not any(v.name == funil for v in vis):
+        om = F.omissao()
+        funil = om if any(v.name == om for v in vis) else (vis[0].name if vis else om)
+    estados = F.fases(funil)
+    filtros = {"status": ["in", [s.name for s in estados if s.type != "Lost"] or ["-"]]}
     if responsavel == "eu":
         filtros["deal_owner"] = frappe.session.user
     # 23-11-2026: separadores de marca também no funil
-    from orbit.interface.marcas import lista as _marcas
     tem_marca = frappe.get_meta("CRM Deal").has_field("marca")
     if marca and tem_marca and frappe.db.exists("Brand", marca):
         filtros["marca"] = marca
@@ -848,7 +867,11 @@ def funil(responsavel: str = "", marca: str = ""):
                             "parado": (agora - d.modified).days if not t else 0})
         colunas.append({"estado": s.name, "rotulo": _rotulo_estado(s.name), "tipo": s.type, "cor": s.color,
                         "total": sum(c["valor"] for c in cartoes), "cartoes": cartoes})
-    return {"colunas": colunas, "marcas": _marcas() if tem_marca else []}
+    info = next((v for v in vis if v.name == funil), None)
+    return {"colunas": colunas, "marcas": _marcas() if tem_marca else [], "funil": funil,
+            "mostra_valor": bool(info.mostra_valor) if info else True,
+            "funis": [{"name": v.name, "omissao": bool(v.por_omissao)} for v in vis],
+            "pode_configurar": "System Manager" in frappe.get_roles()}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -857,9 +880,27 @@ def mover(negocio: str, estado: str):
     if not frappe.db.exists("CRM Deal Status", estado):
         frappe.throw("Fase desconhecida")
     d = frappe.get_doc("CRM Deal", negocio)
+    from orbit.funis import funil_da_fase
+    if funil_da_fase(estado) not in (None, d.get("orbit_funil")):
+        frappe.throw("Esta fase é de outro funil. Para mudar o negócio de funil use «Mover para outro funil…».")
     d.status = estado
     d.save()
     return {"ok": True}
+
+
+@frappe.whitelist(methods=["POST"])
+def mudar_funil(negocio: str, funil: str):
+    """F6: o negócio passa a outro funil — 1.ª fase aberta do novo (ganho/perdido mantêm-se), registo na cronologia."""
+    _guarda()
+    if not frappe.db.exists("Funil", funil):
+        frappe.throw("Funil desconhecido.")
+    d = frappe.get_doc("CRM Deal", negocio)
+    d.check_permission("write")
+    if d.get("orbit_funil") == funil:
+        return {"ok": True, "fase": d.status}
+    d.orbit_funil = funil
+    d.save()
+    return {"ok": True, "fase": d.status}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -1259,8 +1300,8 @@ def sugestao_conversao(lead: str):
         for o in frappe.get_list("CRM Organization", filters=[f], pluck="name", limit=3):
             if o not in [e["name"] for e in empresas]:
                 empresas.append({"name": o, "titulo": _titulo("CRM Organization", o)})
-    fases = [{"name": s.name, "rotulo": _rotulo_estado(s.name)} for s in
-             frappe.get_all("CRM Deal Status", filters={"type": ["not in", ["Won", "Lost"]]}, fields=["name"], order_by="position asc")]
+    from orbit.funis import fases as _fases_funil
+    fases = [{"name": s.name, "rotulo": _rotulo_estado(s.name)} for s in _fases_funil() if s.type not in FECHADOS]
     return {"convertida": bool(l.converted), "nome": l.lead_name, "empresa_texto": l.organization or "",
             "contactos": contactos, "empresas": empresas, "fases": fases,
             "negocios": frappe.get_all("CRM Deal", filters={"lead": lead}, pluck="name")}
@@ -1430,8 +1471,9 @@ def criar_registo(objeto: str, dados: str):
         # propostas do portal — `criar_deal_crm`); fase inicial = a primeira do funil
         if not t("titulo"):
             frappe.throw("Escreva o nome do negócio.")
-        fase = frappe.get_all("CRM Deal Status", pluck="name", order_by="position asc", limit=1)
-        doc = frappe.get_doc({"doctype": "CRM Deal", "status": fase[0] if fase else "Qualification",
+        from orbit import funis as F
+        funil = t("orbit_funil") if t("orbit_funil") and frappe.db.exists("Funil", t("orbit_funil")) else F.omissao()
+        doc = frappe.get_doc({"doctype": "CRM Deal", "status": F.primeira(funil) or "Qualification", "orbit_funil": funil,
                               "deal_owner": frappe.session.user,
                               "organization": t("organization") if t("organization") and frappe.db.exists("CRM Organization", t("organization")) else None})
         if frappe.get_meta("CRM Deal").has_field("titulo"):

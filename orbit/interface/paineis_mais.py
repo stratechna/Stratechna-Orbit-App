@@ -19,7 +19,7 @@ def _desde(periodo):
 
 # ── painel do CRM ────────────────────────────────────────────────────────────────────────────────────
 @frappe.whitelist()
-def crm(periodo: str = "30", responsavel: str = ""):
+def crm(periodo: str = "30", responsavel: str = "", funil: str = ""):
     _guarda()
     if not frappe.has_permission("CRM Deal", "read"):
         frappe.throw(_("Sem acesso ao CRM."), frappe.PermissionError)
@@ -29,7 +29,12 @@ def crm(periodo: str = "30", responsavel: str = ""):
     if responsavel:
         fd["deal_owner"] = responsavel
         fl["lead_owner"] = responsavel
-    tipos = {s.name: s.type for s in frappe.get_all("CRM Deal Status", fields=["name", "type", "position"], order_by="position asc")}
+    # 27-11-2026: vários funis — os números são de um funil (vazio = o por omissão)
+    from orbit import funis as F
+    funil = funil if funil and frappe.db.exists("Funil", funil) else F.omissao()
+    tipos = {s.name: s.type for s in F.fases(funil)}
+    from orbit.interface.api import _rotulo_estado as _rotulo
+    fd["status"] = ["in", list(tipos) or ["-"]]
     negocios = frappe.get_list("CRM Deal", filters=fd, fields=["name", "status", "deal_value", "lost_reason", "creation", "closed_date", "source"], limit=5000)
     abertos = frappe.get_list("CRM Deal", filters={**({"deal_owner": responsavel} if responsavel else {}),
                                                   "status": ["in", [k for k, t in tipos.items() if t not in ("Won", "Lost")]]},
@@ -40,7 +45,7 @@ def crm(periodo: str = "30", responsavel: str = ""):
         if tipo in ("Won", "Lost"):
             continue
         xs = [n for n in abertos if n.status == fase]
-        por_fase.append({"fase": _(fase), "n": len(xs), "valor": round(sum(flt(n.deal_value) for n in xs), 2)})
+        por_fase.append({"fase": _rotulo(fase), "n": len(xs), "valor": round(sum(flt(n.deal_value) for n in xs), 2)})
     ganhos = [n for n in negocios if tipos.get(n.status) == "Won"]
     perdidos = [n for n in negocios if tipos.get(n.status) == "Lost"]
     motivos = {}
@@ -72,6 +77,7 @@ def crm(periodo: str = "30", responsavel: str = ""):
         "origens": sorted([{"r": k, "n": v} for k, v in origens.items()], key=lambda x: -x["n"])[:10],
         "serie": {"labels": rotulos, "series": [{"name": _("Criados"), "values": [serie[k]["criados"] for k in rotulos]},
                                                 {"name": _("Ganhos"), "values": [serie[k]["ganhos"] for k in rotulos]}]},
+        "funil": funil, "funis": [{"name": v.name} for v in F.visiveis()],
         "responsaveis": [{"v": u, "r": frappe.db.get_value("User", u, "full_name") or u}
                          for u in sorted({x for x in frappe.get_all("CRM Deal", pluck="deal_owner", distinct=True) if x})],
     }

@@ -1,0 +1,37 @@
+{
+ "doctype": "DocType",
+ "name": "Funil",
+ "module": "Orbit",
+ "custom": 0,
+ "engine": "InnoDB",
+ "track_changes": 1,
+ "sort_field": "ordem",
+ "sort_order": "ASC",
+ "creation": "2026-11-27 10:00:00.000000",
+ "modified": "2026-11-27 10:00:00.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "autoname": "field:nome",
+ "naming_rule": "By fieldname",
+ "title_field": "nome",
+ "fields": [
+  {"fieldname": "nome", "fieldtype": "Data", "label": "Nome", "reqd": 1, "unique": 1, "in_list_view": 1},
+  {"fieldname": "por_omissao", "fieldtype": "Check", "label": "Por omissão", "in_list_view": 1,
+   "description": "O funil em que nasce um negócio sem funil indicado (propostas do portal, lojas, Booking). Só um."},
+  {"fieldname": "mostra_valor", "fieldtype": "Check", "label": "Mostra o valor (€)", "default": "1"},
+  {"fieldname": "desligado", "fieldtype": "Check", "label": "Desligado", "in_list_view": 1},
+  {"fieldname": "col1", "fieldtype": "Column Break"},
+  {"fieldname": "ordem", "fieldtype": "Int", "label": "Ordem"},
+  {"fieldname": "cor", "fieldtype": "Data", "label": "Cor"},
+  {"fieldname": "modelo", "fieldtype": "Data", "label": "Modelo de partida", "read_only": 1},
+  {"fieldname": "sec_marcas", "fieldtype": "Section Break", "label": "Marcas"},
+  {"fieldname": "marcas", "fieldtype": "Table MultiSelect", "label": "Marcas", "options": "Marca do Contacto",
+   "description": "Vazio = todas as marcas. Com marcas, o funil só aparece nos separadores dessas marcas."},
+  {"fieldname": "descricao", "fieldtype": "Small Text", "label": "Descrição"}
+ ],
+ "permissions": [
+  {"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1, "report": 1, "export": 1},
+  {"role": "Sales Manager", "read": 1, "report": 1},
+  {"role": "Sales User", "read": 1}
+ ]
+}

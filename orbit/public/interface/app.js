@@ -67,7 +67,8 @@ function data(d, comHora = true) {
 }
 function mes(d) { const x = new Date(String(d).replace(" ", "T")); return isNaN(x) ? "" : x.toLocaleDateString("pt-PT", { month: "long", year: "numeric" }); }
 const ESTADO_COR = { gray: "", orange: "ambar", blue: "azul", yellow: "ambar", purple: "roxo", green: "verde", red: "" };
-const FAIXA = { gray: "#94a3b8", orange: "#f59e0b", blue: "#60a5fa", yellow: "#facc15", purple: "#a78bfa", green: "#22c55e", red: "#ef4444", black: "#475569" };
+const FAIXA = { gray: "#94a3b8", orange: "#f59e0b", blue: "#60a5fa", yellow: "#facc15", purple: "#a78bfa", green: "#22c55e", red: "#ef4444", black: "#475569",
+  cyan: "#22d3ee", teal: "#2dd4bf", amber: "#fbbf24", pink: "#f472b6", violet: "#8b5cf6" };
 const ROTAS_DT = { contacto: "Contact", negocio: "CRM Deal", empresa: "CRM Organization", lead: "CRM Lead" };
 const DT_ROTA = Object.fromEntries(Object.entries(ROTAS_DT).map(([k, v]) => [v, k])); DT_ROTA["HD Ticket"] = "ticket";
 // 25-11-2026 (lote 4): o que não é do CRM/Desk abre na ficha do ERP (antes caía na ficha de contacto)
@@ -2299,7 +2300,18 @@ const Funil = {
     const gravarLS = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
     const tipo = ref(ler("orbit.funil.tipo", "negocios"));
     const marca = ref(ler("orbit.marca." + tipo.value, ""));
-    const carregar = async () => (d.value = await api(tipo.value === "leads" ? "funil_leads" : "funil", { responsavel: resp.value, marca: marca.value }));
+    // 27-11-2026: vários funis — o funil escolhido fica gravado por pessoa (como a marca)
+    const funilSel = ref(ler("orbit.funil.escolhido", ""));
+    const carregar = async () => {
+      const r = await api(tipo.value === "leads" ? "funil_leads" : "funil", { responsavel: resp.value, marca: marca.value, ...(tipo.value === "leads" ? {} : { funil: funilSel.value }) });
+      if (r && r.funil) funilSel.value = r.funil;
+      d.value = r;
+    };
+    const escolherFunil = (f) => { funilSel.value = f; gravarLS("orbit.funil.escolhido", f); d.value = null; carregar(); };
+    const mudarDeFunil = ref(null);
+    const passarFunil = async (f) => { const x = mudarDeFunil.value; mudarDeFunil.value = null; if (!x || f === funilSel.value) return;
+      try { await api("mudar_funil", { negocio: x.name, funil: f }, true); toast(`«${x.titulo}» passou para o funil «${f}»`); carregar(); } catch (e) {} };
+    const valor = computed(() => !d.value || d.value.mostra_valor !== false);
     const escolherMarca = (m) => { marca.value = m; gravarLS("orbit.marca." + tipo.value, m); carregar(); };
     const escolherTipo = (t) => { if (t === tipo.value) return; tipo.value = t; gravarLS("orbit.funil.tipo", t); marca.value = ler("orbit.marca." + t, ""); d.value = null; carregar(); };
     watch(resp, carregar); onMounted(carregar);
@@ -2314,15 +2326,19 @@ const Funil = {
     const n = computed(() => d.value ? d.value.colunas.filter((c) => !["Won", "Lost"].includes(c.tipo)).reduce((a, c) => a + c.cartoes.length, 0) : 0);
     // lote 7: criar na coluna, já nessa fase
     const novoNaColuna = async (c) => { const t = prompt(tipo.value === "leads" ? "Nome da lead" : "Nome do negócio"); if (!t) return;
-      const r = await api("criar_registo", { objeto: tipo.value === "leads" ? "leads" : "negocios", dados: JSON.stringify(tipo.value === "leads" ? { first_name: t } : { titulo: t, marca: marca.value || "" }) }, true);
+      const r = await api("criar_registo", { objeto: tipo.value === "leads" ? "leads" : "negocios", dados: JSON.stringify(tipo.value === "leads" ? { first_name: t } : { titulo: t, marca: marca.value || "", orbit_funil: funilSel.value || "" }) }, true);
       await apiA("marcar_estado", { doctype: r.doctype, name: r.name, estado: c.estado }, true).catch(() => {}); toast("Criado em «" + c.rotulo + "»"); carregar(); };
-    return { d, resp, arrastar, alvo, largar, total, n, eur, link, data, FAIXA, marca, escolherMarca, tipo, escolherTipo, novoNaColuna };
+    return { d, resp, arrastar, alvo, largar, total, n, eur, link, data, FAIXA, marca, escolherMarca, tipo, escolherTipo, novoNaColuna,
+             funilSel, escolherFunil, mudarDeFunil, passarFunil, valor };
   },
   template: `
   <div>
     <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-      <div><h1>{{ tipo==='leads' ? 'Funil das leads' : 'Funil de negócios' }}</h1><div class="sub" v-if="tipo==='leads'">{{ n }} leads por converter</div><div class="sub" v-else>{{ n }} em curso · {{ eur(total) }} · ganhos dos últimos 30 dias</div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><div class="seg"><button class="btn" :class="{prim: tipo==='leads'}" @click="escolherTipo('leads')">Leads</button><button class="btn" :class="{prim: tipo==='negocios'}" @click="escolherTipo('negocios')">Negócios</button></div>
+      <div><h1>{{ tipo==='leads' ? 'Funil das leads' : (d && (d.funis||[]).length > 1 ? 'Funil — ' + d.funil : 'Funil de negócios') }}</h1><div class="sub" v-if="tipo==='leads'">{{ n }} leads por converter</div><div class="sub" v-else>{{ n }} em curso<template v-if="valor"> · {{ eur(total) }}</template> · ganhos dos últimos 30 dias</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <select v-if="tipo!=='leads' && d && (d.funis||[]).length > 1" class="btn" :value="funilSel" @change="escolherFunil($event.target.value)" title="Funil"><option v-for="f in d.funis" :key="f.name" :value="f.name">{{ f.name }}</option></select>
+        <a v-if="tipo!=='leads' && d && d.pode_configurar" class="btn" href="#/definicoes/funis" title="Funis e fases">⚙ Funis</a>
+        <div class="seg"><button class="btn" :class="{prim: tipo==='leads'}" @click="escolherTipo('leads')">Leads</button><button class="btn" :class="{prim: tipo==='negocios'}" @click="escolherTipo('negocios')">Negócios</button></div>
         <select class="btn" v-model="resp"><option value="">Todos os responsáveis</option><option value="eu">Só os meus</option></select><a class="btn" :href="tipo==='leads' ? '#/leads' : '#/negocios'">Lista</a></div>
     </div>
     <div class="vistas marcas-sep" v-if="d && (d.marcas||[]).length > 1">
@@ -2333,14 +2349,20 @@ const Funil = {
     <div class="funil" v-else :style="{gridTemplateColumns:'repeat('+d.colunas.length+',minmax(230px,1fr))'}">
       <div class="coluna" v-for="c in d.colunas" :key="c.estado" :class="{alvo: alvo===c.estado}"
            @dragover.prevent="alvo=c.estado" @dragleave="alvo=''" @drop.prevent="largar(c)">
-        <header><b>{{ c.rotulo }} <span class="sub" style="font-weight:500">{{ c.cartoes.length }}</span></b><small v-if="tipo!=='leads'">{{ eur(c.total) }}</small>
+        <header><b>{{ c.rotulo }} <span class="sub" style="font-weight:500">{{ c.cartoes.length }}</span></b><small v-if="tipo!=='leads' && valor">{{ eur(c.total) }}</small>
           <button v-if="!['Won','Lost','Converted'].includes(c.tipo)" class="col-mais" :title="tipo==='leads' ? 'Nova lead nesta coluna' : 'Novo negócio nesta fase'" @click="novoNaColuna(c)">+</button><div class="faixa" :style="{background:FAIXA[c.cor]||'#94a3b8'}"></div></header>
         <a class="cartao negocio" v-for="x in c.cartoes" :key="x.name" :href="link(tipo==='leads' ? 'CRM Lead' : 'CRM Deal', x.name)" draggable="true" @dragstart="arrastar={...x, estado:c.estado}" style="display:block;text-decoration:none;color:inherit">
           <h3>{{ x.titulo }}</h3><div class="sub">{{ x.org }}</div>
-          <div class="val"><template v-if="tipo!=='leads'">{{ eur(x.valor) }}</template><span v-else class="sub" style="font-size:12px">{{ x.origem }}</span><span class="av" style="width:22px;height:22px;font-size:10px;background:#5b6f7a" :title="x.dono_nome">{{ x.dono }}</span></div>
+          <div class="val"><template v-if="tipo!=='leads'"><span v-if="valor">{{ eur(x.valor) }}</span><span v-else></span></template><span v-else class="sub" style="font-size:12px">{{ x.origem }}</span><span class="av" style="width:22px;height:22px;font-size:10px;background:#5b6f7a" :title="x.dono_nome">{{ x.dono }}</span></div>
           <div class="prox" :class="{atraso:x.atraso}" v-if="x.prox">◷ {{ x.prox }}<template v-if="x.prox_data"> · {{ data(x.prox_data,false) }}</template></div>
           <div class="prox" v-else-if="c.tipo!=='Won' && c.tipo!=='Converted'">Sem próxima tarefa<template v-if="x.parado>7"> · {{ x.parado }} dias parado</template></div>
+          <button v-if="tipo!=='leads' && d && (d.funis||[]).length > 1" class="btn sm" style="margin-top:6px;font-size:11px" @click.prevent.stop="mudarDeFunil=x">⇄ Mover para outro funil…</button>
         </a>
+      </div>
+    </div>
+    <div class="modal-fundo" v-if="mudarDeFunil" @click.self="mudarDeFunil=null">
+      <div class="modal" style="max-width:420px"><header><div><b>Mover para outro funil</b><div class="sub">{{ mudarDeFunil.titulo }} — passa à 1.ª fase do funil novo e fica registado na cronologia.</div></div><button class="btn sm" @click="mudarDeFunil=null">Fechar</button></header>
+        <div style="padding:12px 20px 18px;display:grid;gap:8px"><button class="btn" v-for="f in d.funis.filter((f) => f.name !== funilSel)" :key="f.name" @click="passarFunil(f.name)" style="justify-content:flex-start">{{ f.name }}</button></div>
       </div>
     </div>
   </div>`,
@@ -2637,7 +2659,7 @@ const Definicoes = {
       const g = {};
       const junta = (grupo, item) => { (g[grupo] = g[grupo] || []).push(item); };
       nat.value.filter((x) => daApp(x.grupo)).forEach((x) => junta(x.grupo, { href: "#/definicoes/" + x.chave, rotulo: x.titulo, n: x.n }));
-      if (daApp("CRM")) { junta("CRM", { href: "#/definicoes/fluxos", rotulo: "Fluxos (automatismos)" }); junta("CRM", { href: "#/definicoes/formularios", rotulo: "Formulários (disposição das fichas)" }); junta("CRM", { href: "#/definicoes/campos", rotulo: "Campos personalizados" }); }
+      if (daApp("CRM")) { junta("CRM", { href: "#/definicoes/funis", rotulo: "Funis e fases dos negócios" }); junta("CRM", { href: "#/definicoes/fluxos", rotulo: "Fluxos (automatismos)" }); junta("CRM", { href: "#/definicoes/formularios", rotulo: "Formulários (disposição das fichas)" }); junta("CRM", { href: "#/definicoes/campos", rotulo: "Campos personalizados" }); }
       if (daApp("Correio")) junta("Correio", { href: "#/definicoes/caixas", rotulo: "Caixas ligadas ao Orbit" });
       if (!props.gruposApp) junta("Conta e utilizadores", { href: "#/definicoes/utilizadores", rotulo: "Utilizadores do Orbit" });
       if (!props.gruposApp) junta("Conta e utilizadores", { href: "#/definicoes/empresas", rotulo: "Empresas e marcas" });
@@ -2708,6 +2730,101 @@ const DefCampos = {
               <div class="cresce" :style="{opacity: c.oculto ? .5 : 1}">{{ c.rotulo }} <span class="sub">· {{ rotTipo(c.tipo) }}<template v-if="c.opcoes.length"> ({{ c.opcoes.join(', ') }})</template><template v-if="c.oculto"> · escondido</template></span></div>
               <button class="btn sm" @click="editar(c)">Mudar</button><button class="btn sm" @click="esconder(c)">{{ c.oculto ? 'Mostrar' : 'Esconder' }}</button><button class="btn sm" @click="apagar(c)">Apagar</button>
             </template>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>`,
+};
+// ── Funis (27-11-2026): vários funis no CRM, cada um com as suas fases — orbit/interface/funis_api.py ──────────
+const DefFunis = {
+  setup() {
+    const d = ref(null); const aberto = ref(""); const novo = ref(null); const novaFase = ref(null); const ed = ref(null);
+    const apagarF = ref(null); const ocupado = ref(false); const arr = ref(null);
+    const carregar = async () => { d.value = await api("funis_api.listar"); if (!aberto.value && d.value.funis.length) aberto.value = d.value.funis[0].name; };
+    onMounted(carregar);
+    const f = computed(() => (d.value?.funis || []).find((x) => x.name === aberto.value));
+    const rotTipo = (v) => (d.value?.tipos.find((t) => t.v === v) || {}).r || v;
+    const chama = async (metodo, args, msg) => { ocupado.value = true; try { const r = await api("funis_api." + metodo, args, true); if (msg) toast(msg); await carregar(); return r; } catch (e) { return null; } finally { ocupado.value = false; } };
+    const comecar = () => { novo.value = { nome: "", modelo: "compras", marcas: [] }; };
+    const criar = async () => { const r = await chama("criar", { nome: novo.value.nome, modelo: novo.value.modelo, marcas: JSON.stringify(novo.value.marcas) }, "Funil criado");
+      if (r) { aberto.value = r.nome; novo.value = null; } };
+    const gravarF = (dados, msg) => chama("gravar", { nome: f.value.name, dados: JSON.stringify(dados) }, msg || "Gravado").then((r) => { if (r && r.nome) aberto.value = r.nome; });
+    const mudarNome = () => { const n = prompt("Nome do funil", f.value.name); if (n && n.trim() && n.trim() !== f.value.name) gravarF({ nome: n.trim() }, "Nome mudado"); };
+    const alternarMarca = (m) => { const ms = new Set(f.value.marcas); ms.has(m) ? ms.delete(m) : ms.add(m); gravarF({ marcas: [...ms] }, "Marcas gravadas"); };
+    const criarFase = async () => { if (await chama("fase_criar", { funil: f.value.name, rotulo: novaFase.value.rotulo, tipo: novaFase.value.tipo, cor: novaFase.value.cor, probabilidade: novaFase.value.prob || 0 }, "Fase criada")) novaFase.value = null; };
+    const editar = (x) => { ed.value = { nome: x.name, rotulo: x.rotulo, tipo: x.tipo, cor: x.cor, prob: x.probabilidade }; };
+    const gravarFase = async () => { if (await chama("fase_gravar", { nome: ed.value.nome, dados: JSON.stringify({ rotulo: ed.value.rotulo, tipo: ed.value.tipo, cor: ed.value.cor, probabilidade: ed.value.prob }) }, "Fase gravada")) ed.value = null; };
+    const apagarFase = (x) => { if (confirm(`Apagar a fase «${x.rotulo}»?`)) chama("fase_apagar", { nome: x.name }, "Fase apagada"); };
+    const largar = (alvo) => { const de = arr.value; arr.value = null; if (!de || de === alvo.name) return;
+      const nomes = f.value.fases.map((x) => x.name).filter((n) => n !== de); nomes.splice(nomes.indexOf(alvo.name), 0, de);
+      chama("fases_ordenar", { funil: f.value.name, nomes: JSON.stringify(nomes) }, "Ordem gravada"); };
+    const apagar = async () => { const r = await chama("apagar", { nome: apagarF.value.nome, passar_para: apagarF.value.para || "" });
+      if (r) { toast(r.passaram ? `Funil apagado — ${r.passaram} negócio(s) passaram para «${apagarF.value.para}»` : "Funil apagado"); apagarF.value = null; aberto.value = ""; carregar(); } };
+    return { d, aberto, f, novo, novaFase, ed, apagarF, ocupado, arr, rotTipo, comecar, criar, gravarF, mudarNome, alternarMarca, criarFase, editar, gravarFase, apagarFase, largar, apagar, FAIXA };
+  },
+  template: `
+  <div class="pad def-funis">
+    <div class="ola"><div><div style="font-size:13px"><a href="#/definicoes">← Definições</a></div><h1>Funis</h1>
+      <div class="sub">Cada funil tem as suas fases (com uma de ganho e uma de perda). Os negócios das propostas, das lojas e do Booking entram no funil por omissão.</div></div>
+      <button class="btn prim" v-if="d && d.pode && !novo" @click="comecar">+ Novo funil</button></div>
+    <div v-if="!d" class="carregar">A carregar…</div>
+    <template v-else>
+      <div v-if="!d.pode" class="sub" style="margin-bottom:12px">Só os administradores do Orbit mudam os funis.</div>
+      <div class="cartao" v-if="novo" style="margin-bottom:18px;padding:16px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+          <label class="sub">Nome do funil<br><input class="btn" style="width:100%" v-model="novo.nome" placeholder="Ex.: Compras" @keyup.enter="criar"></label>
+          <label class="sub">Começar a partir de<br><select class="btn" style="width:100%" v-model="novo.modelo"><option v-for="m in d.modelos" :key="m.v" :value="m.v">{{ m.r }}</option></select></label>
+        </div>
+        <div class="sub" style="margin-top:8px">Fases: {{ (d.modelos.find((m) => m.v===novo.modelo)||{fases:[]}).fases.join(' → ') }} (mudam-se depois)</div>
+        <div v-if="d.marcas.length > 1" class="sub" style="margin-top:10px">Marcas (nenhuma = todas):
+          <label v-for="m in d.marcas" :key="m" style="margin-left:10px"><input type="checkbox" :value="m" v-model="novo.marcas"> {{ m }}</label></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" @click="novo=null">Cancelar</button><button class="btn prim" :disabled="ocupado || !novo.nome.trim()" @click="criar">{{ ocupado ? 'A criar…' : 'Criar funil' }}</button></div>
+      </div>
+      <div class="vistas" style="margin-bottom:14px"><button v-for="x in d.funis" :key="x.name" :class="{ativo: aberto===x.name}" @click="aberto=x.name;ed=null;novaFase=null" :style="{opacity: x.desligado ? .55 : 1}">{{ x.name }}<template v-if="x.por_omissao"> ★</template> <span class="sub">{{ x.abertos }}</span></button></div>
+      <div class="cartao" v-if="f" style="padding:0">
+        <header style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:14px 16px">
+          <div><h2 style="margin:0">{{ f.name }}</h2><div class="sub">{{ f.abertos }} negócio(s) em curso · {{ f.total }} no total<template v-if="f.marcas.length"> · só {{ f.marcas.join(', ') }}</template><template v-else> · todas as marcas</template></div></div>
+          <div v-if="d.pode" style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn sm" @click="mudarNome">Mudar o nome</button>
+            <button class="btn sm" v-if="!f.por_omissao" @click="gravarF({por_omissao:1}, 'Passou a funil por omissão')">Tornar por omissão</button>
+            <button class="btn sm" @click="gravarF({mostra_valor: f.mostra_valor ? 0 : 1})">{{ f.mostra_valor ? 'Esconder o valor (€)' : 'Mostrar o valor (€)' }}</button>
+            <button class="btn sm" v-if="!f.por_omissao" @click="gravarF({desligado: f.desligado ? 0 : 1}, f.desligado ? 'Funil ligado' : 'Funil desligado (os negócios ficam)')">{{ f.desligado ? 'Ligar' : 'Desligar' }}</button>
+            <button class="btn sm" v-if="!f.por_omissao" @click="apagarF={nome:f.name, n:f.total, para:''}">Apagar</button>
+          </div>
+        </header>
+        <div v-if="d.pode && d.marcas.length > 1" class="linha sub" style="flex-wrap:wrap;gap:10px">Marcas:
+          <label v-for="m in d.marcas" :key="m"><input type="checkbox" :checked="f.marcas.includes(m)" @change="alternarMarca(m)"> {{ m }}</label><span>(nenhuma = todas)</span></div>
+        <div v-for="x in f.fases" :key="x.name" class="linha" style="flex-wrap:wrap;gap:6px" :draggable="d.pode && !ed" @dragstart="arr=x.name" @dragover.prevent @drop.prevent="largar(x)">
+          <template v-if="ed && ed.nome===x.name">
+            <input class="btn sm" style="flex:1;min-width:140px" v-model="ed.rotulo" @keyup.enter="gravarFase">
+            <select class="btn sm" v-model="ed.tipo"><option v-for="t in d.tipos" :key="t.v" :value="t.v">{{ t.r }}</option></select>
+            <select class="btn sm" v-model="ed.cor"><option v-for="c in d.cores" :key="c" :value="c">{{ c }}</option></select>
+            <label class="sub"><input class="btn sm" type="number" min="0" max="100" style="width:64px" v-model="ed.prob"> %</label>
+            <button class="btn sm" @click="ed=null">Cancelar</button><button class="btn sm prim" @click="gravarFase">Gravar</button>
+          </template>
+          <template v-else>
+            <span v-if="d.pode" class="sub" style="cursor:grab" title="Arrastar para mudar a ordem">⋮⋮</span>
+            <span style="width:10px;height:10px;border-radius:3px;display:inline-block" :style="{background: FAIXA[x.cor] || '#94a3b8'}"></span>
+            <div class="cresce">{{ x.rotulo }} <span class="sub">· {{ rotTipo(x.tipo) }} · {{ x.probabilidade }} % · {{ x.n }} negócio(s)</span></div>
+            <template v-if="d.pode"><button class="btn sm" @click="editar(x)">Mudar</button><button class="btn sm" @click="apagarFase(x)" :disabled="x.n > 0" :title="x.n ? 'Tem negócios' : ''">Apagar</button></template>
+          </template>
+        </div>
+        <div class="linha" v-if="d.pode && !novaFase"><button class="btn sm" @click="novaFase={rotulo:'', tipo:'Ongoing', cor:'blue', prob:50}">+ Fase</button></div>
+        <div class="linha" v-if="novaFase" style="flex-wrap:wrap;gap:6px">
+          <input class="btn sm" style="flex:1;min-width:140px" v-model="novaFase.rotulo" placeholder="Nome da fase" @keyup.enter="criarFase">
+          <select class="btn sm" v-model="novaFase.tipo"><option v-for="t in d.tipos" :key="t.v" :value="t.v">{{ t.r }}</option></select>
+          <select class="btn sm" v-model="novaFase.cor"><option v-for="c in d.cores" :key="c" :value="c">{{ c }}</option></select>
+          <label class="sub"><input class="btn sm" type="number" min="0" max="100" style="width:64px" v-model="novaFase.prob"> %</label>
+          <button class="btn sm" @click="novaFase=null">Cancelar</button><button class="btn sm prim" :disabled="ocupado || !novaFase.rotulo.trim()" @click="criarFase">Criar</button>
+        </div>
+      </div>
+      <div class="modal-fundo" v-if="apagarF" @click.self="apagarF=null">
+        <div class="modal" style="max-width:460px"><header><b>Apagar o funil «{{ apagarF.nome }}»</b><button class="btn sm" @click="apagarF=null">Fechar</button></header>
+          <div style="padding:14px 20px 18px">
+            <p v-if="apagarF.n">Tem {{ apagarF.n }} negócio(s). Passam para:</p><p v-else>Não tem negócios. As fases dele também são apagadas.</p>
+            <select v-if="apagarF.n" class="btn" style="width:100%" v-model="apagarF.para"><option value="">— escolher —</option><option v-for="x in d.funis.filter((x) => x.name !== apagarF.nome)" :key="x.name" :value="x.name">{{ x.name }}</option></select>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" @click="apagarF=null">Cancelar</button><button class="btn prim" :disabled="ocupado || (apagarF.n && !apagarF.para)" @click="apagar">Apagar</button></div>
           </div>
         </div>
       </div>
@@ -3568,14 +3685,18 @@ const ErpArvore = { components: { ErpArvoreNo }, props: ["doctype"], setup(p) { 
 // Kanban por um campo de escolha (como a vista Kanban do desk)
 const ErpKanban = { props: ["doctype", "campo", "def", "linhas", "titulo"], emits: ["mudou"],
   setup(p, { emit }) { const arr = ref(null), alvo = ref("");
-    const cols = computed(() => { const c = (p.def.campos || []).find((x) => x.campo === p.campo) || {}; const ops = c.opcoes || []; return ops.map((o) => ({ v: o, itens: p.linhas.filter((l) => (l[p.campo] || "") === o) })); });
+    // 27-11-2026 (funil do processo): no estado de documentos submetíveis, colunas pela ordem do caminho e sem arrastar
+    const processo = computed(() => p.campo === "status" && p.def.processo ? p.def.processo : null);
+    const fixo = computed(() => p.campo === "status" && p.def.submetivel);
+    const cols = computed(() => { const c = (p.def.campos || []).find((x) => x.campo === p.campo) || {}; const ops = processo.value || c.opcoes || []; return ops.map((o) => ({ v: o, itens: p.linhas.filter((l) => (l[p.campo] || "") === o) })); });
     const largar = async (col) => { const x = arr.value; arr.value = null; alvo.value = ""; if (!x || x[p.campo] === col.v) return;
+      if (fixo.value) { toast("O estado muda pelas acções do documento (receber, faturar, pagar…), não arrastando."); return; }
       const r = await apiL("em_massa", { doctype: p.doctype, nomes: JSON.stringify([x.name]), acao: "editar", campo: p.campo, valor: col.v }, true);
       if (r.falhas.length) toast(r.falhas[0].erro); else toast("→ " + col.v); emit("mudou"); };
-    return { cols, arr, alvo, largar, irErp, statusPt }; },
+    return { cols, arr, alvo, largar, irErp, statusPt, fixo }; },
   template: `<div class="funil" :style="{gridTemplateColumns:'repeat('+cols.length+',minmax(220px,1fr))'}"><div v-for="c in cols" :key="c.v" class="coluna" :class="{alvo: alvo===c.v}" @dragover.prevent="alvo=c.v" @dragleave="alvo=''" @drop.prevent="largar(c)">
       <header><b>{{ statusPt(c.v) || '—' }} <span class="sub" style="font-weight:500">{{ c.itens.length }}</span></b></header>
-      <a v-for="l in c.itens" :key="l.name" class="cartao negocio" :href="irErp(doctype,l.name)" draggable="true" @dragstart="arr=l" style="display:block;text-decoration:none;color:inherit"><h3>{{ l[titulo] || l.name }}</h3><div v-if="l[titulo] && l[titulo]!==l.name" class="sub" style="font-size:12px">{{ l.name }}</div></a></div></div>` };
+      <a v-for="l in c.itens" :key="l.name" class="cartao negocio" :href="irErp(doctype,l.name)" :draggable="!fixo" @dragstart="arr=l" style="display:block;text-decoration:none;color:inherit"><h3>{{ l[titulo] || l.name }}</h3><div v-if="l[titulo] && l[titulo]!==l.name" class="sub" style="font-size:12px">{{ l.name }}</div></a></div></div>` };
 // Calendário do mês por um campo de data
 const ErpCalendario = { props: ["doctype", "campo", "titulo"],
   setup(p) { const hoje = new Date(); const ano = ref(hoje.getFullYear()), mes = ref(hoje.getMonth() + 1), itens = ref([]);
@@ -3739,7 +3860,7 @@ const ErpLista = {
     </div>
     <div v-if="def && (def.arvore || def.kanban.length || def.calendario.length)" class="vistas modos-erp">
       <button :class="{ativo: modo==='lista'}" @click="modo='lista'">Lista</button><button v-if="def.arvore" :class="{ativo: modo==='arvore'}" @click="modo='arvore'">Árvore</button>
-      <button v-if="def.kanban.length" :class="{ativo: modo==='kanban'}" @click="modo='kanban'">Kanban</button><button v-if="def.calendario.length" :class="{ativo: modo==='calendario'}" @click="modo='calendario'">Calendário</button>
+      <button v-if="def.kanban.length" :class="{ativo: modo==='kanban'}" @click="modo='kanban'">{{ def.processo ? 'Funil' : 'Kanban' }}</button><button v-if="def.calendario.length" :class="{ativo: modo==='calendario'}" @click="modo='calendario'">Calendário</button>
       <select v-if="modo==='kanban' && def.kanban.length>1" class="btn sm" v-model="campoK" style="margin-left:auto"><option v-for="c in def.kanban" :key="c" :value="c">{{ campo(c).label }}</option></select>
       <select v-if="modo==='calendario' && def.calendario.length>1" class="btn sm" v-model="campoC" style="margin-left:auto"><option v-for="c in def.calendario" :key="c" :value="c">{{ campo(c).label }}</option></select></div>
     <div v-if="modo==='arvore'" style="padding:0 24px 24px"><ErpArvore :doctype="doctype"/></div>
@@ -5618,7 +5739,7 @@ const abrirApp = (chave, url) => {
 
 // ── Aplicação ────────────────────────────────────────────────────────────────────────────────────────
 const App = {
-  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpPainel, ErpContas, ErpImportar, RhAprovar, RhAusencias, CrmPainel, DeskPainel, DeskKb, MktSegmentos, MktMarcadores, MktModelos, ErpLista, ErpFicha, ErpProposta, ErpEmitir, ErpRecibo, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, DefUtilizadores, DefEmpresas, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
+  components: { Icone, Inicio, Lista, Ficha, Funil, Caixa, Definicoes, AppEmbutida, ErpModulo, ErpPainel, ErpContas, ErpImportar, RhAprovar, RhAusencias, CrmPainel, DeskPainel, DeskKb, MktSegmentos, MktMarcadores, MktModelos, ErpLista, ErpFicha, ErpProposta, ErpEmitir, ErpRecibo, ErpDesk, ErpStock, ErpPessoas, ErpRelatorio, Compras, Calendario, DefLista, DefCampos, DefFluxos, DefFunis, DefFormularios, DeskTickets, DeskTicket, DeskModelos, DefConsulta, DefUtilizadores, DefEmpresas, Tarefas, Projetos, Projeto, Documentos, Assinaturas, Tempo, Chat, Duplicados, Fila, Sino },
   setup() {
     const ctx = ref(null); const rota = ref(location.hash || "#/inicio");
     const q = ref(""); const res = ref([]); const selRes = ref(0); let tq;
@@ -5754,6 +5875,7 @@ const App = {
         <DeskTicket v-else-if="ecra==='ticket'" :nome="partes[1]" :key="'t'+partes[1]"/>
         <DeskModelos v-else-if="ecra==='desk-checklists'"/>
         <DefFluxos v-else-if="ecra==='definicoes' && partes[1]==='fluxos'" key="fluxos"/>
+        <DefFunis v-else-if="ecra==='definicoes' && partes[1]==='funis'" key="funis"/>
         <DefFormularios v-else-if="ecra==='definicoes' && partes[1]==='formularios'" key="formularios"/>
         <DefUtilizadores v-else-if="ecra==='definicoes' && partes[1]==='utilizadores'" key="utilizadores"/>
         <DefEmpresas v-else-if="ecra==='definicoes' && partes[1]==='empresas'" key="empresas"/>

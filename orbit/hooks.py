@@ -82,7 +82,8 @@ _LINGUA = ["orbit.lingua.garantir"]
 # 05-11-2026: os emails no CRM (orbit/emails_crm.py; docs/PLANO-EMAILS-NO-CRM.md) — campos próprios
 _EMAILS_CRM = ["orbit.emails_crm.instalar"]
 # 20-11-2026: campos da interface /orbit (Responsável em contactos e empresas)
-_INTERFACE = ["orbit.interface.desk.instalar", "orbit.interface.definicoes.instalar", "orbit.interface.conversa.instalar", "orbit.interface.instalar.instalar", "orbit.interface.ciclo.instalar", "orbit.interface.marcas.instalar", "orbit.interface.detalhes.instalar", "orbit.fluxos_crm.instalar", "orbit.interface.formularios.instalar", "orbit.correio_servicos.acertar"]
+# 27-11-2026: vários funis no CRM (orbit/funis.py; docs/PLANO-FUNIS-CRM-ORBIT.md) — antes dos fluxos, que usam orbit_tipo_fase
+_INTERFACE = ["orbit.funis.instalar", "orbit.interface.desk.instalar", "orbit.interface.definicoes.instalar", "orbit.interface.conversa.instalar", "orbit.interface.instalar.instalar", "orbit.interface.ciclo.instalar", "orbit.interface.marcas.instalar", "orbit.interface.detalhes.instalar", "orbit.fluxos_crm.instalar", "orbit.interface.formularios.instalar", "orbit.correio_servicos.acertar"]
 _FATURACAO = ["orbit.faturacao.instalar.garantir"]   # DP8, 05-11-2026
 _BOOKING = ["orbit.booking.garantir"]   # O1/I1, 06-11-2026: negócio do CRM ligado à marcação do Booking
 # 10-11-2026: propostas comerciais por cima do Orçamento (orbit/propostas; docs/PLANO-PROPOSTAS-ORBIT.md)
@@ -140,7 +141,9 @@ doc_events = {
                 "on_update": "orbit.emails_crm.ao_gravar_registo"},
     "CRM Lead": {"after_insert": ["orbit.emails_crm.ao_gravar_registo", "orbit.marketing.base_legal.ao_criar"], "on_trash": "orbit.emails_crm.lead_apagada"},
     # 23-11-2026: marca herdada da lead/empresa e passada à empresa e aos contactos (orbit/interface/marcas.py)
+    # 27-11-2026: vários funis — a fase é sempre do funil do negócio (orbit/funis.py)
     "CRM Deal": {"before_insert": "orbit.interface.marcas.negocio_antes",
+                 "before_validate": "orbit.funis.antes_de_validar",
                  "after_insert": ["orbit.emails_crm.ao_gravar_registo", "orbit.interface.ciclo.negocio_gravado",
                                   "orbit.interface.marcas.negocio_gravado"],
                  "on_update": ["orbit.emails_crm.ao_gravar_registo", "orbit.interface.ciclo.negocio_gravado",
@@ -160,7 +163,8 @@ doc_events = {
     "Purchase Invoice": {"before_submit": "orbit.compras.rascunho.antes_de_submeter",
                          "on_submit": "orbit.faturacao.sincronizacao.ao_submeter_compra"},
     # 25-11-2026: sincronização bidireccional com o programa certificado (opção na Ligação Faturação)
-    "Purchase Order": {"on_submit": "orbit.faturacao.sincronizacao.ao_submeter_compra"},
+    "Purchase Order": {"on_submit": ["orbit.faturacao.sincronizacao.ao_submeter_compra", "orbit.funis.compra_submetida"]},
+    "CRM Deal Status": {"validate": "orbit.funis.fase_antes_de_gravar", "on_update": "orbit.funis.fase_actualizada"},
     "Stock Entry": {"on_submit": "orbit.faturacao.sincronizacao.ao_mexer_stock",
                     "on_cancel": "orbit.faturacao.sincronizacao.ao_mexer_stock"},
     "Stock Reconciliation": {"on_submit": "orbit.faturacao.sincronizacao.ao_mexer_stock",

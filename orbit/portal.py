@@ -1110,7 +1110,12 @@ def somar_orcamento(id_projeto: str, horas: float):
 # ═══════════════════════════════════════════════════════════════════════════
 # Webmail ↔ CRM (17-10-2026): o painel do Orbit CRM ao lado do email, à maneira do Zoho
 # ═══════════════════════════════════════════════════════════════════════════
-ESTADOS_FECHADOS = ("Won", "Lost")
+ESTADOS_FECHADOS = ("Won", "Lost")   # tipos; nomes de todos os funis em estados_fechados() (27-11-2026)
+
+
+def estados_fechados():
+    from orbit.funis import fechadas
+    return fechadas() or list(ESTADOS_FECHADOS)
 
 
 def _url_crm(tipo: str, nome: str) -> str:
@@ -1151,7 +1156,7 @@ def _perfil(email: str):
                                                           "tipo_conta", "marca", "owner"], as_dict=True)
         out["organizacao"] = {"id": o.name, "nome": o.organization_name, "crm_account_id": o.crm_account_id, "estado": o.estado_conta,
                               "tipo": o.tipo_conta, "marca": o.marca, "url": _url_crm("organizations", o.name)}
-        for d in frappe.get_all("CRM Deal", filters={"organization": org, "status": ["not in", ESTADOS_FECHADOS]},
+        for d in frappe.get_all("CRM Deal", filters={"organization": org, "status": ["not in", estados_fechados()]},
                                 fields=["name", "titulo", "status", "deal_value", "deal_owner"], order_by="modified desc", limit=5):
             out["negocios"].append({"id": d.name, "titulo": d.titulo or d.name, "estado": d.status, "valor": flt(d.deal_value),
                                     "dono": _nome_utilizador(d.deal_owner), "url": _url_crm("deals", d.name)})

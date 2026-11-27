@@ -287,8 +287,9 @@ def novo_negocio(doctype: str, name: str, titulo: str = None, valor: float = Non
     """«Novo negócio» numa empresa ou num contacto: nasce já ligado."""
     _guarda()
     _ler(doctype, name)
-    fase = frappe.get_all("CRM Deal Status", pluck="name", order_by="position asc", limit=1)
-    d = frappe.get_doc({"doctype": "CRM Deal", "status": fase[0] if fase else "Qualification", "deal_owner": frappe.session.user})
+    from orbit import funis as F
+    d = frappe.get_doc({"doctype": "CRM Deal", "status": F.primeira() or "Qualification", "orbit_funil": F.omissao(),
+                        "deal_owner": frappe.session.user})
     if doctype == "CRM Organization":
         d.organization = name
     elif doctype == "Contact":

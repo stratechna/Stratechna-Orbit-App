@@ -218,11 +218,11 @@ def fluxos() -> list:
                 "actions": [_tarefa(R, 1, "contactar", "Contactar {{ doc.lead_name or doc.email }}", 1, "CRM Lead",
                                     "{{ doc.lead_owner or '' }}")]})
     out.append({**R.flow(PREFIXO + "Negócio ganho — arranque com o cliente", "CRM Deal", "Field Value Changed"),
-                "trigger_field": "status", "to_value": "Won",
+                "trigger_field": "orbit_tipo_fase", "to_value": "Won",   # 27-11: qualquer funil (tipo da fase)
                 "actions": [_tarefa(R, 1, "arranque", "Arranque com o cliente — {{ doc.organization or doc.name }}", 2,
                                     "CRM Deal", "{{ doc.deal_owner or '' }}")]})
     out.append({**R.flow(PREFIXO + "Negócio perdido — voltar a contactar aos 90 dias", "CRM Deal", "Field Value Changed"),
-                "trigger_field": "status", "to_value": "Lost",
+                "trigger_field": "orbit_tipo_fase", "to_value": "Lost",
                 "actions": [_tarefa(R, 1, "voltar", "Voltar a contactar — {{ doc.organization or doc.name }}", 90,
                                     "CRM Deal", "{{ doc.deal_owner or '' }}")]})
     for f in out:
@@ -246,6 +246,11 @@ def instalar():
     except ImportError:
         return
     _modelos_email()
+    # 27-11-2026 (vários funis): os dois modelos de ganho/perdido passam a olhar para o TIPO da fase, em todos os funis
+    if frappe.get_meta("CRM Deal").has_field("orbit_tipo_fase"):
+        for fl in frappe.get_all("Automation Flow", filters={"title": ["like", PREFIXO + "Negócio %"], "trigger_field": "status",
+                                                              "to_value": ["in", ["Won", "Lost"]]}, pluck="name"):
+            frappe.db.set_value("Automation Flow", fl, "trigger_field", "orbit_tipo_fase", update_modified=False)
     for f in fluxos():
         if frappe.db.exists("Automation Flow", {"title": f["title"]}):
             continue
