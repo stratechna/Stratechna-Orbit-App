@@ -1776,7 +1776,7 @@ const DeskTicket = {
             <div class="fl-linha" style="flex-wrap:wrap;gap:6px">
               <button type="button" class="btn sm" @click="anexoIn3.click()">📎 Anexar</button><input ref="anexoIn3" type="file" multiple style="display:none" @change="juntarAnexos3">
               <span v-for="(x,k) in r3.anexos" :key="x.id" class="reg-chip">{{ x.nome }}<button type="button" @click="r3.anexos.splice(k,1)">×</button></span>
-              <span v-if="r3.acoes.length" class="etq" :title="r3.acoes.map(a=>a.action_type+': '+a.label).join('\n')">{{ r3.acoes.length }} ação(ões) do modelo</span>
+              <span v-if="r3.acoes.length" class="etq" :title="r3.acoes.map(a=>a.action_type+': '+a.label).join('\\n')">{{ r3.acoes.length }} ação(ões) do modelo</span>
               <span class="sub" style="font-size:12px;margin-left:auto">Rascunho guardado neste aparelho</span>
               <button class="btn prim" :disabled="aEnviar" @click="enviar3">{{ aEnviar ? 'A enviar…' : 'Enviar resposta' }}</button></div>
           </template>
