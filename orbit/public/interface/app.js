@@ -4064,6 +4064,23 @@ const ErpMulti = {
   </div>`,
 };
 
+// 27-11-2026 (Vítor: «se eu escrever 205, o 5 não entra»): a resposta do recálculo do ERPNext chegava depois de a pessoa
+// ter escrito mais algarismos e repunha o valor que tinha sido enviado. Agora junta-se a resposta sem tocar em nada que
+// tenha mudado desde o envio (cabeçalho e linhas, emparelhadas pelo nome); e só a resposta ao último envio conta.
+const _igualR = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+const juntarRecalculo = (alvo, resposta, enviado) => {
+  for (const [k, v] of Object.entries(resposta || {})) {
+    const atual = alvo[k], antes = enviado[k];
+    if (Array.isArray(v) && Array.isArray(atual) && Array.isArray(antes)) {
+      // linhas acrescentadas ou apagadas entretanto: fica o que está; o recálculo seguinte trata delas
+      if (atual.length !== antes.length || atual.some((l, i) => (l && l.name) !== (antes[i] && antes[i].name))) continue;
+      const porNome = (lista) => Object.fromEntries(lista.filter((l) => l && l.name).map((l) => [l.name, l]));
+      const A = porNome(atual), E = porNome(antes);
+      alvo[k] = v.map((lr) => { const la = lr && A[lr.name], le = lr && E[lr.name]; if (!la || !le) return lr;
+        const out = { ...lr }; for (const kk of Object.keys(la)) if (!_igualR(la[kk], le[kk])) out[kk] = la[kk]; return out; });
+    } else if (_igualR(atual, antes)) alvo[k] = v;
+  }
+};
 const ErpTabela = {
   components: { ErpCampo },
   props: ["c", "doc", "filha", "ro"],
@@ -4220,12 +4237,13 @@ const ErpEmitir = {
     const docstatus = computed(() => doc.value?.docstatus || 0);
     let ultima = "", tr0;
     const assin = () => { const d = doc.value; if (!d) return ""; return JSON.stringify([d.customer, d.orbit_marca, d.taxes_and_charges, (d.items || []).map((l) => [l.item_code, l.qty, l.rate, l.discount_percentage, l.warehouse])]); };
-    const recalcular = async () => { if (ro.value) return;
-      const r = await api("erp.recalcular", { doctype: props.dt, dados: JSON.stringify(doc.value) }, true).catch(() => null);
-      if (!r) return; aviso.value = r.aviso || ""; if (!r.doc) return;
-      const nomes = (doc.value.items || []).map((l) => l.name);
+    let nRec = 0;
+    const recalcular = async () => { if (ro.value) return; const n = ++nRec; const enviado = JSON.parse(JSON.stringify(doc.value));
+      const r = await api("erp.recalcular", { doctype: props.dt, dados: JSON.stringify(enviado) }, true).catch(() => null);
+      if (!r || n !== nRec) return; aviso.value = r.aviso || ""; if (!r.doc) return;
+      const nomes = (enviado.items || []).map((l) => l.name);
       r.doc.items = (r.doc.items || []).map((l, i) => (!l.name && nomes[i] ? { ...l, name: nomes[i] } : l));
-      Object.assign(doc.value, r.doc); ultima = assin(); };
+      juntarRecalculo(doc.value, r.doc, enviado); ultima = assin(); };
     watch(() => assin(), (s) => { if (s === ultima) return; ultima = s; clearTimeout(tr0); tr0 = setTimeout(recalcular, 450); });
     const acrescentar = (codigo) => { if (!codigo) return; doc.value.items = doc.value.items || [];
       doc.value.items.push({ name: "novo-" + Math.random().toString(36).slice(2, 9), doctype: props.dt + " Item", item_code: codigo, qty: 1 }); novaLinha.value = ""; };
@@ -4572,13 +4590,14 @@ const ErpProposta = {
     let ultima = ""; let tr0;
     const assin = () => { const d = doc.value; if (!d) return ""; return JSON.stringify([d.party_name, d.orbit_marca, d.orbit_transporte_modo, d.orbit_transporte_total, d.orbit_montagem_total, d.taxes_and_charges,
       (d.items || []).filter((l) => !l.orbit_de).map((l) => [l.item_code, l.qty, l.rate, l.orbit_transporte, l.orbit_montagem])]); };
+    let nRec = 0;
     const recalcular = async () => {
-      if (ro.value) return;
-      const r = await api("erp.recalcular", { doctype: "Quotation", dados: JSON.stringify(doc.value) }, true).catch(() => null);
-      if (!r) return; aviso.value = r.aviso || ""; if (!r.doc) return;
-      const nomes = linhas.value.map((l) => l.name);
+      if (ro.value) return; const n = ++nRec; const enviado = JSON.parse(JSON.stringify(doc.value));
+      const r = await api("erp.recalcular", { doctype: "Quotation", dados: JSON.stringify(enviado) }, true).catch(() => null);
+      if (!r || n !== nRec) return; aviso.value = r.aviso || ""; if (!r.doc) return;
+      const nomes = (enviado.items || []).filter((l) => !l.orbit_de).map((l) => l.name);
       r.doc.items = (r.doc.items || []).map((l, i) => (!l.orbit_de && i < nomes.length && !l.name ? { ...l, name: nomes[i] } : l));
-      Object.assign(doc.value, r.doc); ultima = assin();
+      juntarRecalculo(doc.value, r.doc, enviado); ultima = assin();
     };
     watch(() => assin(), (s) => { if (s === ultima) return; ultima = s; clearTimeout(tr0); tr0 = setTimeout(recalcular, 450); });
     // procurar produtos: ERP primeiro; internet só a pedido
@@ -5119,7 +5138,7 @@ const ErpFicha = {
     onMounted(carregar);
     watch(doc, (n, o) => { if (o) sujo.value = true; }, { deep: true });
     // U3: recálculo pelo ERPNext (preço da lista, nome, unidade, impostos, totais) — nada é gravado
-    let memoItens = {}; let ultimaAss = ""; let tRec;
+    let memoItens = {}; let ultimaAss = ""; let tRec; let nRec = 0;
     const DERIVADOS = ["item_name", "description", "uom", "stock_uom", "conversion_factor", "rate", "price_list_rate", "base_rate", "amount", "base_amount", "image", "item_group", "brand"];
     // o que, ao mudar, pede um novo cálculo ao ERPNext (vendas/compras, stock e RH — U3/U4)
     const CAB = ["customer", "party_name", "supplier", "company", "currency", "selling_price_list", "buying_price_list", "taxes_and_charges",
@@ -5133,12 +5152,13 @@ const ErpFicha = {
     const recalcular = async () => {
       const d = doc.value; if (!d || soLeitura.value || (d.docstatus || 0) !== 0) return;
       for (const l of d.items || []) if (l.item_code && memoItens[l.name] !== l.item_code) { for (const k of DERIVADOS) l[k] = null; }
-      const r = await api("erp.recalcular", { doctype: props.doctype, dados: JSON.stringify(d) }, true).catch(() => null);
-      if (!r) return;
+      const n = ++nRec; const enviado = JSON.parse(JSON.stringify(d));
+      const r = await api("erp.recalcular", { doctype: props.doctype, dados: JSON.stringify(enviado) }, true).catch(() => null);
+      if (!r || n !== nRec) return;
       aviso.value = r.aviso || "";
       if (!r.doc) return;
-      memoItens = Object.fromEntries((r.doc.items || []).map((l) => [l.name, l.item_code]));
-      doc.value = Object.assign(doc.value, r.doc); ultimaAss = assinatura();
+      juntarRecalculo(doc.value, r.doc, enviado);
+      memoItens = Object.fromEntries((doc.value.items || []).map((l) => [l.name, l.item_code])); ultimaAss = assinatura();
     };
     watch(() => assinatura(), (a) => { if (!meta.value?.transacao || a === ultimaAss) return; ultimaAss = a; clearTimeout(tRec); tRec = setTimeout(recalcular, 500); });
     const criarDe = async (o) => {
