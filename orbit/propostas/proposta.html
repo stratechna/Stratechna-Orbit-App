@@ -69,8 +69,16 @@
   .op-aceite td.s { width: 6%; }
   .op-aceite div { border-top: 1px solid #8a939b; padding-top: 4px; margin-top: 40px; }
   .op-anexo { page-break-before: always; }
-  .op-anexo h2 { font-size: 13px; margin: 0 0 10px; color: {{ m.cor_letra }}; }
-  .op-anexo .corpo { font-size: 9.5px; line-height: 1.5; }
+  /* 27-11-2026 (Vítor): Condições Gerais de Venda sempre na última página, em letra pequena e duas colunas */
+  .op-anexo h2 { font-size: 11px; margin: 0 0 1px; color: {{ m.cor_letra }}; }
+  .op-anexo .ent { font-size: 7.5px; color: #4a535c; margin: 0 0 6px; }
+  .op-cg td { width: 48.5%; vertical-align: top; padding: 0; border: 0; font-size: 7px; line-height: 1.32; color: #2b3238; text-align: justify; }
+  .op-cg td.s { width: 3%; }
+  .op-cg h4 { font-size: 7.5px; margin: 5px 0 1px; color: {{ m.cor_letra }}; }
+  .op-cg td > h4:first-child { margin-top: 0; }
+  .op-cg p { margin: 0 0 2px; }
+  .op-cg ul { margin: 0 0 2px 9px; padding: 0; }
+  .op-cg li { margin: 0; }
   .op-rodape { background: {{ m.cor }}; padding: 10px 13mm; font-family: "DM Sans", Helvetica, Arial, sans-serif; }
   .op-rodape td { color: {{ m.cor_texto }}; font-size: 8px; line-height: 1.45; vertical-align: top; padding-right: 12px; border: 0; }
   .op-rodape b { font-size: 8.5px; }
@@ -190,7 +198,7 @@
       <td class="c"><div class="op-rot">PRAZO DE ENTREGA</div>{{ doc.orbit_prazo or "—" }}</td>
     </tr>
   </table>
-  {% if p.anexar %}<div class="op-anexar">Aplicam-se as Condições Comerciais da {{ m.nome }}, em anexo a esta proposta, que dela fazem parte.</div>{% endif %}
+  {% if p.anexar %}<div class="op-anexar">Aplicam-se as Condições Gerais de Venda da {{ m.nome }}, na última página desta proposta, que dela fazem parte.</div>{% endif %}
 
   <table class="op-aceite"><tr>
     <td><div>Pela {{ m.nome }}{% if p.comercial %} — {{ p.comercial }}{% endif %}</div></td>
@@ -202,8 +210,9 @@
 
   {% if p.anexar %}
   <div class="op-anexo">
-    <h2>Condições comerciais — {{ m.nome }}</h2>
-    <div class="corpo">{{ m.condicoes }}</div>
+    <h2>Condições Gerais de Venda</h2>
+    <div class="ent">{{ m.nome }} — {{ m.empresa }} · NIF {{ m.nif }}{% if m.morada %} · {{ " ".join(m.morada.split()) }}{% endif %}</div>
+    <table class="op-cg"><tr><td>{{ m.condicoes_colunas[0] }}</td><td class="s"></td><td>{{ m.condicoes_colunas[1] }}</td></tr></table>
   </div>
   {% endif %}
 </div>

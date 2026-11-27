@@ -269,6 +269,9 @@ def gravar(doctype: str, dados: str):
     _guarda()
     _ler(doctype)
     dados = json.loads(dados) if isinstance(dados, str) else dados
+    # 27-11-2026 (Vítor): uma proposta tem sempre marca (logótipo, série, condições, rodapé) quando há marcas
+    if doctype == "Quotation" and not dados.get("orbit_marca") and frappe.db.count("Brand", {"orbit_serie": ["is", "set"]}):
+        frappe.throw(_("Escolha a marca da proposta antes de gravar."))
     m = frappe.get_meta(doctype)
     nome = doctype if m.issingle else dados.get("name")
     existe = m.issingle or bool(nome and not str(nome).startswith("novo-") and frappe.db.exists(doctype, nome))

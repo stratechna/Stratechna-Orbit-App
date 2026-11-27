@@ -4780,6 +4780,8 @@ const ErpProposta = {
     };
     const remover = (l) => { doc.value.items = doc.value.items.filter((x) => x !== l); };
     const gravar = async () => {
+      // 27-11-2026 (Vítor): sem marca não se grava — a marca dá o logótipo, a série, as condições e o rodapé
+      if (marcas.value.length && !doc.value.orbit_marca) { toast("Escolha a marca que envia a proposta"); aviso.value = "Escolha a marca que envia a proposta (em cima, «Marca que envia»)."; window.scrollTo({ top: 0, behavior: "smooth" }); return; }
       if (!doc.value.party_name) { toast("Escolha o cliente"); return; }
       if (!linhas.value.length) { toast("Acrescente pelo menos um produto"); return; }
       a.value = true;

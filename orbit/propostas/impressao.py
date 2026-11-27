@@ -113,6 +113,24 @@ def _contactos(m, email, site, morada):
     }
 
 
+def _colunas(html):
+    """27-11-2026 (Vítor): condições em letra pequena, numa só página, em duas colunas — divididas aqui pelas secções
+    (<h4>), equilibradas pelo tamanho do texto (o wkhtmltopdf não faz colunas de texto de forma fiável)."""
+    if not html:
+        return ["", ""]
+    partes = [x for x in re.split(r"(?=<h4)", html) if x.strip()]
+    if len(partes) < 2:
+        return [html, ""]
+    tam = [len(re.sub(r"<[^>]+>", "", x)) for x in partes]
+    total, soma, corte = sum(tam), 0, len(partes)
+    for i, t in enumerate(tam):
+        if soma + t / 2 > total / 2:
+            corte = max(1, i)
+            break
+        soma += t
+    return ["".join(partes[:corte]), "".join(partes[corte:])]
+
+
 def _marca(doc):
     nome = doc.get("orbit_marca")
     m = frappe.get_cached_doc("Brand", nome) if nome and frappe.db.exists("Brand", nome) else None
@@ -133,6 +151,7 @@ def _marca(doc):
         "site": (m.get("orbit_site") if m else None) or "",
         "iban": (m.get("orbit_iban") if m else None) or "",
         "condicoes": (m.get("orbit_condicoes") if m else None) or "",
+        "condicoes_colunas": _colunas((m.get("orbit_condicoes") if m else None) or ""),
         "ligacoes": _contactos(m, (m.get("orbit_email") if m else None) or (empresa.email if empresa else ""),
                                (m.get("orbit_site") if m else None) or "", (m.get("orbit_morada") if m else None) or ""),
     })
