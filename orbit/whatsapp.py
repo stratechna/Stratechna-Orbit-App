@@ -60,7 +60,10 @@ def webhook():
         return "ok"
     # Assinatura confirmada: o pedido é da Meta. Corre como sistema — chega sem sessão («Guest») e o CRM, ao avisar o
     # responsável de uma lead nova, lê-a com verificação de permissões (403 «Guest não tem acesso a Lead do CRM»).
+    # O set_user limpa o frappe.local.form_dict (onde o Frappe já leu o JSON da Meta): guarda-se e repõe-se.
+    dados = frappe.local.form_dict
     frappe.set_user("Administrator")
+    frappe.local.form_dict = dados
     return fw.post()
 
 
