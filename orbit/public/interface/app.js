@@ -3863,13 +3863,14 @@ const ErpLista = {
     const fechar = () => { menuV.value = false; maisAc.value = false; }; onMounted(() => document.addEventListener("click", fechar)); onUnmounted(() => document.removeEventListener("click", fechar));
     // o «Estado» do documento já tem coluna própria (selo); não se repete o campo status
     const colunasVis = computed(() => colunas.value.filter((c) => !(meta.value?.submetivel && c === "status")));
-    return { eDevol, rotDevol, rotOrig, orig, procurarOrig, abrirOrig, devolver, modo, campoK, campoC, colunasVis, meta, def, linhas, mais, q, colunas, titulo, a, total, campo, cdef, textoValor, ordenar, ordem, maisLinhas, abrir, irErp, ESTADO_DOC, COR_STATUS, statusPt, cor, ini, tr,
+    const TIT_DEVOL = { "Sales Invoice": "Notas de crédito", "Delivery Note": "Guias de devolução", "Purchase Invoice": "Notas de débito", "Purchase Receipt": "Devoluções a fornecedor" };
+    return { TIT_DEVOL, eDevol, rotDevol, rotOrig, orig, procurarOrig, abrirOrig, devolver, modo, campoK, campoC, colunasVis, meta, def, linhas, mais, q, colunas, titulo, a, total, campo, cdef, textoValor, ordenar, ordem, maisLinhas, abrir, irErp, ESTADO_DOC, COR_STATUS, statusPt, cor, ini, tr,
       filtros, novoF, abrirFiltro, opsDe, juntarFiltro, tirarFiltro, limpar, rotuloOp, rotuloValor, PERIODOS_ERP, tipoOp, verCols, alternarCol, moverCol, colunasPadrao, colEscolhidas,
       vs, vistaAtiva, menuV, aplicarVista, vistaPorOmissao, gravarVista, vistaAtual, apagarVista, porOmissao, sel, todos, massa, opsMassa, camposEditaveis, pessoasL, aplicarMassa, pdfLote, exportar, maisAc };
   },
   template: `<div v-if="meta">
     <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-      <div><h1>{{ meta.rotulo }}</h1><div class="sub">{{ total }} {{ total===1 ? 'registo' : 'registos' }}<template v-if="filtros.length || q"> com estes filtros</template></div></div>
+      <div><h1>{{ eDevol ? TIT_DEVOL[doctype] : meta.rotulo }}</h1><div class="sub">{{ total }} {{ total===1 ? 'registo' : 'registos' }}<template v-if="filtros.length || q"> com estes filtros</template></div></div>
       <div class="acoes-lista" :class="{abertas: maisAc}" @click.stop><button v-if="meta.pode.create && eDevol" class="btn prim" @click="abrirOrig">+ {{ rotDevol }}</button><a v-else-if="meta.pode.create" class="btn prim" :href="irErp(doctype,'novo')">+ Novo</a>
         <button class="btn so-movel" @click="maisAc=!maisAc" aria-label="Mais ações">⋯</button>
         <span class="acoes-sec" @click="maisAc=false"><button v-if="def && def.pode.exportar" class="btn" @click="exportar(false)">Exportar</button><a v-if="meta.pode.create" class="btn" :href="'#/importar-erp/'+encodeURIComponent(doctype)">Importar</a></span></div>
