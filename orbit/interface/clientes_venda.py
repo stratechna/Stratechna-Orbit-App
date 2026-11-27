@@ -19,19 +19,25 @@ def procurar(q: str = ""):
         for c in frappe.get_list("Customer", or_filters=ou, filters={"disabled": 0}, fields=["name", "customer_name", "tax_id", "customer_type"], limit=10, order_by="modified desc"):
             out.append({"tipo": "cliente", "doctype": "Customer", "name": c.name, "titulo": c.customer_name or c.name,
                         "sub": " · ".join(x for x in (c.tax_id and ("NIF " + c.tax_id), _("Empresa") if c.customer_type == "Company" else _("Particular")) if x)})
-    if q and len(q) >= 2:
+    # 27-11-2026: sem texto também se mostram os mais recentes do CRM (a JF tem 1 cliente no ERP e o resto no CRM —
+    # parecia que só havia aquele); com texto procura-se logo a partir da 1.ª letra.
+    if True:
         if frappe.db.exists("DocType", "CRM Organization") and frappe.has_permission("CRM Organization", "read"):
-            for o in frappe.get_list("CRM Organization", or_filters=[["organization_name", "like", like], ["nipc", "like", like]] if frappe.get_meta("CRM Organization").has_field("nipc") else [["organization_name", "like", like]],
+            for o in frappe.get_list("CRM Organization", or_filters=([["organization_name", "like", like], ["nipc", "like", like]] if frappe.get_meta("CRM Organization").has_field("nipc") else [["organization_name", "like", like]]) if q else None, order_by="modified desc",
                                      fields=["name", "organization_name"] + (["nipc"] if frappe.get_meta("CRM Organization").has_field("nipc") else []), limit=6):
                 out.append({"tipo": "crm", "doctype": "CRM Organization", "name": o.name, "titulo": o.organization_name or o.name,
                             "sub": _("Empresa do CRM") + (f" · NIPC {o.get('nipc')}" if o.get("nipc") else "")})
         if frappe.has_permission("Contact", "read"):
-            for c in frappe.get_list("Contact", or_filters=[["full_name", "like", like], ["email_id", "like", like], ["company_name", "like", like], ["mobile_no", "like", like]],
-                                     fields=["name", "full_name", "email_id", "company_name"], limit=6):
+            # a equipa e as caixas da casa não são clientes (contactos de utilizadores e das contas de email)
+            casa = {e.lower() for e in frappe.get_all("Email Account", pluck="email_id") if e} | {u.lower() for u in frappe.get_all("User", filters={"user_type": "System User"}, pluck="name")}
+            for c in frappe.get_list("Contact", filters={"user": ["is", "not set"]}, or_filters=[["full_name", "like", like], ["email_id", "like", like], ["company_name", "like", like], ["mobile_no", "like", like]] if q else None, order_by="modified desc",
+                                     fields=["name", "full_name", "email_id", "company_name"], limit=12):
+                if (c.email_id or "").lower() in casa or len([x for x in out if x["doctype"] == "Contact"]) >= 6:
+                    continue
                 out.append({"tipo": "crm", "doctype": "Contact", "name": c.name, "titulo": c.full_name or c.name,
                             "sub": " · ".join(x for x in (_("Contacto do CRM"), c.company_name, c.email_id) if x)})
         if frappe.db.exists("DocType", "CRM Lead") and frappe.has_permission("CRM Lead", "read"):
-            for l in frappe.get_list("CRM Lead", or_filters=[["lead_name", "like", like], ["email", "like", like], ["organization", "like", like]],
+            for l in frappe.get_list("CRM Lead", or_filters=[["lead_name", "like", like], ["email", "like", like], ["organization", "like", like]] if q else None, order_by="modified desc",
                                      filters={"converted": 0}, fields=["name", "lead_name", "organization", "email"], limit=4):
                 out.append({"tipo": "crm", "doctype": "CRM Lead", "name": l.name, "titulo": l.organization or l.lead_name or l.name,
                             "sub": " · ".join(x for x in (_("Lead do CRM"), l.lead_name if l.organization else "", l.email) if x)})

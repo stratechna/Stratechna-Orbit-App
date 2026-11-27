@@ -4481,20 +4481,24 @@ const ClienteProcura = {
     watch(() => props.modelValue, (v) => { if (v !== txt.value) txt.value = v || ""; });
     const posicionar = () => { const r = campo.value?.getBoundingClientRect(); if (!r) return; const w = Math.min(Math.max(r.width, 320), window.innerWidth - 16);
       pos.value = { position: "fixed", left: Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + "px", width: w + "px", top: (r.bottom + 4) + "px", maxHeight: Math.max(200, window.innerHeight - r.bottom - 20) + "px" }; };
-    const procurar = () => { clearTimeout(tq); tq = setTimeout(async () => { ops.value = await api("clientes_venda.procurar", { q: txt.value }).catch(() => []); posicionar(); aberto.value = true; }, 200); };
+    const aProcurar = ref(false); let nP = 0;
+    const procurar = () => { clearTimeout(tq); aProcurar.value = true; posicionar(); aberto.value = true;
+      tq = setTimeout(async () => { const n = ++nP; const r = await api("clientes_venda.procurar", { q: txt.value }).catch(() => []); if (n !== nP) return; ops.value = r; aProcurar.value = false; posicionar(); }, 200); };
     const escolher = async (o) => { aberto.value = false;
       if (o.tipo === "cliente") { txt.value = o.name; emit("update:modelValue", o.name); return; }
       a.value = true; try { const r = await api("clientes_venda.usar", { doctype: o.doctype, name: o.name }, true); txt.value = r.customer; emit("update:modelValue", r.customer); if (r.contacto) emit("contacto", r.contacto); toast("Cliente «" + r.customer + "» pronto"); } finally { a.value = false; } };
     const criar = async () => { a.value = true; try { const r = await api("clientes_venda.usar", { dados: JSON.stringify(novo.value) }, true); txt.value = r.customer; emit("update:modelValue", r.customer); novo.value = null; toast("Cliente criado"); } finally { a.value = false; } };
     const sair = () => setTimeout(() => { aberto.value = false; }, 180);
-    return { txt, ops, aberto, campo, pos, novo, a, procurar, escolher, criar, sair, irErp };
+    return { aProcurar, txt, ops, aberto, campo, pos, novo, a, procurar, escolher, criar, sair, irErp };
   },
   template: `<div class="erp-ligacao">
     <input ref="campo" v-model="txt" :disabled="ro" placeholder="Procurar cliente, empresa ou contacto…" @focus="procurar" @input="procurar" @blur="sair" autocomplete="off">
     <a v-if="modelValue" class="ir" :href="irErp('Customer', modelValue)" title="Abrir o cliente">↗</a>
     <div v-if="aberto" class="cartao erp-ops cli-ops" :style="pos">
+      <div v-if="aProcurar && !ops.length" class="sub" style="padding:8px 10px;font-size:13px">A procurar…</div>
+      <div v-if="!txt && ops.length" class="sub cli-grupo">Clientes e contactos mais recentes — escreva para procurar</div>
       <div v-for="o in ops" :key="o.doctype+o.name" class="linha" @mousedown.prevent="escolher(o)"><div class="cresce"><b>{{ o.titulo }}</b><small>{{ o.sub }}<template v-if="o.tipo==='crm'"> · passa a cliente ao escolher</template></small></div></div>
-      <div v-if="!ops.length" class="sub" style="padding:8px 10px;font-size:13px">{{ txt ? 'Nenhum cliente, empresa ou contacto com «' + txt + '».' : 'Escreva para procurar.' }}</div>
+      <div v-if="!ops.length && !aProcurar" class="sub" style="padding:8px 10px;font-size:13px">{{ txt ? 'Nenhum cliente, empresa ou contacto com «' + txt + '».' : 'Escreva para procurar.' }}</div>
       <div class="linha cli-novo" @mousedown.prevent="novo={nome:txt,tipo:'Empresa',nif:'',email:'',telefone:''}; aberto=false">+ Criar cliente{{ txt ? ' «' + txt + '»' : '' }}</div>
     </div>
     <div v-if="novo" class="modal-fundo" @click.self="novo=null"><div class="modal" style="max-width:460px"><header><b>Novo cliente</b><button class="btn sm" @click="novo=null">Fechar</button></header>
@@ -4584,7 +4588,12 @@ const ErpProposta = {
       try { const r = await apiP("url_produto.ler_com_ia", { url: u, marca: doc.value?.orbit_marca }); const ant = rever.value || {};
         rever.value = { ...r, referencia: r.referencia || ant.referencia, titulo: r.titulo || ant.titulo, imagens: (r.imagens && r.imagens.length ? r.imagens : ant.imagens) || [], caracteristicas: (r.caracteristicas && r.caracteristicas.length ? r.caracteristicas : ant.caracteristicas) || [] }; } finally { procurando.value = false; } };
     const depoisDeCriar = (g) => { acrescentar(g); rever.value = null; toast("Artigo criado e acrescentado"); };
-    watch(q, () => { clearTimeout(tq); if (q.value.trim().length < 2 || eUrl.value) { sug.value = []; if (eUrl.value) tq = setTimeout(lerPagina, 400); return; } tq = setTimeout(async () => { sug.value = await apiP("versoes.sugestoes", { txt: q.value, marca: doc.value?.orbit_marca }) || []; }, 250); });
+    // 27-11-2026: aviso enquanto procura, e só conta a resposta do último texto (as antigas chegavam depois e trocavam a lista)
+    const aSugerir = ref(false); const sugDe = ref(""); let nSug = 0;
+    watch(q, () => { clearTimeout(tq); const t = q.value.trim(); if (t.length < 2 || eUrl.value) { sug.value = []; aSugerir.value = false; if (eUrl.value) tq = setTimeout(lerPagina, 400); return; }
+      aSugerir.value = true; tq = setTimeout(async () => { const n = ++nSug;
+        try { const r = await apiP("versoes.sugestoes", { txt: t, marca: doc.value?.orbit_marca }) || []; if (n === nSug) { sug.value = r; sugDe.value = t; } }
+        finally { if (n === nSug) aSugerir.value = false; } }, 200); });
     const acrescentar = (p) => {
       doc.value.items = doc.value.items || [];
       const n = linhas.value.length;
@@ -4629,7 +4638,7 @@ const ErpProposta = {
     const titulo = computed(() => doc.value?.customer_name || doc.value?.party_name || "Nova proposta");
     const curtas = (l) => caractPares(l.orbit_caracteristicas).slice(0, 6);
     const nCaract = (l) => caractPares(l.orbit_caracteristicas).length;
-    return { fab, rever, eUrl, lerPagina, lerComIa, depoisDeCriar, statusPt, link, doc, novo, sujo, a, aviso, marcas, versoes, ro, linhas, docstatus, moeda, totais, marcaSel, corMarca, q, sug, procurando, acrescentar, internet, remover,
+    return { aSugerir, sugDe, fab, rever, eUrl, lerPagina, lerComIa, depoisDeCriar, statusPt, link, doc, novo, sujo, a, aviso, marcas, versoes, ro, linhas, docstatus, moeda, totais, marcaSel, corMarca, q, sug, procurando, acrescentar, internet, remover,
       gravar, alternativa, submeter, encomenda, pdf, envio, abrirEnvio, enviar, titulo, curtas, nCaract, abertas, irErp, ESTADO_DOC };
   },
   template: `<div v-if="doc" class="pad prop">
@@ -4672,6 +4681,7 @@ const ErpProposta = {
             <label v-if="!eUrl" class="prop-fab"><span class="so-leitor">Marca do produto</span><input v-model="fab" placeholder="Marca do produto (opcional)" autocomplete="off"></label>
             <button v-if="!eUrl" type="button" class="btn" :disabled="procurando" @click="internet">{{ procurando ? 'A procurar…' : 'Procurar na internet · créditos de IA' }}</button>
           </div>
+          <div v-if="aSugerir && !eUrl" class="sub prop-a-procurar"><span class="roda" aria-hidden="true"></span>A procurar «{{ q.trim() }}» nos artigos…</div>
           <div v-if="sug.length" class="prop-sug">
             <button v-for="s in sug" :key="s.item_code" type="button" class="prop-sug-item" @click="acrescentar(s)">
               <span class="prop-sug-img"><img v-if="s.image" :src="s.image" alt=""></span>
@@ -4680,6 +4690,7 @@ const ErpProposta = {
             </button>
           </div>
           <div v-else-if="eUrl" class="sub">{{ procurando ? 'A ler a página do produto…' : 'Endereço colado: lê-se a página (sem custos) e revê-se antes de criar o artigo.' }}</div>
+          <div v-else-if="aSugerir"></div>
           <div v-else-if="q.trim().length>=2" class="sub">Nada nos artigos do ERP com «{{ q }}». Pode procurar na internet ou colar o endereço da página do produto.</div>
           <div v-else class="sub">Procura nos artigos do ERP pela referência (nossa ou do fornecedor), EAN ou nome — com a imagem e as características.</div>
         </section>

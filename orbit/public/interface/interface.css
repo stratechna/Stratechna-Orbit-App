@@ -903,3 +903,8 @@ tr.por-ler td b,tr.por-ler td{font-weight:600}
 .prod-imgs img{max-width:100%;border-radius:8px;object-fit:contain;background:#fff}.prod-imgs>img{width:100%;aspect-ratio:1;border:1px solid var(--borda,#e5e7eb)}
 .prod-mini{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.prod-mini img{width:48px;height:48px;cursor:pointer;border:2px solid transparent}.prod-mini img.ativo{border-color:var(--accent,#b20009)}
 @media (max-width:640px){.prod-rever{grid-template-columns:minmax(0,1fr)}.prod-imgs>img{max-height:220px}}
+/* 27-11-2026: aviso enquanto procura artigos/clientes */
+.prop-a-procurar{display:flex;align-items:center;gap:8px}
+.prop-a-procurar .roda{width:14px;height:14px;border-radius:50%;border:2px solid var(--borda,#d1d5db);border-top-color:var(--accent,#b20009);animation:orbitRoda .7s linear infinite;flex:none}
+@keyframes orbitRoda{to{transform:rotate(360deg)}}
+.cli-grupo{padding:6px 10px 2px;font-size:12px}

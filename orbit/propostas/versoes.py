@@ -84,13 +84,19 @@ def sugestoes(txt: str, marca: str | None = None):
     txt = (txt or "").strip()
     if len(txt) < 2:
         return []
+    # 27-11-2026: na JF (13 370 artigos, tabela de 106 MB) as procuras por campos sem índice liam a tabela toda — 2 a 4,5 s.
+    # Cada consulta usa agora um índice (name, orbit_ref_feed, orbit_ean, orbit_mpn, item_name); nada de upper()/OR que
+    # obrigue a ler a tabela. As palavras do nome procuram-se só no índice de item_name.
     achados = []
     for sql, args in (
-        ("select name from tabItem where name=%s or upper(name)=upper(%s)", (txt, txt)),
+        ("select name from tabItem where name=%s", (txt,)),
         ("select parent from `tabItem Supplier` where parenttype='Item' and supplier_part_no=%s", (txt,)),
         ("select parent from `tabItem Barcode` where barcode=%s", (txt,)),
-        ("select name from tabItem where orbit_ref_feed=%s or orbit_ean=%s or orbit_mpn=%s", (txt, txt, txt)),
-        ("select name from tabItem where name like %s or orbit_ref_feed like %s limit 10", (txt + "%", txt + "%")),
+        ("select name from tabItem where orbit_ref_feed=%s", (txt,)),
+        ("select name from tabItem where orbit_ean=%s", (txt,)),
+        ("select name from tabItem where orbit_mpn=%s", (txt,)),
+        ("select name from tabItem where name like %s limit 10", (txt + "%",)),
+        ("select name from tabItem where orbit_ref_feed like %s limit 10", (txt + "%",)),
     ):
         try:
             achados += [r[0] for r in frappe.db.sql(sql, args)]
@@ -101,8 +107,12 @@ def sugestoes(txt: str, marca: str | None = None):
     palavras = [p for p in re.split(r"\s+", txt) if len(p) >= 2][:5]
     if len(set(achados)) < 10 and palavras:
         cond = " and ".join(["item_name like %s"] * len(palavras))
-        achados += [r[0] for r in frappe.db.sql(f"select name from tabItem where {cond} and disabled=0 limit 20",
-                                                tuple(f"%{p}%" for p in palavras))]
+        args = tuple(f"%{p}%" for p in palavras)
+        try:
+            linhas = frappe.db.sql(f"select name from tabItem force index (item_name) where {cond} limit 40", args)
+        except Exception:
+            linhas = frappe.db.sql(f"select name from tabItem where {cond} limit 40", args)
+        achados += [r[0] for r in linhas]
     vistos, out = set(), []
     lista = _lista_da_marca(marca)
     for codigo in achados:
@@ -113,8 +123,8 @@ def sugestoes(txt: str, marca: str | None = None):
                                                   "orbit_caracteristicas", "orbit_atributos", "orbit_atributos_locais",
                                                   "orbit_fabricante"] if frappe.get_meta("Item").has_field("orbit_atributos")
                                  else ["name", "item_name", "image", "brand", "stock_uom", "disabled"], as_dict=True)
-        if not it:
-            continue
+        if not it or (cint(it.disabled) and codigo != txt):
+            continue   # desactivados só aparecem pela referência exacta
         caract = do_artigo(it)
         out.append({"item_code": it.name, "item_name": it.item_name, "image": it.image, "marca": it.brand,
                     "fabricante": it.get("orbit_fabricante"), "uom": it.stock_uom, "inactivo": cint(it.disabled),
@@ -153,3 +163,14 @@ def enviar(name: str, para: str, assunto: str, mensagem: str = ""):
     make(doctype="Quotation", name=name, recipients=para, subject=(assunto or f"Proposta {name}")[:140], content=corpo,
          send_email=1, print_format="Proposta Orbit", attach_document_print=1, print_letterhead=0)
     return {"ok": True}
+
+
+def garantir_indices():
+    """Índices para a procura de artigos nas propostas (after_migrate). Sem eles a procura lia a tabela toda."""
+    meta = frappe.get_meta("Item")
+    for campo in ("orbit_ean", "orbit_mpn", "orbit_ref_feed"):
+        if meta.has_field(campo):
+            try:
+                frappe.db.add_index("Item", [campo])
+            except Exception:  # noqa: BLE001
+                frappe.log_error(title=f"Orbit: índice de {campo}")
