@@ -158,7 +158,7 @@ def avisar_chat(nome: str):
     quem = (doc.get("profile_name") or "").strip() or "+" + _digitos(doc)
     linha = (doc.message or "").strip().splitlines()[0][:160] if (doc.message or "").strip() else f"({doc.content_type})"
     url = frappe.utils.get_url(FICHA_URL.get(doc.reference_doctype, "/app/whatsapp-message/{}").format(
-        doc.reference_name if doc.reference_doctype in FICHA_URL else doc.name))
+        doc.reference_name if doc.reference_doctype in FICHA_URL else doc.name)).replace("http://", "https://", 1)
     titulo = _titulo(doc.reference_doctype, doc.reference_name) if doc.reference_name else quem
     texto = f"**{quem}** escreveu no WhatsApp:\n> {linha}\n\n[Abrir a ficha]({url})"
     r = requests.post(f"https://{marca._chat_do_tenant()}/api/v1/messages", auth=(cfg["email"], cfg["chave"]),
