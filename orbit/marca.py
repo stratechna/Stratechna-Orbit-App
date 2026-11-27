@@ -138,9 +138,8 @@ ATALHOS = [
     # caminho do próprio site, e abre na lista de campanhas — que é onde o
     # trabalho começa.
     {"nome": "Marketing", "url": "/app/campanha-de-marketing", "simbolo": "marketing", "ordem": 8},
-    # 10-11-2026 (pedido do Vítor): as propostas comerciais (orbit/propostas) com ícone próprio na grelha, ao
-    # lado do CRM — abrem na lista de Orçamentos. Só onde há ERPNext (`precisa`).
-    {"nome": "Propostas", "url": "/app/quotation", "simbolo": "propostas", "ordem": 10, "precisa": "Quotation"},
+    # 27-11-2026 (Vítor): o atalho «Propostas» (lista de Orçamentos no ecrã antigo, /app/quotation) saiu — as
+    # propostas fazem-se nos Orçamentos do ecrã novo, em Operações › Propostas. Apaga-se em RETIRADOS.
     # 24-11-2026 (pedido do Vítor): o portal da Stratechna em todos os tenants e para todas as pessoas — cada
     # utilizador do Orbit é contado (e faturado) no portal; lá dentro cada um vê o que as permissões lhe dão.
     {"nome": "Portal", "url": "https://portal.stratechna.com", "simbolo": "portal", "ordem": 11, "sempre": True},
@@ -148,7 +147,7 @@ ATALHOS = [
 
 
 # Atalhos que já existiram e saíram do Orbit: repor_atalhos apaga-os em cada tenant.
-RETIRADOS = ("Events", "Social")
+RETIRADOS = ("Events", "Social", "Propostas")
 
 
 # As apps com frontend próprio, que já vêm na grelha e só precisam do símbolo
