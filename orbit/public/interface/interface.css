@@ -925,3 +925,6 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .chat-mais{border:0;background:none;color:var(--ink-3,#6b7280);font-size:16px;line-height:1;width:24px;height:24px;border-radius:6px;cursor:pointer;flex:none;padding:0}
 .chat-mais:hover{background:var(--surface-2,#eef1f3);color:var(--ink,#1d2125)}
 .chat-txt a{color:var(--accent,#b20009);text-decoration:underline}
+.chat-menu{position:relative}.chat-menu-ops{position:absolute;right:0;top:26px;z-index:30;padding:4px;min-width:200px;display:flex;flex-direction:column}
+.chat-menu-ops button{border:0;background:none;text-align:left;padding:7px 10px;border-radius:6px;cursor:pointer;color:var(--ink);font:inherit}
+.chat-menu-ops button:hover{background:var(--surface-2,#eef1f3)}.chat-menu-ops button.perigo{color:var(--accent,#b20009)}

@@ -43,7 +43,12 @@ def _api(metodo, caminho, **kw):
         remove_encrypted_password("User", frappe.session.user, CAMPO)
         frappe.db.commit()
         return None
-    r.raise_for_status()
+    if r.status_code >= 400:
+        try:
+            msg = r.json().get("msg")
+        except Exception:  # noqa: BLE001
+            msg = None
+        frappe.throw(msg or f"O Chat respondeu {r.status_code}.")
     return r.json()
 
 
@@ -78,7 +83,11 @@ def conversas():
     subs = _api("GET", "/users/me/subscriptions")
     if subs is None:
         return {"ligado": False}
-    canais = {s["stream_id"]: {"id": s["stream_id"], "nome": s["name"], "cor": s.get("color"), "topicos": {}, "ult": 0}
+    # 27-11-2026: «Arquivar» e «Mudar o nome» só para quem o Chat deixa — administradores da organização e quem criou o canal
+    me = _api("GET", "/users/me") or {}
+    admin = cint(me.get("role") or 400) <= 200
+    canais = {s["stream_id"]: {"id": s["stream_id"], "nome": s["name"], "cor": s.get("color"), "descricao": s.get("description") or "",
+                               "admin": admin or (s.get("creator_id") and s.get("creator_id") == me.get("user_id")), "topicos": {}, "ult": 0}
               for s in subs.get("subscriptions", [])}
     msgs = _api("GET", "/messages", params={"anchor": "newest", "num_before": 300, "num_after": 0, "apply_markdown": "false",
                                             "narrow": "[]"}) or {}
@@ -187,3 +196,27 @@ def criar_canal(nome: str, descricao: str = "", privado: int = 0, pessoas: str =
         frappe.throw("Ligue primeiro o Chat.")
     sid = (_api("GET", "/get_stream_id", params={"stream": nome[:60]}) or {}).get("stream_id")
     return {"ok": True, "id": sid, "nome": nome[:60]}
+
+
+@frappe.whitelist(methods=["POST"])
+def arquivar_canal(canal: str):
+    """«Apagar» no Chat é arquivar o canal (DELETE /streams/{id}); o Chat recusa a quem não pode."""
+    _guarda()
+    if _api("DELETE", f"/streams/{cint(canal)}") is None:
+        frappe.throw("Ligue primeiro o Chat.")
+    return {"ok": True}
+
+
+@frappe.whitelist(methods=["POST"])
+def editar_canal(canal: str, nome: str = None, descricao: str = None):
+    _guarda()
+    dados = {}
+    if nome and nome.strip():
+        dados["new_name"] = nome.strip().lstrip("#").strip()[:60]
+    if descricao is not None:
+        dados["description"] = descricao[:1024]
+    if not dados:
+        return {"ok": True}
+    if _api("PATCH", f"/streams/{cint(canal)}", data=dados) is None:
+        frappe.throw("Ligue primeiro o Chat.")
+    return {"ok": True}

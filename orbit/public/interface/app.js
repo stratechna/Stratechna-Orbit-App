@@ -802,7 +802,12 @@ const Chat = {
   setup() {
     const conv = ref(null); const sel = ref(null); const msgs = ref(null); const texto = ref(""); const pwd = ref(""); const novoTopico = ref("");
     const pessoas = ref([]); const novaDm = ref(""); let rel;
-    const novoCanal = ref(null); const novaConversa = ref(null);
+    const novoCanal = ref(null); const novaConversa = ref(null); const menuCanal = ref(null); const editCanal = ref(null);
+    const arquivarCanal = async (c) => { menuCanal.value = null;
+      if (!confirm("Arquivar o canal #" + c.nome + "? Deixa de aparecer a todos; as mensagens ficam guardadas no Chat.")) return;
+      await apiC("arquivar_canal", { canal: c.id }, true); toast("Canal arquivado"); if (sel.value && sel.value.canal === c.id) sel.value = null; carregarConv(); };
+    const gravarCanal = async () => { const e = editCanal.value; await apiC("editar_canal", { canal: e.id, nome: e.nome, descricao: e.descricao }, true);
+      editCanal.value = null; toast("Canal alterado"); carregarConv(); };
     const criarCanal = async () => { const n = novoCanal.value; if (!n.nome.trim()) return;
       const r = await apiC("criar_canal", { nome: n.nome, descricao: n.descricao, privado: n.privado ? 1 : 0, pessoas: JSON.stringify(n.pessoas) }, true);
       novoCanal.value = null; toast("Canal criado"); await carregarConv(); if (r.id) abrir({ canal: r.id, nomeCanal: r.nome }); };
@@ -833,7 +838,7 @@ const Chat = {
     const hora = (ts) => { const d = new Date(ts * 1000); return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit" }) + " " + d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }); };
     const titulo = computed(() => !sel.value ? "" : sel.value.ids ? sel.value.nome : `${sel.value.nomeCanal}${sel.value.topico ? " › " + sel.value.topico : ""}`);
     return { conv, sel, msgs, texto, pwd, abrir, ligar, enviar, hora, titulo, textoChat, cor, ini, novoTopico, pessoas, novaDm, abrirDm,
-      novoCanal, novaConversa, criarCanal, comecarConversa };
+      novoCanal, novaConversa, criarCanal, comecarConversa, menuCanal, editCanal, arquivarCanal, gravarCanal };
   },
   template: `
   <div class="caixa chat">
@@ -842,7 +847,9 @@ const Chat = {
         <h6 class="chat-h6">Canais<button class="chat-mais" title="Criar canal" aria-label="Criar canal" @click="novoCanal={nome:'',descricao:'',privado:false,pessoas:[]}">+</button></h6>
         <template v-for="c in conv.canais" :key="c.id">
           <div class="chat-canal"><button :class="{ativo: sel && !sel.ids && sel.canal===c.id && !sel.topico}" @click="abrir({canal:c.id, nomeCanal:c.nome})"><span class="ponto" :style="{background:c.cor||'var(--ink-3)'}"></span><span class="txt"># {{ c.nome }}</span><span class="n" v-if="c.por_ler">{{ c.por_ler }}</span></button>
-            <button class="chat-mais" :title="'Nova conversa em #' + c.nome" :aria-label="'Nova conversa em ' + c.nome" @click="novaConversa={canal:c.id, nomeCanal:c.nome, topico:'', texto:''}">+</button></div>
+            <button class="chat-mais" :title="'Nova conversa em #' + c.nome" :aria-label="'Nova conversa em ' + c.nome" @click="novaConversa={canal:c.id, nomeCanal:c.nome, topico:'', texto:''}">+</button>
+            <span v-if="c.admin" class="chat-menu"><button class="chat-mais" :aria-label="'Mais opções de ' + c.nome" @click="menuCanal = menuCanal===c.id ? null : c.id">⋯</button>
+              <div v-if="menuCanal===c.id" class="cartao chat-menu-ops"><button @click="editCanal={id:c.id, nome:c.nome, descricao:c.descricao}; menuCanal=null">Mudar o nome / descrição</button><button class="perigo" @click="arquivarCanal(c)">Arquivar canal</button></div></span></div>
           <button v-for="t in c.topicos" :key="t.nome" class="topico" :class="{ativo: sel && sel.canal===c.id && sel.topico===t.nome}" @click="abrir({canal:c.id, nomeCanal:c.nome, topico:t.nome})"><span class="txt">{{ t.nome }}</span><span class="n" v-if="t.por_ler">{{ t.por_ler }}</span></button>
         </template>
         <h6>Mensagens diretas</h6>
@@ -880,6 +887,10 @@ const Chat = {
         <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" v-model="novoCanal.privado">Privado — só quem for convidado o vê</label>
         <label class="erp-campo"><span>Pessoas (além de si)</span><select multiple v-model="novoCanal.pessoas" style="min-height:120px"><option v-for="p in pessoas" :key="p.id" :value="p.id">{{ p.nome }}</option></select><small class="sub">⌘/Ctrl + clique para escolher várias</small></label>
         <div class="reg-botoes"><button class="btn prim" :disabled="!novoCanal.nome.trim()">Criar canal</button></div></form></div></div>
+    <div v-if="editCanal" class="modal-fundo" @click.self="editCanal=null"><div class="modal" style="max-width:480px"><header><b>Canal #{{ editCanal.nome }}</b><button class="btn sm" @click="editCanal=null">Fechar</button></header>
+      <form class="reg-form" @submit.prevent="gravarCanal"><label class="erp-campo"><span>Nome</span><input v-model="editCanal.nome" required></label>
+        <label class="erp-campo"><span>Descrição</span><input v-model="editCanal.descricao"></label>
+        <div class="reg-botoes"><button class="btn prim">Gravar</button></div></form></div></div>
     <div v-if="novaConversa" class="modal-fundo" @click.self="novaConversa=null"><div class="modal" style="max-width:520px"><header><b>Nova conversa em #{{ novaConversa.nomeCanal }}</b><button class="btn sm" @click="novaConversa=null">Fechar</button></header>
       <form class="reg-form" @submit.prevent="comecarConversa">
         <label class="erp-campo"><span>Tópico<span class="obrig">*</span></span><input v-model="novaConversa.topico" required autofocus maxlength="60" placeholder="ex.: encomenda da Casa X"></label>
