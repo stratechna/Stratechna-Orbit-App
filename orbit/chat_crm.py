@@ -2,7 +2,7 @@
 
 * C1 — um tópico de um canal PÚBLICO ligado a uma ficha (negócio, empresa, contacto, lead) pelo «Ligar ao CRM» do Chat
   do /orbit: tudo o que se diz nesse tópico, também o que já lá estava (D4), entra na actividade da ficha.
-* C2 — a reacção :crm: numa mensagem de um canal público: entra na ficha do tópico ligado ou na ficha cujo email/
+* C2 — a reacção :crm: numa mensagem de um canal público (das últimas 1000): entra na ficha do tópico ligado ou na ficha cujo email/
   nome de empresa aparece no texto; sem nenhuma fica em «Chat por arrumar». Tirar a reacção tira-a do CRM.
 * C3 — só sugestão: ao abrir um tópico não ligado, o /orbit propõe «Ligar este tópico a …?». Nada se liga sozinho.
 
@@ -30,7 +30,7 @@ from frappe.utils import cint, get_datetime, now_datetime
 DT = "Ligacao do Chat"
 FICHAS = {"CRM Deal": "negócio", "CRM Organization": "empresa", "Contact": "contacto", "CRM Lead": "lead"}
 EMOJI = "crm"
-JANELA_H = 48          # reacções, edições e apagamentos lêem-se nas últimas 48 h
+JANELA_MSG = 1000      # reacções :crm: procuram-se nas últimas 1000 mensagens dos canais públicos
 MAX_TOPICO = 5000      # mensagens trazidas ao ligar um tópico (D4: o tópico inteiro)
 
 
@@ -283,10 +283,9 @@ def _ler():
             continue
         lig.canal = publicos[str(lig.canal_id)]
         sincronizar_topico(frappe._dict(lig), completo=not lig.sincronizado)
-    # C2: reacções :crm: nas mensagens dos canais públicos das últimas 48 h
-    desde = (now_datetime() - timedelta(hours=JANELA_H)).timestamp()
-    recentes = [m for m in _mensagens([{"operator": "channels", "operand": "public"}], antes=1000)
-                if m.get("timestamp", 0) >= desde and m.get("type") == "stream"]
+    # C2: reacções :crm: nas últimas 1000 mensagens dos canais públicos, seja qual for a data (reage-se hoje a uma
+    # mensagem de há uma semana; o Chat não deixa pedir «mensagens com esta reacção»)
+    recentes = [m for m in _mensagens([{"operator": "channels", "operand": "public"}], antes=JANELA_MSG) if m.get("type") == "stream"]
     robos = _robos()
     com_reaccao = {m["id"]: m for m in recentes if m.get("sender_id") not in robos
                    and any(r.get("emoji_name") == EMOJI and r.get("user_id") not in robos for r in m.get("reactions") or [])}

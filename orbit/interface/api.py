@@ -1490,10 +1490,26 @@ def criar_registo(objeto: str, dados: str):
             frappe.throw("Escreva o nome da empresa.")
         if frappe.db.exists("CRM Organization", t("organization_name")):
             frappe.throw("Já existe uma empresa com esse nome.")
+        # 27-11-2026 (Vítor): o NIPC logo na criação, verificado (dígito de controlo + VIES); o VIES preenche a morada
+        from orbit.interface import fiscal
+        fis = fiscal.verificar(t("nipc"), colectivo=True) if t("nipc") else None
+        tem_nipc = frappe.get_meta("CRM Organization").has_field("nipc")
+        if fis and fis["numero"] and tem_nipc:
+            outra = frappe.db.get_value("CRM Organization", {"nipc": fis["numero"]}, "name")
+            if outra:
+                frappe.throw(f"Já existe a empresa «{outra}» com o NIPC {fis['numero']}.")
         doc = frappe.get_doc({"doctype": "CRM Organization", "organization_name": t("organization_name"),
                               "website": t("website")})
+        if fis and fis["numero"] and tem_nipc:
+            doc.nipc = fis["numero"]
         doc.insert()
-        return {"doctype": "CRM Organization", "name": doc.name}
+        aviso = (fis or {}).get("aviso") or ""
+        v = (fis or {}).get("vies") or {}
+        if v.get("valido") and v.get("morada"):
+            partes = fiscal.partir_morada(v["morada"])
+            if partes:
+                fiscal.gravar_morada("CRM Organization", doc.name, partes, so_vazios=True)
+        return {"doctype": "CRM Organization", "name": doc.name, "aviso": aviso}
     if objeto == "negocios":
         # 25-11-2026 (Vítor): negócios também se criam directamente no Orbit (os da Stratechna continuam a nascer das
         # propostas do portal — `criar_deal_crm`); fase inicial = a primeira do funil

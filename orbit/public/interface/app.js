@@ -1364,24 +1364,38 @@ const Lista = {
     const CAMPOS_NOVO = {
       leads: [["first_name", "Nome", true], ["last_name", "Apelido"], ["organization", "Empresa"], ["email", "Email", false, "email"], ["mobile_no", "Telemóvel", false, "tel"]],
       contactos: [["first_name", "Nome", true], ["last_name", "Apelido"], ["company_name", "Empresa (já registada)"], ["designation", "Cargo"], ["email", "Email", false, "email"], ["mobile_no", "Telemóvel", false, "tel"]],
-      empresas: [["organization_name", "Nome da empresa", true], ["website", "Site", false, "url"]],
+      empresas: [["nipc", "NIPC", false, "nipc"], ["organization_name", "Nome da empresa", true], ["website", "Site", false, "url"]],
       negocios: [["titulo", "Nome do negócio", true], ["organization", "Empresa (já registada)"], ["email", "Email do contacto", false, "email"], ["deal_value", "Valor (€)", false, "number"], ["expected_closure_date", "Fecho previsto", false, "date"]],
     };
     const NOME_NOVO = { leads: "Novo lead", contactos: "Novo contacto", empresas: "Nova empresa", negocios: "Novo negócio" };
-    const novoReg = ref(null); const aCriar = ref(false);
-    const abrirNovo = () => { novoReg.value = props.objeto === "negocios" && marca.value ? { marca: marca.value } : {}; };
+    const novoReg = ref(null); const aCriar = ref(false); const nipcEst = ref(null);
+    const abrirNovo = () => { nipcEst.value = null; novoReg.value = props.objeto === "negocios" && marca.value ? { marca: marca.value } : {}; };
     const gravarNovo = async () => {
       aCriar.value = true;
       try { const r = await api("criar_registo", { objeto: props.objeto, dados: JSON.stringify(novoReg.value) }, true);
-        novoReg.value = null; toast("Criado."); window.location.hash = link(r.doctype, r.name); }
+        novoReg.value = null; toast(r.aviso || "Criado."); window.location.hash = link(r.doctype, r.name); }
       catch (e) { toast((e && e.message) || "Não foi possível criar."); }
       finally { aCriar.value = false; }
     };
+    // 27-11-2026 (Vítor): NIPC na «Nova empresa» — confirmado no VIES ao sair do campo; o nome e a morada vêm de lá
+    const verNipc = async () => {
+      const n = String(novoReg.value?.nipc || "").trim(); if (!n) { nipcEst.value = null; return; }
+      if (nipcEst.value && nipcEst.value.n === n) return;
+      nipcEst.value = { n, a: true };
+      try { const r = await api("fiscal.consultar", { numero: n, colectivo: 1 });
+        nipcEst.value = { n, ok: true, nome: r.nome, aviso: r.aviso, morada: [r.morada?.address_line1, r.morada?.pincode, r.morada?.city].filter(Boolean).join(", ") };
+        if (r.numero) novoReg.value.nipc = r.numero;
+        if (r.nome && !String(novoReg.value.organization_name || "").trim()) novoReg.value.organization_name = nomeVies(r.nome);
+      } catch (e) { nipcEst.value = { n, erro: (e && e.message) || "Número inválido" }; }
+    };
+    // o VIES dá os nomes em maiúsculas («STRATECHNA, LDA»): passa a «Stratechna, Lda»
+    const nomeVies = (x) => String(x).toLowerCase().replace(/(^|[\s(\-\/.,&"])([a-zà-ÿ])/g, (m, a, b) => a + b.toUpperCase())
+      .replace(/\b(De|Da|Do|Das|Dos|E)\b/g, (m) => m.toLowerCase()).replace(/^./, (c) => c.toUpperCase());
     const maisAc = ref(false);   // 25-11-2026: Importar/Exportar/Duplicados num «⋯» no telemóvel
     return { maisAc, vista, q, linhas, total, mais, pagina, carregar, ordenar, valor, abrir, a, VISTAS, TITULOS, cor, ini, ordem, meta, salvas, salvaAtiva,
       filtros, colunas, novoF, verCols, sel, massa, escolherFixa, escolherSalva, apagarSalva, guardar, campoMeta, rotuloFiltro, juntarFiltro, tirarFiltro,
       alternarCol, todos, opsMassa, opcoesMassa, aplicarMassa, exportar, OPS_TIPO, importar, marca, escolherMarca,
-      CAMPOS_NOVO, NOME_NOVO, novoReg, aCriar, abrirNovo, gravarNovo };
+      CAMPOS_NOVO, NOME_NOVO, novoReg, aCriar, abrirNovo, gravarNovo, nipcEst, verNipc };
   },
   template: `
   <div>
@@ -1445,10 +1459,17 @@ const Lista = {
     <div v-if="novoReg" class="modal-fundo" @click.self="novoReg=null"><div class="modal" style="max-width:520px">
       <header><b>{{ NOME_NOVO[objeto] }}</b><button class="btn sm" @click="novoReg=null">Fechar</button></header>
       <form @submit.prevent="gravarNovo" style="display:flex;flex-direction:column;gap:10px;padding:14px 16px">
-        <label v-for="c in CAMPOS_NOVO[objeto]" :key="c[0]" class="erp-campo"><span>{{ c[1] }}<span v-if="c[2]" class="obrig">*</span></span>
-          <input v-model="novoReg[c[0]]" :type="c[3]||'text'" :required="c[2]" :autofocus="c[2]"></label>
+        <template v-for="c in CAMPOS_NOVO[objeto]" :key="c[0]">
+          <label v-if="c[3]==='nipc'" class="erp-campo"><span>{{ c[1] }} <small class="sub">— confirmado no VIES; o nome e a morada vêm de lá</small></span>
+            <input v-model="novoReg.nipc" inputmode="numeric" autofocus placeholder="ex.: 509 999 999 ou ES B12345678" @blur="verNipc" @keydown.enter.prevent="verNipc" @input="nipcEst=null">
+            <small v-if="nipcEst && nipcEst.a" class="sub">A confirmar no VIES…</small>
+            <small v-else-if="nipcEst && nipcEst.erro" style="color:var(--accent,#b20009)">{{ nipcEst.erro }}</small>
+            <small v-else-if="nipcEst && nipcEst.ok" :style="{color: nipcEst.aviso ? 'var(--ambar,#b45309)' : 'var(--verde,#15803d)'}">{{ nipcEst.aviso || ('✓ Confirmado no VIES' + (nipcEst.nome ? ': ' + nipcEst.nome : '')) }}<template v-if="nipcEst.morada"><br>Morada: {{ nipcEst.morada }}</template></small></label>
+          <label v-else class="erp-campo"><span>{{ c[1] }}<span v-if="c[2]" class="obrig">*</span></span>
+            <input v-model="novoReg[c[0]]" :type="c[3]||'text'" :required="c[2]" :autofocus="c[2] && !CAMPOS_NOVO[objeto].some(x=>x[3]==='nipc')"></label>
+        </template>
         <p class="sub" style="margin:0">O resto completa-se na ficha, que abre a seguir.</p>
-        <div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" class="btn" @click="novoReg=null">Cancelar</button><button type="submit" class="btn prim" :disabled="aCriar">{{ aCriar ? 'A criar…' : 'Criar' }}</button></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" class="btn" @click="novoReg=null">Cancelar</button><button type="submit" class="btn prim" :disabled="aCriar || (nipcEst && (nipcEst.a || nipcEst.erro))">{{ aCriar ? 'A criar…' : 'Criar' }}</button></div>
       </form></div></div>
   </div>`,
 };

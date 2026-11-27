@@ -19,7 +19,7 @@ def get_context(context):
         raise frappe.Redirect
     context.no_cache = 1
     context.csrf_token = frappe.sessions.get_csrf_token()
-    context.versao = "111"
+    context.versao = "112"
     # 23-11-2026: cada app com o seu ícone e nome — no separador e quando é gravada no telemóvel (orbit/interface/push.py)
     from orbit.interface.push import APPS
     app = frappe.form_dict.get("app") or "crm"
