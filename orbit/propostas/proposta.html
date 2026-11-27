@@ -74,6 +74,7 @@
   .op-rodape { background: {{ m.cor }}; padding: 10px 13mm; font-family: "DM Sans", Helvetica, Arial, sans-serif; }
   .op-rodape td { color: {{ m.cor_texto }}; font-size: 8px; line-height: 1.45; vertical-align: top; padding-right: 12px; border: 0; }
   .op-rodape b { font-size: 8.5px; }
+  .op-rodape a { color: {{ m.cor_texto }}; text-decoration: none; }
   .op-rodape .pag { text-align: right; white-space: nowrap; vertical-align: bottom; font-weight: bold; padding-right: 0; }
   /* 27-11-2026 (Vítor): margem em cima em todas as páginas (a 2.ª começava encostada ao topo) e a barra da marca
      no cabeçalho, que o wkhtmltopdf repete em cada página */
@@ -211,9 +212,15 @@
 
 <div id="footer-html">
   <div class="op-rodape"><table><tr>
-    <td style="width:36%"><b>{{ m.nome }}</b><br>{{ (m.morada or "") | replace("\n", "<br>") }}</td>
-    <td style="width:26%">{{ m.empresa }}<br>NIF {{ m.nif }}{% if m.iban %}<br>IBAN {{ m.iban }}{% endif %}</td>
-    <td style="width:28%">{{ m.telefones }}{% if m.email %}<br>{{ m.email }}{% endif %}{% if m.site %}<br>{{ m.site }}{% endif %}</td>
+    {%- set lg = m.ligacoes -%}
+    <td style="width:33%"><b>{% if lg.site_href %}<a href="{{ lg.site_href }}">{{ m.nome }}</a>{% else %}{{ m.nome }}{% endif %}</b><br>
+      {%- if m.morada %}<a href="{{ lg.morada_href }}">{{ m.morada | replace("\n", "<br>") }}</a>{% endif %}</td>
+    <td style="width:25%">{{ m.empresa }}<br>NIF {{ m.nif }}{% if m.iban %}<br>IBAN {{ m.iban }}{% endif %}</td>
+    <td style="width:32%">
+      {%- for t in lg.tels %}<a href="{{ t.href }}">{{ t.texto }}</a>{{ " · " if not loop.last else "" }}{% endfor %}
+      {%- if lg.whatsapp %}<br>WhatsApp <a href="{{ lg.whatsapp.href }}">{{ lg.whatsapp.texto }}</a>{% endif %}
+      {%- if m.email %}<br><a href="{{ lg.email_href }}">{{ m.email }}</a>{% endif %}
+      {%- if m.site %}<br><a href="{{ lg.site_href }}">{{ lg.site_texto }}</a>{% endif %}</td>
     <td class="pag"><span class="page"></span> / <span class="topage"></span></td>
   </tr></table></div>
   <script>

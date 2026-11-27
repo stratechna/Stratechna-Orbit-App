@@ -3,6 +3,9 @@
 O Jinja fica só com a forma; as contas e as regras (numeração 1, 1A, 2…; transporte por linha; IVA por taxa)
 vivem aqui, onde se testam.
 """
+import re
+from urllib.parse import quote_plus
+
 import frappe
 from frappe.utils import cint, flt, formatdate
 
@@ -75,6 +78,41 @@ def _escurecer(cor: str, fator: float = 0.62) -> str:
     return "#%02x%02x%02x" % (int(r * fator), int(g * fator), int(b * fator))
 
 
+def _digitos(numero):
+    """9 dígitos portugueses passam a +351; devolve só os algarismos com o indicativo."""
+    d = re.sub(r"\D", "", numero or "")
+    if len(d) == 9 and d[0] in "923":
+        d = "351" + d
+    return d
+
+
+def _fone(numero):
+    d = _digitos(numero)
+    if d.startswith("351") and len(d) == 12:
+        return f"+351 {d[3:6]} {d[6:9]} {d[9:]}"
+    return (numero or "").strip()
+
+
+def _contactos(m, email, site, morada):
+    """27-11-2026 (Vítor): no rodapé todos os dados com ligação e o WhatsApp da marca à parte."""
+    wa = _digitos(m.get("orbit_whatsapp")) if m else ""
+    tels = []
+    for t in re.split(r"[·,;/|]+", (m.get("orbit_telefones") if m else None) or ""):
+        d = _digitos(t)
+        if len(d) >= 9 and d != wa and d not in [x["d"] for x in tels]:
+            tels.append({"d": d, "texto": _fone(t), "href": "tel:+" + d})
+    s = (site or "").strip()
+    return {
+        "tels": tels,
+        "whatsapp": {"texto": _fone(wa), "href": "https://wa.me/" + wa} if wa else None,
+        "email_href": ("mailto:" + email) if email else "",
+        "site_href": (s if s.startswith("http") else "https://" + s) if s else "",
+        "site_texto": re.sub(r"^https?://(www\.)?", "", s).rstrip("/"),
+        "morada_href": ("https://www.google.com/maps/search/?api=1&query=" + quote_plus(" ".join((morada or "").split())))
+                       if morada else "",
+    }
+
+
 def _marca(doc):
     nome = doc.get("orbit_marca")
     m = frappe.get_cached_doc("Brand", nome) if nome and frappe.db.exists("Brand", nome) else None
@@ -95,6 +133,8 @@ def _marca(doc):
         "site": (m.get("orbit_site") if m else None) or "",
         "iban": (m.get("orbit_iban") if m else None) or "",
         "condicoes": (m.get("orbit_condicoes") if m else None) or "",
+        "ligacoes": _contactos(m, (m.get("orbit_email") if m else None) or (empresa.email if empresa else ""),
+                               (m.get("orbit_site") if m else None) or "", (m.get("orbit_morada") if m else None) or ""),
     })
 
 
