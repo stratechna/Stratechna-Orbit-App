@@ -4733,6 +4733,8 @@ const ProdutoRever = {
     <div class="reg-form">
       <div v-if="!p.lido" class="aviso" style="margin:0">Não foi possível ler a página ({{ (p.falta||[]).join(', ') }}).</div>
       <div v-else-if="(p.falta||[]).length && !p.ia" class="aviso" style="margin:0">A página não diz: {{ p.falta.join(', ') }}. Pode completar à mão ou pedir à IA.</div>
+      <div v-if="p.traduzido" class="sub" style="font-size:12px">Traduzido para português pela IA — reveja antes de criar.</div>
+      <div v-if="p.aviso_traducao" class="aviso" style="margin:0">Não foi possível traduzir ({{ p.aviso_traducao }}). Os dados estão na língua da página.</div>
       <div v-if="p.existente" class="aviso" style="margin:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">Já existe o artigo «{{ p.existente.titulo }}» com esta referência. <button class="btn sm prim" @click="usarExistente">Usar o que existe</button></div>
       <div class="prod-rever"><div class="prod-imgs"><img v-if="d.imagem" :src="d.imagem" alt=""><div class="prod-mini"><img v-for="i in p.imagens||[]" :key="i" :src="i" :class="{ativo: i===d.imagem}" @click="d.imagem=i" alt=""></div></div>
         <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
@@ -4792,7 +4794,7 @@ const ErpProposta = {
     watch(() => assin(), (s) => { if (s === ultima) return; ultima = s; clearTimeout(tr0); tr0 = setTimeout(recalcular, 450); });
     // procurar produtos: ERP primeiro; internet só a pedido
     const rever = ref(null); const eUrl = computed(() => /^https?:\/\//i.test(q.value.trim()));
-    const lerPagina = async () => { procurando.value = true; try { rever.value = await apiP("url_produto.ler", { url: q.value.trim() }); } finally { procurando.value = false; } };
+    const lerPagina = async () => { procurando.value = true; try { rever.value = await apiP("url_produto.ler_traduzido", { url: q.value.trim(), marca: doc.value?.orbit_marca }); } finally { procurando.value = false; } };
     const lerComIa = async () => { const u = (rever.value && rever.value.url) || q.value.trim(); if (!confirm("A IA lê a página e preenche o que falta. Gasta créditos de IA da conta.")) return; procurando.value = true;
       try { const r = await apiP("url_produto.ler_com_ia", { url: u, marca: doc.value?.orbit_marca }); const ant = rever.value || {};
         rever.value = { ...r, referencia: r.referencia || ant.referencia, titulo: r.titulo || ant.titulo, imagens: (r.imagens && r.imagens.length ? r.imagens : ant.imagens) || [], caracteristicas: (r.caracteristicas && r.caracteristicas.length ? r.caracteristicas : ant.caracteristicas) || [] }; } finally { procurando.value = false; } };
@@ -4907,7 +4909,7 @@ const ErpProposta = {
               <span v-if="s.preco" class="prop-sug-preco">{{ moeda(s.preco) }}</span>
             </button>
           </div>
-          <div v-else-if="eUrl" class="sub">{{ procurando ? 'A ler a página do produto…' : 'Endereço colado: lê-se a página (sem custos) e revê-se antes de criar o artigo.' }}</div>
+          <div v-else-if="eUrl" class="sub">{{ procurando ? 'A ler a página do produto…' : 'Endereço colado: lê-se a página e revê-se antes de criar o artigo; se não estiver em português, a IA traduz (créditos).' }}</div>
           <div v-else-if="aSugerir"></div>
           <div v-else-if="q.trim().length>=2" class="sub">Nada nos artigos do ERP com «{{ q }}». Pode procurar na internet ou colar o endereço da página do produto.</div>
           <div v-else class="sub">Procura nos artigos do ERP pela referência (nossa ou do fornecedor), EAN ou nome — com a imagem e as características.</div>

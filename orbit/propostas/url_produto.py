@@ -100,11 +100,64 @@ def ler(url: str):
     return res
 
 
+# 27-11-2026 (Vítor): o produto que vem de fora (página, EAN e marca, internet) chega sempre em português de Portugal
+PT = (" Responde sempre em português de Portugal (Acordo Ortográfico): traduz o título, a descrição e os nomes e valores"
+      " das características; mantém a referência, o EAN, a marca, os modelos e as medidas tal como estão.")
+_PT_PALAVRAS = {"com", "não", "aço", "em", "uma", "um", "porta", "portas", "madeira", "largura", "altura", "profundidade",
+                "cadeira", "prateleiras", "prateleira", "do", "da", "dos", "das", "ao", "às", "pela", "pelo", "potência",
+                "capacidade", "gaveta", "gavetas", "frigorífico", "forno", "bancada", "também", "você"}
+# palavras próprias do castelhano, inglês, francês e alemão (nunca «de», que é comum)
+_OUTRAS = {"con", "y", "el", "la", "los", "las", "del", "sin", "silla", "madera", "ancho", "fondo", "alto", "acero", "inoxidable",
+           "puerta", "puertas", "cajón", "cajones", "potencia", "capacidad", "nevera", "horno", "encimera", "estante", "estantes",
+           "the", "with", "and", "of", "width", "height", "depth", "weight", "stainless", "steel", "door", "doors", "drawer",
+           "avec", "et", "le", "les", "largeur", "hauteur", "profondeur", "poids", "porte", "mit", "und", "der", "die", "das_",
+           "breite", "höhe", "tiefe", "gewicht"}
+
+
+def _em_portugues(*textos):
+    t = " ".join(x for x in textos if x).lower()
+    if not t.strip():
+        return True
+    palavras = re.findall(r"[a-zà-ÿ]+", t)
+    pt = sum(1 for w in palavras if w in _PT_PALAVRAS) + len(re.findall(r"ção|ções|ões|ã|õ", t))
+    fora = sum(1 for w in palavras if w in _OUTRAS) + len(re.findall(r"ñ|ción|ciones", t))
+    return pt > fora or (pt == fora == 0)
+
+
+def traduzir(p: dict, marca: str = None) -> dict:
+    """Traduz título, descrição e características pela IA da conta (créditos), sem pesquisar nem inventar."""
+    dados = {"titulo": p.get("titulo") or "", "descricao": p.get("descricao") or "",
+             "caracteristicas": [list(x) if isinstance(x, (list, tuple)) else ["", x] for x in (p.get("caracteristicas") or [])]}
+    t = _portal("internet", "Não pesquises na internet: traduz apenas os dados deste produto e devolve-os no mesmo formato."
+                + PT + " Dados: " + json.dumps(dados, ensure_ascii=False), marca) or {}
+    if t.get("titulo") or t.get("descricao"):
+        p = dict(p)
+        for k in ("titulo", "descricao", "caracteristicas"):
+            if t.get(k):
+                p[k] = t[k]
+        p["traduzido"] = 1
+    return p
+
+
+@frappe.whitelist()
+def ler_traduzido(url: str, marca: str = None):
+    """Lê a página (sem custos) e, se não estiver em português, traduz pela IA da conta."""
+    p = ler(url)
+    if p.get("lido") and not _em_portugues(p.get("titulo"), p.get("descricao"),
+                                            " ".join(" ".join(map(str, x)) if isinstance(x, (list, tuple)) else str(x) for x in p.get("caracteristicas") or [])):
+        try:
+            p = traduzir(p, marca)
+        except Exception as e:  # noqa: BLE001 — sem créditos ou falha: fica no original, com aviso
+            frappe.local.message_log = []   # o aviso vai no resultado, não como erro
+            p["aviso_traducao"] = "a conta não tem créditos de IA" if "crédito" in str(e) else (str(e)[:200] or "falha da IA")
+    return p
+
+
 @frappe.whitelist()
 def ler_com_ia(url: str, marca: str = None):
     """A IA da conta lê a página (créditos de IA), para o que a página não declara."""
     frappe.has_permission("Quotation", "create", throw=True)
-    p = _portal("internet", f"Lê esta página de produto e tira os dados: {url}", marca) or {}
+    p = _portal("internet", f"Lê esta página de produto e tira os dados: {url}." + PT, marca) or {}
     if not p:
         return {"url": url, "lido": False, "falta": ["a IA não conseguiu ler a página"]}
     return {"url": url, "lido": True, "titulo": p.get("titulo") or "", "descricao": p.get("descricao") or "",

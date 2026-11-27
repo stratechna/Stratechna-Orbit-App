@@ -207,6 +207,9 @@ def procurar_internet(referencia: str, marca: str | None = None, fabricante: str
     fab = (fabricante or "").strip()
     alvo = (f"EAN {ref}" if ref.isdigit() and 8 <= len(ref) <= 14 else f"referência {ref}")
     pedido = f"Produto da marca {fab}, {alvo}" if fab else ref
+    # 27-11-2026 (Vítor): o que vem da internet chega sempre em português de Portugal
+    pedido += (". Responde em português de Portugal (Acordo Ortográfico): traduz o título, a descrição e as características;"
+               " mantém a referência, o EAN, a marca, os modelos e as medidas tal como estão.")
     produto = _portal("internet", pedido, marca)
     if produto:
         produto["a_confirmar"] = 1
