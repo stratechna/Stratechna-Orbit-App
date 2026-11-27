@@ -77,8 +77,11 @@
   .op-rodape .pag { text-align: right; white-space: nowrap; vertical-align: bottom; font-weight: bold; padding-right: 0; }
   /* 27-11-2026 (Vítor): margem em cima em todas as páginas (a 2.ª começava encostada ao topo) e a barra da marca
      no cabeçalho, que o wkhtmltopdf repete em cada página */
-  .print-format { padding: 0 !important; margin-top: 17mm; margin-bottom: 30mm; margin-left: 0; margin-right: 0; }
+  .print-format { padding: 0 !important; margin-top: 17mm; margin-bottom: 34mm; }
   .op-fim { page-break-inside: avoid; }
+  /* o cabeçalho e o rodapé são documentos à parte com os mesmos estilos (o corpo deles tem onload="subst()"):
+     aí as margens da página não se aplicam, senão empurram a barra e o rodapé para fora da folha */
+  body[onload] .print-format { margin-top: 0 !important; margin-bottom: 0 !important; }
 </style>
 
 <div class="orbit-prop">
