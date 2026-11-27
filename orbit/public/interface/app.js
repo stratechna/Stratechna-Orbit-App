@@ -4444,9 +4444,9 @@ const ErpEmitir = {
                       <select v-model="l.batch_no" :disabled="ro" @change="l.use_serial_batch_fields=1"><option value="">— escolher —</option><option v-for="b in sl[l.item_code].lotes" :key="b.lote" :value="b.lote">{{ b.lote }}{{ b.validade ? ' · val. ' + b.validade : '' }}</option></select></label></div>
                     <div v-if="sl[l.item_code] && sl[l.item_code].serie" class="sl-campo"><label>N.º de série <span class="sub">({{ nSeries(l) }} de {{ l.qty || 0 }})</span><span class="obrig">*</span>
                       <textarea rows="2" v-model="l.serial_no" :disabled="ro" @input="l.use_serial_batch_fields=1" :placeholder="'Um por linha' + (sl[l.item_code].series.length ? ' — disponíveis: ' + sl[l.item_code].series.slice(0,5).join(', ') + (sl[l.item_code].series.length>5?'…':'') : '')"></textarea></label></div></td>
-                  <td style="text-align:right"><input type="number" min="0" step="any" v-model.number="l.qty" :disabled="ro" style="width:72px;text-align:right"></td>
-                  <td style="text-align:right"><input type="number" min="0" step="0.01" v-model.number="l.rate" :disabled="ro" style="width:96px;text-align:right"></td>
-                  <td v-if="fatura" style="text-align:right"><input type="number" min="0" max="100" step="0.01" v-model.number="l.discount_percentage" :disabled="ro" style="width:64px;text-align:right"></td>
+                  <td style="text-align:right"><input type="number" min="0" step="any" v-model.number="l.qty" :disabled="ro" style="width:90px;text-align:right"></td>
+                  <td style="text-align:right"><input type="number" min="0" step="0.01" v-model.number="l.rate" :disabled="ro" style="width:118px;text-align:right"></td>
+                  <td v-if="fatura" style="text-align:right"><input type="number" min="0" max="100" step="0.01" v-model.number="l.discount_percentage" :disabled="ro" style="width:80px;text-align:right"></td>
                   <td class="sub" style="font-size:12px">{{ l.warehouse || '—' }}</td>
                   <td style="text-align:right;font-weight:600">{{ moeda(l.amount) }}</td>
                   <td v-if="!ro"><button type="button" class="btn sm" @click="remover(l)" aria-label="Remover linha">×</button></td>
