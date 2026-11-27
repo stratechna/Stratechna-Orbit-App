@@ -122,7 +122,6 @@
   </div>{% endif %}
 
   {% for l in p.linhas %}
-    {% if loop.last %}<div class="op-fim">{% endif %}
     {% if l.servico %}
     <table class="op-serv"><tr>
       <td>
@@ -160,8 +159,8 @@
     </tr></table>
     {% endif %}
   {% endfor %}
-  {% if not p.linhas %}<div class="op-fim">{% endif %}
-
+  {# 27-11-2026 (Vítor): os produtos enchem as páginas; os totais, as condições e as assinaturas vão sempre juntos #}
+  <div class="op-fim">
   {% if p.imprimir_total %}
   <table class="op-totais">
     <tr class="sub"><td>Equipamentos e serviços</td><td class="v">{{ p.equipamentos }}</td></tr>
