@@ -202,6 +202,9 @@ override_whitelisted_methods = {
     "frappe.core.doctype.user.user.update_password": "orbit.palavra_passe.update_password",
     # 05-11-2026: «só para mim» — as actividades do CRM sem os emails e notas privados de outra pessoa
     "crm.api.activities.get_activities": "orbit.emails_crm.filtrar_actividades",
+    # 27-11-2026 (docs/PLANO-WHATSAPP-ORBIT.md D3): o webhook do frappe_whatsapp não verifica a
+    # assinatura da Meta; o mesmo endereço passa a exigir o X-Hub-Signature-256.
+    "frappe_whatsapp.utils.webhook.webhook": "orbit.whatsapp.webhook",
 }
 
 # 05-11-2026: os emails e notas «só para mim» (orbit_privado_de) ficam fora das listas, da pesquisa e da
