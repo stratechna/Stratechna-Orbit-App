@@ -116,6 +116,9 @@ add_to_apps_screen = []
 
 # Contas só de leitura (demonstrações): inerte sem `orbit_funcao_so_leitura` no site_config — ver so_leitura.py
 doc_events = {
+    # 27-11-2026 (docs/PLANO-WHATSAPP-ORBIT.md W3): a mensagem na ficha certa pelo número nacional, lead para números
+    # novos e aviso no canal «WhatsApp» do Chat. Só existe nos tenants com o frappe_whatsapp.
+    "WhatsApp Message": {"validate": "orbit.whatsapp.ligar_ficha", "after_insert": "orbit.whatsapp.mensagem_nova"},
     "*": {e: "orbit.so_leitura.guarda" for e in
           ("before_insert", "validate", "on_trash", "before_submit", "before_cancel", "before_update_after_submit")},
     # 16-10-2026: utilizadores contratados (orbit_utilizadores_max no site_config, escrito pelo portal)
