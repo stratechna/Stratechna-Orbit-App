@@ -8,7 +8,7 @@
   .orbit-prop, .orbit-prop td, .orbit-prop th { font-family: "DM Sans", "Helvetica Neue", Helvetica, Arial, sans-serif; color: #1d2125; }
   .orbit-prop { font-size: 10.5px; line-height: 1.45; padding: 0 13mm; }
   .orbit-prop table { width: 100%; border-collapse: collapse; }
-  .op-barra { height: 7px; background: {{ m.cor }}; margin: 0 -13mm 16px; }
+  .op-barra { height: 7px; background: {{ m.cor }}; }
   .op-cab td { vertical-align: bottom; padding: 0 0 14px; }
   .op-logo { max-height: 64px; max-width: 260px; }
   .op-nome { font-size: 26px; font-weight: bold; color: {{ m.cor_letra }}; }
@@ -75,11 +75,13 @@
   .op-rodape td { color: {{ m.cor_texto }}; font-size: 8px; line-height: 1.45; vertical-align: top; padding-right: 12px; border: 0; }
   .op-rodape b { font-size: 8.5px; }
   .op-rodape .pag { text-align: right; white-space: nowrap; vertical-align: bottom; font-weight: bold; padding-right: 0; }
-  .print-format { padding: 0 !important; }
+  /* 27-11-2026 (Vítor): margem em cima em todas as páginas (a 2.ª começava encostada ao topo) e a barra da marca
+     no cabeçalho, que o wkhtmltopdf repete em cada página */
+  .print-format { padding: 0 !important; margin-top: 17mm; margin-bottom: 30mm; margin-left: 0; margin-right: 0; }
+  .op-fim { page-break-inside: avoid; }
 </style>
 
 <div class="orbit-prop">
-  <div class="op-barra"></div>
   <table class="op-cab"><tr>
     <td>{% if m.logo %}<img class="op-logo" src="{{ m.logo }}">{% else %}<span class="op-nome">{{ m.nome }}</span>{% endif %}</td>
     <td class="op-doc">
@@ -117,6 +119,7 @@
   </div>{% endif %}
 
   {% for l in p.linhas %}
+    {% if loop.last %}<div class="op-fim">{% endif %}
     {% if l.servico %}
     <table class="op-serv"><tr>
       <td>
@@ -154,6 +157,7 @@
     </tr></table>
     {% endif %}
   {% endfor %}
+  {% if not p.linhas %}<div class="op-fim">{% endif %}
 
   {% if p.imprimir_total %}
   <table class="op-totais">
@@ -191,6 +195,8 @@
     <td><div>Aceite pelo cliente (data, nome e assinatura)</div></td>
   </tr></table>
 
+  </div>{# fim de .op-fim #}
+
   {% if p.anexar %}
   <div class="op-anexo">
     <h2>Condições comerciais — {{ m.nome }}</h2>
@@ -198,6 +204,8 @@
   </div>
   {% endif %}
 </div>
+
+<div id="header-html"><div class="op-barra"></div></div>
 
 <div id="footer-html">
   <div class="op-rodape"><table><tr>
