@@ -916,3 +916,6 @@ tr.por-ler td b,tr.por-ler td{font-weight:600}
 .prop-linha-mais{padding:10px 14px 14px;border-top:1px solid var(--borda,#e5e7eb)}
 .sl-campo{margin-top:6px}.sl-campo label{display:flex;flex-direction:column;gap:3px;font-size:12px}.sl-campo select,.sl-campo textarea{width:100%;min-width:160px;box-sizing:border-box}
 .prop-mais-grelha .prop-mais-largo{grid-column:1/-1}
+/* 27-11-2026 (Vítor): os algarismos ficavam encostados às setas de subir/descer — espaço entre os dois em todos os campos numéricos */
+input[type=number]{padding-right:6px}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{margin-left:8px}
