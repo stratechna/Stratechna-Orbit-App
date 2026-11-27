@@ -9,6 +9,7 @@
   .orbit-prop { font-size: 10.5px; line-height: 1.45; padding: 0 13mm; }
   .orbit-prop table { width: 100%; border-collapse: collapse; }
   .op-barra { height: 7px; background: {{ m.cor }}; }
+  .op-cabeca .op-barra { margin: 0 -13mm 12px; }
   .op-cab td { vertical-align: bottom; padding: 0 0 14px; }
   .op-logo { max-height: 64px; max-width: 260px; }
   .op-nome { font-size: 26px; font-weight: bold; color: {{ m.cor_letra }}; }
@@ -79,6 +80,7 @@
   .op-cg p { margin: 0 0 2px; }
   .op-cg ul { margin: 0 0 2px 9px; padding: 0; }
   .op-cg li { margin: 0; }
+  .op-rodape-folga { height: 5mm; background: #fff; }
   .op-rodape { background: {{ m.cor }}; padding: 10px 13mm; font-family: "DM Sans", Helvetica, Arial, sans-serif; }
   .op-rodape td { color: {{ m.cor_texto }}; font-size: 8px; line-height: 1.45; vertical-align: top; padding-right: 12px; border: 0; }
   .op-rodape b { font-size: 8.5px; }
@@ -86,22 +88,17 @@
   .op-rodape .pag { text-align: right; white-space: nowrap; vertical-align: bottom; font-weight: bold; padding-right: 0; }
   /* 27-11-2026 (Vítor): margem em cima em todas as páginas (a 2.ª começava encostada ao topo) e a barra da marca
      no cabeçalho, que o wkhtmltopdf repete em cada página */
-  .print-format { padding: 0 !important; margin-top: 17mm; margin-bottom: 34mm; }
+  .print-format { padding: 0 !important; margin-top: 40mm; margin-bottom: 45mm; }
   .op-fim { page-break-inside: avoid; }
+  /* 27-11-2026 (Vítor): o último produto fecha com o traço azul, que fica sempre com ele (nunca passa sozinho à página seguinte) */
+  .op-prod.ultimo, .op-serv.ultimo { border-bottom: 3px solid {{ m.cor }}; }
+  .op-prod.ultimo > tbody > tr > td, .op-prod.ultimo > tr > td, .op-serv.ultimo > tbody > tr > td, .op-serv.ultimo > tr > td { padding-bottom: 12px; }
   /* o cabeçalho e o rodapé são documentos à parte com os mesmos estilos (o corpo deles tem onload="subst()"):
      aí as margens da página não se aplicam, senão empurram a barra e o rodapé para fora da folha */
   body[onload] .print-format { margin-top: 0 !important; margin-bottom: 0 !important; }
 </style>
 
 <div class="orbit-prop">
-  <table class="op-cab"><tr>
-    <td>{% if m.logo %}<img class="op-logo" src="{{ m.logo }}">{% else %}<span class="op-nome">{{ m.nome }}</span>{% endif %}</td>
-    <td class="op-doc">
-      <div class="op-tipo">PROPOSTA COMERCIAL</div>
-      <div class="op-num">{{ doc.name }}{% if p.versao %} · versão {{ p.versao }}{% endif %}</div>
-      <div class="op-data">{{ p.data }}{% if p.valido_ate %} · válida até {{ p.valido_ate }}{% endif %}</div>
-    </td>
-  </tr></table>
 
   <table class="op-blocos"><tr>
     <td class="b">
@@ -132,7 +129,7 @@
 
   {% for l in p.linhas %}
     {% if l.servico %}
-    <table class="op-serv"><tr>
+    <table class="op-serv{% if loop.last %} ultimo{% endif %}"><tr>
       <td>
         <div class="op-ref">{{ l.numero }} · {{ "Serviço" if l.referencia in ("MONTAGEM", "TRANSPORTE") else "Ref. " ~ l.referencia }}</div>
         <div class="op-desig">{{ l.nome }}</div>
@@ -142,7 +139,7 @@
       <td class="op-preco"><div><span class="q">{{ l.qtd }} × {{ l.preco }}</span><br><span class="t">{{ l.total }}</span>{% if p.mostrar_iva %}<br><span class="i">+ IVA {{ l.iva }}</span>{% endif %}</div></td>
     </tr></table>
     {% else %}
-    <table class="op-prod"><tr>
+    <table class="op-prod{% if loop.last %} ultimo{% endif %}"><tr>
       <td class="op-foto">{% if l.imagem %}<div><img src="{{ l.imagem }}"></div>{% endif %}</td>
       <td>
         <table><tr>
@@ -217,9 +214,20 @@
   {% endif %}
 </div>
 
-<div id="header-html"><div class="op-barra"></div></div>
+{# 27-11-2026 (Vítor): o cabeçalho — barra, logótipo e identificação da proposta — repete-se em todas as páginas #}
+<div id="header-html"><div class="orbit-prop op-cabeca"><div class="op-barra"></div>
+  <table class="op-cab"><tr>
+    <td>{% if m.logo %}<img class="op-logo" src="{{ m.logo }}">{% else %}<span class="op-nome">{{ m.nome }}</span>{% endif %}</td>
+    <td class="op-doc">
+      <div class="op-tipo">PROPOSTA COMERCIAL</div>
+      <div class="op-num">{{ doc.name }}{% if p.versao %} · versão {{ p.versao }}{% endif %}</div>
+      <div class="op-data">{{ p.data }}{% if p.valido_ate %} · válida até {{ p.valido_ate }}{% endif %}</div>
+    </td>
+  </tr></table>
+</div></div>
 
 <div id="footer-html">
+  {# 27-11-2026 (Vítor): o rodapé cortava-se na impressão — fica cerca de 5 mm acima do fundo da folha #}
   <div class="op-rodape"><table><tr>
     {%- set lg = m.ligacoes -%}
     <td style="width:33%"><b>{% if lg.site_href %}<a href="{{ lg.site_href }}">{{ m.nome }}</a>{% else %}{{ m.nome }}{% endif %}</b><br>
@@ -232,6 +240,7 @@
       {%- if m.site %}<br><a href="{{ lg.site_href }}">{{ lg.site_texto }}</a>{% endif %}</td>
     <td class="pag"><span class="page"></span> / <span class="topage"></span></td>
   </tr></table></div>
+  <div class="op-rodape-folga"></div>
   <script>
     /* Páginas «02 / 07» (regra da casa): o subst() do Frappe escreve os números; este embrulho só os completa. */
     (function () {
