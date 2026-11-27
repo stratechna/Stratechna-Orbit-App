@@ -4481,7 +4481,7 @@ const ErpEmitir = {
 
 // ── Receber pagamento (recibo) ─────────────────────────────────────────────────────────────────────────────
 const ErpRecibo = {
-  components: { ErpLigacao },
+  components: { ErpLigacao, ErpRestantes },
   props: ["name"],
   setup(props) {
     const novo = props.name === "novo";
@@ -4561,6 +4561,7 @@ const ErpRecibo = {
         <div class="prop-principal"><section class="cartao"><h2 style="font-size:15px;margin:0 0 8px">Faturas liquidadas</h2>
           <a v-for="r in doc.references || []" :key="r.name" class="prop-tot" :href="irErp(r.reference_doctype, r.reference_name)" style="text-decoration:none;color:inherit"><span>{{ r.reference_name }}</span><span>{{ moeda(r.allocated_amount) }}</span></a>
           <div class="prop-tot" style="border-top:2px solid var(--ink);padding-top:8px"><b>Recebido</b><b>{{ moeda(doc.paid_amount) }}</b></div></section></div>
+      <ErpRestantes doctype="Payment Entry" :doc="doc" :ro="true" :novo="false" :excluir="['references']" style="margin-top:14px"/>
         <aside class="prop-lado"><section class="cartao"><h2>Documentos associados</h2>
           <div v-if="!assoc.length" class="sub">Nenhum.</div>
           <a v-for="x in assoc" :key="x.doctype+x.name" :href="irErp(x.doctype, x.name)" class="prop-tot" style="text-decoration:none;color:inherit"><span><b>{{ x.tipo }}</b> {{ x.name }}</span><span class="etq">{{ statusPt(x.estado) }}</span></a></section>
