@@ -176,7 +176,7 @@ doc_events = {
     "Supplier": {"on_update": "orbit.faturacao.sincronizacao.ao_gravar_fornecedor"},
     # 10-11-2026: marca → série/timbre/textos, linhas de transporte e montagem, IVA (orbit/propostas/regras.py)
     # 10-11-2026: a marca do artigo pelo prefixo da referência (A… JFusados, N… Arnox) → armazém da marca
-    "Item": {"before_validate": "orbit.marcas_artigos.antes_de_validar_artigo"},
+    "Item": {"before_validate": ["orbit.marcas_artigos.antes_de_validar_artigo", "orbit.inventario.manuais.antes_de_validar"]},
     "Quotation": {"before_insert": ["orbit.propostas.regras.antes_de_inserir", "orbit.propostas.negocio.antes_de_inserir"],
                   "before_validate": "orbit.propostas.regras.antes_de_validar",
                   # 25-11-2026: o orçamento abre ou liga a um negócio do CRM e o negócio segue-o

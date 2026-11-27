@@ -15,6 +15,7 @@ decide (o inventário é o mestre):
 | `peso`, `comprimento`, `largura`, `altura` | artigo |
 | `imagem_url`, `imagens_secundarias` | `orbit_imagens` |
 | `estado_publicacao` | artigo desactivado → rascunho |
+| `titulo`, `descricao`, `descricao_curta`, `categorias_loja`(+ids), `tags_loja` | a ficha, quando mudados à mão no Orbit (`orbit_campos_manuais`, manuais.py) |
 
 Quando o valor do Orbit é igual em significado ao da loja (5 e 5.0, «» e None), fica o original: a assinatura de
 preço/stock da Sync3 compara texto, e uma diferença só de forma faria reenviar o catálogo inteiro.
@@ -51,7 +52,8 @@ def _carregar(canal) -> dict:
     itens = frappe.get_all("Item", filters={"orbit_chave_importador": ["is", "set"]},
                            fields=["name", "disabled", "orbit_chave_importador", "orbit_fabricante", "weight_per_unit",
                                    "orbit_comprimento", "orbit_largura", "orbit_altura", "orbit_imagens",
-                                   "orbit_dados_loja"])
+                                   "orbit_dados_loja", "item_name", "description", "orbit_descricao_curta",
+                                   "orbit_categorias_loja", "orbit_tags_loja", "orbit_campos_manuais"])
     precos = {r.item_code: r.price_list_rate for r in frappe.get_all(
         "Item Price", filters={"price_list": canal.lista_precos}, fields=["item_code", "price_list_rate"])} \
         if canal.lista_precos else {}
@@ -83,7 +85,9 @@ def _carregar(canal) -> dict:
             qtd = max(0.0, flt(o.quantidade) - int(s.get("orbit_margem_stock") or 0)) if fresca else 0.0
         ofertas.setdefault(o.item_code, []).append({"qtd": qtd, "fresca": fresca, "estado": o.estado_stock,
                                                     "prazo": o.prazo_entrega})
-    return {"itens": itens, "precos": precos, "custos": custos, "proprio": proprio, "ofertas": ofertas}
+    from orbit.inventario.manuais import ids_categorias
+    return {"itens": itens, "precos": precos, "custos": custos, "proprio": proprio, "ofertas": ofertas,
+            "ids_categoria": ids_categorias(itens)}
 
 
 def produto(it, canal, dados: dict) -> dict | None:
@@ -127,6 +131,9 @@ def produto(it, canal, dados: dict) -> dict | None:
             loja["imagens_secundarias"] = imagens[1:]
     if it.disabled and loja.get("estado_publicacao") == "publicado":
         loja["estado_publicacao"] = "rascunho"
+    if it.get("orbit_campos_manuais"):   # 27-11: textos e categorias mudados à mão no Orbit (manuais.py)
+        from orbit.inventario.manuais import no_feed
+        no_feed(it, loja, dados.get("ids_categoria") or {})
     return loja
 
 

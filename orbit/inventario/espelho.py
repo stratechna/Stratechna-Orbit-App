@@ -154,15 +154,20 @@ def _artigo(p: dict, canal, caches: dict) -> str:
         doc.is_stock_item = 1
         doc.include_item_in_manufacturing = 0
         doc.orbit_chave_importador = chave
-    doc.item_name = _l(p.get("titulo"), 140) or doc.item_code
-    doc.description = (p.get("descricao") or p.get("titulo") or "")[:60000]
+    from orbit.inventario.manuais import lista as _manuais
+    manuais = _manuais(doc) if nome else set()   # 27-11: o que se mudou à mão no Orbit não se escreve por cima
+    if "item_name" not in manuais:
+        doc.item_name = _l(p.get("titulo"), 140) or doc.item_code
+    if "description" not in manuais:
+        doc.description = (p.get("descricao") or p.get("titulo") or "")[:60000]
     doc.item_group = _grupo((p.get("categorias") or [""])[0], caches["grupos"])
     if canal.marca:
         doc.brand = canal.marca
     doc.orbit_fabricante = _fabricante(p.get("marca"), caches["fabricantes"])
     doc.orbit_pai_ref = _l(p.get("pai"), 140)
     doc.orbit_origem_stock = _l(p.get("origem_stock"), 140)
-    doc.orbit_categorias_loja = "\n".join(_l(c, 140) for c in (p.get("categorias") or [])[:20])
+    if "orbit_categorias_loja" not in manuais:
+        doc.orbit_categorias_loja = "\n".join(_l(c, 140) for c in (p.get("categorias") or [])[:20])
     imagens = [_l(u, 500) for u in (p.get("imagens") or []) if u][:30]
     doc.orbit_imagens = "\n".join(imagens)
     if imagens and not (doc.image or "").startswith("/files/"):
@@ -360,7 +365,11 @@ SIM_NAO = {"orbit_preco_congelado": "preco_congelado", "orbit_preco_sob_consulta
 def preencher_loja(doc, loja: dict) -> None:
     if not doc.meta.has_field("orbit_ref_feed"):
         return
+    from orbit.inventario.manuais import lista as _manuais
+    manuais = _manuais(doc)
     for campo, k in MAPA_LOJA.items():
+        if campo in manuais:
+            continue
         v = _texto(loja.get(k))
         doc.set(campo, v[:140] if doc.meta.get_field(campo).fieldtype == "Data" else v[:60000])
     for campo, k in DINHEIRO.items():
