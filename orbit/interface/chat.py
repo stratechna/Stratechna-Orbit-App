@@ -84,6 +84,8 @@ def conversas():
                                             "narrow": "[]"}) or {}
     directas = {}
     eu = frappe.session.user.lower()
+    # 27-11-2026: os nomes vêm sempre da lista actual de utilizadores (o «Welcome Bot» passou a «Stratechna Chat»)
+    nomes = {u["user_id"]: u.get("full_name") for u in ((_api("GET", "/users") or {}).get("members") or [])}
     for m in msgs.get("messages", []):
         lida = "read" in (m.get("flags") or [])
         if m["type"] == "stream" and m.get("stream_id") in canais:
@@ -95,7 +97,7 @@ def conversas():
         elif m["type"] == "private":
             outros = [x for x in m.get("display_recipient", []) if (x.get("email") or "").lower() != eu] or m.get("display_recipient", [])
             chave = ",".join(sorted(str(x["id"]) for x in outros))
-            d = directas.setdefault(chave, {"ids": [x["id"] for x in outros], "nome": ", ".join(x.get("full_name") or x.get("email") for x in outros),
+            d = directas.setdefault(chave, {"ids": [x["id"] for x in outros], "nome": ", ".join(nomes.get(x["id"]) or x.get("full_name") or x.get("email") for x in outros),
                                              "ult": 0, "por_ler": 0})
             d["ult"] = max(d["ult"], m["timestamp"])
             d["por_ler"] += 0 if lida else 1
@@ -105,7 +107,7 @@ def conversas():
         c["por_ler"] = sum(t["por_ler"] for t in c["topicos"])
         lista.append(c)
     lista.sort(key=lambda c: (-c["ult"], c["nome"].lower()))
-    return {"ligado": True, "canais": lista, "directas": sorted(directas.values(), key=lambda d: -d["ult"])[:20]}
+    return {"ligado": True, "base": _base(), "canais": lista, "directas": sorted(directas.values(), key=lambda d: -d["ult"])[:20]}
 
 
 def _narrow(canal=None, topico=None, ids=None):
@@ -126,8 +128,9 @@ def mensagens(canal: str = None, topico: str = None, ids: str = None, marcar: in
     if d is None:
         return {"ligado": False, "mensagens": []}
     out, por_ler = [], []
+    nomes = {u["user_id"]: u.get("full_name") for u in ((_api("GET", "/users") or {}).get("members") or [])}
     for m in d.get("messages", []):
-        out.append({"id": m["id"], "quem": m.get("sender_full_name"), "email": m.get("sender_email"), "quando": m["timestamp"],
+        out.append({"id": m["id"], "quem": nomes.get(m.get("sender_id")) or m.get("sender_full_name"), "email": m.get("sender_email"), "quando": m["timestamp"],
                     "texto": m.get("content") or "", "topico": m.get("subject") or "",
                     "meu": (m.get("sender_email") or "").lower() == frappe.session.user.lower()})
         if "read" not in (m.get("flags") or []):
@@ -164,3 +167,23 @@ def pessoas():
     return sorted([{"id": u["user_id"], "nome": u.get("full_name"), "email": u.get("email")} for u in d.get("members", [])
                    if u.get("is_active") and not u.get("is_bot") and (u.get("email") or "").lower() != eu],
                   key=lambda x: (x["nome"] or "").lower())
+
+
+# 27-11-2026 (Vítor: os botões que o tutorial do Chat menciona): criar canal e começar conversa (tópico) no /orbit
+@frappe.whitelist(methods=["POST"])
+def criar_canal(nome: str, descricao: str = "", privado: int = 0, pessoas: str = None):
+    _guarda()
+    nome = (nome or "").strip().lstrip("#").strip()
+    if not nome:
+        frappe.throw("Indique o nome do canal.")
+    quem = [cint(i) for i in json.loads(pessoas or "[]") if str(i).isdigit()]
+    eu = (_api("GET", "/users/me") or {}).get("user_id")
+    dados = {"subscriptions": json.dumps([{"name": nome[:60], "description": (descricao or "")[:1024]}]),
+             "invite_only": json.dumps(bool(cint(privado)))}
+    if quem:
+        dados["principals"] = json.dumps(sorted(set(quem + ([eu] if eu else []))))
+    r = _api("POST", "/users/me/subscriptions", data=dados)
+    if r is None:
+        frappe.throw("Ligue primeiro o Chat.")
+    sid = (_api("GET", "/get_stream_id", params={"stream": nome[:60]}) or {}).get("stream_id")
+    return {"ok": True, "id": sid, "nome": nome[:60]}

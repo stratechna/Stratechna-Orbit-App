@@ -919,3 +919,9 @@ tr.por-ler td b,tr.por-ler td{font-weight:600}
 /* 27-11-2026 (Vítor): os algarismos ficavam encostados às setas de subir/descer — espaço entre os dois em todos os campos numéricos */
 input[type=number]{padding-right:6px}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{margin-left:8px}
+/* 27-11-2026: Chat — «+» para criar canal e começar conversa */
+.chat-h6{display:flex;align-items:center;justify-content:space-between}
+.chat-canal{display:flex;align-items:center}.chat-canal>button:first-child{flex:1;min-width:0}
+.chat-mais{border:0;background:none;color:var(--ink-3,#6b7280);font-size:16px;line-height:1;width:24px;height:24px;border-radius:6px;cursor:pointer;flex:none;padding:0}
+.chat-mais:hover{background:var(--surface-2,#eef1f3);color:var(--ink,#1d2125)}
+.chat-txt a{color:var(--accent,#b20009);text-decoration:underline}

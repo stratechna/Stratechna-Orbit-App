@@ -781,17 +781,35 @@ const EMOJIS = { smile: "😄", grinning: "😀", smiley: "😃", laughing: "�
   octopus: "🐙", dog: "🐶", cat: "🐱", robot: "🤖", ghost: "👻", bell: "🔔", speech_bubble: "💬", thought: "💭",
   search: "🔍", gear: "⚙️", wrench: "🔧", hammer: "🔨", tools: "🛠️", shield: "🛡️", recycle: "♻️", soon: "🔜", new: "🆕",
   arrow_right: "➡️", arrow_left: "⬅️", arrow_up: "⬆️", arrow_down: "⬇️", repeat: "🔁", plus: "➕", minus: "➖", heavy_plus_sign: "➕" };
-function textoChat(t) {
-  const esc = String(t || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/:([a-z0-9_+\-]+):/g, (m, n) => EMOJIS[n] || m);
-  return esc.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/\n/g, "<br>");
+// 27-11-2026: markdown do Chat em texto seguro (nada de HTML do servidor) — ligações [texto](endereço) clicáveis, as
+// relativas (/#inbox, /help/…) abrem no Chat da organização, **negrito**, *itálico*, `código`, emojis :nome:
+let CHAT_BASE = "";
+function textoChat(t, base) {
+  base = base || CHAT_BASE;
+  const esc = (x) => String(x || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const ligacoes = [];
+  const marca = (href, txt) => { ligacoes.push('<a href="' + esc(href) + '" target="_blank" rel="noopener">' + txt + "</a>"); return "\u0000" + (ligacoes.length - 1) + "\u0000"; };
+  const url = (u) => { u = u.trim(); if (/^https?:\/\//i.test(u)) return u; if (/^\/|^#/.test(u) && base) return base.replace(/\/$/, "") + (u[0] === "#" ? "/" + u : u); return null; };
+  let x = String(t || "");
+  x = x.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, txt, u) => { const h = url(u); return h ? marca(h, esc(txt)) : esc(txt); });
+  x = x.replace(/(https?:\/\/[^\s<)]+)/g, (m) => marca(m, esc(m)));
+  x = esc(x).replace(/:([a-z0-9_+\-]+):/g, (m, n) => EMOJIS[n] || m)
+    .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/(^|[\s(])\*([^*\n]+)\*/g, "$1<i>$2</i>").replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\n/g, "<br>");
+  return x.replace(/\u0000(\d+)\u0000/g, (m, i) => ligacoes[+i]);
 }
 const Chat = {
   setup() {
     const conv = ref(null); const sel = ref(null); const msgs = ref(null); const texto = ref(""); const pwd = ref(""); const novoTopico = ref("");
     const pessoas = ref([]); const novaDm = ref(""); let rel;
-    const carregarConv = async () => { conv.value = await apiC("conversas"); };
+    const novoCanal = ref(null); const novaConversa = ref(null);
+    const criarCanal = async () => { const n = novoCanal.value; if (!n.nome.trim()) return;
+      const r = await apiC("criar_canal", { nome: n.nome, descricao: n.descricao, privado: n.privado ? 1 : 0, pessoas: JSON.stringify(n.pessoas) }, true);
+      novoCanal.value = null; toast("Canal criado"); await carregarConv(); if (r.id) abrir({ canal: r.id, nomeCanal: r.nome }); };
+    const comecarConversa = async () => { const c = novaConversa.value; if (!c.topico.trim() || !c.texto.trim()) return;
+      await apiC("enviar", { texto: c.texto, canal: c.canal, topico: c.topico.trim() }, true);
+      novaConversa.value = null; await carregarConv(); abrir({ canal: c.canal, nomeCanal: c.nomeCanal, topico: c.topico.trim() }); };
+    const carregarConv = async () => { conv.value = await apiC("conversas"); if (conv.value?.base) CHAT_BASE = conv.value.base; };
     const carregarMsgs = async (rolar = true) => {
       if (!sel.value) return;
       const a = sel.value.ids ? { ids: sel.value.ids.join(",") } : { canal: sel.value.canal, topico: sel.value.topico || "" };
@@ -814,15 +832,17 @@ const Chat = {
     const abrirDm = () => { const p = pessoas.value.find((x) => String(x.id) === novaDm.value); if (p) abrir({ ids: [p.id], nome: p.nome }); novaDm.value = ""; };
     const hora = (ts) => { const d = new Date(ts * 1000); return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit" }) + " " + d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }); };
     const titulo = computed(() => !sel.value ? "" : sel.value.ids ? sel.value.nome : `${sel.value.nomeCanal}${sel.value.topico ? " › " + sel.value.topico : ""}`);
-    return { conv, sel, msgs, texto, pwd, abrir, ligar, enviar, hora, titulo, textoChat, cor, ini, novoTopico, pessoas, novaDm, abrirDm };
+    return { conv, sel, msgs, texto, pwd, abrir, ligar, enviar, hora, titulo, textoChat, cor, ini, novoTopico, pessoas, novaDm, abrirDm,
+      novoCanal, novaConversa, criarCanal, comecarConversa };
   },
   template: `
   <div class="caixa chat">
     <aside class="canais">
       <template v-if="conv && conv.ligado">
-        <h6>Canais</h6>
+        <h6 class="chat-h6">Canais<button class="chat-mais" title="Criar canal" aria-label="Criar canal" @click="novoCanal={nome:'',descricao:'',privado:false,pessoas:[]}">+</button></h6>
         <template v-for="c in conv.canais" :key="c.id">
-          <button :class="{ativo: sel && !sel.ids && sel.canal===c.id && !sel.topico}" @click="abrir({canal:c.id, nomeCanal:c.nome})"><span class="ponto" :style="{background:c.cor||'var(--ink-3)'}"></span><span class="txt"># {{ c.nome }}</span><span class="n" v-if="c.por_ler">{{ c.por_ler }}</span></button>
+          <div class="chat-canal"><button :class="{ativo: sel && !sel.ids && sel.canal===c.id && !sel.topico}" @click="abrir({canal:c.id, nomeCanal:c.nome})"><span class="ponto" :style="{background:c.cor||'var(--ink-3)'}"></span><span class="txt"># {{ c.nome }}</span><span class="n" v-if="c.por_ler">{{ c.por_ler }}</span></button>
+            <button class="chat-mais" :title="'Nova conversa em #' + c.nome" :aria-label="'Nova conversa em ' + c.nome" @click="novaConversa={canal:c.id, nomeCanal:c.nome, topico:'', texto:''}">+</button></div>
           <button v-for="t in c.topicos" :key="t.nome" class="topico" :class="{ativo: sel && sel.canal===c.id && sel.topico===t.nome}" @click="abrir({canal:c.id, nomeCanal:c.nome, topico:t.nome})"><span class="txt">{{ t.nome }}</span><span class="n" v-if="t.por_ler">{{ t.por_ler }}</span></button>
         </template>
         <h6>Mensagens diretas</h6>
@@ -853,6 +873,18 @@ const Chat = {
       </template>
       <div v-else class="vazio">Escolha um canal, um tópico ou uma conversa.</div>
     </div>
+    <div v-if="novoCanal" class="modal-fundo" @click.self="novoCanal=null"><div class="modal" style="max-width:480px"><header><b>Criar canal</b><button class="btn sm" @click="novoCanal=null">Fechar</button></header>
+      <form class="reg-form" @submit.prevent="criarCanal">
+        <label class="erp-campo"><span>Nome<span class="obrig">*</span></span><input v-model="novoCanal.nome" required autofocus placeholder="ex.: vendas"></label>
+        <label class="erp-campo"><span>Descrição</span><input v-model="novoCanal.descricao" placeholder="Para que serve o canal"></label>
+        <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" v-model="novoCanal.privado">Privado — só quem for convidado o vê</label>
+        <label class="erp-campo"><span>Pessoas (além de si)</span><select multiple v-model="novoCanal.pessoas" style="min-height:120px"><option v-for="p in pessoas" :key="p.id" :value="p.id">{{ p.nome }}</option></select><small class="sub">⌘/Ctrl + clique para escolher várias</small></label>
+        <div class="reg-botoes"><button class="btn prim" :disabled="!novoCanal.nome.trim()">Criar canal</button></div></form></div></div>
+    <div v-if="novaConversa" class="modal-fundo" @click.self="novaConversa=null"><div class="modal" style="max-width:520px"><header><b>Nova conversa em #{{ novaConversa.nomeCanal }}</b><button class="btn sm" @click="novaConversa=null">Fechar</button></header>
+      <form class="reg-form" @submit.prevent="comecarConversa">
+        <label class="erp-campo"><span>Tópico<span class="obrig">*</span></span><input v-model="novaConversa.topico" required autofocus maxlength="60" placeholder="ex.: encomenda da Casa X"></label>
+        <label class="erp-campo"><span>Mensagem<span class="obrig">*</span></span><textarea v-model="novaConversa.texto" rows="4" required></textarea></label>
+        <div class="reg-botoes"><button class="btn prim" :disabled="!novaConversa.topico.trim() || !novaConversa.texto.trim()">Começar conversa</button></div></form></div></div>
   </div>`,
 };
 
@@ -2407,7 +2439,7 @@ const Caixa = {
     const urlAnexo = (i) => "/api/method/orbit.interface.correio.anexo?" + new URLSearchParams({ pasta: mail.value.pasta, uid: mail.value.uid, i });
     // F3 (23-11-2026): o Chat na caixa — conversas com não lidas e resposta no mesmo sítio
     const chat = ref(null); const chatSel = ref(null); const chatMsgs = ref(null); const chatTexto = ref("");
-    const carregarChat = async () => { try { chat.value = await apiC("conversas"); } catch (e) { chat.value = { ligado: false }; } };
+    const carregarChat = async () => { try { chat.value = await apiC("conversas"); if (chat.value?.base) CHAT_BASE = chat.value.base; } catch (e) { chat.value = { ligado: false }; } };
     const chatLista = computed(() => {
       if (!chat.value || !chat.value.ligado) return [];
       const out = (chat.value.directas || []).map((d) => ({ chave: "d" + d.ids.join(), nome: d.nome, por_ler: d.por_ler, ult: d.ult, sel: { ids: d.ids, nome: d.nome } }));
