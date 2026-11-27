@@ -3790,6 +3790,22 @@ const ErpLista = {
       carregar();
     });
     watch(q, () => { clearTimeout(tq); tq = setTimeout(() => { pagina.value = 0; carregar(); }, 300); });
+    const doMenu = () => { let pre = null; try { pre = JSON.parse(sessionStorage.getItem("orbit.erp.filtro") || "null"); } catch (e) {}
+      if (!pre || pre.doctype !== props.doctype) return; sessionStorage.removeItem("orbit.erp.filtro"); filtros.value = pre.filtros || []; vistaAtiva.value = ""; pagina.value = 0; carregar(); };
+    onMounted(() => window.addEventListener("orbit-erp-filtro", doMenu)); onUnmounted(() => window.removeEventListener("orbit-erp-filtro", doMenu));
+    // devoluções: nascem sempre de um documento original (como o «Criar › Devolução» do ERPNext)
+    const DEVOL = { "Sales Invoice": ["Nova nota de crédito", "Fatura a corrigir"], "Delivery Note": ["Nova guia de devolução", "Guia a devolver"],
+      "Purchase Invoice": ["Nova nota de débito", "Fatura de fornecedor a corrigir"], "Purchase Receipt": ["Nova devolução a fornecedor", "Receção a devolver"] };
+    const eDevol = computed(() => !!DEVOL[props.doctype] && filtros.value.some((f) => f[0] === "is_return" && Number(f[2]) === 1));
+    const rotDevol = computed(() => (DEVOL[props.doctype] || [])[0] || ""); const rotOrig = computed(() => (DEVOL[props.doctype] || [])[1] || "");
+    const orig = ref(null);
+    const procurarOrig = async () => { const venda = ["Sales Invoice", "Delivery Note"].includes(props.doctype);
+      const r = await apiL("lista", { doctype: props.doctype, filtros: JSON.stringify([["docstatus", "=", 1], ["is_return", "=", 0]]), q: orig.value.q || "", ordem: "modified desc", pagina: 0,
+        colunas: JSON.stringify([venda ? "customer_name" : "supplier_name", "posting_date", "grand_total"]), por: 30 }).catch(() => null);
+      orig.value.lista = ((r && r.linhas) || []).map((x) => ({ name: x.name, parte: x.customer_name || x.supplier_name || "", data: x.posting_date || "", total: x.grand_total })); };
+    const abrirOrig = () => { orig.value = { q: "", lista: null }; procurarOrig(); };
+    const devolver = async (n) => { const r = await api("erp.criar_de", { doctype: props.doctype, name: n, destino: "devolucao" }, true);
+      try { sessionStorage.setItem("orbit.erp.novo", JSON.stringify(r.doc)); } catch (e) {} orig.value = null; location.hash = irErp(props.doctype, "novo"); };
     const campo = (f) => (meta.value?.campos || []).find((c) => c.fieldname === f) || { fieldname: f, label: ((def.value?.campos || []).find((c) => c.campo === f) || {}).rotulo || f };
     const cdef = (f) => (def.value?.campos || []).find((c) => c.campo === f);
     const ordenar = (f) => { ordem.value = ordem.value === f + " desc" ? f + " asc" : f + " desc"; pagina.value = 0; carregar(); };
@@ -3847,14 +3863,14 @@ const ErpLista = {
     const fechar = () => { menuV.value = false; maisAc.value = false; }; onMounted(() => document.addEventListener("click", fechar)); onUnmounted(() => document.removeEventListener("click", fechar));
     // o «Estado» do documento já tem coluna própria (selo); não se repete o campo status
     const colunasVis = computed(() => colunas.value.filter((c) => !(meta.value?.submetivel && c === "status")));
-    return { modo, campoK, campoC, colunasVis, meta, def, linhas, mais, q, colunas, titulo, a, total, campo, cdef, textoValor, ordenar, ordem, maisLinhas, abrir, irErp, ESTADO_DOC, COR_STATUS, statusPt, cor, ini, tr,
+    return { eDevol, rotDevol, rotOrig, orig, procurarOrig, abrirOrig, devolver, modo, campoK, campoC, colunasVis, meta, def, linhas, mais, q, colunas, titulo, a, total, campo, cdef, textoValor, ordenar, ordem, maisLinhas, abrir, irErp, ESTADO_DOC, COR_STATUS, statusPt, cor, ini, tr,
       filtros, novoF, abrirFiltro, opsDe, juntarFiltro, tirarFiltro, limpar, rotuloOp, rotuloValor, PERIODOS_ERP, tipoOp, verCols, alternarCol, moverCol, colunasPadrao, colEscolhidas,
       vs, vistaAtiva, menuV, aplicarVista, vistaPorOmissao, gravarVista, vistaAtual, apagarVista, porOmissao, sel, todos, massa, opsMassa, camposEditaveis, pessoasL, aplicarMassa, pdfLote, exportar, maisAc };
   },
   template: `<div v-if="meta">
     <div class="pad" style="padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <div><h1>{{ meta.rotulo }}</h1><div class="sub">{{ total }} {{ total===1 ? 'registo' : 'registos' }}<template v-if="filtros.length || q"> com estes filtros</template></div></div>
-      <div class="acoes-lista" :class="{abertas: maisAc}" @click.stop><a v-if="meta.pode.create" class="btn prim" :href="irErp(doctype,'novo')">+ Novo</a>
+      <div class="acoes-lista" :class="{abertas: maisAc}" @click.stop><button v-if="meta.pode.create && eDevol" class="btn prim" @click="abrirOrig">+ {{ rotDevol }}</button><a v-else-if="meta.pode.create" class="btn prim" :href="irErp(doctype,'novo')">+ Novo</a>
         <button class="btn so-movel" @click="maisAc=!maisAc" aria-label="Mais ações">⋯</button>
         <span class="acoes-sec" @click="maisAc=false"><button v-if="def && def.pode.exportar" class="btn" @click="exportar(false)">Exportar</button><a v-if="meta.pode.create" class="btn" :href="'#/importar-erp/'+encodeURIComponent(doctype)">Importar</a></span></div>
     </div>
@@ -3938,7 +3954,15 @@ const ErpLista = {
     </div>
     <div v-if="mais" style="text-align:center;margin-bottom:24px"><button class="btn" @click="maisLinhas">Carregar mais ({{ linhas.length }} de {{ total }})</button></div>
     </template>
-  </div><div v-else class="vazio">A carregar…</div>`,
+  </div><div v-else class="vazio">A carregar…</div>
+    <div v-if="orig" class="modal-fundo" @click.self="orig=null"><div class="modal" style="max-width:620px"><header><b>{{ rotDevol }} — escolher {{ rotOrig.toLowerCase() }}</b><button class="btn sm" @click="orig=null">Fechar</button></header>
+      <div class="reg-form"><input v-model="orig.q" placeholder="Procurar pelo número ou pelo nome…" @input="procurarOrig" autofocus>
+        <div v-if="orig.lista===null" class="sub">A procurar…</div>
+        <div v-else-if="!orig.lista.length" class="sub">Nenhum documento submetido{{ orig.q ? ' com «' + orig.q + '»' : '' }}.</div>
+        <div v-else class="cartao" style="padding:0;max-height:55vh;overflow:auto"><button v-for="o in orig.lista" :key="o.name" type="button" class="linha" style="width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);cursor:pointer" @click="devolver(o.name)">
+          <div class="cresce"><b>{{ o.name }}</b><small>{{ o.parte }} · {{ o.data }}</small></div><b>{{ new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(o.total||0) }}</b></button></div>
+        <p class="sub" style="margin:0;font-size:12px">O ERPNext prepara o documento com as linhas do original em negativo; acerta as quantidades e grava.</p></div></div></div>
+`,
 };
 
 const ErpLigacao = {
@@ -4354,7 +4378,9 @@ const ErpEmitir = {
       finally { if (imp.value) imp.value.aImportar = false; } };
     const origens = computed(() => (doc.value?.orbit_origens || "").split("\n").filter(Boolean).map((o) => { const [dt, n] = o.split("|"); return { dt, n }; }));
     const marcaSel = computed(() => marcas.value.find((m) => m.name === doc.value?.orbit_marca));
-    const titulo = computed(() => novo.value ? (fatura ? "Nova fatura" : "Nova guia de transporte") : (fatura ? "Fatura " : "Guia ") + (doc.value?.orbit_numero_certificado || doc.value?.name));
+    const devol = computed(() => !!doc.value?.is_return);
+    const titulo = computed(() => { const t = devol.value ? (fatura ? "Nota de crédito" : "Guia de devolução") : (fatura ? "Fatura" : "Guia de transporte");
+      return novo.value ? (devol.value ? "Nova " + t.toLowerCase() : (fatura ? "Nova fatura" : "Nova guia de transporte")) : t + " " + (doc.value?.orbit_numero_certificado || doc.value?.name); });
     const pdf = computed(() => doc.value && !novo.value ? `/api/method/frappe.utils.print_format.download_pdf?doctype=${encodeURIComponent(props.dt)}&name=${encodeURIComponent(doc.value.name)}` : "");
     // números de série e lotes: pedidos na linha quando o artigo os exige
     const sl = ref({});
@@ -4363,11 +4389,11 @@ const ErpEmitir = {
       const cods = [...new Set((doc.value?.items || []).map((l) => l.item_code).filter(Boolean))]; if (!cods.length) { sl.value = {}; return; }
       sl.value = await api("clientes_venda.serie_lote", { codigos: JSON.stringify(cods), armazem: doc.value.set_warehouse || "" }).catch(() => ({})) || {}; });
     const linhaMais = ref({});
-    return { linhaMais, sl, nSeries, fatura, doc, novo, sujo, a, aviso, ro, docstatus, marcas, marcaSel, assoc, imp, novaLinha, moeda, remover, gravar, emitir, proforma, converter, receber,
+    return { devol, linhaMais, sl, nSeries, fatura, doc, novo, sujo, a, aviso, ro, docstatus, marcas, marcaSel, assoc, imp, novaLinha, moeda, remover, gravar, emitir, proforma, converter, receber,
       abrirImportar, tiposImp, listaImp, escolherImp, importar, origens, titulo, pdf, irErp, link, ESTADO_DOC, statusPt, ROT_DT };
   },
   template: `<div v-if="doc" class="pad prop">
-    <div class="sub"><a :href="irErp(dt)">← {{ fatura ? 'Faturas' : 'Guias de transporte' }}</a> · <a v-if="!novo" :href="irErp(dt, doc.name) + '/completa'">ficha completa</a></div>
+    <div class="sub"><a :href="irErp(dt)">← {{ fatura ? (devol ? 'Notas de crédito' : 'Faturas') : (devol ? 'Guias de devolução' : 'Guias de transporte') }}</a> · <a v-if="!novo" :href="irErp(dt, doc.name) + '/completa'">ficha completa</a><template v-if="devol && doc.return_against"> · corrige <a :href="irErp(dt, doc.return_against)">{{ doc.return_against }}</a></template></div>
     <div class="prop-topo">
       <div><div class="prop-tit"><h1>{{ titulo }}</h1><span class="etq" :class="ESTADO_DOC[docstatus][1]">{{ docstatus===0 ? 'Rascunho' : (doc.status ? statusPt(doc.status) : ESTADO_DOC[docstatus][0]) }}</span><span v-if="sujo" class="etq ambar">Por gravar</span><span v-if="doc.orbit_proforma_numero" class="etq">Pró-forma {{ doc.orbit_proforma_numero }}</span></div>
         <div class="sub" v-if="!novo">{{ doc.name }} · {{ doc.company }}</div></div>
@@ -5863,9 +5889,16 @@ const APPS = {
   gestao: { nome: "Gestão", sub: "Dinheiro e obrigações", ic: "euro", inicio: "",
     nav: [], modulos: ["Invoicing", "Payments", "Banking", "Accounting", "Financial Reports", "Subscription"], defs: ["Vendas e faturação", "Marcas e empresa"] },
   operacoes: { nome: "Operações", sub: "Comprar, produzir, vender", ic: "cubo", inicio: "",
-    nav: [["sec", "Vendas"], ["erp/Quotation", "nota", "Propostas"], ["erp/Sales Order", "nota", "Encomendas"], ["erp/Sales Invoice", "euro", "Faturas"], ["erp/Delivery Note", "cubo", "Guias de transporte"], ["erp/Payment Entry", "euro", "Recibos"],
-      ["sec", "Compras"], ["compras", "euro", "Faturas de compra"], ["erp/Purchase Order", "nota", "Encomendas a fornecedor"], ["erp/Purchase Receipt", "cubo", "Receções"], ["erp/Supplier", "pessoas", "Fornecedores"],
-      ["sec", "Stock"], ["erp-stock", "cubo", "Inventário"]],
+    // 27-11-2026 (Vítor: «têm que existir todo o tipo de documentos… devoluções, notas de crédito»): cada tipo com a sua
+    // lista (o 4.º elemento são os filtros com que abre) e o seu «+ Nova…» a partir do documento original
+    nav: [["sec", "Vendas"], ["erp/Quotation", "nota", "Propostas"], ["erp/Sales Order", "nota", "Encomendas"], ["erp/Sales Invoice", "euro", "Faturas", [["is_return", "=", 0]]],
+      ["erp/Sales Invoice", "euro", "Notas de crédito", [["is_return", "=", 1]]], ["erp/Delivery Note", "cubo", "Guias de transporte", [["is_return", "=", 0]]],
+      ["erp/Delivery Note", "cubo", "Guias de devolução", [["is_return", "=", 1]]], ["erp/Payment Entry", "euro", "Recibos", [["payment_type", "=", "Receive"]]], ["erp/Customer", "pessoas", "Clientes"],
+      ["sec", "Compras"], ["compras", "euro", "Faturas de compra"], ["erp/Purchase Invoice", "euro", "Faturas de fornecedor", [["is_return", "=", 0]]],
+      ["erp/Purchase Invoice", "euro", "Notas de débito", [["is_return", "=", 1]]], ["erp/Material Request", "nota", "Pedidos de material"], ["erp/Supplier Quotation", "nota", "Cotações de fornecedor"],
+      ["erp/Purchase Order", "nota", "Encomendas a fornecedor"], ["erp/Purchase Receipt", "cubo", "Receções", [["is_return", "=", 0]]],
+      ["erp/Purchase Receipt", "cubo", "Devoluções a fornecedor", [["is_return", "=", 1]]], ["erp/Payment Entry", "euro", "Pagamentos", [["payment_type", "=", "Pay"]]], ["erp/Supplier", "pessoas", "Fornecedores"],
+      ["sec", "Stock"], ["erp-stock", "cubo", "Inventário"], ["erp/Stock Entry", "cubo", "Movimentos de stock"], ["erp/Stock Reconciliation", "cubo", "Acertos de inventário"], ["erp/Item", "cubo", "Artigos"]],
     modulos: ["Selling", "Buying", "Stock", "Assets", "Manufacturing", "Subcontracting", "Quality"], defs: ["Vendas e faturação"] },
   // 22-11-2026: o Marketing com o mesmo aspecto das outras apps (os ecrãs dele são da secretária, mostrados cá dentro).
   marketing: { nome: "Marketing", sub: "Campanhas e envios", ic: "megafone", inicio: "erp/Campanha de Marketing",
@@ -5959,7 +5992,14 @@ const App = {
       ...((ctx.value?.apps) || []).map((a) => ({ chave: a.nome.toLowerCase(), nome: a.nome, ic: a.icone, url: a.url })),
     ].filter((a, i, l) => l.findIndex((b) => b.chave === a.chave) === i));   // sem repetidos (o Marketing vinha duas vezes)
     const irApp = (a) => { seletor.value = false; if (a.chave === APP_ATUAL) return; abrirApp(a.chave, a.url); };
-    const ativoNav = (n) => { const e = ecra.value; const r = partes.value.join("/"); return n[0] === r || decodeURIComponent(n[0]) === r || e === n[0] || (n[0]==='contactos'&&e==='contacto') || (n[0]==='negocios'&&e==='negocio') || (n[0]==='empresas'&&e==='empresa') || (n[0]==='leads'&&e==='lead') || (n[0]==='projetos'&&e==='projeto') || (n[0]==='tarefas'&&e==='fila'); };
+    // 27-11-2026: itens do menu com filtros (Faturas / Notas de crédito…) — a lista abre já filtrada e só o escolhido fica activo
+    const navEscolhido = ref(null);
+    const irNav = (n) => { navEscolhido.value = n; if (!n[3]) { if (NAV.some((x) => x !== n && x[0] === n[0] && x[3])) n = [n[0], n[1], n[2], []]; else return; }
+      try { sessionStorage.setItem("orbit.erp.filtro", JSON.stringify({ doctype: decodeURIComponent(n[0].split("/")[1] || ""), filtros: n[3] })); } catch (e) {}
+      window.dispatchEvent(new Event("orbit-erp-filtro")); };
+    const _ativoBase = (n) => { const e = ecra.value; const r = partes.value.join("/"); return n[0] === r || decodeURIComponent(n[0]) === r || e === n[0] || (n[0]==='contactos'&&e==='contacto') || (n[0]==='negocios'&&e==='negocio') || (n[0]==='empresas'&&e==='empresa') || (n[0]==='leads'&&e==='lead') || (n[0]==='projetos'&&e==='projeto') || (n[0]==='tarefas'&&e==='fila'); };
+    const ativoNav = (n) => { if (!_ativoBase(n)) return false; const irmaos = NAV.filter((x) => x[0] === n[0]); if (irmaos.length < 2) return true;
+      return navEscolhido.value ? navEscolhido.value === n : n === irmaos[0]; };
     const rotaCal = computed(() => partes.value.join("/"));
     // 25-11-2026: a barra de baixo do telemóvel é a de cada app (era a do CRM em todas): 4 destinos + «Menu»
     const MOVEL = computed(() => {
@@ -5968,7 +6008,7 @@ const App = {
       if (l.length < 4) l = l.concat(modulosApp.value.filter((m) => m.barra).map((m) => ({ n: ["erp-m/" + encodeURIComponent(m.barra)], rota: "erp-m/" + encodeURIComponent(m.barra), ic: "grelha", r: m.nome })));
       return l.slice(0, 4);
     });
-    return { gaveta, MOVEL, ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal, APP, APP_ATUAL, modulosApp, seletor, LISTA_APPS, irApp, ativoNav, srcApp, menuConta, sair };
+    return { irNav, gaveta, MOVEL, ctx, ecra, partes, q, res, selRes, irRes, teclaPesq, tema, NAV, estado, ROTAS_DT, EMBUTIDAS, rotaCal, APP, APP_ATUAL, modulosApp, seletor, LISTA_APPS, irApp, ativoNav, srcApp, menuConta, sair };
   },
   template: `
   <div class="app" v-if="ctx">
@@ -5977,7 +6017,7 @@ const App = {
       <div class="marca"><div class="logo logo-app"><img :src="srcApp(APP_ATUAL)" alt=""></div><div>{{ APP.nome }}<small>{{ APP.sub }}</small></div></div>
       <template v-for="(n,i) in NAV" :key="i">
         <h6 v-if="n[0]==='sec'">{{ n[1] }}</h6>
-        <a v-else :href="'#/'+n[0]" style="text-decoration:none"><button :class="{ativo: ativoNav(n)}" tabindex="-1"><Icone :n="n[1]"/>{{ n[2] }}<span class="conta" v-if="n[0]==='caixa' && ctx.contadores.tickets">{{ ctx.contadores.tickets }}</span><span class="conta" v-if="n[0]==='compras' && ctx.contadores.compras" title="Faturas de compra por rever">{{ ctx.contadores.compras }}</span><span class="conta" v-if="n[0]==='chat' && estado.chat" title="Mensagens por ler no Chat">{{ estado.chat }}</span></button></a>
+        <a v-else :href="'#/'+n[0]" style="text-decoration:none" @click="irNav(n)"><button :class="{ativo: ativoNav(n)}" tabindex="-1"><Icone :n="n[1]"/>{{ n[2] }}<span class="conta" v-if="n[0]==='caixa' && ctx.contadores.tickets">{{ ctx.contadores.tickets }}</span><span class="conta" v-if="n[0]==='compras' && ctx.contadores.compras" title="Faturas de compra por rever">{{ ctx.contadores.compras }}</span><span class="conta" v-if="n[0]==='chat' && estado.chat" title="Mensagens por ler no Chat">{{ estado.chat }}</span></button></a>
       </template>
       <template v-if="modulosApp.length"><h6>{{ APP_ATUAL==='admin' ? 'Sistema' : 'Módulos' }}</h6>
       <a v-for="m in modulosApp" :key="m.url" :href="m.barra ? '#/erp-m/'+encodeURIComponent(m.barra) : m.url" :target="m.barra ? null : '_blank'" style="text-decoration:none"><button tabindex="-1" :class="{ativo: ecra==='erp-m' && partes[1]===m.barra}"><Icone n="grelha"/>{{ m.nome }}<span class="fora" v-if="!m.barra">↗</span></button></a></template>
