@@ -908,3 +908,10 @@ tr.por-ler td b,tr.por-ler td{font-weight:600}
 .prop-a-procurar .roda{width:14px;height:14px;border-radius:50%;border:2px solid var(--borda,#d1d5db);border-top-color:var(--accent,#b20009);animation:orbitRoda .7s linear infinite;flex:none}
 @keyframes orbitRoda{to{transform:rotate(360deg)}}
 .cli-grupo{padding:6px 10px 2px;font-size:12px}
+/* 27-11-2026: mais campos do orçamento e da linha */
+.prop-mais>summary{cursor:pointer;font-weight:600;padding:2px 0}
+.prop-mais-bloco h3{font-size:13px;margin:14px 0 6px;color:var(--sub,#6b7280);font-weight:600;text-transform:none}
+.prop-mais-grelha{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:10px 14px}
+.prop-mais-grelha .erp-campo{min-width:0}
+.prop-linha-mais{padding:10px 14px 14px;border-top:1px solid var(--borda,#e5e7eb)}
+.sl-campo{margin-top:6px}.sl-campo label{display:flex;flex-direction:column;gap:3px;font-size:12px}.sl-campo select,.sl-campo textarea{width:100%;min-width:160px;box-sizing:border-box}

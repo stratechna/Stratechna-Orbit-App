@@ -4216,7 +4216,8 @@ const EditorRico = {
 const apiE = (m, a = {}, post = false) => api("emitir." + m, a, post);
 const ROT_DT = { "Quotation": "Proposta", "Sales Order": "Encomenda", "Delivery Note": "Guia", "Sales Invoice": "Fatura", "Payment Entry": "Recibo" };
 const ErpEmitir = {
-  components: { ErpLigacao },
+  // ClienteProcura/ContactoProcura vêm mais abaixo no ficheiro: getters para não as ler antes de existirem
+  components: { ErpLigacao, get ClienteProcura() { return ClienteProcura; }, get ContactoProcura() { return ContactoProcura; } },
   props: ["dt", "name"],
   setup(props) {
     const fatura = props.dt === "Sales Invoice";
@@ -4291,7 +4292,13 @@ const ErpEmitir = {
     const marcaSel = computed(() => marcas.value.find((m) => m.name === doc.value?.orbit_marca));
     const titulo = computed(() => novo.value ? (fatura ? "Nova fatura" : "Nova guia de transporte") : (fatura ? "Fatura " : "Guia ") + (doc.value?.orbit_numero_certificado || doc.value?.name));
     const pdf = computed(() => doc.value && !novo.value ? `/api/method/frappe.utils.print_format.download_pdf?doctype=${encodeURIComponent(props.dt)}&name=${encodeURIComponent(doc.value.name)}` : "");
-    return { fatura, doc, novo, sujo, a, aviso, ro, docstatus, marcas, marcaSel, assoc, imp, novaLinha, moeda, remover, gravar, emitir, proforma, converter, receber,
+    // números de série e lotes: pedidos na linha quando o artigo os exige
+    const sl = ref({});
+    const nSeries = (l) => (l.serial_no || "").split(/[\n,]+/).map((x) => x.trim()).filter(Boolean).length;
+    watch(() => doc.value ? (doc.value.items || []).map((l) => l.item_code).join("|") + "@" + (doc.value.set_warehouse || "") : "", async (k) => {
+      const cods = [...new Set((doc.value?.items || []).map((l) => l.item_code).filter(Boolean))]; if (!cods.length) { sl.value = {}; return; }
+      sl.value = await api("clientes_venda.serie_lote", { codigos: JSON.stringify(cods), armazem: doc.value.set_warehouse || "" }).catch(() => ({})) || {}; });
+    return { sl, nSeries, fatura, doc, novo, sujo, a, aviso, ro, docstatus, marcas, marcaSel, assoc, imp, novaLinha, moeda, remover, gravar, emitir, proforma, converter, receber,
       abrirImportar, tiposImp, listaImp, escolherImp, importar, origens, titulo, pdf, irErp, link, ESTADO_DOC, statusPt, ROT_DT };
   },
   template: `<div v-if="doc" class="pad prop">
@@ -4317,7 +4324,8 @@ const ErpEmitir = {
             <div class="prop-chips"><button v-for="m in marcas" :key="m.name" type="button" :disabled="ro" :class="{ativo: doc.orbit_marca===m.name}" @click="doc.orbit_marca=m.name"><span :style="{background: m.orbit_cor || '#5b6470'}"></span>{{ m.name }}</button></div>
             <div class="sub">{{ fatura ? 'Faturada' : 'Emitida' }} por <b>{{ doc.company }}</b><template v-if="doc.orbit_marca"> · série da marca {{ doc.orbit_marca }} no programa certificado</template></div></div>
           <div class="prop-campos">
-            <label>Cliente<ErpLigacao v-model="doc.customer" alvo="Customer" :ro="ro"/></label>
+            <label>Empresa/Cliente<ClienteProcura v-model="doc.customer" :ro="ro" @contacto="(c)=>{ if(!doc.contact_person) doc.contact_person=c }"/></label>
+            <label>Ao cuidado de<ContactoProcura v-model="doc.contact_person" :parte="doc.customer" tipo="Customer" :ro="ro"/></label>
             <label>Data<input type="date" v-model="doc.posting_date" :disabled="ro"></label>
             <label v-if="fatura">Vencimento<input type="date" v-model="doc.due_date" :disabled="ro"></label>
             <template v-else>
@@ -4339,7 +4347,11 @@ const ErpEmitir = {
               <thead><tr><th style="text-align:left">Artigo</th><th>Qtd</th><th>Preço</th><th v-if="fatura">Desc. %</th><th style="text-align:left">Armazém</th><th>Total</th><th v-if="!ro"></th></tr></thead>
               <tbody>
                 <tr v-for="l in doc.items || []" :key="l.name">
-                  <td><b>{{ l.item_name || l.item_code }}</b><div class="sub" style="font-size:12px">{{ l.item_code }}</div></td>
+                  <td><b>{{ l.item_name || l.item_code }}</b><div class="sub" style="font-size:12px">{{ l.item_code }}</div>
+                    <div v-if="sl[l.item_code] && sl[l.item_code].lote" class="sl-campo"><label>Lote<span class="obrig">*</span>
+                      <select v-model="l.batch_no" :disabled="ro" @change="l.use_serial_batch_fields=1"><option value="">— escolher —</option><option v-for="b in sl[l.item_code].lotes" :key="b.lote" :value="b.lote">{{ b.lote }}{{ b.validade ? ' · val. ' + b.validade : '' }}</option></select></label></div>
+                    <div v-if="sl[l.item_code] && sl[l.item_code].serie" class="sl-campo"><label>N.º de série <span class="sub">({{ nSeries(l) }} de {{ l.qty || 0 }})</span><span class="obrig">*</span>
+                      <textarea rows="2" v-model="l.serial_no" :disabled="ro" @input="l.use_serial_batch_fields=1" :placeholder="'Um por linha' + (sl[l.item_code].series.length ? ' — disponíveis: ' + sl[l.item_code].series.slice(0,5).join(', ') + (sl[l.item_code].series.length>5?'…':'') : '')"></textarea></label></div></td>
                   <td style="text-align:right"><input type="number" min="0" step="any" v-model.number="l.qty" :disabled="ro" style="width:72px;text-align:right"></td>
                   <td style="text-align:right"><input type="number" min="0" step="0.01" v-model.number="l.rate" :disabled="ro" style="width:96px;text-align:right"></td>
                   <td v-if="fatura" style="text-align:right"><input type="number" min="0" max="100" step="0.01" v-model.number="l.discount_percentage" :disabled="ro" style="width:64px;text-align:right"></td>
@@ -4493,36 +4505,76 @@ const ErpRecibo = {
 };
 // 26-11-2026 (Vítor): o cliente da proposta procura-se em todo o lado (clientes do ERP e CRM) e cria-se quando falta
 const ClienteProcura = {
-  props: ["modelValue", "ro"], emits: ["update:modelValue", "contacto"],
+  props: ["modelValue", "ro", "modo"], emits: ["update:modelValue", "contacto"],
   setup(props, { emit }) {
+    const lead = computed(() => props.modo === "lead");
     const txt = ref(props.modelValue || ""), ops = ref([]), aberto = ref(false), campo = ref(null), pos = ref({}), novo = ref(null), a = ref(false); let tq;
     watch(() => props.modelValue, (v) => { if (v !== txt.value) txt.value = v || ""; });
     const posicionar = () => { const r = campo.value?.getBoundingClientRect(); if (!r) return; const w = Math.min(Math.max(r.width, 320), window.innerWidth - 16);
       pos.value = { position: "fixed", left: Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + "px", width: w + "px", top: (r.bottom + 4) + "px", maxHeight: Math.max(200, window.innerHeight - r.bottom - 20) + "px" }; };
     const aProcurar = ref(false); let nP = 0;
     const procurar = () => { clearTimeout(tq); aProcurar.value = true; posicionar(); aberto.value = true;
-      tq = setTimeout(async () => { const n = ++nP; const r = await api("clientes_venda.procurar", { q: txt.value }).catch(() => []); if (n !== nP) return; ops.value = r; aProcurar.value = false; posicionar(); }, 200); };
+      tq = setTimeout(async () => { const n = ++nP; const r = await api("clientes_venda.procurar", { q: txt.value, modo: props.modo || "cliente" }).catch(() => []); if (n !== nP) return; ops.value = r; aProcurar.value = false; posicionar(); }, 200); };
     const escolher = async (o) => { aberto.value = false;
       if (o.tipo === "cliente") { txt.value = o.name; emit("update:modelValue", o.name); return; }
-      a.value = true; try { const r = await api("clientes_venda.usar", { doctype: o.doctype, name: o.name }, true); txt.value = r.customer; emit("update:modelValue", r.customer); if (r.contacto) emit("contacto", r.contacto); toast("Cliente «" + r.customer + "» pronto"); } finally { a.value = false; } };
-    const criar = async () => { a.value = true; try { const r = await api("clientes_venda.usar", { dados: JSON.stringify(novo.value) }, true); txt.value = r.customer; emit("update:modelValue", r.customer); novo.value = null; toast("Cliente criado"); } finally { a.value = false; } };
+      a.value = true; try { const r = await api("clientes_venda.usar", { doctype: o.doctype, name: o.name, modo: props.modo || "cliente" }, true); txt.value = r.customer; emit("update:modelValue", r.customer); if (r.contacto) emit("contacto", r.contacto); toast("Cliente «" + r.customer + "» pronto"); } finally { a.value = false; } };
+    const criar = async () => { a.value = true; try { const r = await api("clientes_venda.usar", { dados: JSON.stringify(novo.value), modo: props.modo || "cliente" }, true); txt.value = r.customer; emit("update:modelValue", r.customer); novo.value = null; toast("Cliente criado"); } finally { a.value = false; } };
     const sair = () => setTimeout(() => { aberto.value = false; }, 180);
-    return { aProcurar, txt, ops, aberto, campo, pos, novo, a, procurar, escolher, criar, sair, irErp };
+    return { lead, aProcurar, txt, ops, aberto, campo, pos, novo, a, procurar, escolher, criar, sair, irErp };
   },
   template: `<div class="erp-ligacao">
-    <input ref="campo" v-model="txt" :disabled="ro" placeholder="Procurar cliente, empresa ou contacto…" @focus="procurar" @input="procurar" @blur="sair" autocomplete="off">
-    <a v-if="modelValue" class="ir" :href="irErp('Customer', modelValue)" title="Abrir o cliente">↗</a>
+    <input ref="campo" v-model="txt" :disabled="ro" :placeholder="lead ? 'Procurar lead…' : 'Procurar empresa, cliente ou contacto…'" @focus="procurar" @input="procurar" @blur="sair" @keydown.esc="aberto=false" autocomplete="off">
+    <a v-if="modelValue" class="ir" :href="irErp(lead ? 'Lead' : 'Customer', modelValue)" :title="lead ? 'Abrir a lead' : 'Abrir o cliente'">↗</a>
     <div v-if="aberto" class="cartao erp-ops cli-ops" :style="pos">
       <div v-if="aProcurar && !ops.length" class="sub" style="padding:8px 10px;font-size:13px">A procurar…</div>
-      <div v-if="!txt && ops.length" class="sub cli-grupo">Clientes e contactos mais recentes — escreva para procurar</div>
-      <div v-for="o in ops" :key="o.doctype+o.name" class="linha" @mousedown.prevent="escolher(o)"><div class="cresce"><b>{{ o.titulo }}</b><small>{{ o.sub }}<template v-if="o.tipo==='crm'"> · passa a cliente ao escolher</template></small></div></div>
-      <div v-if="!ops.length && !aProcurar" class="sub" style="padding:8px 10px;font-size:13px">{{ txt ? 'Nenhum cliente, empresa ou contacto com «' + txt + '».' : 'Escreva para procurar.' }}</div>
-      <div class="linha cli-novo" @mousedown.prevent="novo={nome:txt,tipo:'Empresa',nif:'',email:'',telefone:''}; aberto=false">+ Criar cliente{{ txt ? ' «' + txt + '»' : '' }}</div>
+      <div v-if="!txt && ops.length" class="sub cli-grupo">{{ lead ? 'Leads mais recentes' : 'Clientes e contactos mais recentes' }} — escreva para procurar</div>
+      <div v-for="o in ops" :key="o.doctype+o.name" class="linha" @mousedown.prevent="escolher(o)"><div class="cresce"><b>{{ o.titulo }}</b><small>{{ o.sub }}<template v-if="o.tipo==='crm'"> · {{ lead ? 'passa a lead do ERP' : 'passa a cliente' }} ao escolher</template></small></div></div>
+      <div v-if="!ops.length && !aProcurar" class="sub" style="padding:8px 10px;font-size:13px">{{ txt ? (lead ? 'Nenhuma lead com «' : 'Nenhum cliente, empresa ou contacto com «') + txt + '».' : 'Escreva para procurar.' }}</div>
+      <div class="linha cli-novo" @mousedown.prevent="novo={nome:txt,tipo:'Empresa',nif:'',email:'',telefone:'',empresa:''}; aberto=false">+ {{ lead ? 'Criar lead' : 'Criar cliente' }}{{ txt ? ' «' + txt + '»' : '' }}</div>
     </div>
-    <div v-if="novo" class="modal-fundo" @click.self="novo=null"><div class="modal" style="max-width:460px"><header><b>Novo cliente</b><button class="btn sm" @click="novo=null">Fechar</button></header>
-      <form class="reg-form" @submit.prevent="criar"><label class="erp-campo"><span>Nome<span class="obrig">*</span></span><input v-model="novo.nome" required autofocus></label>
-        <div class="reg-linha3" style="grid-template-columns:1fr 1fr"><label class="erp-campo"><span>Tipo</span><select v-model="novo.tipo"><option>Empresa</option><option>Particular</option></select></label><label class="erp-campo"><span>NIF</span><input v-model="novo.nif"></label></div>
+    <div v-if="novo" class="modal-fundo" @click.self="novo=null"><div class="modal" style="max-width:460px"><header><b>{{ lead ? 'Nova lead' : 'Novo cliente' }}</b><button class="btn sm" @click="novo=null">Fechar</button></header>
+      <form class="reg-form" @submit.prevent="criar"><label class="erp-campo"><span>{{ lead ? 'Nome da pessoa' : 'Nome' }}<span class="obrig">*</span></span><input v-model="novo.nome" required autofocus></label>
+        <label v-if="lead" class="erp-campo"><span>Empresa</span><input v-model="novo.empresa"></label>
+        <div v-if="!lead" class="reg-linha3" style="grid-template-columns:1fr 1fr"><label class="erp-campo"><span>Tipo</span><select v-model="novo.tipo"><option>Empresa</option><option>Particular</option></select></label><label class="erp-campo"><span>NIF</span><input v-model="novo.nif"></label></div>
         <div class="reg-linha3" style="grid-template-columns:1fr 1fr"><label class="erp-campo"><span>Email</span><input type="email" v-model="novo.email"></label><label class="erp-campo"><span>Telemóvel</span><input type="tel" v-model="novo.telefone"></label></div>
+        <div class="reg-botoes"><button class="btn prim" :disabled="a">Criar e usar</button></div></form></div></div>
+  </div>`,
+};
+// «Ao cuidado de» (27-11-2026): procura os contactos — primeiro os da empresa/cliente, depois os outros — e cria um novo já ligado
+const ContactoProcura = {
+  props: ["modelValue", "ro", "parte", "tipo"], emits: ["update:modelValue"],
+  setup(props, { emit }) {
+    const txt = ref(props.modelValue || ""), ops = ref([]), aberto = ref(false), campo = ref(null), pos = ref({}), novo = ref(null), a = ref(false), aProcurar = ref(false); let tq, nP = 0;
+    watch(() => props.modelValue, (v) => { if (v !== txt.value) txt.value = v || ""; });
+    const posicionar = () => { const r = campo.value?.getBoundingClientRect(); if (!r) return; const w = Math.min(Math.max(r.width, 300), window.innerWidth - 16);
+      pos.value = { position: "fixed", left: Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + "px", width: w + "px", top: (r.bottom + 4) + "px", maxHeight: Math.max(200, window.innerHeight - r.bottom - 20) + "px" }; };
+    const procurar = () => { clearTimeout(tq); aProcurar.value = true; posicionar(); aberto.value = true;
+      tq = setTimeout(async () => { const n = ++nP; const r = await api("clientes_venda.contactos", { q: txt.value === props.modelValue ? "" : txt.value, parte: props.parte || "", tipo: props.tipo || "Customer" }).catch(() => []);
+        if (n !== nP) return; ops.value = r; aProcurar.value = false; posicionar(); }, 200); };
+    const escolher = (o) => { aberto.value = false; txt.value = o.name; emit("update:modelValue", o.name); };
+    const limpar = () => { txt.value = ""; emit("update:modelValue", ""); };
+    const criar = async () => { a.value = true; try { const r = await api("clientes_venda.criar_contacto", { dados: JSON.stringify(novo.value), parte: props.parte || "", tipo: props.tipo || "Customer" }, true);
+      txt.value = r.name; emit("update:modelValue", r.name); novo.value = null; toast("Contacto criado"); } finally { a.value = false; } };
+    const sair = () => setTimeout(() => { aberto.value = false; if (!txt.value && props.modelValue) emit("update:modelValue", ""); }, 180);
+    const daParte = computed(() => ops.value.filter((o) => o.da_parte)), outros = computed(() => ops.value.filter((o) => !o.da_parte));
+    return { txt, ops, aberto, campo, pos, novo, a, aProcurar, procurar, escolher, limpar, criar, sair, daParte, outros, irErp };
+  },
+  template: `<div class="erp-ligacao">
+    <input ref="campo" v-model="txt" :disabled="ro" placeholder="Procurar contacto…" @focus="procurar" @input="procurar" @blur="sair" @keydown.esc="aberto=false" autocomplete="off">
+    <a v-if="modelValue" class="ir" :href="irErp('Contact', modelValue)" title="Abrir o contacto">↗</a>
+    <div v-if="aberto" class="cartao erp-ops cli-ops" :style="pos">
+      <div v-if="aProcurar && !ops.length" class="sub" style="padding:8px 10px;font-size:13px">A procurar…</div>
+      <div v-if="daParte.length" class="sub cli-grupo">Contactos de {{ parte }}</div>
+      <div v-for="o in daParte" :key="o.name" class="linha" @mousedown.prevent="escolher(o)"><div class="cresce"><b>{{ o.titulo }}</b><small>{{ o.sub }}</small></div></div>
+      <div v-if="outros.length" class="sub cli-grupo">{{ daParte.length ? 'Outros contactos' : (parte ? 'Sem contactos ligados a ' + parte + ' — outros contactos' : 'Contactos') }}</div>
+      <div v-for="o in outros" :key="o.name" class="linha" @mousedown.prevent="escolher(o)"><div class="cresce"><b>{{ o.titulo }}</b><small>{{ o.sub }}</small></div></div>
+      <div v-if="!ops.length && !aProcurar" class="sub" style="padding:8px 10px;font-size:13px">{{ txt ? 'Nenhum contacto com «' + txt + '».' : 'Escreva para procurar.' }}</div>
+      <div class="linha cli-novo" @mousedown.prevent="novo={nome:txt,email:'',telefone:''}; aberto=false">+ Criar contacto{{ txt ? ' «' + txt + '»' : '' }}{{ parte ? ' em ' + parte : '' }}</div>
+    </div>
+    <div v-if="novo" class="modal-fundo" @click.self="novo=null"><div class="modal" style="max-width:460px"><header><b>Novo contacto</b><button class="btn sm" @click="novo=null">Fechar</button></header>
+      <form class="reg-form" @submit.prevent="criar"><label class="erp-campo"><span>Nome<span class="obrig">*</span></span><input v-model="novo.nome" required autofocus></label>
+        <div class="reg-linha3" style="grid-template-columns:1fr 1fr"><label class="erp-campo"><span>Email</span><input type="email" v-model="novo.email"></label><label class="erp-campo"><span>Telemóvel</span><input type="tel" v-model="novo.telefone"></label></div>
+        <p v-if="parte" class="sub" style="margin:0;font-size:12px">Fica ligado a {{ parte }}.</p>
         <div class="reg-botoes"><button class="btn prim" :disabled="a">Criar e usar</button></div></form></div></div>
   </div>`,
 };
@@ -4557,7 +4609,7 @@ const ProdutoRever = {
 };
 
 const ErpProposta = {
-  components: { ErpLigacao, EditorRico, ClienteProcura, ProdutoRever },
+  components: { ErpLigacao, ErpCampo, EditorRico, ClienteProcura, ContactoProcura, ProdutoRever },
   props: ["name"],
   setup(props) {
     const doc = ref(null); const novo = ref(false); const sujo = ref(false); const a = ref(false); const aviso = ref("");
@@ -4657,7 +4709,26 @@ const ErpProposta = {
     const titulo = computed(() => doc.value?.customer_name || doc.value?.party_name || "Nova proposta");
     const curtas = (l) => caractPares(l.orbit_caracteristicas).slice(0, 6);
     const nCaract = (l) => caractPares(l.orbit_caracteristicas).length;
-    return { aSugerir, sugDe, fab, rever, eUrl, lerPagina, lerComIa, depoisDeCriar, statusPt, link, doc, novo, sujo, a, aviso, marcas, versoes, ro, linhas, docstatus, moeda, totais, marcaSel, corMarca, q, sug, procurando, acrescentar, internet, remover,
+    // 27-11-2026 (Vítor: «há campos originalmente existentes na interface dos orçamentos que não existem aqui»): todos os
+    // campos editáveis do Orçamento e da linha que este ecrã não mostra, com os mesmos controlos da ficha completa
+    const metaQ = ref(null); const linhaMais = ref({});
+    onMounted(async () => { metaQ.value = await api("erp.meta", { doctype: "Quotation" }).catch(() => null); });
+    const NA_PROPOSTA = new Set(["quotation_to", "party_name", "contact_person", "valid_till", "orbit_negocio", "orbit_marca", "orbit_texto_intro", "orbit_garantia",
+      "orbit_pagamento", "orbit_prazo", "orbit_anexar_condicoes", "orbit_imprimir_total", "orbit_mostrar_iva", "orbit_proposta_base", "orbit_transporte_modo",
+      "orbit_transporte_total", "orbit_montagem_total", "items", "naming_series", "amended_from"]);
+    const NA_LINHA = new Set(["item_code", "item_name", "qty", "rate", "amount", "orbit_caracteristicas", "orbit_transporte", "orbit_montagem", "orbit_observacoes", "image", "orbit_de"]);
+    const SEM = new Set(["Section Break", "Column Break", "Tab Break", "HTML", "Button", "Heading", "Fold", "Image"]);
+    const serve = (c, d, fora) => !fora.has(c.fieldname) && !SEM.has(c.fieldtype) && !c.hidden && !c.read_only && !/^base_/.test(c.fieldname) && avaliar(c.depends_on, d);
+    const blocosExtra = computed(() => { const m = metaQ.value, d = doc.value; if (!m || !d) return [];
+      const out = []; let b = { label: "Geral", campos: [] }; out.push(b);
+      for (const c of m.campos || []) {
+        if (c.fieldtype === "Section Break" || c.fieldtype === "Tab Break") { if (c.label) { b = { label: c.label, campos: [] }; out.push(b); } continue; }
+        if (serve(c, d, NA_PROPOSTA)) b.campos.push(c);
+      }
+      return out.filter((x) => x.campos.length); });
+    const nExtra = computed(() => blocosExtra.value.reduce((n, b) => n + b.campos.length, 0));
+    const camposLinha = (l) => ((metaQ.value?.filhas || {})["Quotation Item"]?.campos || []).filter((c) => serve(c, Object.assign({}, l, { parent: doc.value }), NA_LINHA) && c.fieldtype !== "Table");
+    return { blocosExtra, nExtra, camposLinha, linhaMais, aSugerir, sugDe, fab, rever, eUrl, lerPagina, lerComIa, depoisDeCriar, statusPt, link, doc, novo, sujo, a, aviso, marcas, versoes, ro, linhas, docstatus, moeda, totais, marcaSel, corMarca, q, sug, procurando, acrescentar, internet, remover,
       gravar, alternativa, submeter, encomenda, pdf, envio, abrirEnvio, enviar, titulo, curtas, nCaract, abertas, irErp, ESTADO_DOC };
   },
   template: `<div v-if="doc" class="pad prop">
@@ -4685,14 +4756,18 @@ const ErpProposta = {
           <div class="prop-marcas" v-if="marcas.length"><div class="sub">Marca que envia</div>
             <div class="prop-chips"><button v-for="m in marcas" :key="m.name" type="button" :disabled="ro" :class="{ativo: doc.orbit_marca===m.name}" :style="doc.orbit_marca===m.name ? {borderColor: corMarca(m)} : {}" @click="doc.orbit_marca=m.name"><span :style="{background: corMarca(m)}"></span>{{ m.name }}</button></div></div>
           <div class="prop-campos">
-            <label>Proposta para<select v-model="doc.quotation_to" :disabled="ro"><option value="Customer">Cliente</option><option value="Lead">Lead</option><option value="Prospect">Potencial cliente</option></select></label>
-            <label>{{ doc.quotation_to==='Customer' ? 'Cliente' : doc.quotation_to==='Lead' ? 'Lead' : 'Potencial cliente' }}<ClienteProcura v-if="doc.quotation_to==='Customer'" v-model="doc.party_name" :ro="ro" @contacto="(c)=>{ if(!doc.contact_person) doc.contact_person=c }"/><ErpLigacao v-else v-model="doc.party_name" :alvo="doc.quotation_to" :ro="ro"/></label>
-            <label>Ao cuidado de<ErpLigacao v-model="doc.contact_person" alvo="Contact" :ro="ro"/></label>
+            <label>Proposta para<select v-model="doc.quotation_to" :disabled="ro" @change="doc.party_name=''"><option value="Customer">Empresa/Cliente</option><option value="Lead">Lead / potencial cliente</option><option v-if="doc.quotation_to==='Prospect'" value="Prospect">Potencial cliente (antigo)</option></select></label>
+            <label>{{ doc.quotation_to==='Lead' ? 'Lead / potencial cliente' : doc.quotation_to==='Prospect' ? 'Potencial cliente' : 'Empresa/Cliente' }}<ClienteProcura v-if="doc.quotation_to!=='Prospect'" :key="doc.quotation_to" :modo="doc.quotation_to==='Lead' ? 'lead' : 'cliente'" v-model="doc.party_name" :ro="ro" @contacto="(c)=>{ if(!doc.contact_person) doc.contact_person=c }"/><ErpLigacao v-else v-model="doc.party_name" alvo="Prospect" :ro="ro"/></label>
+            <label>Ao cuidado de<ContactoProcura v-model="doc.contact_person" :parte="doc.party_name" :tipo="doc.quotation_to" :ro="ro"/></label>
             <label>Válida até<input type="date" v-model="doc.valid_till" :disabled="ro"></label>
             <label>Negócio<ErpLigacao v-model="doc.orbit_negocio" alvo="CRM Deal" :ro="ro || !!doc.orbit_proposta_base" :filtros="JSON.stringify({status: ['not in', ['Won','Lost']]})"/><small class="sub" v-if="!doc.orbit_negocio && !ro">Vazio = nasce um negócio novo ao gravar</small><a v-else-if="doc.orbit_negocio" class="sub" :href="link('CRM Deal', doc.orbit_negocio)">Abrir o negócio</a></label>
             <div class="larga prop-intro"><span class="rotulo-campo">Introdução</span><EditorRico v-model="doc.orbit_texto_intro" :ro="ro" placeholder="Na sequência do seu pedido, apresentamos…"/></div>
           </div>
         </section>
+        <details v-if="nExtra" class="cartao prop-mais"><summary>Mais campos do orçamento <span class="sub">({{ nExtra }})</span></summary>
+          <div v-for="b in blocosExtra" :key="b.label" class="prop-mais-bloco"><h3>{{ b.label }}</h3>
+            <div class="prop-mais-grelha"><div v-for="c in b.campos" :key="c.fieldname" class="erp-campo"><label v-if="c.fieldtype!=='Check'">{{ c.label }}<span v-if="c.reqd" class="obrig">*</span></label><ErpCampo :c="c" :doc="doc" :ro="ro" doctype="Quotation"/><small v-if="c.descricao" class="sub">{{ c.descricao }}</small></div></div></div>
+        </details>
         <section v-if="!ro" class="cartao prop-procura" aria-label="Adicionar produto">
           <div class="prop-procura-linha">
             <label class="cresce"><span class="so-leitor">Referência, EAN ou nome</span><input v-model="q" placeholder="Adicionar produto — referência, EAN ou nome…" autocomplete="off"></label>
@@ -4735,9 +4810,11 @@ const ErpProposta = {
               <label>Montagem<input type="number" min="0" step="0.01" v-model.number="l.orbit_montagem" :disabled="ro"></label>
             </template>
             <label class="cresce">Observações<input v-model="l.orbit_observacoes" :disabled="ro" placeholder="Ex.: precisa de tomada 230 V a menos de 1,5 m"></label>
+            <button v-if="camposLinha(l).length" type="button" class="btn sm" @click="linhaMais[i] = !linhaMais[i]">{{ linhaMais[i] ? 'Menos campos' : 'Mais campos (' + camposLinha(l).length + ')' }}</button>
             <button v-if="!novo && i===0 && !ro" type="button" class="btn sm" @click="alternativa">Criar proposta alternativa com outro produto</button>
             <button v-if="!ro" type="button" class="btn sm" @click="remover(l)">Remover</button>
           </div>
+          <div v-if="linhaMais[i]" class="prop-mais-grelha prop-linha-mais"><div v-for="c in camposLinha(l)" :key="c.fieldname" class="erp-campo"><label v-if="c.fieldtype!=='Check'">{{ c.label }}</label><ErpCampo :c="c" :doc="l" :ro="ro" compacto="1"/></div></div>
         </article>
         <div v-if="!linhas.length" class="cartao vazio">Ainda sem produtos — procure acima pela referência ou pelo nome.</div>
       </div>
