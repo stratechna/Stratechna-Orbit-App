@@ -4215,9 +4215,73 @@ const EditorRico = {
 // funções de conversão do ERPNext); documentos associados nos dois sentidos; pró-forma a partir da fatura em rascunho.
 const apiE = (m, a = {}, post = false) => api("emitir." + m, a, post);
 const ROT_DT = { "Quotation": "Proposta", "Sales Order": "Encomenda", "Delivery Note": "Guia", "Sales Invoice": "Fatura", "Payment Entry": "Recibo" };
+// 27-11-2026 (Vítor: «cada ecrã alterado tem que ter TODOS os campos que existiam originalmente»): os ecrãs próprios
+// (proposta, fatura/guia, recibo) mostram aqui, arrumados como na ficha completa, todos os campos do documento que o
+// ecrã não desenha — tabelas, campos só de leitura com valor e condições incluídos. Nada fica só na ficha completa.
+const ErpRestantes = {
+  components: { ErpCampo, ErpTabela, ErpMulti },
+  props: ["doctype", "doc", "ro", "excluir", "novo"],
+  setup(props) {
+    const meta = ref(null);
+    onMounted(async () => { meta.value = await metaErp(props.doctype).catch(() => null); });
+    const fora = computed(() => new Set(props.excluir || []));
+    const ds = computed(() => props.doc?.docstatus || 0);
+    const roCampo = (c) => !!props.ro || ds.value === 2 || c.read_only || (ds.value === 1 && !c.allow_on_submit) || (c.read_only_depends_on && avaliar(c.read_only_depends_on, props.doc));
+    const obrig = (c) => c.reqd || (c.mandatory_depends_on && avaliar(c.mandatory_depends_on, props.doc));
+    const visivel = (c) => {
+      if (fora.value.has(c.fieldname) || c.hidden || !avaliar(c.depends_on, props.doc)) return false;
+      if (c.fieldtype === "HTML") return !!c.options;
+      if (c.fieldtype === "Image") return !!props.doc[c.options];
+      if (["Button", "Fold"].includes(c.fieldtype)) return false;
+      if (SEM_VALOR.includes(c.fieldtype) || FILHAS.includes(c.fieldtype)) return true;
+      if (roCampo(c) && !props.novo && vazioV(props.doc[c.fieldname])) return false;
+      return true;
+    };
+    const blocos = computed(() => { const m = meta.value; if (!m) return [];
+      const out = []; let aba = ""; let b = null;
+      const novo = (label) => { b = { aba, label: label || "", depends_on: null, campos: [] }; out.push(b); };
+      for (const c of m.campos || []) {
+        if (c.fieldtype === "Tab Break") { aba = c.label || ""; b = null; continue; }
+        if (c.fieldtype === "Section Break") { novo(c.label); b.depends_on = c.depends_on; continue; }
+        if (c.fieldtype === "Column Break") continue;
+        if (!b) novo("");
+        b.campos.push(c);
+      }
+      return out.filter((x) => avaliar(x.depends_on, props.doc) && x.campos.some(visivel)); });
+    const n = computed(() => blocos.value.reduce((k, b) => k + b.campos.filter(visivel).length, 0));
+    return { meta, blocos, n, visivel, roCampo, obrig };
+  },
+  template: `<details v-if="n" class="cartao prop-mais"><summary>Todos os outros campos <span class="sub">({{ n }})</span></summary>
+    <div v-for="(b, bi) in blocos" :key="bi" class="prop-mais-bloco"><h3>{{ [b.aba, b.label].filter(Boolean).join(' › ') || 'Geral' }}</h3>
+      <div class="prop-mais-grelha"><template v-for="c in b.campos" :key="c.fieldname"><div v-if="visivel(c)" class="erp-campo" :class="{'prop-mais-largo': ['Table','Table MultiSelect','Text Editor','Small Text','Text','Long Text','HTML'].includes(c.fieldtype)}">
+        <label v-if="!['Check','Button','Heading','HTML'].includes(c.fieldtype)">{{ c.label }}<span v-if="obrig(c)" class="obrig">*</span></label>
+        <ErpTabela v-if="c.fieldtype==='Table'" :c="c" :doc="doc" :filha="meta.filhas[c.options]" :ro="roCampo(c)"/>
+        <ErpMulti v-else-if="c.fieldtype==='Table MultiSelect'" :c="c" :doc="doc" :filha="meta.filhas[c.options]" :ro="roCampo(c)"/>
+        <ErpCampo v-else :c="c" :doc="doc" :ro="roCampo(c)" :doctype="doctype"/>
+        <small v-if="c.descricao" class="sub">{{ c.descricao }}</small></div></template></div></div>
+  </details>`,
+};
+// Os campos de uma linha que o ecrã próprio não desenha (proposta, fatura/guia)
+const ErpLinhaCampos = {
+  components: { ErpCampo },
+  props: ["doctype", "linha", "parent", "ro", "excluir"],
+  setup(props) {
+    const meta = ref(null);
+    onMounted(async () => { const m = await metaErp(props.doctype.replace(/ Item$/, "") ).catch(() => null); meta.value = m && m.filhas ? m.filhas[props.doctype] : null; });
+    const fora = computed(() => new Set(props.excluir || []));
+    const ctx = computed(() => Object.assign({}, props.linha, { parent: props.parent }));
+    const ds = computed(() => props.parent?.docstatus || 0);
+    const roCampo = (c) => !!props.ro || c.read_only || (ds.value === 1 && !c.allow_on_submit) || (c.read_only_depends_on && avaliar(c.read_only_depends_on, ctx.value));
+    const campos = computed(() => ((meta.value && meta.value.campos) || []).filter((c) => !fora.value.has(c.fieldname) && !["Section Break", "Column Break", "Tab Break", "Button", "Fold", "Table", "Table MultiSelect"].includes(c.fieldtype)
+      && !c.hidden && avaliar(c.depends_on, ctx.value) && !(c.fieldtype === "HTML" && !c.options) && !(roCampo(c) && vazioV(props.linha[c.fieldname]))));
+    return { campos, roCampo };
+  },
+  template: `<div class="prop-mais-grelha prop-linha-mais"><div v-for="c in campos" :key="c.fieldname" class="erp-campo"><label v-if="!['Check','Heading','HTML'].includes(c.fieldtype)">{{ c.label }}</label><ErpCampo :c="c" :doc="linha" :ro="roCampo(c)" compacto="1"/></div>
+    <div v-if="!campos.length" class="sub">Sem mais campos nesta linha.</div></div>`,
+};
 const ErpEmitir = {
   // ClienteProcura/ContactoProcura vêm mais abaixo no ficheiro: getters para não as ler antes de existirem
-  components: { ErpLigacao, get ClienteProcura() { return ClienteProcura; }, get ContactoProcura() { return ContactoProcura; } },
+  components: { ErpLigacao, ErpRestantes, ErpLinhaCampos, get ClienteProcura() { return ClienteProcura; }, get ContactoProcura() { return ContactoProcura; } },
   props: ["dt", "name"],
   setup(props) {
     const fatura = props.dt === "Sales Invoice";
@@ -4298,7 +4362,8 @@ const ErpEmitir = {
     watch(() => doc.value ? (doc.value.items || []).map((l) => l.item_code).join("|") + "@" + (doc.value.set_warehouse || "") : "", async (k) => {
       const cods = [...new Set((doc.value?.items || []).map((l) => l.item_code).filter(Boolean))]; if (!cods.length) { sl.value = {}; return; }
       sl.value = await api("clientes_venda.serie_lote", { codigos: JSON.stringify(cods), armazem: doc.value.set_warehouse || "" }).catch(() => ({})) || {}; });
-    return { sl, nSeries, fatura, doc, novo, sujo, a, aviso, ro, docstatus, marcas, marcaSel, assoc, imp, novaLinha, moeda, remover, gravar, emitir, proforma, converter, receber,
+    const linhaMais = ref({});
+    return { linhaMais, sl, nSeries, fatura, doc, novo, sujo, a, aviso, ro, docstatus, marcas, marcaSel, assoc, imp, novaLinha, moeda, remover, gravar, emitir, proforma, converter, receber,
       abrirImportar, tiposImp, listaImp, escolherImp, importar, origens, titulo, pdf, irErp, link, ESTADO_DOC, statusPt, ROT_DT };
   },
   template: `<div v-if="doc" class="pad prop">
@@ -4346,8 +4411,8 @@ const ErpEmitir = {
             <table class="tab-emitir" style="width:100%;border-collapse:collapse;min-width:620px;font-size:13px">
               <thead><tr><th style="text-align:left">Artigo</th><th>Qtd</th><th>Preço</th><th v-if="fatura">Desc. %</th><th style="text-align:left">Armazém</th><th>Total</th><th v-if="!ro"></th></tr></thead>
               <tbody>
-                <tr v-for="l in doc.items || []" :key="l.name">
-                  <td><b>{{ l.item_name || l.item_code }}</b><div class="sub" style="font-size:12px">{{ l.item_code }}</div>
+                <template v-for="l in doc.items || []" :key="l.name"><tr>
+                  <td><b>{{ l.item_name || l.item_code }}</b><div class="sub" style="font-size:12px">{{ l.item_code }} · <button type="button" class="link" @click="linhaMais[l.name] = !linhaMais[l.name]">{{ linhaMais[l.name] ? 'menos campos' : 'todos os campos' }}</button></div>
                     <div v-if="sl[l.item_code] && sl[l.item_code].lote" class="sl-campo"><label>Lote<span class="obrig">*</span>
                       <select v-model="l.batch_no" :disabled="ro" @change="l.use_serial_batch_fields=1"><option value="">— escolher —</option><option v-for="b in sl[l.item_code].lotes" :key="b.lote" :value="b.lote">{{ b.lote }}{{ b.validade ? ' · val. ' + b.validade : '' }}</option></select></label></div>
                     <div v-if="sl[l.item_code] && sl[l.item_code].serie" class="sl-campo"><label>N.º de série <span class="sub">({{ nSeries(l) }} de {{ l.qty || 0 }})</span><span class="obrig">*</span>
@@ -4359,12 +4424,14 @@ const ErpEmitir = {
                   <td style="text-align:right;font-weight:600">{{ moeda(l.amount) }}</td>
                   <td v-if="!ro"><button type="button" class="btn sm" @click="remover(l)" aria-label="Remover linha">×</button></td>
                 </tr>
+                <tr v-if="linhaMais[l.name]"><td :colspan="(fatura ? 6 : 5) + (ro ? 0 : 1)" style="padding:0"><ErpLinhaCampos :doctype="dt + ' Item'" :linha="l" :parent="doc" :ro="ro" :excluir="['item_code','item_name','qty','rate','discount_percentage','amount','serial_no','batch_no']"/></td></tr></template>
                 <tr v-if="!(doc.items||[]).length"><td :colspan="fatura ? 7 : 6" class="sub" style="text-align:center;padding:14px">Sem linhas — acrescente um artigo ou importe de outro documento.</td></tr>
               </tbody>
             </table>
           </div>
           <label class="sub" style="display:flex;flex-direction:column;gap:4px">Observações<textarea rows="2" v-model="doc.remarks" :disabled="ro"></textarea></label>
         </section>
+        <ErpRestantes :doctype="dt" :doc="doc" :ro="ro" :novo="novo" :excluir="['customer','contact_person','posting_date','due_date','remarks','set_warehouse','shipping_address_name','vehicle_no','items','orbit_marca']"/>
       </div>
       <aside class="prop-lado" aria-label="Resumo">
         <section class="cartao" aria-label="Documentos associados">
@@ -4609,7 +4676,7 @@ const ProdutoRever = {
 };
 
 const ErpProposta = {
-  components: { ErpLigacao, ErpCampo, EditorRico, ClienteProcura, ContactoProcura, ProdutoRever },
+  components: { ErpLigacao, ErpCampo, ErpRestantes, ErpLinhaCampos, EditorRico, ClienteProcura, ContactoProcura, ProdutoRever },
   props: ["name"],
   setup(props) {
     const doc = ref(null); const novo = ref(false); const sujo = ref(false); const a = ref(false); const aviso = ref("");
@@ -4709,26 +4776,13 @@ const ErpProposta = {
     const titulo = computed(() => doc.value?.customer_name || doc.value?.party_name || "Nova proposta");
     const curtas = (l) => caractPares(l.orbit_caracteristicas).slice(0, 6);
     const nCaract = (l) => caractPares(l.orbit_caracteristicas).length;
-    // 27-11-2026 (Vítor: «há campos originalmente existentes na interface dos orçamentos que não existem aqui»): todos os
-    // campos editáveis do Orçamento e da linha que este ecrã não mostra, com os mesmos controlos da ficha completa
-    const metaQ = ref(null); const linhaMais = ref({});
-    onMounted(async () => { metaQ.value = await api("erp.meta", { doctype: "Quotation" }).catch(() => null); });
-    const NA_PROPOSTA = new Set(["quotation_to", "party_name", "contact_person", "valid_till", "orbit_negocio", "orbit_marca", "orbit_texto_intro", "orbit_garantia",
+    // 27-11-2026: todos os campos do Orçamento e da linha que este ecrã não desenha aparecem em «Todos os outros campos»
+    const linhaMais = ref({});
+    const NA_PROPOSTA = ["quotation_to", "party_name", "contact_person", "valid_till", "orbit_negocio", "orbit_marca", "orbit_texto_intro", "orbit_garantia",
       "orbit_pagamento", "orbit_prazo", "orbit_anexar_condicoes", "orbit_imprimir_total", "orbit_mostrar_iva", "orbit_proposta_base", "orbit_transporte_modo",
-      "orbit_transporte_total", "orbit_montagem_total", "items", "naming_series", "amended_from"]);
-    const NA_LINHA = new Set(["item_code", "item_name", "qty", "rate", "amount", "orbit_caracteristicas", "orbit_transporte", "orbit_montagem", "orbit_observacoes", "image", "orbit_de"]);
-    const SEM = new Set(["Section Break", "Column Break", "Tab Break", "HTML", "Button", "Heading", "Fold", "Image"]);
-    const serve = (c, d, fora) => !fora.has(c.fieldname) && !SEM.has(c.fieldtype) && !c.hidden && !c.read_only && !/^base_/.test(c.fieldname) && avaliar(c.depends_on, d);
-    const blocosExtra = computed(() => { const m = metaQ.value, d = doc.value; if (!m || !d) return [];
-      const out = []; let b = { label: "Geral", campos: [] }; out.push(b);
-      for (const c of m.campos || []) {
-        if (c.fieldtype === "Section Break" || c.fieldtype === "Tab Break") { if (c.label) { b = { label: c.label, campos: [] }; out.push(b); } continue; }
-        if (serve(c, d, NA_PROPOSTA)) b.campos.push(c);
-      }
-      return out.filter((x) => x.campos.length); });
-    const nExtra = computed(() => blocosExtra.value.reduce((n, b) => n + b.campos.length, 0));
-    const camposLinha = (l) => ((metaQ.value?.filhas || {})["Quotation Item"]?.campos || []).filter((c) => serve(c, Object.assign({}, l, { parent: doc.value }), NA_LINHA) && c.fieldtype !== "Table");
-    return { blocosExtra, nExtra, camposLinha, linhaMais, aSugerir, sugDe, fab, rever, eUrl, lerPagina, lerComIa, depoisDeCriar, statusPt, link, doc, novo, sujo, a, aviso, marcas, versoes, ro, linhas, docstatus, moeda, totais, marcaSel, corMarca, q, sug, procurando, acrescentar, internet, remover,
+      "orbit_transporte_total", "orbit_montagem_total", "items"];
+    const NA_LINHA = ["item_code", "item_name", "qty", "rate", "orbit_caracteristicas", "orbit_transporte", "orbit_montagem", "orbit_observacoes", "orbit_de"];
+    return { NA_PROPOSTA, NA_LINHA, linhaMais, aSugerir, sugDe, fab, rever, eUrl, lerPagina, lerComIa, depoisDeCriar, statusPt, link, doc, novo, sujo, a, aviso, marcas, versoes, ro, linhas, docstatus, moeda, totais, marcaSel, corMarca, q, sug, procurando, acrescentar, internet, remover,
       gravar, alternativa, submeter, encomenda, pdf, envio, abrirEnvio, enviar, titulo, curtas, nCaract, abertas, irErp, ESTADO_DOC };
   },
   template: `<div v-if="doc" class="pad prop">
@@ -4764,10 +4818,7 @@ const ErpProposta = {
             <div class="larga prop-intro"><span class="rotulo-campo">Introdução</span><EditorRico v-model="doc.orbit_texto_intro" :ro="ro" placeholder="Na sequência do seu pedido, apresentamos…"/></div>
           </div>
         </section>
-        <details v-if="nExtra" class="cartao prop-mais"><summary>Mais campos do orçamento <span class="sub">({{ nExtra }})</span></summary>
-          <div v-for="b in blocosExtra" :key="b.label" class="prop-mais-bloco"><h3>{{ b.label }}</h3>
-            <div class="prop-mais-grelha"><div v-for="c in b.campos" :key="c.fieldname" class="erp-campo"><label v-if="c.fieldtype!=='Check'">{{ c.label }}<span v-if="c.reqd" class="obrig">*</span></label><ErpCampo :c="c" :doc="doc" :ro="ro" doctype="Quotation"/><small v-if="c.descricao" class="sub">{{ c.descricao }}</small></div></div></div>
-        </details>
+        <ErpRestantes doctype="Quotation" :doc="doc" :ro="ro" :novo="novo" :excluir="NA_PROPOSTA"/>
         <section v-if="!ro" class="cartao prop-procura" aria-label="Adicionar produto">
           <div class="prop-procura-linha">
             <label class="cresce"><span class="so-leitor">Referência, EAN ou nome</span><input v-model="q" placeholder="Adicionar produto — referência, EAN ou nome…" autocomplete="off"></label>
@@ -4810,11 +4861,11 @@ const ErpProposta = {
               <label>Montagem<input type="number" min="0" step="0.01" v-model.number="l.orbit_montagem" :disabled="ro"></label>
             </template>
             <label class="cresce">Observações<input v-model="l.orbit_observacoes" :disabled="ro" placeholder="Ex.: precisa de tomada 230 V a menos de 1,5 m"></label>
-            <button v-if="camposLinha(l).length" type="button" class="btn sm" @click="linhaMais[i] = !linhaMais[i]">{{ linhaMais[i] ? 'Menos campos' : 'Mais campos (' + camposLinha(l).length + ')' }}</button>
+            <button type="button" class="btn sm" @click="linhaMais[i] = !linhaMais[i]">{{ linhaMais[i] ? 'Menos campos' : 'Todos os campos da linha' }}</button>
             <button v-if="!novo && i===0 && !ro" type="button" class="btn sm" @click="alternativa">Criar proposta alternativa com outro produto</button>
             <button v-if="!ro" type="button" class="btn sm" @click="remover(l)">Remover</button>
           </div>
-          <div v-if="linhaMais[i]" class="prop-mais-grelha prop-linha-mais"><div v-for="c in camposLinha(l)" :key="c.fieldname" class="erp-campo"><label v-if="c.fieldtype!=='Check'">{{ c.label }}</label><ErpCampo :c="c" :doc="l" :ro="ro" compacto="1"/></div></div>
+          <ErpLinhaCampos v-if="linhaMais[i]" doctype="Quotation Item" :linha="l" :parent="doc" :ro="ro" :excluir="NA_LINHA"/>
         </article>
         <div v-if="!linhas.length" class="cartao vazio">Ainda sem produtos — procure acima pela referência ou pelo nome.</div>
       </div>
