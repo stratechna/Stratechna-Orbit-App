@@ -592,6 +592,37 @@ def stock_resumo():
 
 
 @frappe.whitelist()
+def stock_armazem(warehouse: str, q: str = ""):
+    """O inventário de um armazém: artigos com stock, quantidade, custo médio, valor e números de série (27-11-2026)."""
+    _guarda()
+    frappe.get_doc("Warehouse", warehouse).check_permission("read")
+    filtros = {"warehouse": warehouse, "actual_qty": ["!=", 0]}
+    bins = frappe.get_list("Bin", fields=["item_code", "actual_qty", "reserved_qty", "valuation_rate", "stock_value"],
+                           filters=filtros, limit_page_length=20000)
+    codigos = [b.item_code for b in bins]
+    artigos = {i.name: i for i in frappe.get_all("Item", filters={"name": ["in", codigos or [""]]},
+                                                   fields=["name", "item_name", "brand", "item_group", "stock_uom", "has_serial_no"])}
+    series = {}
+    if codigos:
+        for s in frappe.get_all("Serial No", filters={"warehouse": warehouse, "item_code": ["in", codigos]},
+                                fields=["item_code", "name"], limit_page_length=50000):
+            series.setdefault(s.item_code, []).append(s.name)
+    t = (q or "").strip().lower()
+    out = []
+    for b in bins:
+        i = artigos.get(b.item_code) or frappe._dict()
+        sn = sorted(series.get(b.item_code, []))
+        if t and t not in (b.item_code + " " + (i.item_name or "") + " " + " ".join(sn)).lower():
+            continue
+        out.append({"item_code": b.item_code, "item_name": i.item_name, "marca": i.brand, "grupo": i.item_group,
+                    "unidade": i.stock_uom, "qtd": b.actual_qty, "reservado": b.reserved_qty,
+                    "custo": b.valuation_rate, "valor": b.stock_value, "series": sn})
+    out.sort(key=lambda x: x["item_code"])
+    return {"armazem": warehouse, "artigos": out, "total_qtd": sum(x["qtd"] for x in out),
+            "total_valor": sum(x["valor"] or 0 for x in out)}
+
+
+@frappe.whitelist()
 def pessoas():
     """Diretório, quem está ausente hoje e o saldo de férias de quem está a ver."""
     _guarda()

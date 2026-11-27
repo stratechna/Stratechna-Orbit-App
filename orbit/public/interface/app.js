@@ -5643,7 +5643,19 @@ const ErpStock = {
     const num = (v) => new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 2 }).format(v || 0);
     const eur2 = (v) => new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(v || 0);
     const abrir = (m) => { location.hash = irErp(m.voucher_type, m.voucher_no); };
-    return { escolhido, r, resumo, a, num, eur2, irErp, data, abrir };
+    // 27-11-2026 (Vítor): carregar no armazém mostra o inventário dele — artigos, quantidades, custo, valor e séries
+    const arm = ref(null); const qArm = ref(""); let tArm;
+    const abrirArmazem = async (w) => { arm.value = { armazem: w, a: true, artigos: [] }; qArm.value = "";
+      arm.value = await api("erp.stock_armazem", { warehouse: w }); };
+    const procurarArm = () => { clearTimeout(tArm); tArm = setTimeout(async () => { const w = arm.value.armazem;
+      arm.value = await api("erp.stock_armazem", { warehouse: w, q: qArm.value }); }, 250); };
+    const exportarArm = () => {
+      const linhas = [["Código", "Artigo", "Marca", "Quantidade", "Custo médio", "Valor", "Números de série"]]
+        .concat(arm.value.artigos.map((x) => [x.item_code, x.item_name, x.marca || "", x.qtd, x.custo, x.valor, x.series.join(" ")]));
+      const csv = linhas.map((l) => l.map((c) => '"' + String(c ?? "").replace(/"/g, '""') + '"').join(";")).join("\n");
+      const el = document.createElement("a"); el.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv" }));
+      el.download = "inventario-" + arm.value.armazem.replace(/[^\w-]+/g, "-") + ".csv"; el.click(); };
+    return { escolhido, r, resumo, a, num, eur2, irErp, data, abrir, arm, qArm, abrirArmazem, procurarArm, exportarArm };
   },
   template: `<div class="pad">
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px">
@@ -5668,9 +5680,17 @@ const ErpStock = {
           <tbody><tr v-for="m in r.movimentos" :key="m.voucher_no+m.warehouse+m.actual_qty" @click="abrir(m)"><td>{{ data(m.posting_date, false) }}</td><td>{{ m.voucher_rotulo }} {{ m.voucher_no }}</td><td>{{ m.warehouse }}</td><td :style="{color: m.actual_qty<0?'var(--acao)':'inherit'}">{{ m.actual_qty>0?'+':'' }}{{ num(m.actual_qty) }}</td><td>{{ num(m.qty_after_transaction) }}</td></tr></tbody></table>
           <div v-if="!r.movimentos.length" class="vazio">Sem movimentos.</div></div></div>
     </template>
-    <div v-else-if="!a" class="cartao"><header><b>Stock por armazém</b><span class="sub">escolha um artigo para ver o detalhe</span></header>
+    <div v-else-if="arm" class="cartao"><header style="flex-wrap:wrap;gap:8px"><div><button class="btn sm" @click="arm=null">← Armazéns</button> <b style="margin-left:6px">{{ arm.armazem }}</b>
+        <span class="sub" v-if="!arm.a"> · {{ arm.artigos.length }} artigos · {{ num(arm.total_qtd) }} unidades · {{ eur2(arm.total_valor) }}</span></div>
+        <span style="display:flex;gap:8px;margin-left:auto"><input class="filtro" style="border-style:solid;min-width:220px" v-model="qArm" @input="procurarArm" placeholder="Procurar código, artigo ou nº de série…"><button class="btn sm" @click="exportarArm" :disabled="!arm.artigos.length">Exportar CSV</button></span></header>
+      <div v-if="arm.a" class="carregar">A carregar…</div>
+      <div v-else class="tabela-wrap cartoes-movel" style="margin:0;border:0"><table><thead><tr><th>Código</th><th>Artigo</th><th>Quantidade</th><th>Custo médio</th><th>Valor</th><th>Números de série</th></tr></thead>
+        <tbody><tr v-for="x in arm.artigos" :key="x.item_code" @click="escolhido=x.item_code"><td class="cel-tit"><a href="#" @click.prevent>{{ x.item_code }}</a></td><td>{{ x.item_name }}</td><td>{{ num(x.qtd) }}<span v-if="x.reservado" class="sub"> ({{ num(x.reservado) }} reserv.)</span></td><td>{{ eur2(x.custo) }}</td><td>{{ eur2(x.valor) }}</td>
+          <td style="font-size:12px;max-width:320px">{{ x.series.slice(0,4).join(", ") }}<span v-if="x.series.length>4" class="sub"> +{{ x.series.length-4 }}</span></td></tr></tbody></table>
+        <div v-if="!arm.artigos.length" class="vazio">Nada encontrado.</div></div></div>
+    <div v-else-if="!a" class="cartao"><header><b>Stock por armazém</b><span class="sub">carregue num armazém para ver o inventário, ou escolha um artigo</span></header>
       <div class="tabela-wrap" style="margin:0;border:0"><table><thead><tr><th>Armazém</th><th>Artigos com stock</th><th>Valor</th></tr></thead>
-        <tbody><tr v-for="w in resumo" :key="w.warehouse" style="cursor:default"><td>{{ w.warehouse }}</td><td>{{ num(w.artigos) }}</td><td>{{ eur2(w.valor) }}</td></tr></tbody></table>
+        <tbody><tr v-for="w in resumo" :key="w.warehouse" @click="abrirArmazem(w.warehouse)" title="Ver o inventário deste armazém"><td><a href="#" @click.prevent>{{ w.warehouse }}</a></td><td>{{ num(w.artigos) }}</td><td>{{ eur2(w.valor) }}</td></tr></tbody></table>
         <div v-if="!resumo.length" class="vazio">Ainda não há stock próprio registado (inventário inicial por fazer).</div></div></div>
   </div>`,
 };
